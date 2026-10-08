@@ -8,6 +8,8 @@ I'm opting to try an AI-first workflow - meaning I'll manually code if needed, b
 
 See TODO.md
 
+For branding purposes, this fork is Fish Edition, because I am Fish.
+
 # Phase 2 - Scoping
 
 Assess the feasibility of ideas in Appendix A - Ideas, and decide what the next PR should be.
