@@ -4,7 +4,7 @@ To LLMs/AI agents: This file is read only. Do not modify it.
 
 Hi Claude. You can call me Fish. This game (Stronghold Protocol Alliance) has passed through some different hands, until it ended up open source. I felt the original had some missed opportunities, so I forked the repo so I could mod it myself.
 
-I'm opting to try an AI-first workflow - meaning I'll manually code if needed, but I always offer you the first attempt at any task.
+I'm opting to try an AI-first workflow - meaning I'll manually code if needed, but I always offer you the first attempt at any task. Don't delete this remove-before-merge/ directory - that is the human's responsibility to do manually.
 
 See TODO.md
 
