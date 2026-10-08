@@ -73,7 +73,7 @@ test('present data/local-assets.json is served as-is', async () => {
 
 test('docs and messages say what falls back without the local art and how a server without the client gets it (GitHub issue #42)', async () => {
   const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-  const { LOCAL_ART_FALLBACK, LOCAL_ART_COPY_HINT } = await import('../tools/setup.mjs');
+  const { LOCAL_ART_FALLBACK, LOCAL_ART_COPY_HINT, LOCAL_ART_FALLBACK_EN, LOCAL_ART_COPY_HINT_EN } = await import('../tools/setup.mjs');
   for (const f of ['README.md', 'docs/DEPLOY.md', 'tools/setup.mjs', 'tools/doctor.mjs']) {
     assert.ok(!/不影响游戏|其他功能不受影响|游戏不受影响/.test(read(f)), `${f}: never "the local art does not matter"`);
   }
@@ -83,7 +83,11 @@ test('docs and messages say what falls back without the local art and how a serv
   // setup's row is printed on every start (scripts/launch.mjs): it names the fallbacks and points to DEPLOY §6; doctor adds the hint
   const noClientRow = read('tools/setup.mjs').split('\n').find((l) => l.includes("'未检测到本机明日方舟客户端'"));
   assert.ok(noClientRow && noClientRow.includes('LOCAL_ART_FALLBACK') && noClientRow.includes('DEPLOY.md 第 6 节') && !noClientRow.includes('LOCAL_ART_COPY_HINT'), noClientRow);
-  assert.match(read('tools/doctor.mjs'), /未提取：\$\{LOCAL_ART_FALLBACK\}（\$\{LOCAL_ART_COPY_HINT\}）/);
+  // doctor prints in English: the EN twins of the two constants say the same things
+  for (const re of [/3D board/, /UI icons/, /Originium Slug/]) assert.match(LOCAL_ART_FALLBACK_EN, re);
+  assert.ok(!/emote|How to Play/i.test(LOCAL_ART_FALLBACK_EN), 'the emotes and the How to Play pages are downloaded, not local-only');
+  assert.match(LOCAL_ART_COPY_HINT_EN, /same version/);
+  assert.match(read('tools/doctor.mjs'), /not extracted: \$\{LOCAL_ART_FALLBACK_EN\} \(\$\{LOCAL_ART_COPY_HINT_EN\}\)/);
   const deploy = read('docs/DEPLOY.md');
   const s6 = deploy.slice(deploy.indexOf('## 6. 本地客户端素材'));
   assert.ok(deploy.includes('## 6. 本地客户端素材') && s6.length > 200, 'DEPLOY §6');

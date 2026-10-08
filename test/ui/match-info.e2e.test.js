@@ -27,7 +27,7 @@ const OUT = path.join(ROOT, 'test/e2e/out');
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME) && existsSync(path.join(ROOT, 'public/assets'));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const ARGS = ['--no-sandbox', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling',
+const ARGS = ['--accept-lang=zh-CN', '--no-sandbox', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--mute-audio'];
 const ANDROID_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36';
 const PHONE = (width, height) => ({ width, height, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true });

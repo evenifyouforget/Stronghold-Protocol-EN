@@ -28,7 +28,7 @@ describe('field view features in headless Chrome', { skip }, () => {
     const puppeteer = (await import('puppeteer-core')).default;
     const { startServer } = await import('../../server/index.js');
     srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true });
-    browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--no-first-run', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
+    browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--accept-lang=zh-CN', '--no-first-run', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] });
     mkdirSync(OUT, { recursive: true });
   });
   after(async () => {

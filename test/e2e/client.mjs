@@ -14,7 +14,7 @@ export const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.ap
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const hasChrome = () => existsSync(CHROME);
 
-const CHROME_ARGS = ['--no-sandbox', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling',
+const CHROME_ARGS = ['--accept-lang=zh-CN', '--no-sandbox', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--disable-background-timer-throttling',
   '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows', '--mute-audio', '--force-device-scale-factor=1'];
 
 /** A free TCP port on 127.0.0.1. */
