@@ -1,0 +1,4 @@
+- [ ] Figure out what tool this app was apparently vibe coded with
+- [ ] Translate documentation files to English (ex. README.md -> README.en.md). Do not modify the original file.
+- [ ] Determine if the game is possible to build and run locally in this container. Are we just missing dependencies? If we cannot do a full build and run inside the container, then what is possible to test?
+- [ ] Determine which game rules are owned by this repo, and which ones are downloaded on the fly (would need patching at runtime if we want to change them).

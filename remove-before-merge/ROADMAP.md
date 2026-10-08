@@ -1,0 +1,43 @@
+To LLMs/AI agents: This file is read only. Do not modify it.
+
+# Phase 1 - Understanding
+
+Hi Claude. You can call me Fish. This game (Stronghold Protocol Alliance) has passed through some different hands, until it ended up open source. I felt the original had some missed opportunities, so I forked the repo so I could mod it myself.
+
+I'm opting to try an AI-first workflow - meaning I'll manually code if needed, but I always offer you the first attempt at any task.
+
+See TODO.md
+
+# Phase 2 - Scoping
+
+Assess the feasibility of ideas in Appendix A - Ideas, and decide what the next PR should be.
+
+Priority factors in:
+
+- Hard dependencies
+- Soft dependencies (one feature acts as a prototype or gives useful insights for another)
+- Ease of implementation
+- Possibility of parallel independent PRs
+- User demand/urgency
+
+# Phase 3 - Implementation
+
+...
+
+# Appendix A - Ideas
+
+## Menu/UI
+
+- Highlighted keywords (ex. Cold) already exist, but they don't currently show a definition on hover or on click. On click to show a popup with the keyword definition would be helpful.
+- Some kind of damage chart (possibly hidden in a post-game analysis tab) would be helpful. The simplest prototype would be a bar chart that splits by operator (so duplicates of the same operator end up counting toward the same bar). A probably more useful chart would split by operator/player/round, with 3 buttons to toggle whether operator/player/round are combined, and an additional 2 buttons to filter round to only last round/second last round (since these are the boss rounds and it would be a very common query).
+- On the difficulty selection screen, it doesn't show details for what each difficulty actually changes. Like, is this giving enemies +50% HP? If Ultimate is just adding a flat stat modifier, that sounds simple enough to just change the text to say. If it's a long list of changes, we might be able to hide it in a help menu.
+- Status effects that currently show as an icon above enemies' heads, don't show how long it lasts (for effects that expire). Considering these are already circular icons, it seems simple enough to make an arc chart in the form of a thick outline.
+- Status effects that currently show as an icon above enemies' heads, some of these have an associated stack or variable, but it's not visible. (correct me if I'm wrong but) Fragile is one of these, and currently there's no way to distinguish 35% Fragile from 40% Fragile.
+
+## Gameplay Expansion
+
+All of these will require some input from the dev before the details are finalized.
+
+- A difficulty higher than Ultimate.
+- Gameplay modifiers which the host of the lobby (for simplicity, we can ignore matchmaking for this and only consider solo or custom lobbies) can choose to enable for the whole lobby. (a) +2 Deployment Limit (b) +2 Funds every round (c) Doubled enemy waves (the enemy list is copied once) (d) Disable time limit for all user action screens (but not the autobattle timer)
+- Alliance Modules. Like how Operator Modules give a choice of different gameplay for each Operator, Alliance Modules give a choice of different gameplay for an Alliance. Not all Alliances will have Module selections, so it is an optional field. For matchmaking, all Alliance Modules are locked to Mod A (the original effect). For solo/custom lobbies, the host of the lobby can select the Modules for all Alliances, and this is shared between all players. (it must be this way because the final boss combines 2 players' boards, and if we allowed per-user selections, there may be a conflict in the combined board)
