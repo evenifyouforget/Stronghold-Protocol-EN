@@ -304,6 +304,40 @@
 .ailast__opt .icon { opacity: .25; }
 .ailast__opt .icon.is-on { opacity: 1; }
 
+/* ---- lobby rules strip (between the seats and the bottom bar) ------------------------------------------- */
+.room-rules {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: .22rem;
+  padding: 0 .6rem .16rem;
+  font-size: .14rem;
+}
+.rules-pick { display: flex; flex-wrap: wrap; gap: .1rem; }
+.rules-pick__opt {
+  display: flex;
+  align-items: center;
+  gap: .06rem;
+  height: .44rem;
+  padding: 0 .18rem;
+  border: 1px solid var(--line-2);
+  background: rgba(0, 0, 0, .3);
+  color: var(--text-lo);
+  font-size: .16rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  transition: color var(--t-fast), background-color var(--t-med), border-color var(--t-med);
+}
+.rules-pick__opt .icon { width: .18rem; height: .18rem; opacity: .6; }
+.rules-pick__opt:hover:not(:disabled) { color: var(--text-hi); background: rgba(255, 255, 255, .03); }
+.rules-pick__opt:disabled { cursor: default; }
+.rules-pick__opt.is-active {
+  color: var(--mint-400);
+  border-color: var(--mint-600);
+  background: rgba(78, 216, 175, .1);
+}
+.rules-pick__opt.is-active .icon { opacity: 1; }
+
 .ready-count[hidden] { display: none; }
 .ready-count { display: flex; align-items: baseline; gap: .06rem; font-size: .16rem; }
 .ready-count b { font-size: .36rem; line-height: 1; color: var(--mint-400); text-shadow: 0 0 .14rem rgba(23, 249, 183, .45); }

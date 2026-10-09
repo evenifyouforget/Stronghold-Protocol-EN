@@ -6,6 +6,7 @@
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
+import { RULE_EXTRA_FUNDS } from '../../../shared/constants.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
 
@@ -19,7 +20,9 @@ export class PlayerRound {
     this.pendingFunds = 0;
     this.m.dispatch(this, 'onIncome', ev);
     const nonNeg = (v) => (Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0);
-    this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending), { reason: 'income' });
+    // extraFunds lobby rule: added after the onIncome handlers, so nothing withholds or rewrites it
+    const extra = this.m.rules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
+    this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending) + extra, { reason: 'income' });
     // temp is NOT wiped here: the last prep's deadline resolved what the player could act on (endPrep); what overflowed
     // after it (battle-result grants, SETTLE merges, returned equipment) is shown and usable in this prep (tempDue).
     // Likewise reward offers of the last prep already expired at its end; what is still queued was earned after it —

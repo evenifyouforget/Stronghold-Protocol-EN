@@ -61,9 +61,11 @@ export class MatchInfra {
    * for 准备就绪 (co-op keeps the official 25 s guard), BAND_DRAFT / SP_DRAFT / PREP are untimed, and the fixed
    * presentation steps (BATTLE_CHECK, ROUND_START, SETTLE) run silently (no countdown). The same holds for any match
    * with a single human (loneHuman: a 同盟 room started alone or with AI teammates only — user playtest #4 item 3):
-   * the timers only ever made humans wait on each other; AI seats act at once.
+   * the timers only ever made humans wait on each other; AI seats act at once. The `untimed` lobby rule does the same for
+   * any match: a phase then ends when every alive player is ready (a disconnected human is waited for until the
+   * reconnect window turns the drop into onLeave).
    */
-  get soloUntimed() { return this.isSolo || this.loneHuman; }
+  get soloUntimed() { return this.isSolo || this.loneHuman || !!this.rules?.untimed; }
 
   nextUid() { return ++this.uidSeq; }
 

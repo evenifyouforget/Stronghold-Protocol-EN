@@ -7,7 +7,7 @@
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
-import { PHASE } from '../../../shared/constants.js';
+import { PHASE, RULE_EXTRA_DEPLOY } from '../../../shared/constants.js';
 import { msg, dn } from '../../../shared/i18n.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, resolveLoadout } from '../../../shared/protocol.js';
 import { cultivationOf } from '../../../shared/potential.js';
@@ -27,7 +27,10 @@ export class PlayerBasics {
   /** The engine acts for this seat (AI teammate or "AI 托管"; a departed human is eliminated, so nothing is left to do). */
   get botControlled() { return this.isBot || this.left || this.autoplay; }
 
-  get deployCap() { return Math.max(1, this.gd.deployCap + this.deployCapBonus, this.deployCapMin); }
+  get deployCap() {
+    const rule = this.m.rules?.extraDeploy ? RULE_EXTRA_DEPLOY : 0; // lobby rule (shared/constants.js)
+    return Math.max(1, this.gd.deployCap + rule + this.deployCapBonus, this.deployCapMin);
+  }
   get deployCount() { let n = 0; for (const p of this.board.values()) if (p.kind === 'chess') n++; return n; }
   get tempEmpty() { return this.temp.every((x) => x == null); }
 

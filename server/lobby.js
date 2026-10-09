@@ -8,8 +8,8 @@
 //     Humans and bots take the lowest free seat index; seat indexes never compact.
 //   * ▸ Being in a LOBBY room and sending room.create / room.join implicitly leaves it. While your room is
 //     in a match, create/join of another room fails with ROOM_STARTED (send g.leave or room.leave first).
-//   * Host-only: room.setDifficulty, room.setAiPicksLast, room.addBot, room.removeBot, room.kick, room.start.
-//     ▸ Changing the difficulty or the AI-picks-last option (co-op only) un-readies the other humans.
+//   * Host-only: room.setDifficulty, room.setAiPicksLast, room.setRules, room.addBot, room.removeBot, room.kick, room.start.
+//     ▸ Changing the difficulty, the AI-picks-last option (co-op only) or the lobby rules un-readies the other humans.
 //     ▸ room.start requires every other human to be connected and ready; the host's start counts as the host's
 //     ready (the host may still toggle room.ready for display).
 //   * room.kick {seat, playerId} (community report #17, owner approved): before the match only, the host removes another
@@ -104,7 +104,7 @@
 //     Disconnect, expiry, room.create / room.join / room.spectate leave the queue.
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
+import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, normalizeRules } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -186,6 +186,8 @@ export class Room {
      * put every human seat before every AI seat (Match opts.aiPicksLast). Kept across the room's matches.
      */
     this.aiPicksLast = false;
+    /** lobby rules (shared/constants.js RULE_KEYS), all off until the host sets them; kept across the room's matches */
+    this.rules = normalizeRules(null);
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
@@ -240,6 +242,7 @@ export class Room {
       mode: this.mode,
       difficulty: this.difficulty,
       aiPicksLast: this.aiPicksLast,
+      rules: { ...this.rules },
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }
@@ -354,6 +357,7 @@ export class Lobby {
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
+      case 'room.setRules': return this.setRules(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -569,6 +573,22 @@ export class Lobby {
     return OK;
   }
 
+  /** Lobby rules (Fish Edition, shared/constants.js RULE_KEYS): host-only, before the match; a partial update is merged. */
+  setRules(session, { rules }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    this.dropReplay(room, session.playerId);
+    const next = normalizeRules(rules, room.rules);
+    if (Object.keys(next).some((k) => next[k] !== room.rules[k])) {
+      room.rules = next;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
   addBot(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -751,6 +771,8 @@ export class Lobby {
         modeId: modeIdFor(room.mode, room.difficulty),
         // 「AI 队友最后选择」 (GitHub #338): fixed for the match
         aiPicksLast: room.mode !== 'solo' && room.aiPicksLast === true,
+        // lobby rules (Fish Edition): fixed for the match
+        rules: room.rules,
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),

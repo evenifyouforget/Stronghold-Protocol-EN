@@ -70,6 +70,7 @@ export class MatchViews {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
+      rules: { ...this.rules },
       stageId: this.stageId,
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),

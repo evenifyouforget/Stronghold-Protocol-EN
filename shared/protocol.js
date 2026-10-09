@@ -1,7 +1,7 @@
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
-import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_SEATS, EMOTES, GEO } from './constants.js';
+import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, MAX_SEATS, EMOTES, GEO, RULE_KEYS } from './constants.js';
 import { isDroppableChess } from './standIn.js';
 import { diySlotIds, validateDiyPicks } from './diy.js';
 import { cultivatedStats, isPotential, isCultivate, POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from './potential.js';
@@ -388,6 +388,8 @@ export const C2S = {
   // the co-op room option 「AI 队友最后选择」 (GitHub #338; host, before the match): the strategy and 机变 drafts order every
   // human seat before every AI seat (server/match/match/phases.js humansFirst); room.state.aiPicksLast
   'room.setAiPicksLast': { on: isBool },
+  // lobby rules (host only, constants.js RULE_KEYS): a non-empty partial { [key]: boolean }, merged into the room's rules
+  'room.setRules': { rules: (v) => isMap(v, RULE_KEYS.length, (k) => RULE_KEYS.includes(k), isBool) && Object.keys(v).length > 0 },
   'room.addBot': {},
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the

@@ -15,6 +15,9 @@
 //   opts.aiPicksLast boolean (optional)         the co-op room option 「AI 队友最后选择」 (room.setAiPicksLast, GitHub #338):
 //                                              the strategy and 机变 drafts put every human seat before every AI seat
 //                                              (MatchPhases.humansFirst); only `true` turns it on; ignored in solo
+//   opts.rules       { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
+//                                              Read once: extraDeploy → PlayerState.deployCap, extraFunds → the round
+//                                              start income, untimed → soloUntimed. Shown as m.public.rules.
 //   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
 //                            loadout?: { [baseChessId]: { skill: index, module: uniEquipId|'none'|null } } | null,
 //                            ops?: { [charId]: { potential: 1–6, cultivate: 0–3 } } | null,
@@ -172,7 +175,7 @@
 //   common.js        what the modules share (FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS — re-exported here, OK,
 //                    fail, BOSS_CLOCK_MS)
 
-import { PHASE, modeIdFor } from '../../shared/constants.js';
+import { PHASE, modeIdFor, normalizeRules } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -235,6 +238,8 @@ export class Match {
     this.mode = opts.mode === 'solo' ? 'solo' : 'coop';
     this.difficulty = opts.difficulty;
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
+    /** lobby rules (shared/constants.js RULE_KEYS), fixed for the whole match */
+    this.rules = normalizeRules(opts.rules);
     this.seed = (Number(opts.seed) >>> 0) || 1;
     this.log = opts.log || noopLog;
     this.sendFn = opts.send;

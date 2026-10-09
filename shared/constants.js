@@ -25,6 +25,24 @@ export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
+// Lobby rules (Fish Edition): host-set gameplay modifiers of a room, all off by default. room.setRules merges a partial
+// { [key]: boolean } into the room's rules; the match reads them once at start (Match opts.rules).
+//   extraDeploy  +RULE_EXTRA_DEPLOY deployment limit for every player
+//   extraFunds   +RULE_EXTRA_FUNDS Funds at every round start, on top of the round's income
+//   untimed      no countdown on the screens players act on (strategy draft, 机变, 休整期), like a solo match; the
+//                battles keep their time limit
+export const RULE_KEYS = Object.freeze(['extraDeploy', 'extraFunds', 'untimed']);
+export const DEFAULT_RULES = Object.freeze({ extraDeploy: false, extraFunds: false, untimed: false });
+export const RULE_EXTRA_DEPLOY = 2;
+export const RULE_EXTRA_FUNDS = 2;
+
+/** A complete, frozen rules object: known keys only, booleans only, missing keys from `base` (default: all off). */
+export function normalizeRules(rules, base = DEFAULT_RULES) {
+  const out = {};
+  for (const k of RULE_KEYS) out[k] = rules && typeof rules[k] === 'boolean' ? rules[k] : !!base[k];
+  return Object.freeze(out);
+}
+
 // modeId in data/config.json = `mode_${type}_${difficulty.toLowerCase()}` with type single|multi
 export const modeIdFor = (roomMode, difficulty) =>
   `mode_${roomMode === 'solo' ? 'single' : 'multi'}_${difficulty.toLowerCase()}`;

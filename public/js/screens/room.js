@@ -1,5 +1,5 @@
 // Room screen (同盟等待室): 4 seat cards (avatar frame, name, ready state, AI badge, host crown),
-// host controls (difficulty picker, add/remove AI and the 「AI 队友最后选择」 switch in co-op, start), invite code with
+// host controls (difficulty picker, lobby rules, add/remove AI and the 「AI 队友最后选择」 switch in co-op, start), invite code with
 // copy code / copy link, ready toggle and leave.
 //
 // Start rule (server/lobby.js): room.start needs every *other* human connected and ready; the
@@ -13,7 +13,9 @@
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import {
+  DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS,
+} from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo,
 } from '../ui/components.js';
@@ -225,6 +227,38 @@ function AiLastToggle({ option, busy, onToggle }) {
   </div>`;
 }
 
+/**
+ * The lobby rule toggles shown for a room (Fish Edition, shared/constants.js RULE_KEYS). `untimed` is left out of solo
+ * rooms: a solo match is untimed anyway.
+ * @param {'solo'|'coop'} mode
+ */
+export function ruleOptions(mode) {
+  const all = [
+    { key: 'extraDeploy', label: t('部署上限 +{n}', { n: RULE_EXTRA_DEPLOY }), tip: t('所有博士的部署上限 +{n}', { n: RULE_EXTRA_DEPLOY }) },
+    { key: 'extraFunds', label: t('每回合资金 +{n}', { n: RULE_EXTRA_FUNDS }), tip: t('每回合开始时额外获得 {n} 资金', { n: RULE_EXTRA_FUNDS }) },
+    { key: 'untimed', label: t('行动阶段不限时'), tip: t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）') },
+  ];
+  return mode === 'solo' ? all.filter((o) => o.key !== 'untimed') : all;
+}
+
+/** The lobby rules strip (between the seats and the bottom bar): the host toggles them, everybody else sees them. */
+function RulesBar({ room, isHost, busy, onToggle }) {
+  const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
+  return html`<div class="room-rules">
+    <span class="room-bar__label">${t('自定义房间改动')}<${MicroLabel}>CUSTOM<//></span>
+    <div class="rules-pick" role="group" aria-label=${t('自定义房间改动')}>
+      ${ruleOptions(room.mode).map((o) => html`<${Tooltip} key=${o.key} text=${o.tip}>
+        <button type="button" role="switch" aria-checked=${rules[o.key] ? 'true' : 'false'}
+          class=${`rules-pick__opt${rules[o.key] ? ' is-active' : ''}`} data-rule=${o.key}
+          disabled=${!isHost || !!busy} onClick=${() => onToggle(o.key, !rules[o.key])}>
+          <${Icon} name=${rules[o.key] ? 'check' : 'plus'} />${o.label}
+        </button>
+      <//>`)}
+    </div>
+    ${isHost ? null : html`<span class="t-dim">${t('由创建者设置')}</span>`}
+  </div>`;
+}
+
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
@@ -268,6 +302,7 @@ export function RoomScreen() {
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
+  const setRule = (key, on) => run('rules', () => net.request('room.setRules', { rules: { [key]: on } }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
   const sit = () => run('sit', () => net.request('room.join', { code: room.code }));
@@ -347,6 +382,7 @@ export function RoomScreen() {
     </main>
     <${SpectatorBar} facts=${facts} myId=${me.playerId} busy=${busy} onRemove=${removeSpectator} onSit=${sit} />
     <${SearchBar} room=${room} facts=${facts} findMates=${findMates} setFindMates=${setFindMates} />
+    <${RulesBar} room=${room} isHost=${facts.isHost} busy=${busy} onToggle=${setRule} />
 
     <footer class="room-bar">
       <div class="room-bar__left">
