@@ -198,6 +198,9 @@ export const LOCAL_ART_FALLBACK = '3D 棋盘改用 2D，部分官方界面图标
 /** Where a machine without the client gets the local art (docs/DEPLOY.md §6「本地客户端素材」); shown by doctor (setup's row,
  * printed on every start by scripts/launch.mjs, only points to that section). */
 export const LOCAL_ART_COPY_HINT = '没有客户端的服务器可以从同一版本的整合包复制 public/assets/local 和 data/local-assets.json';
+/** English versions of the two above, for doctor (its output is in English). Keep all four in sync. */
+export const LOCAL_ART_FALLBACK_EN = 'the 3D board falls back to 2D, and some official UI icons and the Blazing/Pyric Originium Slug models use substitutes';
+export const LOCAL_ART_COPY_HINT_EN = 'a server without the client can copy public/assets/local and data/local-assets.json from a bundle of the same version';
 
 /**
  * Local-client art (optional): manifest entry count, whether the 3D board atlas is on disk and whether the extraction
