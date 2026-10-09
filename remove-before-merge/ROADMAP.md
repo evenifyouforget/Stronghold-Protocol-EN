@@ -51,11 +51,55 @@ All of these will require some input from the dev before the details are finaliz
 
 #### Laterano Mod B
 
-[Laterano] Operators gain +min(5 + 1.5 × stacks, 105 + 0.3 × stacks)% ammo on skill activation
+[Laterano] Operators gain +min(5 + 1.0 × stacks, 75 + 0.3 × stacks)% ammo on skill activation
 
 <At 100 stacks> [Laterano] Operators deal 200% damage. "On spending X bullets" effects (namely, Mostima, Executor the Ex Foedere, Lemuen) trigger twice.
 
 <With 6 different [Laterano] Operators on field> All [Laterano] Operators +4% ATK whenever any [Laterano] Operator spends 1 ammo, max +200%
+
+##### Analysis
+
+Mod B is less bullets until 100 stacks, at which point it jumps to effectively more bullets than Mod A, and Mod A wins again at 272 stacks.
+
+Mod B solves one of Laterano lategame's biggest problem, which is that Lemuen skill 3 only shoots all at once after expending all bullets, and it takes too long for her to shoot. Limiting the amount of bullets means she doesn't take ages to shoot, while the 200% damage modifier compensates.
+
+Local pro player pointed out the real reason Mod B will likely be preferred, is purely for the midgame Executor the Ex Foedere farming of Foresight (one of the 3 economy Alliances) Alliance stacks, which will now be accumulated twice as fast. You don't even need to stay on Laterano for late game. Just get 100 Laterano stacks, get your gold, and then buy the thing you actually want.
+
+#### Victoria Mod B
+
+- Rejected after pro player review (doesn't solve what makes Victoria weak, which is poor stabilization)
+
+[Victoria] Operators carrying equipment deal (125 + 0.8 × stacks)% damage
+
+<Every 100 stacks> Obtain a random special Victorian Hammer
+
+<At 300 stacks> Gain one Damazti Isomorph (once only). When entering Rest Phase, convert excess stacks above 300 to next most stacked active Alliance.
+
+<With 6 different [Victoria] Operators on field> All [Victoria] Operators gain +50% ATK for each piece of equipment; or +80% ATK if equipment is upgraded*
+
+#### Victoria Mod C
+
+- Suggested by our local pro player
+
+Victoria operators gain +8 SP after skill activation per Victorian Hammer equipped. Victorian Hammers in the shop cost 0 and are upgraded. At the end of Rest Phase, Victoria operators with a Victorian Hammer equipped gain Victoria stacks equal to their tier.
+
+At 6 Victoria operators, Victoria operatiors with Victorian Hammers equipped gain stacks to all of their non-Victoria active alliances equal to double their tier. At the start of combat, Victoria operators gain (200 + 1.2x stacks)% ATK, 200% HP as Barrier, and Status Resistance.
+
+#### Kjerag Mod B
+
+- Rejected after pro player review (Kjerag is already strong, why are you making it stronger)
+
+[Kjerag] Operators deal 125% damage, or (135 + 1 × stacks)% damage to Cold and Frozen enemies
+
+<With 6 different [Kjerag] Operators on field> [Kjerag] Operators deal 10% ATK as Necrosis injury, or 100% ATK as Arts damage to enemies already under Necrosis burst. Both the added Necrosis injury and added Arts damage are doubled against enemies immune to Freeze.
+
+#### Siracusa Mod B
+
+- Rejected after pro player review (Siracusa is already strong, why are you making it stronger)
+
+[Siracusa] Operators gain +(5 + 0.2 × stacks) initial SP and +(25 + 0.8 × stacks) ASPD while skill is active
+
+<With 6 different [Siracusa] Operators on field> [Siracusa] Operators also gain Invisibility while skill is active, and deal (10000 + 100 × stacks) True damage to enemies in a radius of 1.5 on skill end or death.
 
 ### Rebalanced Alliance Effects
 
@@ -63,6 +107,7 @@ I'll bundle others into this category if they don't fit as an Alliance Mod B or 
 
 - Give Virtuosa membership in Swift and Aid in addition to Laterano. (because Virtuosa is currently very weak)
 - Give Civilight Eterna, Mlynar, Nearl the Radiant Knight, Vina Victoria, and Lappland the Decadenza membership in a new "Radiant" Alliance focused on buffing True damage. (since currently Arts damage gets the most love, followed by Physical damage and the Elemental damage types, and True damage doesn't have many buff sources)
+- Catherine is replaced entirely with Blaze (who inherits Catherine's skill selection). Blaze is a member of Yan and Victoria, and her passive is changed to <When sold> Produces Blaze the Igniting Spark. (just like in season 1)
 
 #### Radiant
 
