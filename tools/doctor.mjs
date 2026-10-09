@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import {
   ROOT, MIN_NODE, IS_WIN, IS_MAC, c, mark, capture, padDisplay, displayWidth,
   checkNode, checkDeps, checkVendor, checkData, checkAssets, checkLocal, findClient, findPython,
+  LOCAL_ART_FALLBACK_EN, LOCAL_ART_COPY_HINT_EN,
 } from './setup.mjs';
 
 // ---------------------------------------------------------------------------------------------------
@@ -192,7 +193,7 @@ async function main() {
   const client = findClient(null);
   row(local.manifest ? 'ok' : 'skip', 'Local client art (optional)', local.manifest
     ? `${local.count} entries${local.board3d ? ', 3D board available' : ', no board textures (2D board)'}${local.board3d && !local.tiles ? '; tiles.json missing → node tools/setup.mjs' : ''}`
-    : client ? `${client.kind} client found → node tools/setup.mjs --local` : 'not extracted: the 3D board falls back to 2D, and some official UI icons and the Scorching/Blazing Originium Slug models use substitutes (a server without the client can copy public/assets/local and data/local-assets.json from a bundle of the same version)');
+    : client ? `${client.kind} client found → node tools/setup.mjs --local` : `not extracted: ${LOCAL_ART_FALLBACK_EN} (${LOCAL_ART_COPY_HINT_EN})`);
   if (client || local.manifest) {
     const py = findPython();
     row(py ? 'ok' : 'skip', 'Python (extraction only)', py ? `${py.cmd} ${py.version}` : 'Python 3.8+ not found');
