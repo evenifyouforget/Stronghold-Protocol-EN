@@ -8,8 +8,8 @@
 //     Humans and bots take the lowest free seat index; seat indexes never compact.
 //   * ▸ Being in a LOBBY room and sending room.create / room.join implicitly leaves it. While your room is
 //     in a match, create/join of another room fails with ROOM_STARTED (send g.leave or room.leave first).
-//   * Host-only: room.setDifficulty, room.addBot, room.removeBot, room.start. ▸ Changing the difficulty
-//     un-readies the other humans. ▸ room.start requires every other human to be connected and ready;
+//   * Host-only: room.setDifficulty, room.setRules, room.addBot, room.removeBot, room.start. ▸ Changing the difficulty
+//     or the rules un-readies the other humans. ▸ room.start requires every other human to be connected and ready;
 //     the host's start counts as the host's ready (the host may still toggle room.ready for display).
 //   * Host migration: when the host leaves (or is removed), the lowest-seat remaining human (connected
 //     ones first) becomes host. A room without humans is disposed (bots never keep a room alive).
@@ -58,7 +58,7 @@
 //     and refuses it afterwards (WRONG_PHASE: the match's loadout is locked, the stored one applies to the next match).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { ERR, MAX_SEATS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
+import { ERR, MAX_SEATS, ROOM_CODE_LEN, modeIdFor, normalizeRules } from '../shared/constants.js';
 import { BOT_NAMES } from '../shared/i18n.js';
 import { checkLoadout } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -107,6 +107,8 @@ export class Room {
     this.code = code;
     this.mode = mode;
     this.difficulty = difficulty;
+    /** lobby rules (shared/constants.js RULE_KEYS), all off until the host sets them */
+    this.rules = normalizeRules(null);
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
@@ -151,6 +153,7 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      rules: { ...this.rules },
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }
@@ -256,6 +259,7 @@ export class Lobby {
       case 'room.leave': return this.leave(session);
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
+      case 'room.setRules': return this.setRules(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.start': return this.start(session);
@@ -391,6 +395,21 @@ export class Lobby {
     return OK;
   }
 
+  setRules(session, { rules }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    this.dropReplay(room, session.playerId);
+    const next = normalizeRules(rules, room.rules);
+    if (Object.keys(next).some((k) => next[k] !== room.rules[k])) {
+      room.rules = next;
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
   addBot(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -495,6 +514,7 @@ export class Lobby {
         mode: room.mode,
         difficulty: room.difficulty,
         modeId: modeIdFor(room.mode, room.difficulty),
+        rules: room.rules,
         seats,
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)

@@ -70,7 +70,7 @@
 //     it during INFO_CHECK only. battleInput() resolves every chess unit to `skillIndex` + `moduleId` (resolveLoadout:
 //     normal chess → moduleId null, elite → uniEquipId | 'none'); m.private exposes `loadout`.
 
-import { ERR, GEO, PHASE, layerGainRoom } from '../../shared/constants.js';
+import { ERR, GEO, PHASE, layerGainRoom, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS } from '../../shared/constants.js';
 import { checkLoadout, resolveLoadout } from '../../shared/protocol.js';
 import { FIELD, tileKey, parseKey, inField, canPlace, positionClass, boardOrder, freeSlot, pieceDir, parseDir, mergeTile, ownerRangeKeys } from './board.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
@@ -173,7 +173,10 @@ export class PlayerState {
   /** The engine acts for this seat (AI teammate or "AI 托管"; a departed human is eliminated, so nothing is left to do). */
   get botControlled() { return this.isBot || this.left || this.autoplay; }
 
-  get deployCap() { return Math.max(1, this.gd.deployCap + this.deployCapBonus, this.deployCapMin); }
+  get deployCap() {
+    const rule = this.m.rules?.extraDeploy ? RULE_EXTRA_DEPLOY : 0; // lobby rule (shared/constants.js)
+    return Math.max(1, this.gd.deployCap + rule + this.deployCapBonus, this.deployCapMin);
+  }
   get deployCount() { let n = 0; for (const p of this.board.values()) if (p.kind === 'chess') n++; return n; }
   get tempEmpty() { return this.temp.every((x) => x == null); }
 
@@ -1460,7 +1463,9 @@ export class PlayerState {
     this.pendingFunds = 0;
     this.m.dispatch(this, 'onIncome', ev);
     const nonNeg = (v) => (Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0);
-    this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending), { reason: 'income' });
+    // extraFunds lobby rule: added after the onIncome handlers, so nothing withholds or rewrites it
+    const extra = this.m.rules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
+    this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending) + extra, { reason: 'income' });
     // temp is NOT wiped here: the last prep's deadline resolved what the player could act on (endPrep); what overflowed
     // after it (battle-result grants, SETTLE merges, returned equipment) is shown and usable in this prep (tempDue).
     // Likewise reward offers of the last prep already expired at its end; what is still queued was earned after it —

@@ -12,6 +12,9 @@
 //   opts.mode        'solo' | 'coop'
 //   opts.difficulty  'FUNNY'|'NORMAL'|'HARD'|'ABYSS'
 //   opts.modeId      string                     modeIdFor(mode, difficulty), e.g. 'mode_multi_hard'
+//   opts.rules       { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
+//                                              Read once: extraDeploy → PlayerState.deployCap, extraFunds → the round
+//                                              start income, untimed → soloUntimed. Shown as m.public.rules.
 //   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
 //                            loadout?: { [baseChessId]: { skill: index, module: uniEquipId|'none'|null } } | null }>
 //                    sorted by seat, 1–4 entries, ≥ 1 human; solo ⇒ exactly 1 human and no bots.
@@ -120,7 +123,7 @@
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
 import { textMsg, nameArg, namesArg } from '../../shared/i18n.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom, normalizeRules } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -229,6 +232,8 @@ export class Match {
     this.mode = opts.mode === 'solo' ? 'solo' : 'coop';
     this.difficulty = opts.difficulty;
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
+    /** lobby rules (shared/constants.js RULE_KEYS), fixed for the whole match */
+    this.rules = normalizeRules(opts.rules);
     this.seed = (Number(opts.seed) >>> 0) || 1;
     this.log = opts.log || noopLog;
     this.sendFn = opts.send;
@@ -599,9 +604,11 @@ export class Match {
    * for 准备就绪 (co-op keeps the official 25 s guard), BAND_DRAFT / SP_DRAFT / PREP are untimed, and the fixed
    * presentation steps (BATTLE_CHECK, ROUND_START, SETTLE) run silently (no countdown). The same holds for any match
    * with a single human (loneHuman: a 同盟 room started alone or with AI teammates only — user playtest #4 item 3):
-   * the timers only ever made humans wait on each other; AI seats act at once.
+   * the timers only ever made humans wait on each other; AI seats act at once. The `untimed` lobby rule does the same for
+   * any match: a phase then ends when every alive player is ready (a disconnected human is waited for until the
+   * reconnect window turns the drop into onLeave).
    */
-  get soloUntimed() { return this.isSolo || this.loneHuman; }
+  get soloUntimed() { return this.isSolo || this.loneHuman || this.rules.untimed; }
 
   nextUid() { return ++this.uidSeq; }
 
@@ -800,6 +807,7 @@ export class Match {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
+      rules: { ...this.rules },
       stageId: this.stageId,
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),

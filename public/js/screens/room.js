@@ -1,5 +1,5 @@
 // Room screen (同盟等待室): 4 seat cards (avatar frame, name, ready state, AI badge, host crown),
-// host controls (difficulty picker, add/remove AI in co-op, start), invite code with copy code /
+// host controls (difficulty picker, lobby rules, add/remove AI in co-op, start), invite code with copy code /
 // copy link, ready toggle and leave.
 //
 // Start rule (server/lobby.js): room.start needs every *other* human connected and ready; the
@@ -8,7 +8,9 @@
 // Solo rooms show a single seat.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS } from '../../../shared/constants.js';
+import {
+  DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS,
+} from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo,
 } from '../ui/components.js';
@@ -162,6 +164,37 @@ function DifficultyPicker({ room, isHost, busy, onPick }) {
   </div>`;
 }
 
+/**
+ * The lobby rule toggles shown for a room (shared/constants.js RULE_KEYS). `untimed` is left out of solo rooms: a solo
+ * match is untimed anyway.
+ * @param {'solo'|'coop'} mode
+ */
+export function ruleOptions(mode) {
+  const all = [
+    { key: 'extraDeploy', label: T('部署上限 +{0}', RULE_EXTRA_DEPLOY), tip: T('所有博士的部署上限 +{0}', RULE_EXTRA_DEPLOY) },
+    { key: 'extraFunds', label: T('每回合资金 +{0}', RULE_EXTRA_FUNDS), tip: T('每回合开始时额外获得 {0} 资金', RULE_EXTRA_FUNDS) },
+    { key: 'untimed', label: T('行动阶段不限时'), tip: T('选择策略、机变阶段与休整期不限时（作战仍有时间限制）') },
+  ];
+  return mode === 'solo' ? all.filter((o) => o.key !== 'untimed') : all;
+}
+
+function RulesBar({ room, isHost, busy, onToggle }) {
+  const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
+  return html`<div class="room-rules">
+    <span class="room-bar__label">${T('模拟规则')}<${MicroLabel}>RULES<//></span>
+    <div class="rules-pick" role="group" aria-label=${T('模拟规则')}>
+      ${ruleOptions(room.mode).map((o) => html`<${Tooltip} key=${o.key} text=${o.tip}>
+        <button type="button" role="switch" aria-checked=${rules[o.key] ? 'true' : 'false'}
+          class=${`rules-pick__opt${rules[o.key] ? ' is-active' : ''}`} data-rule=${o.key}
+          disabled=${!isHost || !!busy} onClick=${() => onToggle(o.key, !rules[o.key])}>
+          <${Icon} name=${rules[o.key] ? 'check' : 'plus'} />${o.label}
+        </button>
+      <//>`)}
+    </div>
+    ${isHost ? null : html`<span class="t-dim">${T('由创建者选择')}</span>`}
+  </div>`;
+}
+
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
@@ -195,6 +228,7 @@ export function RoomScreen() {
   const addBot = () => run('add', () => net.request('room.addBot', {}));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
+  const setRule = (key, on) => run('rules', () => net.request('room.setRules', { rules: { [key]: on } }));
   const leave = async () => {
     if (inFlight.current) return;
     const othersHere = facts.humans.some((s) => s.playerId !== me.playerId);
@@ -263,6 +297,8 @@ export function RoomScreen() {
         </ul>
       </aside>`}
     </main>
+
+    <${RulesBar} room=${room} isHost=${facts.isHost} busy=${busy} onToggle=${setRule} />
 
     <footer class="room-bar">
       <div class="room-bar__left">
