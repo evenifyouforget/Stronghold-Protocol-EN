@@ -134,6 +134,8 @@ const TABLES = [
   { rel: 'excel/item_table.json', pick: (j) => j?.items },
   { rel: 'excel/token_table.json' },
   { rel: 'levels/enemydata/enemy_database.json', pick: (j) => (Array.isArray(j?.enemies) ? kvMap(j.enemies) : j) },
+  // the status keyword glossary (data/terms.json)
+  { rel: 'excel/gamedata_const.json', pick: (j) => j?.termDescriptionDict },
 ];
 
 /** A Unity-style list of { Key, Value } entries as a plain map (the two dumps serialize some tables either way). */
@@ -149,7 +151,7 @@ const SEASON_SCOPE = 'act2';
 
 /** data/*.json files localized, in output order. */
 export const DATA_FILES = Object.freeze(['chess', 'backups', 'tokens', 'bonds', 'garrisons', 'items', 'bands', 'effects',
-  'choices', 'enemies', 'factions', 'stages', 'bosses', 'config', 'emotes']);
+  'choices', 'enemies', 'factions', 'stages', 'bosses', 'config', 'emotes', 'terms']);
 
 /**
  * Research / developer notes of the data files (English with Chinese terms; no screen shows them): never translated,
@@ -675,7 +677,7 @@ export function buildOverlay({ zh, en, data, fallback = {}, source = null, lang 
         // record-level names (and the stand-ins' operator names): what server messages name
         const top = l.path.length === 1
           || (file === 'backups' && ((id === 'units' && l.path.length === 2) || (id === 'diy' && l.path[0] === 'operators' && l.path.length === 3)));
-        if (!top || !NAME_KEYS.has(l.key) || untranslated(l.zh, l.en)) continue;
+        if (!top || file === 'terms' || !NAME_KEYS.has(l.key) || untranslated(l.zh, l.en)) continue; // keyword names are no data names
         const prio = NAME_PRIORITY.indexOf(file);
         const list = nameVotes.get(l.zh) || [];
         list.push({ en: l.en, prio: prio < 0 ? 99 : prio });
