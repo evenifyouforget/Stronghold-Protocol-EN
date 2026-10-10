@@ -36,6 +36,10 @@ Priority factors in:
 - Status effects that currently show as an icon above enemies' heads, don't show how long it lasts (for effects that expire). Considering these are already circular icons, it seems simple enough to make an arc chart in the form of a thick outline.
 - Status effects that currently show as an icon above enemies' heads, some of these have an associated stack or variable, but it's not visible. (correct me if I'm wrong but) Fragile is one of these, and currently there's no way to distinguish 35% Fragile from 40% Fragile.
 
+## Network/Maintenance
+
+- Some way to handle server restarts (which may be required to deploy a new update). My initial assumption is that restarting a server while a game is going will cause that game to end, which may be upsetting to players. It's less bad if only a few friends play; worse if a server is opened to the public and popular. The simplest solution would be to have some way for the server sysadmin to schedule a server reboot/maintenance, and have the webapp display when the next upcoming downtime is. A more advanced solution may be to opportunistically reboot early if no matches are live, or to make game data somehow carry over between reboots. However, if the new update had gameplay changes, this makes carrying over game state more difficult, maybe not worth the effort to engineer.
+
 ## Gameplay Expansion
 
 All of these will require some input from the dev before the details are finalized.
@@ -75,7 +79,7 @@ Local pro player pointed out the real reason Mod B will likely be preferred, is 
 
 <At 300 stacks> Gain one Damazti Isomorph (once only). When entering Rest Phase, convert excess stacks above 300 to next most stacked active Alliance.
 
-<With 6 different [Victoria] Operators on field> All [Victoria] Operators gain +50% ATK for each piece of equipment; or +80% ATK if equipment is upgraded*
+<With 6 different [Victoria] Operators on field> All [Victoria] Operators gain +50% ATK for each piece of equipment; or +80% ATK if equipment is upgraded\*
 
 #### Victoria Mod C
 
@@ -111,6 +115,6 @@ I'll bundle others into this category if they don't fit as an Alliance Mod B or 
 
 #### Radiant
 
-*Add-on Alliance · ??? · activates at 2*
+_Add-on Alliance · ??? · activates at 2_
 
 Enemies take +(10 + 1 × stacks)% True damage.
