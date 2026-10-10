@@ -753,12 +753,16 @@ async function main() {
     if (existsSync(abs)) data[f] = JSON.parse(await readFile(abs, 'utf8'));
   }
   const readDict = async (abs) => (existsSync(abs) ? JSON.parse(await readFile(abs, 'utf8')) : {});
-  // the remake's own strings and PR #70's are English; another language falls back to its pack's UI strings only
+  // the remake's own strings and PR #70's are English; another language falls back to its own optional
+  // tools/i18n/fallback-remake.<code>.json (texts its client lacks, e.g. newer status keywords), then its pack's UI strings
   const fallback = opts.lang === 'en' ? {
     remake: await readDict(join(ROOT, 'tools', 'i18n', 'fallback-remake.json')),
     pr70: await readDict(join(ROOT, 'tools', 'i18n', 'fallback-pr70.json')),
     ui: await readDict(join(ROOT, 'public', 'i18n', 'en.json')),
-  } : { ui: await readDict(join(ROOT, 'public', 'i18n', `${opts.lang}.json`)) };
+  } : {
+    remake: await readDict(join(ROOT, 'tools', 'i18n', `fallback-remake.${opts.lang}.json`)),
+    ui: await readDict(join(ROOT, 'public', 'i18n', `${opts.lang}.json`)),
+  };
   if (opts.dict) fallback.dict = JSON.parse(await readFile(opts.dict, 'utf8'));
   const { overlay, report } = buildOverlay({ zh, en, data, fallback, lang: opts.lang, source: client ? { id: opts.source, label: src.label, home: src.home, season: seasonEn } : { id: 'dict', label: src.label } });
 
