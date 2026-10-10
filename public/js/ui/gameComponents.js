@@ -92,7 +92,10 @@ export function RichText({ text, class: cls, as = 'span' }) {
   return html`<${Tag} class=${cx('rt', cls)}>${segs.map((s, i) => (s.br
     ? html`<br key=${i} />`
     : s.cls.length || s.term
-      ? html`<span key=${i} class=${cx(s.cls.map((c) => rtClassName(c)), s.term && 'rt-term')}>${s.text}</span>`
+      ? s.termId
+        // a status keyword: ui/termTip.js opens its official definition on a tap / Enter (document-level listener)
+        ? html`<span key=${i} class=${cx(s.cls.map((c) => rtClassName(c)), 'rt-term')} data-term=${s.termId} role="button" tabindex="0">${s.text}</span>`
+        : html`<span key=${i} class=${cx(s.cls.map((c) => rtClassName(c)), s.term && 'rt-term')}>${s.text}</span>`
       : s.text))}<//>`;
 }
 
