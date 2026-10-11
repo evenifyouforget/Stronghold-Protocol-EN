@@ -736,3 +736,14 @@ the DIY stock (per player in the match, `PlayerState.diyStock`: `config.economy.
 field), 助战 borrows (`borrowCount` 20), and a player's potential / 练度 per operator (the 干员调配 settings sent with
 `room.loadout`; the forms are built at full potential and carry the lower ranks, §2.3; 练度 = effects.json
 `aceffect_char_1…4`).
+
+## 19. `terms.json` — status keyword glossary — `{ [termId]: { name, desc } }` (55)
+
+The official definitions of the status keywords the texts tag (`<$ba.stun>晕眩</>`; `public/js/ui/richText.js` keeps the
+id as `termId`), from `excel/gamedata_const.json` `termDescriptionDict` (`termName` → `name`, `description` → `desc`):
+every term id found in the other built files, plus the terms their own descriptions mention (`desc` is rich text and
+may tag other keywords — 元素损伤 lists the five 损伤). Keys sorted. A tap on a tagged keyword opens its definition
+(`public/js/ui/termTip.js`). The language overlays (`data/i18n/<code>.json` `files.terms`) take the official texts of
+each client's `termDescriptionDict`; keywords a client lacks fall back to `tools/i18n/fallback-remake[.<code>].json`
+(docs/I18N.md §2), else to the Chinese.
+
