@@ -54,6 +54,12 @@ export function MaintenanceBar() {
     return () => clearInterval(id);
   }, [m?.at]);
   const text = maintenanceText(m, now);
+  // the bar takes the top edge where toasts start: css/components.css moves them below it while it shows
+  useEffect(() => {
+    const root = globalThis.document?.documentElement;
+    root?.classList.toggle('has-maint-bar', !!text);
+    return () => root?.classList.remove('has-maint-bar');
+  }, [!!text]);
   if (!text) return null;
   return html`<div class="maint-bar" role="status"><${Icon} name="warn" /><span class="num">${text}</span></div>`;
 }
