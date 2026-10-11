@@ -151,6 +151,21 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 
 不用更新包也可以：停止服务器，把新版本的整合包解压到新目录后从那里启动（完整包已含素材；装了开机自启的，在新目录重新运行一次 `install-service-windows.ps1`）。用精简包或 GitHub「Download ZIP」源码包的：解压新版本后，把旧目录里的 `public\assets`、`public\fonts`、`.cache` 和 `data\local-assets.json`（若有）复制过去，可避免重新下载（setup 只补下新增的素材）。
 
+### 1.6 计划维护（更新前）
+
+更新要重启服务器，而重启会结束正在进行的对局。`scripts/maintenance.mjs` 让你先通知玩家、不再开新局，等对局打完再停：
+
+```powershell
+node scripts/maintenance.mjs --status            # 正在进行的对局、房间、玩家人数，以及当前的维护设置
+node scripts/maintenance.mjs --in 15             # 所有玩家屏幕顶部出现倒计时「服务器将在 14:59 后维护」
+node scripts/maintenance.mjs --at 21:30          # 或者指定时刻（本机时间；已过则为明天）
+node scripts/maintenance.mjs --close             # 从现在起不能开始新的模拟，正在进行的对局照常打完
+node scripts/maintenance.mjs --stop-when-idle    # 没有进行中的对局时自动停止服务器（只生效一次）
+node scripts/maintenance.mjs --cancel            # 全部取消，倒计时消失
+```
+
+选项可以一起用（`--in 15 --close --stop-when-idle`），也可以分几次加；`--open` 重新允许开新局，`--keep-running` 取消自动停止。倒计时到 0 不会自动做任何事，也不会中断对局：只有设置了 `--stop-when-idle`（最后一局结束时）或你自己停止时服务器才会停。停止后用平常的方式再启动（开机自启的计划任务、NSSM、systemd 的 `Restart=always` 会自动重启）。脚本写入 `logs/maintenance.json`，服务器约 2 秒内生效；服务器没在运行时写入的设置会在下次启动时被忽略。VPS 上请用服务用户运行（`sudo -u stronghold node scripts/maintenance.mjs …`）。
+
 ## 2. 让不在同一网络的朋友加入
 
 ### 2.1 Tailscale / ZeroTier（推荐给家用小主机）

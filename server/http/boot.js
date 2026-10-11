@@ -105,4 +105,6 @@ export async function runMain(start) {
   };
   process.on('SIGINT', () => stop('SIGINT'));
   process.on('SIGTERM', () => stop('SIGTERM'));
+  // scripts/maintenance.mjs --stop-when-idle: the same clean shutdown once no match is live (server/maintenance.js)
+  if (srv.maintenance) srv.maintenance.onStop = () => stop('maintenance');
 }

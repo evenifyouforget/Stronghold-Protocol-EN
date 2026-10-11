@@ -1053,3 +1053,24 @@
   --bk-c: var(--red-premium);
 }
 .crash__box h2 { font-size: .3rem; }
+
+/* ---- planned maintenance bar (ui/maintenance.js) ---------------------------------------------------------- */
+.maint-bar {
+  position: fixed;
+  left: 50%;
+  top: calc(.08rem + var(--sa-t, 0px));
+  transform: translateX(-50%);
+  z-index: var(--z-conn);
+  display: flex;
+  align-items: center;
+  gap: .1rem;
+  padding: .06rem .18rem;
+  background: rgba(24, 12, 8, .94);
+  border: 1px solid rgba(232, 90, 26, .55);
+  box-shadow: 0 .06rem .24rem rgba(0, 0, 0, .6);
+  color: #ffd2b8;
+  font-size: calc(.14 * var(--t, 1rem));
+  pointer-events: none;
+  white-space: nowrap;
+}
+.maint-bar .icon { width: .18rem; height: .18rem; color: #ff9a5a; }

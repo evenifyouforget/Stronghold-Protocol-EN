@@ -106,6 +106,21 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 
 Without start-on-boot, replace the last step with double-clicking `start-windows.bat` again. If you use the Releases full bundle: stop the server, unzip the new version's full bundle into a new directory and start from there (assets are included; if start-on-boot is installed, run `install-service-windows.ps1` once more from the new directory). If you use GitHub's "Download ZIP" source archive: after unzipping the new version, copy `public\assets`, `public\fonts`, `.cache` and `data\local-assets.json` (if present) over from the old directory to avoid re-downloading.
 
+### 1.6 Planned maintenance (before an update)
+
+Updating needs a restart, and a restart ends the matches in progress. `scripts/maintenance.mjs` lets you warn the players and stop new matches first, then stop once the matches are over:
+
+```powershell
+node scripts/maintenance.mjs --status            # live matches, rooms and players, and the maintenance in force
+node scripts/maintenance.mjs --in 15             # every player sees a countdown at the top: "Server maintenance in 14:59"
+node scripts/maintenance.mjs --at 21:30          # or a clock time (this machine's time; tomorrow if it has passed)
+node scripts/maintenance.mjs --close             # no new simulations from now on; matches in progress play on
+node scripts/maintenance.mjs --stop-when-idle    # stop the server as soon as no match is live (once)
+node scripts/maintenance.mjs --cancel            # remove all of it; the countdown disappears
+```
+
+Options combine (`--in 15 --close --stop-when-idle`) or can be added one at a time; `--open` allows new matches again and `--keep-running` cancels the automatic stop. The countdown reaching 0 does nothing by itself and never interrupts a match: the server only stops with `--stop-when-idle` (when the last match ends) or when you stop it. Start it again the usual way (the start-on-boot task, NSSM and systemd's `Restart=always` restart it automatically). The script writes `logs/maintenance.json` and the server picks it up within about 2 seconds; a setting written while the server was not running is ignored at the next start. On a VPS run it as the service user (`sudo -u stronghold node scripts/maintenance.mjs …`).
+
 ## 2. Letting friends on other networks join
 
 ### 2.1 Tailscale / ZeroTier (recommended for a home mini PC)
