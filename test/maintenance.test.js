@@ -176,7 +176,9 @@ function runScript(args) {
     let out = '';
     child.stdout.on('data', (d) => { out += d; });
     child.stderr.on('data', (d) => { out += d; });
-    child.on('close', (code) => resolve({ code, out }));
+    // a hang fails the test instead of the CI job
+    const timer = setTimeout(() => { out += '\n[killed after 30 s]'; child.kill(); }, 30000);
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code, out }); });
   });
 }
 
@@ -201,18 +203,17 @@ test('--wait: refuses without a server (nothing written), and returns 0 only onc
 
 test('--wait: a server that stops before the first wait probe counts as stopped (no race with an idle server)', async () => {
   const file = tmpFile();
-  const log = { info() {}, warn() {}, debug() {}, error() {} };
-  const srv = await startServer({ port: 0, host: '127.0.0.1', log, MatchClass: StubMatch, noticeFile: null, maintenanceFile: file, maintenancePollMs: 60000 });
-  // stop the moment the file appears, before the script can ask again (what a fast poll does on a busy machine)
-  const watcher = fs.watch(path.dirname(file), () => { if (fs.existsSync(file)) { watcher.close(); void srv.close(); } });
-  try {
-    const r = await runScript(['--file', file, '--port', String(srv.port), '--close', '--stop-when-idle', '--wait']);
-    assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /Server stopped\./);
-  } finally {
-    watcher.close();
-    await srv.close().catch(() => {});
-  }
+  // answers the check made before the file is written, then is gone: an idle server that picked the file up at once
+  const once = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, version: 1, app: 'test', uptimeSec: 5, matches: 0 }));
+    once.close();
+    once.closeAllConnections();
+  });
+  await new Promise((resolve) => once.listen(0, '127.0.0.1', resolve));
+  const r = await runScript(['--file', file, '--port', String(once.address().port), '--close', '--stop-when-idle', '--wait']);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Server stopped\./);
 });
 
 test('probe: tells our server, another program, nothing listening and a hang apart; only the first two mean "stopped"', async () => {
