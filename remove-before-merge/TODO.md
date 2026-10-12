@@ -11,6 +11,29 @@ Status (2026-10-11)
 - Open PRs into main: `wip/sync-yuri-dev` (Yuri's 4 commits after 1f05351c), `wip/lobby-rules-i18n` (ja / ko / zh-TW strings of the lobby modifications, plus Fish's ROADMAP commit).
 - Next sync with yuri/dev-0.2 brings in Yuri's merged versions of #3 (English docs) and #4 (difficulty details, with Text Size); expect conflicts with our own copies, resolve in favour of Yuri's. After it, main's keyword popup CSS needs `font-size: calc(.14 * var(--t))` (Text Size), as on `yuri/keyword-popup`.
 
+Server maintenance (ROADMAP "Reboot for updates"), branch `wip/server-maintenance`
+
+- [x] See live matches: `npm run maintenance -- --status` (also `/healthz`).
+- [x] No new matches this session: `--close` (enforced in Lobby.startMatch, so matchmaking can't slip past it).
+- [x] Scheduled maintenance with a live countdown for players: `--in 15` / `--at 21:30`.
+- [x] Smart stop, once, cancellable: `--stop-when-idle` / `--keep-running` / `--cancel`.
+- Design for the ROADMAP usability check (2026-10-12):
+  - [ ] One copy-paste command for non-technical hosts who run from source, in README.en.md and README.md:
+    `npm run maintenance -- --close --stop-when-idle --back-in 20 --wait && git checkout -- data/assets.json && git pull && npm ci && scripts/start.sh`
+    (Windows: end in `scripts\start-windows.bat`; cmd or PowerShell 7, since Windows PowerShell 5 has no `&&`). Release-bundle
+    hosts use the update bundle, service setups follow DEPLOY. Nothing in our tools runs `git pull` on its own.
+  - [ ] `--wait`: block until the server has stopped (exit 0); no server answering = exit 1, so the chain never pulls by
+    mistake; Ctrl+C leaves the maintenance set and says how to cancel.
+  - [ ] `--back-in` / `--back-at`: expected downtime; when the server stops it tells players "back around 21:45", shown
+    while the page reconnects, cleared when the new server answers.
+  - [ ] `--message`: free text in the bar. `announce.mjs` stays for one-off notices; its help points here for reboots.
+  - [ ] One-shot for real: the server consumes the file when it stops and drops a stale one at start.
+  - [ ] `--stop-when-idle` alone also shows players a bar ("restarts when current matches end").
+  - [ ] Stable interfaces documented (`logs/maintenance.json`, `/healthz` `maintenance`, `--status --json`, `--wait` exit
+    codes); script text output and bar wording are for humans and may change.
+  - [ ] DEPLOY: how to start again per setup, `Restart=on-failure` does not restart after the idle stop (exit 0), and use
+    `--close --stop-when-idle` rather than reading `--status` and stopping by hand.
+
 Feedback for feature/lobby-rules
 
 - Looks good, plays correctly
@@ -34,4 +57,5 @@ Known issue: stale browser data (2026-10-10)
 - [x] Difficulty details: Yuri #4, merged; Yuri moved its font sizes onto Text Size (`--t`).
 - [ ] Keyword popup: `yuri/keyword-popup` pushed, PR not opened yet (description drafted; its CI is red only because of the stale reroll test below, so open it after Yuri #5).
 - [ ] Reroll test expects the old 25 s co-op briefing (Yuri raised it to 45 s in d7f4e8d7): `yuri/fix-briefing-timer-test`, Yuri #5 (open), CI green on GitHub. Makes dev-0.2's CI green again.
+- [ ] Server maintenance: port `wip/server-maintenance` once it passes the ROADMAP usability check (Yuri runs a public server).
 - [ ] Custom Lobby Modifications (lobby rules): main only for now. Ask Yuri whether gameplay mods are welcome as dormant code behind a server option (off by default) before porting.
