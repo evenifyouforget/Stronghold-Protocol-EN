@@ -36,6 +36,17 @@ Priority factors in:
 - Status effects that currently show as an icon above enemies' heads, don't show how long it lasts (for effects that expire). Considering these are already circular icons, it seems simple enough to make an arc chart in the form of a thick outline.
 - Status effects that currently show as an icon above enemies' heads, some of these have an associated stack or variable, but it's not visible. (correct me if I'm wrong but) Fragile is one of these, and currently there's no way to distinguish 35% Fragile from 40% Fragile.
 
+## Reboot for updates (network/sysadmin)
+
+Goal: Be able to reboot the server to apply updates.
+
+Problem: There might be an ongoing match, which will die if we reboot now.
+
+- Ability for sysadmin to easily see if any match is ongoing
+- Ability for sysadmin to disable creating new matches in the current server session
+- Ability for sysadmin to announce a scheduled reboot
+- Smart reboot (stops the server as soon as live matches is 0) (only applies once) (can be cancelled)
+
 ## Gameplay Expansion
 
 All of these will require some input from the dev before the details are finalized.
