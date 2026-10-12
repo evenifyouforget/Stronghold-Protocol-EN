@@ -1,19 +1,34 @@
-// Planned maintenance bar: `sys.maintenance { at, closed, serverNow }` (server/maintenance.js, set by the operator with
-// scripts/maintenance.mjs) shows a bar at the top of every screen — a live countdown to the maintenance time on the
-// server's clock (store.js serverNow, corrected from the ping samples) and, while the server is closed to new matches,
-// that no new simulation can start. `at` null and `closed` false clears it.
+// Planned maintenance bar: `sys.maintenance` (server/maintenance.js, set by the operator with scripts/maintenance.mjs)
+// shows a bar at the top of every screen: a live countdown to the maintenance time on the server's clock (store.js
+// serverNow, corrected from the ping samples), "restarts when the current matches end", "no new simulations" while the
+// server is closed, the expected downtime, and the operator's message. The server's last frame before it stops
+// (`stopping`) stays while the page reconnects ("back around 21:45"); the next welcome clears it (clearMaintenance),
+// and a server still in maintenance sends it again right after.
 
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Icon } from './components.js';
 import { store, useStore, serverNow } from '../store.js';
 import { t } from '../../../shared/i18n.js';
 
+const num = (v) => (Number.isFinite(v) ? v : null);
+
 /** Store the latest sys.maintenance (null when cleared). */
 export function applyMaintenance(msg) {
-  const at = Number.isFinite(msg?.at) ? msg.at : null;
-  const closed = msg?.closed === true;
-  store.set({ maintenance: at != null || closed ? { at, closed } : null });
+  const m = {
+    at: num(msg?.at), closed: msg?.closed === true, stopWhenIdle: msg?.stopWhenIdle === true, stopping: msg?.stopping === true,
+    backIn: num(msg?.backIn), backAt: num(msg?.backAt), message: typeof msg?.message === 'string' && msg.message ? msg.message : null,
+  };
+  const any = m.at != null || m.closed || m.stopWhenIdle || m.stopping || m.message;
+  store.set({ maintenance: any ? m : null });
 }
+
+/** A new welcome: the previous server's state is gone (a server still in maintenance sends it again). */
+export function clearMaintenance() {
+  if (store.get().maintenance) store.set({ maintenance: null });
+}
+
+/** "21:45" in the player's own time zone. */
+const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 /** "1:05:09" / "9:42" / "0:07" for a remaining time in ms (rounded up to the second). */
 export function formatCountdown(ms) {
@@ -26,21 +41,29 @@ export function formatCountdown(ms) {
 }
 
 /**
- * The bar's text for a state at server time `now`.
- * @param {{ at: number | null, closed: boolean } | null} m
+ * The bar's text for a state at server time `now` (`backAt` is shown in the player's local time).
+ * @param {{ at?: number | null, closed?: boolean, stopWhenIdle?: boolean, stopping?: boolean, backIn?: number | null,
+ *   backAt?: number | null, message?: string | null } | null} m
  * @param {number} now
  * @returns {string | null}
  */
 export function maintenanceText(m, now) {
   if (!m) return null;
   const parts = [];
-  if (m.at != null) {
-    parts.push(m.at > now ? t('服务器将在 {time} 后维护', { time: formatCountdown(m.at - now) }) : t('服务器维护即将开始'));
+  if (m.stopping) {
+    parts.push(m.backAt != null ? t('服务器正在重启，预计 {time} 恢复', { time: clock(m.backAt) }) : t('服务器正在重启'));
   } else {
-    parts.push(t('服务器即将维护'));
+    if (m.at != null) {
+      parts.push(m.at > now ? t('服务器将在 {time} 后维护', { time: formatCountdown(m.at - now) }) : t('服务器维护即将开始'));
+    }
+    if (m.stopWhenIdle) parts.push(t('当前对局结束后服务器将重启'));
+    if (!parts.length && (m.closed || m.message)) parts.push(t('服务器即将维护'));
+    if (m.closed) parts.push(t('暂不开始新的模拟'));
+    if (m.backAt != null) parts.push(t('预计 {time} 恢复', { time: clock(m.backAt) }));
+    else if (m.backIn != null) parts.push(t('预计停机约 {n} 分钟', { n: m.backIn }));
   }
-  if (m.closed) parts.push(t('暂不开始新的模拟'));
-  return parts.join(' · ');
+  if (m.message) parts.push(m.message);
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /** Mount once near the root (main.js App). */

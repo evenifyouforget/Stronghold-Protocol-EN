@@ -1,4 +1,6 @@
-// Planned maintenance, for the operator of a running server (see server/maintenance.js).
+// Planned maintenance, for the operator of a running server (see server/maintenance.js; docs/DEPLOY.md §1.6).
+// Also `npm run maintenance -- …`. For a server started by hand from source, one line updates it (README):
+//   npm run maintenance -- --close --stop-when-idle --back-in 20 --wait && git checkout -- data/assets.json && git pull && npm ci && scripts/start.sh
 //
 //   node scripts/maintenance.mjs --status            live rooms / matches / players, and the maintenance in force
 //   node scripts/maintenance.mjs --in 15             countdown for every player: "Server maintenance in 14:59"
@@ -7,7 +9,13 @@
 //   node scripts/maintenance.mjs --open              allow new matches again (keeps the countdown)
 //   node scripts/maintenance.mjs --stop-when-idle    stop the server cleanly as soon as no match is live (once)
 //   node scripts/maintenance.mjs --keep-running      cancel --stop-when-idle (keeps the rest)
+//   node scripts/maintenance.mjs --back-in 20        expected downtime, shown to players (or --back-at 21:45)
+//   node scripts/maintenance.mjs --message "…"       a line of text in the players' bar (--message "" removes it)
+//   node scripts/maintenance.mjs --wait              after the rest: wait until the server has stopped (needs
+//                                                    --stop-when-idle); exit 0 = stopped, 1 = no server answering,
+//                                                    3 = it was started again meanwhile (a service manager), 130 = Ctrl+C
 //   node scripts/maintenance.mjs --cancel            remove all of it (the countdown bar disappears)
+//   node scripts/maintenance.mjs --status --json     the same as JSON: { file, server } (for scripts; a stable shape)
 //
 // Options combine and add to what is already set: `--in 15 --close --stop-when-idle` in one go, or one at a time.
 // Reaching the time does nothing by itself: matches are never cut. Stopping only happens with --stop-when-idle
@@ -23,11 +31,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_MINUTES = 7 * 24 * 60;
 
+const MESSAGE_MAX = 200; // server/maintenance.js MAINTENANCE_MESSAGE_MAX
+const WAIT_POLL_MS = 2000;
+
 const USAGE = `Usage:
-  node scripts/maintenance.mjs --status                        what the server is doing, and the maintenance in force
+  node scripts/maintenance.mjs --status [--json]                   what the server is doing, and the maintenance in force
   node scripts/maintenance.mjs [--in MIN | --at HH:MM] [--close | --open] [--stop-when-idle | --keep-running]
-  node scripts/maintenance.mjs --cancel                        remove the maintenance
-Options: --file <path> (default logs/maintenance.json), --port <n> for --status (default $PORT or 3000).`;
+                               [--back-in MIN | --back-at HH:MM] [--message TEXT] [--wait]
+  node scripts/maintenance.mjs --cancel                            remove the maintenance
+Options: --file <path> (default logs/maintenance.json), --port <n> of the server (default $PORT or 3000).
+--wait blocks until the server has stopped (needs --stop-when-idle): exit 0 stopped, 1 no server answering,
+3 started again meanwhile, 130 interrupted. Docs: docs/DEPLOY.md section 1.6.`;
 
 function fail(msg) {
   console.error(msg);
@@ -53,10 +67,13 @@ export function nextClockTime(hhmm, now) {
 
 /**
  * The new maintenance state from the current one and the options (null = nothing left: remove the file).
- * @param {{ at?: number | null, closed?: boolean, stopWhenIdle?: boolean } | null} cur
- * @param {{ in?: string, at?: string, close?: boolean, open?: boolean, 'stop-when-idle'?: boolean, 'keep-running'?: boolean }} opt
+ * @param {{ at?: number | null, closed?: boolean, stopWhenIdle?: boolean, backIn?: number | null, backAt?: number | null,
+ *   message?: string | null } | null} cur
+ * @param {{ in?: string, at?: string, close?: boolean, open?: boolean, 'stop-when-idle'?: boolean, 'keep-running'?: boolean,
+ *   'back-in'?: string, 'back-at'?: string, message?: string }} opt
  * @param {number} now
- * @returns {{ createdAt: number, at: number | null, closed: boolean, stopWhenIdle: boolean } | null}
+ * @returns {{ createdAt: number, at: number | null, closed: boolean, stopWhenIdle: boolean, backIn: number | null,
+ *   backAt: number | null, message: string | null } | null}
  */
 export function nextState(cur, opt, now) {
   if (opt.in != null && opt.at != null) throw new Error('Use either --in or --at, not both.');
@@ -78,7 +95,28 @@ export function nextState(cur, opt, now) {
   let stopWhenIdle = cur?.stopWhenIdle === true;
   if (opt['stop-when-idle']) stopWhenIdle = true;
   if (opt['keep-running']) stopWhenIdle = false;
-  return at != null || closed || stopWhenIdle ? { createdAt: now, at, closed, stopWhenIdle } : null;
+  if (opt['back-in'] != null && opt['back-at'] != null) throw new Error('Use either --back-in or --back-at, not both.');
+  let backIn = Number.isFinite(cur?.backIn) ? cur.backIn : null;
+  let backAt = Number.isFinite(cur?.backAt) ? cur.backAt : null;
+  if (opt['back-in'] != null) {
+    const minutes = Number(opt['back-in']);
+    if (!Number.isFinite(minutes) || minutes <= 0 || minutes > MAX_MINUTES) throw new Error(`--back-in must be a number of minutes from 1 to ${MAX_MINUTES}.`);
+    backIn = minutes;
+    backAt = null;
+  }
+  if (opt['back-at'] != null) {
+    backAt = nextClockTime(opt['back-at'], now);
+    if (backAt == null) throw new Error('--back-at must be a time like 21:45 (24-hour clock).');
+    backIn = null;
+  }
+  let message = typeof cur?.message === 'string' ? cur.message : null;
+  if (opt.message != null) {
+    const text = String(opt.message).trim();
+    if (text.length > MESSAGE_MAX) throw new Error(`--message is too long: ${text.length} characters (max ${MESSAGE_MAX}).`);
+    message = text || null;
+  }
+  const any = at != null || closed || stopWhenIdle || message;
+  return any ? { createdAt: now, at, closed, stopWhenIdle, backIn, backAt, message } : null;
 }
 
 /** One line per part of a state, for the terminal. */
@@ -93,6 +131,9 @@ export function describe(s, now = Date.now()) {
   }
   lines.push(s.closed ? 'Closed: no new matches.' : 'Open: new matches allowed.');
   if (s.stopWhenIdle) lines.push('The server stops as soon as no match is live.');
+  if (Number.isFinite(s.backAt)) lines.push(`Players are told it is back around ${new Date(s.backAt).toLocaleString()}.`);
+  else if (Number.isFinite(s.backIn)) lines.push(`Players are told it is down for about ${s.backIn} min.`);
+  if (s.message) lines.push(`Message: ${s.message}`);
   return lines;
 }
 
@@ -105,6 +146,52 @@ function writeFailed(e, file) {
     fail(`Permission denied writing ${file}.\nOn the server run it as the service user: sudo -u stronghold node scripts/maintenance.mjs …`);
   }
   fail(`Could not write ${file}: ${e?.message || e}`);
+}
+
+async function health(port) {
+  const res = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(3000) });
+  return res.json();
+}
+
+async function statusJson(file, port) {
+  let server = null;
+  try { server = await health(port); } catch { /* not reachable: null */ }
+  console.log(JSON.stringify({ file: readState(file), server }, null, 2));
+}
+
+/**
+ * Wait until the server on `port` has stopped. Exit codes: 0 stopped, 1 no server answering at the start, 3 it was
+ * started again meanwhile (uptime went back), 130 interrupted (the maintenance stays set).
+ */
+async function waitForStop(port) {
+  let h;
+  try { h = await health(port); } catch {
+    console.error(`No server answers at http://127.0.0.1:${port} — nothing to wait for. Use --port if it listens elsewhere.`);
+    process.exit(1);
+  }
+  process.on('SIGINT', () => {
+    console.error('\nStopped waiting. The maintenance is still set: undo it with `node scripts/maintenance.mjs --cancel`.');
+    process.exit(130);
+  });
+  let lastMatches = null;
+  let lastUptime = h.uptimeSec;
+  console.log('Waiting for the server to stop (Ctrl+C stops waiting; the maintenance stays set)…');
+  for (;;) {
+    if (h.matches !== lastMatches) {
+      console.log(`  ${h.matches} live match(es)${h.matches > 0 ? ': the server stops when they end' : ''}`);
+      lastMatches = h.matches;
+    }
+    await new Promise((r) => setTimeout(r, WAIT_POLL_MS));
+    try { h = await health(port); } catch {
+      console.log('Server stopped.');
+      return;
+    }
+    if (h.uptimeSec < lastUptime) {
+      console.error('The server was started again meanwhile (a service manager?). Not continuing: update it the way your setup does (docs/DEPLOY.md).');
+      process.exit(3);
+    }
+    lastUptime = h.uptimeSec;
+  }
 }
 
 async function status(file, port) {
@@ -138,6 +225,11 @@ async function main() {
         open: { type: 'boolean' },
         'stop-when-idle': { type: 'boolean' },
         'keep-running': { type: 'boolean' },
+        'back-in': { type: 'string' },
+        'back-at': { type: 'string' },
+        message: { type: 'string' },
+        wait: { type: 'boolean' },
+        json: { type: 'boolean' },
         cancel: { type: 'boolean' },
         file: { type: 'string' },
         port: { type: 'string' },
@@ -150,22 +242,36 @@ async function main() {
   const opt = args.values;
   const file = path.resolve(opt.file || path.join(ROOT, 'logs', 'maintenance.json'));
   const port = Number(opt.port || process.env.PORT || 3000);
-  const changes = ['in', 'at', 'close', 'open', 'stop-when-idle', 'keep-running'].some((k) => opt[k] != null);
+  const changes = ['in', 'at', 'close', 'open', 'stop-when-idle', 'keep-running', 'back-in', 'back-at', 'message'].some((k) => opt[k] != null);
 
   if (opt.help) { console.log(USAGE); return; }
   if (opt.cancel) {
-    if (changes) fail('--cancel removes everything; use it alone.');
+    if (changes || opt.wait) fail('--cancel removes everything; use it alone.');
     try { fs.rmSync(file, { force: true }); } catch (e) { writeFailed(e, file); }
     console.log('Maintenance cancelled. Players see the bar disappear within a few seconds.');
     return;
   }
-  if (!changes) {
+  if (!changes && !opt.wait) {
+    if (opt.json) { await statusJson(file, port); return; }
     if (!opt.status) console.log(`${USAGE}\n`);
     await status(file, port);
     return;
   }
+  if (!changes) {
+    // --wait alone: wait for a stop that is already set
+    if (readState(file)?.stopWhenIdle !== true) fail('--wait needs --stop-when-idle (now or set earlier): otherwise the server never stops by itself.');
+    await waitForStop(port);
+    return;
+  }
   let next;
   try { next = nextState(readState(file), opt, Date.now()); } catch (e) { fail(e.message); }
+  if (opt.wait && next?.stopWhenIdle !== true) fail('--wait needs --stop-when-idle: otherwise the server never stops by itself.');
+  if (opt.wait) {
+    // check the server first: a typo in --port must not leave a setting behind and then fail the chain halfway
+    try { await health(port); } catch {
+      fail(`No server answers at http://127.0.0.1:${port}; nothing was changed. Use --port if it listens elsewhere.`);
+    }
+  }
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     if (next) fs.writeFileSync(file, `${JSON.stringify(next)}\n`);
@@ -176,6 +282,7 @@ async function main() {
   for (const l of describe(next)) console.log(l);
   console.log('The server picks it up within ~2 s.');
   if (opt.status) await status(file, port);
+  if (opt.wait) await waitForStop(port);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

@@ -108,18 +108,39 @@ Without start-on-boot, replace the last step with double-clicking `start-windows
 
 ### 1.6 Planned maintenance (before an update)
 
-Updating needs a restart, and a restart ends the matches in progress. `scripts/maintenance.mjs` lets you warn the players and stop new matches first, then stop once the matches are over:
+Updating needs a restart, and a restart ends the matches in progress. `scripts/maintenance.mjs` (also `npm run maintenance -- …`) warns the players, stops new matches and stops the server once the matches are over. It never updates or starts anything itself.
+
+**Started by hand from source:** the one line in the README (section "Updating a running server") does everything:
+`npm run maintenance -- --close --stop-when-idle --back-in 20 --wait && git checkout -- data/assets.json && git pull && npm ci && scripts/start.sh`.
+
+**The options** (they combine, and each run adds to what is already set):
 
 ```powershell
-node scripts/maintenance.mjs --status            # live matches, rooms and players, and the maintenance in force
+node scripts/maintenance.mjs --status            # live matches, rooms and players, and the maintenance in force (--json for scripts)
 node scripts/maintenance.mjs --in 15             # every player sees a countdown at the top: "Server maintenance in 14:59"
 node scripts/maintenance.mjs --at 21:30          # or a clock time (this machine's time; tomorrow if it has passed)
-node scripts/maintenance.mjs --close             # no new simulations from now on; matches in progress play on
-node scripts/maintenance.mjs --stop-when-idle    # stop the server as soon as no match is live (once)
-node scripts/maintenance.mjs --cancel            # remove all of it; the countdown disappears
+node scripts/maintenance.mjs --close             # no new simulations from now on; matches in progress play on (--open undoes)
+node scripts/maintenance.mjs --stop-when-idle    # stop the server as soon as no match is live, once (--keep-running undoes)
+node scripts/maintenance.mjs --back-in 20        # the downtime players are told to expect (or --back-at 21:45)
+node scripts/maintenance.mjs --message "Update 0.2.3"   # a line of text in the players' bar (--message "" removes it)
+node scripts/maintenance.mjs --wait              # wait until the server has stopped (needs --stop-when-idle)
+node scripts/maintenance.mjs --cancel            # remove all of it; the bar disappears
 ```
 
-Options combine (`--in 15 --close --stop-when-idle`) or can be added one at a time; `--open` allows new matches again and `--keep-running` cancels the automatic stop. The countdown reaching 0 does nothing by itself and never interrupts a match: the server only stops with `--stop-when-idle` (when the last match ends) or when you stop it. Start it again the usual way (the start-on-boot task, NSSM and systemd's `Restart=always` restart it automatically). The script writes `logs/maintenance.json` and the server picks it up within about 2 seconds; a setting written while the server was not running is ignored at the next start. On a VPS run it as the service user (`sudo -u stronghold node scripts/maintenance.mjs …`).
+- **Players** see a bar at the top of every screen: the countdown, "restarting once the current matches end", "no new simulations", the expected downtime and your message. Starting a simulation (including matchmaking and Find Teammates) is refused with an explanation. Matches in progress are never interrupted, and the countdown reaching 0 does nothing by itself. When the server stops, players see "Server restarting, back around 21:45" while their page waits to reconnect; it reconnects by itself once the server is back.
+- **Use `--close --stop-when-idle`** rather than watching `--status` and stopping the server by hand: a match can start between your check and your Ctrl+C, while the server checks and stops in one step. Without `--close`, new matches keep the server running.
+- **Starting again** is up to whatever runs the server: started by hand, start it again (or use the README line, which does); the start-on-boot task and NSSM restart it; systemd with `Restart=always` restarts it, but **`Restart=on-failure` does not**, because the idle stop exits with code 0. A service restarts the **old** version unless you update it first: with a service, update its files and then restart it (section 1.5, `install-service-windows.ps1 -Restart`), and don't use the README line, which starts a second server.
+- **Announcements:** `scripts/announce.mjs` stays for a one-off message; for a planned restart use this script.
+- The setting is one-shot: the server removes `logs/maintenance.json` when it stops, and ignores (and removes) a file written while it was not running. On a VPS run the script as the service user (`sudo -u stronghold node scripts/maintenance.mjs …`).
+
+**For scripts and your own tooling.** These are stable (changed only with care, and noted in the CHANGELOG):
+- `logs/maintenance.json`: `{ "createdAt": ms, "at": ms|null, "closed": bool, "stopWhenIdle": bool, "backIn": minutes|null, "backAt": ms|null, "message": string|null }`. Writing it yourself works the same as running the script; the server reads it within about 2 seconds and only if `createdAt` is after its own start.
+- `GET /healthz`: `matches`, `rooms`, `humans`, `uptimeSec`, and `maintenance` (the fields above without `createdAt`, or `null`).
+- `node scripts/maintenance.mjs --status --json`: `{ "file": …, "server": <the /healthz body> | null }`.
+- `--wait` exit codes: `0` stopped, `1` no server answering (nothing changed), `3` the server was started again meanwhile (a service manager; don't continue), `130` interrupted (the maintenance stays set).
+- The server exits with code 0 after an idle stop.
+
+The script's normal text output and the wording of the players' bar are for people and may change. Our tools never run `git pull` or touch your service setup; to build on them, start from `server/maintenance.js` (the server side), `public/js/ui/maintenance.js` (the bar) and `docs/design/network.md` (the `sys.maintenance` message).
 
 ## 2. Letting friends on other networks join
 

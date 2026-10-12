@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { MaintenanceBoard, parseMaintenance } from '../server/maintenance.js';
 import { nextState, nextClockTime } from '../scripts/maintenance.mjs';
@@ -17,8 +19,13 @@ import { ERR } from '../shared/constants.js';
 const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sp-maint-')), 'maintenance.json');
 const write = (file, obj) => fs.writeFileSync(file, JSON.stringify(obj));
 
-test('parseMaintenance: a time, closed and stop-when-idle; nothing set or malformed is null', () => {
-  assert.deepEqual(parseMaintenance({ createdAt: 5, at: 100, closed: true }), { createdAt: 5, at: 100, closed: true, stopWhenIdle: false });
+const SCRIPT = fileURLToPath(new URL('../scripts/maintenance.mjs', import.meta.url));
+
+test('parseMaintenance: a time, closed, stop-when-idle, downtime and message; nothing set or malformed is null', () => {
+  assert.deepEqual(parseMaintenance({ createdAt: 5, at: 100, closed: true }),
+    { createdAt: 5, at: 100, closed: true, stopWhenIdle: false, backIn: null, backAt: null, message: null });
+  assert.equal(parseMaintenance({ createdAt: 5, message: '  update 0.2.3  ' }).message, 'update 0.2.3');
+  assert.equal(parseMaintenance({ createdAt: 5, closed: true, backIn: 20 }).backIn, 20);
   assert.equal(parseMaintenance({ createdAt: 5, at: null, closed: false, stopWhenIdle: false }), null);
   assert.equal(parseMaintenance({ at: 100 }), null, 'no createdAt');
   assert.equal(parseMaintenance([1]), null);
@@ -42,24 +49,31 @@ test('board: sends the state to everyone, ignores a file older than the server, 
   await board.check();
   assert.equal(board.state(), null);
   assert.equal(board.closed(), false);
+  assert.equal(fs.existsSync(file), false, 'a file from before the start is removed');
 
   now = 1200;
-  write(file, { createdAt: 1100, at: 5000, closed: true, stopWhenIdle: true, pad: 'x' });
+  write(file, { createdAt: 1100, at: 5000, closed: true, pad: 'x' });
   await board.check();
   assert.equal(board.closed(), true);
-  assert.deepEqual(board.report(), { at: 5000, closed: true, stopWhenIdle: true });
+  assert.deepEqual(board.report(), { at: 5000, closed: true, stopWhenIdle: false, backIn: null, backAt: null, message: null });
+  fs.rmSync(file);
+  await board.check();
+  assert.equal(board.state(), null);
+  let frames = sent.filter((m) => m.t === 'sys.maintenance');
+  assert.deepEqual({ at: frames.at(-1).at, closed: frames.at(-1).closed, stopping: frames.at(-1).stopping }, { at: null, closed: false, stopping: false }, 'cleared');
+
+  write(file, { createdAt: 1300, closed: true, stopWhenIdle: true, backIn: 20 });
+  now = 1400;
+  await board.check();
   assert.equal(stops, 0, 'a match is live');
   matches = 0;
   await board.check();
   await board.check();
   assert.equal(stops, 1, 'stops once the last match ends, only once');
-
-  fs.rmSync(file);
-  await board.check();
-  assert.equal(board.state(), null);
-  const frames = sent.filter((m) => m.t === 'sys.maintenance');
-  assert.ok(frames.length >= 1, 'the cleared state was sent');
-  assert.deepEqual({ at: frames.at(-1).at, closed: frames.at(-1).closed }, { at: null, closed: false });
+  frames = sent.filter((m) => m.t === 'sys.maintenance');
+  assert.equal(frames.at(-1).stopping, true, 'players are told before it stops');
+  assert.equal(frames.at(-1).backAt, 1400 + 20 * 60000, 'back = stop time + the downtime');
+  assert.equal(fs.existsSync(file), false, 'one-shot: the setting is used up');
 });
 
 describe('lobby while closed for maintenance', () => {
@@ -121,7 +135,12 @@ describe('lobby while closed for maintenance', () => {
 test('script: options add to the current state; --in / --at, --close / --open, --stop-when-idle / --keep-running', () => {
   const now = new Date(2026, 9, 11, 20, 0, 0).getTime();
   const a = nextState(null, { in: '15', close: true }, now);
-  assert.deepEqual(a, { createdAt: now, at: now + 15 * 60000, closed: true, stopWhenIdle: false });
+  assert.deepEqual(a, { createdAt: now, at: now + 15 * 60000, closed: true, stopWhenIdle: false, backIn: null, backAt: null, message: null });
+  const c = nextState(a, { 'back-in': '20', message: 'Update 0.2.3' }, now);
+  assert.deepEqual([c.backIn, c.backAt, c.message, c.at], [20, null, 'Update 0.2.3', a.at]);
+  const d = nextState(c, { 'back-at': '21:45', message: '' }, now);
+  assert.deepEqual([d.backIn, d.backAt, d.message], [null, new Date(2026, 9, 11, 21, 45).getTime(), null]);
+  assert.throws(() => nextState(null, { 'back-in': '5', 'back-at': '21:00' }, now));
   const b = nextState(a, { 'stop-when-idle': true }, now + 1000);
   assert.equal(b.at, a.at, 'the countdown is kept');
   assert.equal(b.closed, true);
@@ -142,4 +161,39 @@ test('bar text: a live countdown on the server clock, "now" once reached, and th
   assert.notEqual(maintenanceText({ at: 10000, closed: false }, 20000), maintenanceText({ at: 10000, closed: false }, 0));
   assert.ok(maintenanceText({ at: null, closed: true }, 0).includes(' · '));
   assert.equal(maintenanceText(null, 0), null);
+  const idle = maintenanceText({ at: null, closed: true, stopWhenIdle: true, backIn: 20 }, 0);
+  assert.ok(idle.split(' · ').length === 3, idle);
+  const back = new Date(2026, 9, 12, 21, 45).getTime();
+  assert.match(maintenanceText({ stopping: true, backAt: back }, 0), /(21|9):45/, "the player's own clock format");
+  assert.match(maintenanceText({ at: null, closed: false, message: 'Update 0.2.3' }, 0), /Update 0\.2\.3/);
+});
+
+/** Run scripts/maintenance.mjs; resolves to { code, out }. */
+function runScript(args) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [SCRIPT, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { out += d; });
+    child.on('close', (code) => resolve({ code, out }));
+  });
+}
+
+test('--wait: refuses without a server (nothing written), and returns 0 only once the server has stopped', async () => {
+  const file = tmpFile();
+  const none = await runScript(['--file', file, '--port', '1', '--close', '--stop-when-idle', '--wait']);
+  assert.equal(none.code, 1, none.out);
+  assert.equal(fs.existsSync(file), false, 'a wrong port leaves nothing behind');
+  const noStop = await runScript(['--file', file, '--port', '1', '--close', '--wait']);
+  assert.equal(noStop.code, 1, '--wait needs --stop-when-idle');
+
+  const log = { info() {}, warn() {}, debug() {}, error() {} };
+  const srv = await startServer({ port: 0, host: '127.0.0.1', log, MatchClass: StubMatch, noticeFile: null, maintenanceFile: file, maintenancePollMs: 50 });
+  let stoppedAt = 0;
+  srv.maintenance.onStop = () => { stoppedAt = Date.now(); void srv.close(); }; // runMain does the same with the SIGTERM path
+  const r = await runScript(['--file', file, '--port', String(srv.port), '--close', '--stop-when-idle', '--back-in', '20', '--wait']);
+  assert.equal(r.code, 0, r.out);
+  assert.ok(stoppedAt > 0, 'the server stopped itself');
+  assert.match(r.out, /Server stopped\./);
+  assert.equal(fs.existsSync(file), false, 'used up');
 });

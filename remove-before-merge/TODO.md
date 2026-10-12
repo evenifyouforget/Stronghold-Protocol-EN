@@ -18,20 +18,20 @@ Server maintenance (ROADMAP "Reboot for updates"), branch `wip/server-maintenanc
 - [x] Scheduled maintenance with a live countdown for players: `--in 15` / `--at 21:30`.
 - [x] Smart stop, once, cancellable: `--stop-when-idle` / `--keep-running` / `--cancel`.
 - Design for the ROADMAP usability check (2026-10-12):
-  - [ ] One copy-paste command for non-technical hosts who run from source, in README.en.md and README.md:
+  - [x] One copy-paste command for non-technical hosts who run from source, in README.en.md and README.md:
     `npm run maintenance -- --close --stop-when-idle --back-in 20 --wait && git checkout -- data/assets.json && git pull && npm ci && scripts/start.sh`
     (Windows: end in `scripts\start-windows.bat`; cmd or PowerShell 7, since Windows PowerShell 5 has no `&&`). Release-bundle
     hosts use the update bundle, service setups follow DEPLOY. Nothing in our tools runs `git pull` on its own.
-  - [ ] `--wait`: block until the server has stopped (exit 0); no server answering = exit 1, so the chain never pulls by
+  - [x] `--wait`: block until the server has stopped (exit 0); no server answering = exit 1, so the chain never pulls by
     mistake; Ctrl+C leaves the maintenance set and says how to cancel.
-  - [ ] `--back-in` / `--back-at`: expected downtime; when the server stops it tells players "back around 21:45", shown
+  - [x] `--back-in` / `--back-at`: expected downtime; when the server stops it tells players "back around 21:45", shown
     while the page reconnects, cleared when the new server answers.
-  - [ ] `--message`: free text in the bar. `announce.mjs` stays for one-off notices; its help points here for reboots.
-  - [ ] One-shot for real: the server consumes the file when it stops and drops a stale one at start.
-  - [ ] `--stop-when-idle` alone also shows players a bar ("restarts when current matches end").
-  - [ ] Stable interfaces documented (`logs/maintenance.json`, `/healthz` `maintenance`, `--status --json`, `--wait` exit
+  - [x] `--message`: free text in the bar. `announce.mjs` stays for one-off notices; its help points here for reboots.
+  - [x] One-shot for real: the server consumes the file when it stops and drops a stale one at start.
+  - [x] `--stop-when-idle` alone also shows players a bar ("restarts when current matches end").
+  - [x] Stable interfaces documented (`logs/maintenance.json`, `/healthz` `maintenance`, `--status --json`, `--wait` exit
     codes); script text output and bar wording are for humans and may change.
-  - [ ] DEPLOY: how to start again per setup, `Restart=on-failure` does not restart after the idle stop (exit 0), and use
+  - [x] DEPLOY: how to start again per setup, `Restart=on-failure` does not restart after the idle stop (exit 0), and use
     `--close --stop-when-idle` rather than reading `--status` and stopping by hand.
 
 Feedback for feature/lobby-rules
