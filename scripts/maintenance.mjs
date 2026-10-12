@@ -39,7 +39,8 @@ const USAGE = `Usage:
   node scripts/maintenance.mjs [--in MIN | --at HH:MM] [--close | --open] [--stop-when-idle | --keep-running]
                                [--back-in MIN | --back-at HH:MM] [--message TEXT] [--wait]
   node scripts/maintenance.mjs --cancel                            remove the maintenance
-Options: --file <path> (default logs/maintenance.json), --port <n> of the server (default $PORT or 3000).
+Options: --file <path> (default logs/maintenance.json), --port <n> of the server (default $PORT or 3000),
+--host <address> where it listens (default: 127.0.0.1, then ::1).
 --wait blocks until the server has stopped (needs --stop-when-idle): exit 0 stopped, 1 no server answering,
 3 started again meanwhile, 130 interrupted. Docs: docs/DEPLOY.md section 1.6.`;
 
@@ -148,44 +149,79 @@ function writeFailed(e, file) {
   fail(`Could not write ${file}: ${e?.message || e}`);
 }
 
-async function health(port) {
-  const res = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(3000) });
-  return res.json();
+const PROBE_TIMEOUT_MS = 10000;
+/** Where to look for the server: --host, else IPv4 then IPv6 loopback (the default bind `::` answers both). */
+let PROBE_HOSTS = ['127.0.0.1', '::1'];
+const urlOf = (host, port) => `http://${host.includes(':') ? `[${host}]` : host}:${port}/healthz`;
+
+/**
+ * Ask every candidate address for /healthz. `ours`: the first answer that is this game's server (a JSON body with
+ * `ok` and `version`). Otherwise one entry per address: `refused` (nothing listens there), `timeout` (no answer within
+ * PROBE_TIMEOUT_MS: maybe busy), `other` (something else answers: another program on the port), `error`.
+ * @returns {Promise<{ ours: any, host?: string, tries: Array<{ host: string, kind: string, detail: string }> }>}
+ */
+export async function probe(port, hosts = PROBE_HOSTS, timeoutMs = PROBE_TIMEOUT_MS) {
+  const tries = [];
+  for (const host of hosts) {
+    try {
+      const res = await fetch(urlOf(host, port), { signal: AbortSignal.timeout(timeoutMs) });
+      let body = null;
+      try { body = await res.json(); } catch { /* not JSON */ }
+      if (res.ok && body && body.ok === true && body.version != null) return { ours: body, host, tries };
+      tries.push({ host, kind: 'other', detail: `answered HTTP ${res.status}, but not as this game's server (another program on port ${port}?)` });
+    } catch (e) {
+      // a timeout is a DOMException (name TimeoutError, numeric code 23); a refused connection has cause.code
+      const code = e?.name === 'TimeoutError' || e?.name === 'AbortError' ? e.name : e?.cause?.code || e?.code || e?.name;
+      if (code === 'ECONNREFUSED' || code === 'EADDRNOTAVAIL' || code === 'ENETUNREACH' || code === 'EHOSTUNREACH') tries.push({ host, kind: 'refused', detail: `nothing listening (${code})` });
+      else if (code === 'TimeoutError' || code === 'AbortError') tries.push({ host, kind: 'timeout', detail: `no answer within ${timeoutMs / 1000} s (busy?)` });
+      else tries.push({ host, kind: 'error', detail: String(code || e) });
+    }
+  }
+  return { ours: null, tries };
 }
 
+/** Our server is gone: no address answers as ours, and none merely timed out. */
+export const stopped = (r) => !r.ours && r.tries.every((t) => t.kind === 'refused' || t.kind === 'other');
+
+const explain = (r, port) => r.tries.map((t) => `  ${urlOf(t.host, port)}: ${t.detail}`).join('\n');
+
 async function statusJson(file, port) {
-  let server = null;
-  try { server = await health(port); } catch { /* not reachable: null */ }
-  console.log(JSON.stringify({ file: readState(file), server }, null, 2));
+  const r = await probe(port);
+  console.log(JSON.stringify({ file: readState(file), server: r.ours }, null, 2));
 }
 
 /**
  * Wait until the server on `port` has stopped. Exit codes: 0 stopped, 1 no server answering at the start, 3 it was
- * started again meanwhile (uptime went back), 130 interrupted (the maintenance stays set).
+ * started again meanwhile (uptime went back), 130 interrupted (the maintenance stays set). A slow answer is not a stop.
  */
 async function waitForStop(port) {
-  let h;
-  try { h = await health(port); } catch {
-    console.error(`No server answers at http://127.0.0.1:${port} — nothing to wait for. Use --port if it listens elsewhere.`);
+  let r = await probe(port);
+  if (!r.ours) {
+    console.error(`Could not reach this game's server — nothing to wait for:\n${explain(r, port)}\nUse --port / --host if it listens elsewhere.`);
     process.exit(1);
   }
   process.on('SIGINT', () => {
     console.error('\nStopped waiting. The maintenance is still set: undo it with `node scripts/maintenance.mjs --cancel`.');
     process.exit(130);
   });
+  PROBE_HOSTS = [r.host]; // keep asking where it answered
+  let h = r.ours;
   let lastMatches = null;
   let lastUptime = h.uptimeSec;
-  console.log('Waiting for the server to stop (Ctrl+C stops waiting; the maintenance stays set)…');
+  console.log(`Waiting for the server at ${urlOf(r.host, port)} to stop (Ctrl+C stops waiting; the maintenance stays set)…`);
   for (;;) {
     if (h.matches !== lastMatches) {
       console.log(`  ${h.matches} live match(es)${h.matches > 0 ? ': the server stops when they end' : ''}`);
       lastMatches = h.matches;
     }
-    await new Promise((r) => setTimeout(r, WAIT_POLL_MS));
-    try { h = await health(port); } catch {
-      console.log('Server stopped.');
-      return;
+    await new Promise((res) => setTimeout(res, WAIT_POLL_MS));
+    r = await probe(port);
+    if (!r.ours) {
+      if (stopped(r)) { console.log('Server stopped.'); return; }
+      console.log(`  no answer this time, still waiting:\n${explain(r, port)}`);
+      continue;
     }
+    h = r.ours;
     if (h.uptimeSec < lastUptime) {
       console.error('The server was started again meanwhile (a service manager?). Not continuing: update it the way your setup does (docs/DEPLOY.md).');
       process.exit(3);
@@ -197,15 +233,13 @@ async function waitForStop(port) {
 async function status(file, port) {
   console.log('Maintenance file:');
   for (const l of describe(readState(file))) console.log(`  ${l}`);
-  const url = `http://127.0.0.1:${port}/healthz`;
-  let h;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-    h = await res.json();
-  } catch (e) {
-    console.log(`\nServer: not reachable at ${url} (${e?.cause?.code || e?.name || e}). Use --port if it listens elsewhere.`);
+  const r = await probe(port);
+  if (!r.ours) {
+    console.log(`\nServer: could not reach this game's server:\n${explain(r, port)}\nUse --port / --host if it listens elsewhere.`);
     return;
   }
+  const h = r.ours;
+  const url = urlOf(r.host, port);
   console.log(`\nServer (${url}): up ${Math.round((h.uptimeSec || 0) / 60)} min, version ${h.app}`);
   console.log(`  ${h.matches} live match(es), ${h.rooms} room(s), ${h.humans} player(s) seated, ${h.spectators ?? 0} spectator(s), ${h.sessions} session(s)`);
   if (h.maintenance === undefined) console.log('  (this server version does not report maintenance)');
@@ -233,6 +267,7 @@ async function main() {
         cancel: { type: 'boolean' },
         file: { type: 'string' },
         port: { type: 'string' },
+        host: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -242,6 +277,7 @@ async function main() {
   const opt = args.values;
   const file = path.resolve(opt.file || path.join(ROOT, 'logs', 'maintenance.json'));
   const port = Number(opt.port || process.env.PORT || 3000);
+  if (opt.host) PROBE_HOSTS = [opt.host.replace(/^\[|\]$/g, '')];
   const changes = ['in', 'at', 'close', 'open', 'stop-when-idle', 'keep-running', 'back-in', 'back-at', 'message'].some((k) => opt[k] != null);
 
   if (opt.help) { console.log(USAGE); return; }
@@ -268,9 +304,8 @@ async function main() {
   if (opt.wait && next?.stopWhenIdle !== true) fail('--wait needs --stop-when-idle: otherwise the server never stops by itself.');
   if (opt.wait) {
     // check the server first: a typo in --port must not leave a setting behind and then fail the chain halfway
-    try { await health(port); } catch {
-      fail(`No server answers at http://127.0.0.1:${port}; nothing was changed. Use --port if it listens elsewhere.`);
-    }
+    const r = await probe(port);
+    if (!r.ours) fail(`Could not reach this game's server; nothing was changed:\n${explain(r, port)}\nUse --port / --host if it listens elsewhere.`);
   }
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });

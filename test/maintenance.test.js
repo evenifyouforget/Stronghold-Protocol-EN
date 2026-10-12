@@ -9,7 +9,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { MaintenanceBoard, parseMaintenance } from '../server/maintenance.js';
-import { nextState, nextClockTime } from '../scripts/maintenance.mjs';
+import { nextState, nextClockTime, probe, stopped } from '../scripts/maintenance.mjs';
+import http from 'node:http';
 import { formatCountdown, maintenanceText } from '../public/js/ui/maintenance.js';
 import { startServer } from '../server/index.js';
 import { StubMatch } from '../server/match/StubMatch.js';
@@ -197,3 +198,34 @@ test('--wait: refuses without a server (nothing written), and returns 0 only onc
   assert.match(r.out, /Server stopped\./);
   assert.equal(fs.existsSync(file), false, 'used up');
 });
+
+test('probe: tells our server, another program, nothing listening and a hang apart; only the first two mean "stopped"', async () => {
+  const listen = (handler) => new Promise((resolve) => { const s = http.createServer(handler); s.listen(0, '127.0.0.1', () => resolve(s)); });
+  const other = await listen((req, res) => { res.writeHead(404, { 'content-type': 'text/html' }); res.end('<h1>Not found</h1>'); });
+  const hang = await listen(() => { /* never answers */ });
+  try {
+    const o = await probe(other.address().port, ['127.0.0.1'], 500);
+    assert.equal(o.ours, null);
+    assert.equal(o.tries[0].kind, 'other');
+    assert.equal(stopped(o), true, 'another program on the port: ours is not there');
+    const gone = await listen(() => {});
+    const freePort = gone.address().port;
+    await new Promise((r) => gone.close(r));
+    const free = await probe(freePort, ['127.0.0.1'], 500);
+    assert.equal(free.tries[0].kind, 'refused');
+    assert.equal(stopped(free), true);
+    const h = await probe(hang.address().port, ['127.0.0.1'], 300);
+    assert.equal(h.tries[0].kind, 'timeout');
+    assert.equal(stopped(h), false, 'a slow answer is not a stop: --wait keeps waiting');
+  } finally {
+    hang.closeAllConnections?.();
+    await Promise.all([other, hang].map((s) => new Promise((r) => s.close(r))));
+  }
+  const log = { info() {}, warn() {}, debug() {}, error() {} };
+  const srv = await startServer({ port: 0, host: '127.0.0.1', log, MatchClass: StubMatch, noticeFile: null, maintenanceFile: null });
+  try {
+    const ours = await probe(srv.port, ['::1', '127.0.0.1'], 1000);
+    assert.ok(ours.ours && ours.host === '127.0.0.1', 'falls through to the address that answers');
+  } finally { await srv.close(); }
+});
+
