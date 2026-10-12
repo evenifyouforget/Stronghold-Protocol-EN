@@ -193,9 +193,11 @@ async function statusJson(file, port) {
 /**
  * Wait until the server on `port` has stopped. Exit codes: 0 stopped, 1 no server answering at the start, 3 it was
  * started again meanwhile (uptime went back), 130 interrupted (the maintenance stays set). A slow answer is not a stop.
+ * `first`: the answer seen just before the file was written — an idle server may stop before the next probe, which is
+ * the stop being waited for, not a missing server.
  */
-async function waitForStop(port) {
-  let r = await probe(port);
+async function waitForStop(port, first = null) {
+  let r = first ?? await probe(port);
   if (!r.ours) {
     console.error(`Could not reach this game's server — nothing to wait for:\n${explain(r, port)}\nUse --port / --host if it listens elsewhere.`);
     process.exit(1);
@@ -302,9 +304,10 @@ async function main() {
   let next;
   try { next = nextState(readState(file), opt, Date.now()); } catch (e) { fail(e.message); }
   if (opt.wait && next?.stopWhenIdle !== true) fail('--wait needs --stop-when-idle: otherwise the server never stops by itself.');
+  let seen = null;
   if (opt.wait) {
     // check the server first: a typo in --port must not leave a setting behind and then fail the chain halfway
-    const r = await probe(port);
+    const r = seen = await probe(port);
     if (!r.ours) fail(`Could not reach this game's server; nothing was changed:\n${explain(r, port)}\nUse --port / --host if it listens elsewhere.`);
   }
   try {
@@ -317,7 +320,7 @@ async function main() {
   for (const l of describe(next)) console.log(l);
   console.log('The server picks it up within ~2 s.');
   if (opt.status) await status(file, port);
-  if (opt.wait) await waitForStop(port);
+  if (opt.wait) await waitForStop(port, seen);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

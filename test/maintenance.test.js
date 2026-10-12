@@ -199,6 +199,22 @@ test('--wait: refuses without a server (nothing written), and returns 0 only onc
   assert.equal(fs.existsSync(file), false, 'used up');
 });
 
+test('--wait: a server that stops before the first wait probe counts as stopped (no race with an idle server)', async () => {
+  const file = tmpFile();
+  const log = { info() {}, warn() {}, debug() {}, error() {} };
+  const srv = await startServer({ port: 0, host: '127.0.0.1', log, MatchClass: StubMatch, noticeFile: null, maintenanceFile: file, maintenancePollMs: 60000 });
+  // stop the moment the file appears, before the script can ask again (what a fast poll does on a busy machine)
+  const watcher = fs.watch(path.dirname(file), () => { if (fs.existsSync(file)) { watcher.close(); void srv.close(); } });
+  try {
+    const r = await runScript(['--file', file, '--port', String(srv.port), '--close', '--stop-when-idle', '--wait']);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /Server stopped\./);
+  } finally {
+    watcher.close();
+    await srv.close().catch(() => {});
+  }
+});
+
 test('probe: tells our server, another program, nothing listening and a hang apart; only the first two mean "stopped"', async () => {
   const listen = (handler) => new Promise((resolve) => { const s = http.createServer(handler); s.listen(0, '127.0.0.1', () => resolve(s)); });
   const other = await listen((req, res) => { res.writeHead(404, { 'content-type': 'text/html' }); res.end('<h1>Not found</h1>'); });
