@@ -229,3 +229,22 @@ test('probe: tells our server, another program, nothing listening and a hang apa
   } finally { await srv.close(); }
 });
 
+
+test('Ctrl+C guard: asks first only in a terminal with live matches; the second press within 10 s stops', async () => {
+  const { interruptGuard, INTERRUPT_CONFIRM_MS } = await import('../server/http/boot.js');
+  let now = 0;
+  let live = 2;
+  const g = interruptGuard({ interactive: true, liveMatches: () => live, now: () => now });
+  assert.match(g(), /2 match\(es\) in progress/);
+  now += 3000;
+  assert.equal(g(), null, 'confirmed: stop');
+  now += INTERRUPT_CONFIRM_MS + 1;
+  assert.ok(g(), 'a later press asks again');
+  live = 0;
+  now += INTERRUPT_CONFIRM_MS + 1;
+  assert.equal(g(), null, 'no match live: stop at once');
+  const service = interruptGuard({ interactive: false, liveMatches: () => 3 });
+  assert.equal(service(), null, 'not a terminal (systemd, NSSM, Docker): stop at once');
+  const broken = interruptGuard({ interactive: true, liveMatches: () => { throw new Error('x'); } });
+  assert.equal(broken(), null, 'when the count fails, do not block the stop');
+});
