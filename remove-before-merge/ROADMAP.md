@@ -47,6 +47,25 @@ Problem: There might be an ongoing match, which will die if we reboot now.
 - Ability for sysadmin to announce a scheduled reboot
 - Smart reboot (stops the server as soon as live matches is 0) (only applies once) (can be cancelled)
 
+Usability check:
+
+- Can someone new to the project and not very technical, starting at README.en.md ...
+- (bonus) Or someone starting at README.md ...
+- Figure out how to run the server from source
+- Figure out how to check live matches and reboot
+- Not accidentally shut down the server in a scenario where a new match is started after the last active check
+- While also being useful to technical users such that...
+- They can tell if our useful tools will conflict with their setup (ex. if we git pull, but the sysadmin already set up their own ansible wrapper)
+- They can tell how to integrate our tools into their own custom setup
+- They can tell what to change to develop/build on our tools
+- And for players/users to understand...
+- What they can/cannot do in the event of a scheduled reboot
+- When they can expect the server to be back
+
+We should avoid duplicating existing work. If an existing script does something similar, but it has a usability issue, should we perhaps modify that script instead?
+
+We must also decide which scripts are meant for humans (and thus subject to interface changes) and which ones need a stable API/CLI for integrations.
+
 ## Gameplay Expansion
 
 All of these will require some input from the dev before the details are finalized.
