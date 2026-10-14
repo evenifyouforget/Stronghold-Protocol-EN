@@ -4,7 +4,7 @@
 // Reads the official zh_CN client data (Kengxxiao/ArknightsGameData) plus the research JSON in
 // docs/research/ and emits compact, game-ready JSON into data/:
 //   config, chess, bonds, garrisons, items, bands, effects, choices, enemies, factions, waves,
-//   stages, bosses, tokens, backups (every field is documented in docs/DATA.md).
+//   stages, bosses, tokens, backups, terms (every field is documented in docs/DATA.md).
 //
 // Usage:  node tools/build-data.mjs [--refresh | --offline] [--out <dir>] [--cache <dir>]
 //                                   [--report <file>] [--quiet] [--no-research] [--force]

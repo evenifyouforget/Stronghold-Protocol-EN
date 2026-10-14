@@ -37,6 +37,7 @@ import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/compone
 import { ConnectionBanner } from './ui/connBanner.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
 import { MaintenanceBar, applyMaintenance, clearMaintenance } from './ui/maintenance.js';
+import { TermTipHost } from './ui/termTip.js';
 import { net, identity, NetError } from './net.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
 import { data } from './data.js';
@@ -338,6 +339,7 @@ function App() {
     <${ToastHost} />
     <${PreloadHost} />
     <${UiHosts} />
+    <${TermTipHost} />
     <${GuideHost} />
     <${LoadoutHost} />
     <${StatsHost} />
