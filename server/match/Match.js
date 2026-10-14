@@ -179,6 +179,7 @@
 //   common.js        what the modules share (FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS — re-exported here, OK,
 //                    fail, BOSS_CLOCK_MS)
 
+import { ruleDataPatch, rulesChangeData } from '../../shared/ruleData.js';
 import { PHASE, modeIdFor, normalizeRules } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
@@ -254,6 +255,11 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
+    // the rebalanced alliances of the lobby rules (shared/ruleData.js): this match's records, the shared data untouched
+    if (rulesChangeData(this.rules)) {
+      const patch = ruleDataPatch(this.data, this.rules);
+      this.data = { ...this.data, chess: { ...(this.data.chess || {}), ...patch.chess }, garrisons: { ...(this.data.garrisons || {}), ...patch.garrisons }, bonds: { ...(this.data.bonds || {}), ...patch.bonds } };
+    }
     this.gd = new GameData(this.data, this.modeId);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;
     this.isSolo = this.mode === 'solo' || this.gd.isSolo;
@@ -333,13 +339,13 @@ export class Match {
     this.loneHuman = this.order.filter((p) => !p.isBot).length === 1;
 
     // per-match setup (DESIGN §6.5)
-    const setup = setupMatchWaves(this.gd, this.rngSetup);
+    const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.rules.stage });
     this.stageId = setup.stageId;
     this.stage = this.stageId ? this.gd.stage(this.stageId) : null;
     this.factions = setup.factions;
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
-    const bans = drawDisabledBonds(this.gd, this.rngSetup);
+    const bans = drawDisabledBonds(this.gd, this.rngSetup, { picks: this.rules.bans });
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;

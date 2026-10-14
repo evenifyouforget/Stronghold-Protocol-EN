@@ -470,6 +470,8 @@ export function makeCtx(m, ps, source, hook, ev = null) {
     difficulty: m.difficulty,
     isSolo: m.isSolo,
     isCoop: !m.isSolo,
+    /** Custom Lobby Modifications of the match (shared/rules.js), every rule at its default without any. */
+    rules: m.rules,
     data: gd.raw,
     gd,
     rng: m.rngMeta,

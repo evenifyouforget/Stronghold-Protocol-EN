@@ -178,11 +178,14 @@ function scheduleRng(rng) {
  *   `factions` also carries the schedule as a non-enumerable `schedule` property ({ typeSlots, picks }), so callers
  *   that keep only the factions array (Match: buildNormalWave(gd, rng, this.factions, r)) get the official rounds.
  */
-export function setupMatchWaves(gd, rng) {
+export function setupMatchWaves(gd, rng, { stageId: chosenStage = null } = {}) {
   // stage
   const stageIds = Array.isArray(gd.mode.stages) ? gd.mode.stages : [];
   const stagePairs = stageIds.map((id) => [id, gd.stage(id)]).filter(([, s]) => s && s.active !== false && Number(s.weight) > 0).map(([id, s]) => [id, s.weight]);
   let stageId = stagePairs.length ? weightedPick(rng, stagePairs) : null;
+  // a chosen map (Custom Lobby Modifications `stage`, shared/rules.js) replaces the draw — after it, so the factions,
+  // bosses and schedule below are those of the same seed without a choice; one this mode cannot play is ignored
+  if (chosenStage && stagePairs.some(([id]) => id === chosenStage)) stageId = chosenStage;
   if (!stageId) {
     const any = Object.keys(gd.raw.stages || {}).filter((id) => gd.stage(id) && gd.stage(id).active);
     stageId = any.length ? any.sort()[0] : null;

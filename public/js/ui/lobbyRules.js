@@ -1,0 +1,243 @@
+// Custom Lobby Modifications in the room (shared/rules.js): the strip under the seats lists the rules in force and how a
+// result will be labelled ("WITH CHEATS" for a cheat, "seeded" for a chosen map or chosen bans); the host's 调整 (others:
+// 查看) opens the dialog, grouped by category:
+//   作弊 (cheats)          +2 Deployment Limit, +2 Funds, untimed (co-op only)
+//   盟约模组 (modules)      拉特兰 A / B, 维多利亚 A / C — A is the original effect
+//   盟约调整 (rebalanced)   塑心 also in 迅捷 and 助力; 煌 in 凯瑟琳's shop slot
+//   减少随机 (seeded)       the map (or random) and up to the difficulty's count of core / add-on bans (the rest random)
+// Every change is one room.setRules partial update. Names of operators and alliances come from the game data (each
+// language's official name). A room searching for teammates plays the original game (the server refuses rules then).
+
+import { useState } from '../../vendor/hooks.module.js';
+import { html, Button, Modal, Icon, MicroLabel, Tooltip } from './components.js';
+import { BondGlyph } from './gameComponents.js';
+import { data, useData } from '../data.js';
+import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
+import { rulesInForce, ruleLabels, ruleOf } from '../../../shared/rules.js';
+import { VIRTUOSA, BLAZE, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
+import { t } from '../../../shared/i18n.js';
+
+const cx = (...p) => p.flat().filter(Boolean).join(' ');
+const chessName = (id, fallback) => data.lookup('chess', id)?.name || fallback;
+const bondName = (id) => data.lookup('bonds', id)?.name || id;
+
+/** The short label of a rule in force (the strip, the result screen). */
+export function ruleLabel(key, rules) {
+  const v = rules?.[key];
+  switch (key) {
+    case 'extraDeploy': return t('部署上限 +{n}', { n: RULE_EXTRA_DEPLOY });
+    case 'extraFunds': return t('每回合资金 +{n}', { n: RULE_EXTRA_FUNDS });
+    case 'untimed': return t('行动阶段不限时');
+    case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
+    case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
+    case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
+    case 'blaze': return t('{name}代替{old}', { name: data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a) });
+    case 'stage': return t('指定战场：{name}', { name: data.lookup('stages', v)?.name || v });
+    case 'bans': return t('指定禁用盟约：{list}', { list: (v || []).map(bondName).join(t('、')) });
+    default: return key;
+  }
+}
+
+/** The result-title suffix and watermark of `rules`: `{ seeded, cheats }` texts (null when not labelled). */
+export function ruleBadges(rules) {
+  const l = ruleLabels(rules);
+  return { seeded: l.seeded ? 'seeded' : null, cheats: l.cheats ? 'WITH CHEATS' : null };
+}
+
+/** The strip between the seats and the bottom bar: the rules in force, the labels, and the button to the dialog. */
+export function RulesBar({ room, isHost, busy, onSet }) {
+  const [open, setOpen] = useState(false);
+  useData('chess', 'bonds', 'stages', 'backups');
+  const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
+  const on = rulesInForce(rules);
+  const badges = ruleBadges(rules);
+  return html`<div class="room-rules">
+    <span class="room-bar__label">${t('自定义房间改动')}<${MicroLabel}>CUSTOM<//></span>
+    <${Button} variant="secondary" class="rules-open" onClick=${() => setOpen(true)}>${isHost ? t('调整') : t('查看')}<//>
+    <div class="rules-summary">
+      ${on.length ? on.map((k) => html`<span key=${k} class=${cx('rules-chip', `rules-chip--${ruleOf(k).category}`)}>${ruleLabel(k, rules)}</span>`)
+        : html`<span class="t-dim">${t('原版规则')}</span>`}
+      ${badges.cheats ? html`<span class="rules-badge rules-badge--cheat">${badges.cheats}</span>` : null}
+      ${badges.seeded ? html`<span class="rules-badge rules-badge--seeded">${badges.seeded}</span>` : null}
+    </div>
+    <${RulesDialog} open=${open} onClose=${() => setOpen(false)} room=${room} rules=${rules} editable=${isHost && !busy} onSet=${onSet} />
+  </div>`;
+}
+
+/** One rule row: an on/off switch with its explanation. */
+function Toggle({ k, rules, editable, onSet, label, desc }) {
+  const v = rules[k] === true;
+  return html`<div class="rules-row">
+    <button type="button" role="switch" aria-checked=${v ? 'true' : 'false'} class=${cx('rules-pick__opt', v && 'is-active')}
+      data-rule=${k} disabled=${!editable} onClick=${() => onSet({ [k]: !v })}>
+      <${Icon} name=${v ? 'check' : 'plus'} />${label}
+    </button>
+    ${desc ? html`<p class="rules-row__desc">${desc}</p>` : null}
+  </div>`;
+}
+
+/** A module choice (A = the original effect) and the text of the chosen one. */
+function ModuleChoice({ k, bondId, rules, editable, onSet, texts }) {
+  const rule = ruleOf(k);
+  const v = rules[k];
+  return html`<div class="rules-row">
+    <div class="rules-mod">
+      <${BondGlyph} bondId=${bondId} /><b>${bondName(bondId)}</b>
+      <div class="rules-seg" role="radiogroup" aria-label=${bondName(bondId)}>
+        ${rule.options.map((o) => html`<button key=${o} type="button" role="radio" aria-checked=${v === o ? 'true' : 'false'}
+          class=${cx('rules-seg__opt', v === o && 'is-active')} data-rule=${k} data-value=${o} disabled=${!editable}
+          onClick=${() => onSet({ [k]: o })}>${o === rule.options[0] ? t('模组 {m}（原版）', { m: o }) : t('模组 {m}', { m: o })}</button>`)}
+      </div>
+    </div>
+    <p class="rules-row__desc">${texts[v] || ''}</p>
+  </div>`;
+}
+
+function Section({ title, note, children }) {
+  return html`<section class="rules-sec"><h3>${title}${note ? html`<span class="t-dim"> · ${note}</span>` : null}</h3>${children}</section>`;
+}
+
+/** The map choice and the ban picks of the room's difficulty. */
+function Seeded({ room, rules, editable, onSet }) {
+  useData('config', 'stages', 'bonds');
+  const config = data.get('config');
+  const mode = config?.modes?.[modeIdFor(room.mode, room.difficulty)] || null;
+  const stages = Array.isArray(mode?.stages) ? mode.stages : [];
+  const counts = config?.bans?.[room.difficulty] || { core: 0, addon: 0 };
+  const inactive = new Set(Array.isArray(mode?.inactiveBondIds) ? mode.inactiveBondIds : []);
+  const bonds = (data.list('bonds') || []).filter((b) => b && Number(b.weight) > 0 && !inactive.has(b.bondId));
+  const picks = new Set(rules.bans || []);
+  const group = (isCore, max) => {
+    const list = bonds.filter((b) => !!b.isCore === isCore);
+    const n = list.filter((b) => picks.has(b.bondId)).length;
+    const toggle = (id) => {
+      const next = new Set(picks);
+      if (next.has(id)) next.delete(id);
+      else if (n < max) next.add(id);
+      else return;
+      onSet({ bans: [...next].sort() });
+    };
+    return html`<div class="rules-bans">
+      <div class="rules-bans__head"><b>${isCore ? t('禁用核心盟约') : t('禁用附加盟约')}</b>
+        <span class="t-dim">${t('已选 {n}/{max}，其余随机', { n, max })}</span></div>
+      <div class="rules-bans__grid">
+        ${list.map((b) => html`<${Tooltip} key=${b.bondId} text=${b.name}>
+          <button type="button" class=${cx('rules-ban', picks.has(b.bondId) && 'is-active')} aria-pressed=${picks.has(b.bondId) ? 'true' : 'false'}
+            data-ban=${b.bondId} disabled=${!editable || (!picks.has(b.bondId) && n >= max)} onClick=${() => toggle(b.bondId)}>
+            <${BondGlyph} bondId=${b.bondId} /><span>${b.name}</span>
+            ${picks.has(b.bondId) ? html`<${Icon} name="close" class="rules-ban__x" />` : null}
+          </button>
+        <//>`)}
+      </div>
+    </div>`;
+  };
+  return html`
+    <div class="rules-row rules-map">
+      <div class="rules-map__pick">
+        <b>${t('战场')}</b>
+        <div class="rules-seg rules-seg--wrap" role="radiogroup" aria-label=${t('战场')}>
+          <button type="button" role="radio" aria-checked=${rules.stage == null ? 'true' : 'false'} class=${cx('rules-seg__opt', rules.stage == null && 'is-active')}
+            data-stage="" disabled=${!editable} onClick=${() => onSet({ stage: null })}>${t('随机')}</button>
+          ${stages.map((id, i) => html`<${Tooltip} key=${id} text=${data.lookup('stages', id)?.name || id}>
+            <button type="button" role="radio" aria-checked=${rules.stage === id ? 'true' : 'false'}
+              class=${cx('rules-seg__opt rules-seg__opt--num num', rules.stage === id && 'is-active')} data-stage=${id} disabled=${!editable}
+              onClick=${() => onSet({ stage: id })}>${stageNumber(id, i)}</button>
+          <//>`)}
+        </div>
+      </div>
+      <${StagePreview} stageId=${rules.stage} />
+    </div>
+    <p class="rules-row__desc">${t('选择要禁用的盟约；未选满的名额仍随机抽取')}</p>
+    ${counts.core > 0 ? group(true, counts.core) : null}
+    ${counts.addon > 0 ? group(false, counts.addon) : null}`;
+}
+
+/** A battlefield's own number from its name ("战场#04 活性源石" → 4), else its place in the list (1-based). */
+function stageNumber(id, i) {
+  const m = /#\s*0*(\d+)/.exec(data.getRaw('stages')?.[id]?.name || data.lookup('stages', id)?.name || '');
+  return m ? Number(m[1]) : i + 1;
+}
+
+/** Colour class of a stage tile (data/stages.json `tiles` legend) in the map preview; null = not drawn. */
+function tileClass(tile) {
+  if (!tile) return null;
+  const k = tile.tileKey;
+  if (k === 'tile_forbidden' || k === 'tile_achand') return null;
+  if (k === 'tile_start') return 'gate';
+  if (k === 'tile_end') return 'goal';
+  if (k === 'tile_telin' || k === 'tile_telout') return 'tele';
+  if (k === 'tile_wall') return 'high';
+  if (k === 'tile_fence_bound') return 'fence';
+  if (k === 'tile_deepsea') return 'deep';
+  if (k === 'tile_smog') return 'smog';
+  if (k === 'tile_infection') return 'infect';
+  if (k === 'tile_mire') return 'mire';
+  if (k === 'tile_floor') return 'floor';
+  return 'road';
+}
+
+/** The player's field of a stage (rows 9–12, GEO.NORMAL_RECT; drawn far row on top) as a small tile map; "?" for random. */
+export function StagePreview({ stageId }) {
+  useData('stages');
+  const st = stageId ? data.lookup('stages', stageId) : null;
+  const name = st?.name || (stageId ? stageId : t('随机'));
+  if (!st || !Array.isArray(st.rows)) {
+    return html`<figure class="stage-prev stage-prev--random"><div class="stage-prev__q">?</div><figcaption>${name}</figcaption></figure>`;
+  }
+  const rows = [12, 11, 10, 9];
+  const cells = [];
+  let c0 = Infinity, c1 = -Infinity;
+  rows.forEach((r, y) => [...(st.rows[r] || '')].forEach((g, c) => {
+    const cls = tileClass(st.tiles?.[g]);
+    if (!cls) return;
+    c0 = Math.min(c0, c); c1 = Math.max(c1, c);
+    cells.push({ x: c, y, cls });
+  }));
+  if (!cells.length) return html`<figure class="stage-prev"><figcaption>${name}</figcaption></figure>`;
+  const w = c1 - c0 + 1;
+  return html`<figure class="stage-prev" data-stage-preview=${stageId}>
+    <svg viewBox=${`0 0 ${w} ${rows.length}`} role="img" aria-label=${name}>
+      ${cells.map((q) => html`<rect key=${`${q.x}:${q.y}`} class=${`stage-prev__t stage-prev__t--${q.cls}`} x=${q.x - c0 + 0.04} y=${q.y + 0.04} width="0.92" height="0.92" rx="0.08" />`)}
+    </svg>
+    <figcaption>${name}</figcaption>
+  </figure>`;
+}
+
+/** The dialog: every rule, grouped by category; read-only for everybody but the host. */
+export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
+  useData('chess', 'bonds', 'backups');
+  const lat = bondName('lateranoShip'), vic = bondName('victoriaShip');
+  const blazeName = data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId;
+  const spark = chessName(BLAZE.product.a, BLAZE.product.a);
+  const lateranoTexts = {
+    A: t('原版效果'),
+    B: t(LATERANO_B_TEXT, { bond: lat, list: LATERANO_B_LIST.map((id) => chessName(id, id)).join(t('、')) }),
+  };
+  const victoriaTexts = {
+    A: t('原版效果'),
+    C: t(VICTORIA_C_TEXT, { bond: vic }),
+  };
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('自定义房间改动')} micro="CUSTOM" width="13rem" class="rules-dialog"
+    actions=${html`<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
+    ${room.searching ? html`<p class="rules-note">${t('搜寻队友时使用原版规则')}</p>` : null}
+    ${editable ? null : html`<p class="rules-note">${t('由创建者设置')}</p>`}
+    <${Section} title=${t('作弊')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
+      <${Toggle} k="extraDeploy" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraDeploy', rules)} desc=${t('所有博士的部署上限 +{n}', { n: RULE_EXTRA_DEPLOY })} />
+      <${Toggle} k="extraFunds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraFunds', rules)} desc=${t('每回合开始时额外获得 {n} 资金', { n: RULE_EXTRA_FUNDS })} />
+      ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
+    <//>
+    <${Section} title=${t('盟约模组')} note=${t('不影响结算标签')}>
+      <${ModuleChoice} k="lateranoMod" bondId="lateranoShip" rules=${rules} editable=${editable} onSet=${onSet} texts=${lateranoTexts} />
+      <${ModuleChoice} k="victoriaMod" bondId="victoriaShip" rules=${rules} editable=${editable} onSet=${onSet} texts=${victoriaTexts} />
+    <//>
+    <${Section} title=${t('盟约调整')} note=${t('不影响结算标签')}>
+      <${Toggle} k="virtuosaBonds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('virtuosaBonds', rules)}
+        desc=${t('{name}同时属于【{a}】【{b}】【{c}】', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: lat, b: bondName('swiftShip'), c: bondName('deputShip') })} />
+      <${Toggle} k="blaze" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('blaze', rules)}
+        desc=${t('{name}占据{old}在调度中心的位置（相同的阶级与价格，使用为{old}选择的技能），属于【{a}】【{b}】；<售出时>获得1名【{spark}】', { name: blazeName, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a), a: bondName('yanShip'), b: vic, spark })} />
+    <//>
+    <${Section} title=${t('减少随机')} note=${t('结算标题将带有「{mark}」', { mark: 'seeded' })}>
+      <${Seeded} room=${room} rules=${rules} editable=${editable} onSet=${onSet} />
+    <//>
+  <//>`;
+}

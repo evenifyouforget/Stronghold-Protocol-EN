@@ -31,6 +31,11 @@ import { useEffect, useReducer } from '../vendor/hooks.module.js';
 import { applyFileOverlay } from '../../shared/i18nData.js';
 import { canonicalLang } from '../../shared/i18nPacks.js';
 import { genUrl } from './gen.js';
+import { ruleDataPatch, rulesChangeData } from '../../shared/ruleData.js';
+import { t } from '../../shared/i18n.js';
+
+/** Files the lobby rules change (setRules). */
+const RULED_FILES = new Set(['chess', 'garrisons', 'bonds']);
 
 /** Known data files (name → URL basename). Unknown names are allowed too (`/data/<name>.json`). */
 export const DATA_FILES = Object.freeze({
@@ -269,9 +274,39 @@ export function createDataStore(opts = {}) {
     return l;
   }
 
+  /**
+   * The Custom Lobby Modifications of the match on screen (shared/ruleData.js — 塑心's extra alliances, 煌 in 凯瑟琳's slot):
+   * `chess` and `garrisons` show this match's records, built from the localized files (煌's texts from `backups`) and
+   * kept until the next setRules or locale switch. null = the files as they are.
+   */
+  let ruleSet = null;
+  const ruled = new Map();
+  function ruledEntry(name) {
+    if (!ruleSet || !RULED_FILES.has(name)) return null;
+    const e = entries.get(name);
+    if (!e || e.status !== 'ready') return null;
+    const value = localizedEntry(name)?.value ?? e.value;
+    const backups = localizedEntry('backups')?.value ?? entries.get('backups')?.value ?? null;
+    let r = ruled.get(name);
+    if (!r || r.base !== value || r.lang !== locale || r.backups !== backups) {
+      const chessFile = localizedEntry('chess')?.value ?? entries.get('chess')?.value ?? null;
+      const bondsFile = localizedEntry('bonds')?.value ?? entries.get('bonds')?.value ?? null;
+      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile }, ruleSet, { text: (s, params) => t(s, params) });
+      const extra = patch[name] || {};
+      r = { base: value, lang: locale, backups, value: Object.keys(extra).length ? { ...value, ...extra } : value, index: null };
+      ruled.set(name, r);
+    }
+    return r;
+  }
+
   function index(name) {
     const e = entries.get(name);
     if (!e || e.status !== 'ready') return null;
+    const r = ruledEntry(name);
+    if (r) {
+      if (!r.index) r.index = buildIndex(name, r.value);
+      return r.index;
+    }
     const l = localizedEntry(name);
     if (l) {
       if (!l.index) l.index = buildIndex(name, l.value);
@@ -279,6 +314,15 @@ export function createDataStore(opts = {}) {
     }
     if (!e.index) e.index = buildIndex(name, e.value);
     return e.index;
+  }
+
+  /** Show the records of a match with these lobby rules (shared/rules.js); null / no data change = the files as they are. */
+  function setRules(rules) {
+    const next = rulesChangeData(rules) ? { virtuosaBonds: rules.virtuosaBonds === true, blaze: rules.blaze === true, lateranoMod: rules.lateranoMod ?? 'A', victoriaMod: rules.victoriaMod ?? 'A' } : null;
+    if (JSON.stringify(next) === JSON.stringify(ruleSet)) return;
+    ruleSet = next;
+    ruled.clear();
+    for (const name of RULED_FILES) if (entries.get(name)?.status === 'ready') notify(name);
   }
 
   /**
@@ -314,7 +358,8 @@ export function createDataStore(opts = {}) {
     /** Load several files; resolves when all settled. */
     loadAll: (...names) => Promise.all(names.flat().map(load)),
     /** JSON of a loaded file in the current locale (null when missing / not loaded yet). */
-    get: (name) => localizedEntry(name)?.value ?? entries.get(name)?.value ?? null,
+    get: (name) => ruledEntry(name)?.value ?? localizedEntry(name)?.value ?? entries.get(name)?.value ?? null,
+    setRules,
     /** The file exactly as downloaded (Chinese texts), whatever the locale. */
     getRaw: (name) => entries.get(name)?.value ?? null,
     /** 'idle' | 'loading' | 'ready' | 'missing' */
@@ -323,6 +368,16 @@ export function createDataStore(opts = {}) {
     lookup(name, id) {
       if (id == null) return null;
       return index(name)?.get(String(id)) ?? null;
+    },
+    /** Record by id in the current locale without the lobby rules' changes (setRules): 凯瑟琳's own record in a 煌 match. */
+    lookupBase(name, id) {
+      if (id == null) return null;
+      const e = entries.get(name);
+      if (!e || e.status !== 'ready') return null;
+      const l = localizedEntry(name);
+      const src = l || e;
+      if (!src.index) src.index = buildIndex(name, src.value);
+      return src.index.get(String(id)) ?? null;
     },
     /**
      * Record by id from a loaded file exactly as downloaded (its Chinese texts), whatever the locale — what the server

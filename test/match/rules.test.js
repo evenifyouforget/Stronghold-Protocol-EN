@@ -3,24 +3,36 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE, DEFAULT_RULES, RULE_KEYS, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, normalizeRules } from '../../shared/constants.js';
+import { rulesInForce, ruleLabels, anyRule } from '../../shared/rules.js';
 import { validateC2S } from '../../shared/protocol.js';
 import { makeMatch } from './harness.js';
 
-test('normalizeRules: known keys only, booleans only, missing keys from the base (default all off), frozen', () => {
+test('normalizeRules: known keys only, valid values only, missing keys from the base (default the original game), frozen', () => {
   assert.deepEqual(normalizeRules(null), DEFAULT_RULES);
   assert.deepEqual(Object.keys(normalizeRules({})), RULE_KEYS);
-  assert.ok(RULE_KEYS.every((k) => DEFAULT_RULES[k] === false), 'every rule is off by default');
-  assert.deepEqual(normalizeRules({ extraFunds: true, bogus: true, untimed: 1 }), { extraDeploy: false, extraFunds: true, untimed: false });
-  const base = normalizeRules({ extraDeploy: true });
-  assert.deepEqual(normalizeRules({ untimed: true }, base), { extraDeploy: true, extraFunds: false, untimed: true });
-  assert.deepEqual(normalizeRules({ extraDeploy: false }, base), DEFAULT_RULES);
+  assert.deepEqual(rulesInForce(DEFAULT_RULES), [], 'every rule is off by default');
+  assert.deepEqual(normalizeRules({ extraFunds: true, bogus: true, untimed: 1, lateranoMod: 'Z', bans: ['b', 'a', 'a'] }),
+    { ...DEFAULT_RULES, extraFunds: true, bans: ['a', 'b'] });
+  const base = normalizeRules({ extraDeploy: true, victoriaMod: 'C', stage: 'act1autochess_m02' });
+  assert.deepEqual(normalizeRules({ untimed: true }, base), { ...base, untimed: true });
+  assert.deepEqual(normalizeRules({ extraDeploy: false, victoriaMod: 'A', stage: null }, base), DEFAULT_RULES);
   assert.ok(Object.isFrozen(base));
 });
 
-test('room.setRules: a non-empty partial map of known rule keys to booleans', () => {
+test('ruleLabels: cheats watermark (Risk 0), seeded for a chosen map or bans, neutral rules label nothing', () => {
+  assert.deepEqual(ruleLabels(DEFAULT_RULES), { cheats: false, seeded: false, risk: 0 });
+  assert.deepEqual(ruleLabels({ ...DEFAULT_RULES, lateranoMod: 'B', blaze: true }), { cheats: false, seeded: false, risk: 0 });
+  assert.deepEqual(ruleLabels({ ...DEFAULT_RULES, bans: ['yanShip'] }), { cheats: false, seeded: true, risk: 0 });
+  assert.deepEqual(ruleLabels({ ...DEFAULT_RULES, untimed: true, stage: 'act1autochess_m02' }), { cheats: true, seeded: true, risk: 0 });
+  assert.equal(anyRule(DEFAULT_RULES), false);
+  assert.equal(anyRule({ ...DEFAULT_RULES, virtuosaBonds: true }), true);
+});
+
+test('room.setRules: a non-empty partial map of known rule keys to values of their type', () => {
   assert.equal(validateC2S({ t: 'room.setRules', rules: { extraDeploy: true } }), null);
-  assert.equal(validateC2S({ t: 'room.setRules', rules: { extraDeploy: true, extraFunds: false, untimed: true } }), null);
-  for (const rules of [undefined, null, {}, [], { extraDeploy: 1 }, { bogus: true }, { extraDeploy: 'yes' }]) {
+  assert.equal(validateC2S({ t: 'room.setRules', rules: { extraDeploy: true, lateranoMod: 'B', stage: null, bans: ['yanShip'] } }), null);
+  for (const rules of [undefined, null, {}, [], { extraDeploy: 1 }, { bogus: true }, { extraDeploy: 'yes' }, { victoriaMod: 'B' },
+    { stage: 3 }, { bans: ['x', 'x'] }, { bans: Array.from({ length: 13 }, (_, i) => `b${i}`) }]) {
     assert.notEqual(validateC2S({ t: 'room.setRules', rules }), null, JSON.stringify(rules));
   }
 });
@@ -93,4 +105,32 @@ test('untimed: a co-op match with two humans publishes no countdown outside batt
   h.sched.advance(1);
   assert.notEqual(m.phase, PHASE.PREP, 'prep ends once every player is ready');
   m.dispose();
+});
+
+test('seeded: a chosen map and chosen bans are used; the rest is drawn as usual, the same seed without picks unchanged', () => {
+  const plain = makeMatch({ mode: 'solo', seed: 7 });
+  const base = { stageId: plain.m.stageId, bossId: plain.m.bossId, factions: [...plain.m.factions], drawn: plain.m.disabledBonds };
+  const otherStage = plain.m.gd.mode.stages.find((id) => id !== base.stageId);
+  const coreIds = plain.m.gd.bondIds.filter((b) => plain.m.gd.bond(b).isCore && Number(plain.m.gd.bond(b).weight) > 0);
+  const notDrawn = coreIds.filter((b) => !base.drawn.includes(b)).slice(0, 2);
+  const h = makeMatch({ mode: 'solo', seed: 7, rules: { stage: otherStage, bans: notDrawn } });
+  const m = h.m;
+  assert.equal(m.stageId, otherStage);
+  assert.equal(m.bossId, base.bossId, 'the same seed keeps its bosses');
+  assert.deepEqual([...m.factions], base.factions, '… and its factions');
+  for (const b of notDrawn) assert.ok(m.disabledBonds.includes(b), `${b} banned`);
+  const { core, addon } = m.gd.bans(m.gd.difficulty);
+  assert.equal(m.disabledBonds.length, core + addon, 'as many bans as the difficulty draws');
+  assert.equal(m.disabledBonds.filter((b) => m.gd.bond(b).isCore).length, core);
+  // a setup reroll keeps the choices and redraws only what is still random
+  m.completeSetupReroll();
+  assert.equal(m.setupRevision, 1);
+  assert.equal(m.stageId, otherStage);
+  for (const b of notDrawn) assert.ok(m.disabledBonds.includes(b), `${b} still banned after the reroll`);
+  assert.equal(m.disabledBonds.length, core + addon);
+  // a map the mode does not have, and bonds that cannot be banned, are ignored
+  const odd = makeMatch({ mode: 'solo', seed: 7, rules: { stage: 'nope_stage', bans: ['nopeShip'] } });
+  assert.equal(odd.m.stageId, base.stageId);
+  assert.deepEqual(odd.m.disabledBonds, base.drawn);
+  plain.m.dispose(); h.m.dispose(); odd.m.dispose();
 });

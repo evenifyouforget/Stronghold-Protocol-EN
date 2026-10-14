@@ -220,6 +220,16 @@ const CLOSE_REASON = {
   merged: N_('同盟已与其他同盟合并，观战席已满'),
 };
 
+// the records the match's Custom Lobby Modifications change (data.js setRules: 煌 in 凯瑟琳's slot, 塑心's alliances) are
+// shown while that match is on screen; any other state shows the files as they are
+let shownRules = null;
+store.subscribe(() => {
+  const rules = store.get().match?.public?.rules ?? null;
+  if (rules === shownRules) return;
+  shownRules = rules;
+  data.setRules(rules);
+});
+
 function wireNet() {
   net.on('status', (snap) => {
     const cur = store.get().connection;

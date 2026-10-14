@@ -1,5 +1,6 @@
-// test/lobby-rules.test.js — room.setRules over the real WebSocket lobby (shared/constants.js RULE_KEYS): host only,
-// before the match, partial updates merged, shown in room.state, un-readies the other humans, handed to the match.
+// test/lobby-rules.test.js — room.setRules over the real WebSocket lobby (shared/rules.js RULES): host only, before the
+// match, partial updates merged, every value type checked, shown in room.state, un-readies the other humans, handed to the
+// match; a room with a rule set cannot search for teammates (they play the original game).
 import { describe, test, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -73,7 +74,7 @@ describe('lobby rules', () => {
 
     await expectOk(host, { t: 'room.setRules', rules: { extraDeploy: true, untimed: true } });
     const s2 = await guest.waitFor('room.state', (s) => s.rules.untimed);
-    assert.deepEqual(s2.rules, { extraDeploy: true, extraFunds: true, untimed: true }, 'partial updates merge');
+    assert.deepEqual(s2.rules, { ...DEFAULT_RULES, extraDeploy: true, extraFunds: true, untimed: true }, 'partial updates merge');
 
     // setting a rule to its current value changes nothing (no broadcast, the guest stays ready)
     await expectOk(guest, { t: 'room.ready', ready: true });
@@ -85,6 +86,37 @@ describe('lobby rules', () => {
     assert.equal(seatOf(inMatch, guest.id).ready, true);
 
     await expectError(host, { t: 'room.setRules', rules: { untimed: false } }, ERR.ROOM_STARTED);
-    assert.deepEqual(started.at(-1).rules, { extraDeploy: true, extraFunds: true, untimed: true }, 'the match gets the room rules');
+    assert.deepEqual(started.at(-1).rules, { ...DEFAULT_RULES, extraDeploy: true, extraFunds: true, untimed: true }, 'the match gets the room rules');
+  });
+
+  test('every value type: choices, a stage, ban lists (the same list again changes nothing); a room with rules cannot search', async () => {
+    const host = await player('Host2');
+    assert.equal((await host.request({ t: 'room.create', mode: 'coop', difficulty: 'NORMAL' })).t, 'ok');
+    const st = await host.waitFor('room.state', (s) => s.hostId === host.id);
+    for (const bad of [{ lateranoMod: 'C' }, { victoriaMod: 'B' }, { stage: 5 }, { bans: 'kjeragShip' }, { bans: ['a', 'a'] }, { blaze: 'yes' }]) {
+      await expectError(host, { t: 'room.setRules', rules: bad }, ERR.BAD_MSG);
+    }
+    await expectOk(host, { t: 'room.setRules', rules: { lateranoMod: 'B', stage: 'act2autochess_m02', bans: ['yanShip', 'kjeragShip'] } });
+    const s1 = await host.waitFor('room.state', (s) => s.code === st.code && s.rules.lateranoMod === 'B');
+    assert.equal(s1.rules.stage, 'act2autochess_m02');
+    assert.deepEqual(s1.rules.bans, ['kjeragShip', 'yanShip'], 'kept sorted');
+
+    const guest = await player('Guest2');
+    await expectOk(guest, { t: 'room.join', code: st.code });
+    await expectOk(guest, { t: 'room.ready', ready: true });
+    await host.waitFor('room.state', (s) => seatOf(s, guest.id)?.ready);
+    guest.clearInbox();
+    await expectOk(host, { t: 'room.setRules', rules: { bans: ['yanShip', 'kjeragShip'] } });
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(guest.inbox.filter((m) => m.t === 'room.state').length, 0, 'the same bans in another order change nothing');
+
+    await expectError(host, { t: 'room.search', on: true }, ERR.CUSTOM_RULES);
+    await expectOk(host, { t: 'room.setRules', rules: { lateranoMod: 'A', stage: null, bans: [] } });
+    await host.waitFor('room.state', (s) => s.code === st.code && s.rules.lateranoMod === 'A' && s.rules.stage === null);
+    await expectOk(guest, { t: 'room.ready', ready: true });
+    await host.waitFor('room.state', (s) => seatOf(s, guest.id)?.ready);
+    await expectOk(host, { t: 'room.search', on: true });
+    await host.waitFor('room.state', (s) => s.searching);
+    await expectError(host, { t: 'room.setRules', rules: { extraFunds: true } }, ERR.CUSTOM_RULES);
   });
 });
