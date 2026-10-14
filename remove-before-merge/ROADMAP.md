@@ -187,7 +187,7 @@ Don't worry about getting this exactly right on the first try. There will be fee
 - (1/2/3 risk) Operators' auto recovery skills gain SP slower by 0.2/0.5/0.8 SP/s
 - (1 risk) Upgrading barge from tier 4 to tier 5 costs 2 additional Funds
 - - (2 risk) Also affects tier 5 to tier 6, and penalty increased to 3 Funds
-- (1 risk) Round 9 improv always offers Deathless Black Snake as an option, worth 0 Funds (no bounty); not taking Mandragora causes final boss to have +200% max HP.
+- (1 risk) Round 9 improv always offers Deathless Black Snake as an option, worth 0 Funds (no bounty); not taking Deathless Black Snake causes final boss to have +200% max HP.
 - - (2 risk) Also adds Patriot and FrostNova to the wave; penalty for skipping also gives final boss +100% ATK
 - (1 risk) On rounds 10~13, the player with the least total stacks will have 5 Vein Guardian added to their wave.
 - (1/2 risk) Leader enemies have 50/90% Physical and Arts DR while not under an elemental burst effect.
