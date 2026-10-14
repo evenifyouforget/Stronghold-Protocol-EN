@@ -77,3 +77,17 @@ test('ccInvestorBench: 投资人 counts the board only', () => {
     assert.equal(plain.m.gd.bond('investShip').countMode, 'BOARD_AND_DECK');
   } finally { h.m.dispose(); plain.m.dispose(); }
 });
+
+test('ccPatriot (provisional): round 9, one 爱国者 in every alive player\'s wave, no bounty', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 1 } });
+  try {
+    h.m.round = 9;
+    for (const id of ['p_0', 'p_1']) {
+      const [b] = h.m.riskBounties(h.ps(id));
+      assert.equal(b.card.enemyKey, CC.patriot.key);
+      assert.equal(b.card.coin, 0);
+    }
+    h.m.round = 10;
+    assert.ok(!h.m.riskBounties(h.ps('p_0')).some((b) => b.card.enemyKey === CC.patriot.key));
+  } finally { h.m.dispose(); }
+});

@@ -630,6 +630,88 @@ function kitWolfLord(ab) {
 }
 
 /**
+ * 爱国者 (Patriot, enemy_1506_patrt) — a Fish Edition addition for the SPA-CC Risk tags (tools/build-data.mjs
+ * FORK_ENEMY_KEYS), not in the official mode. enemy_database talents strength / shield / taunt / reborn / immo_trigger[rage],
+ * skills Immo[Rage] / throwspear[Rage]; arknights.wiki.gg Patriot/Enemy for what the data leaves open:
+ *   * 【强化】 every other enemy on the field ATK +strength.atk, DEF +strength.def while he lives (the wiki: "all enemies on
+ *     the map", stacking per Patriot);
+ *   * 行军姿态 (first form): ATK +shield.atk, DEF +shield.def × base, RES +shield.magic_resistance × base, taunt level
+ *     +taunt.taunt_level (easier to target), every normal attack hits 4 times;
+ *   * KO ⇒ a reborn.duration s 重生 (the shared reborn(): inert, invulnerable [ASSUMED: the wiki does not say], HP back to
+ *     full), meanwhile PATRIOT_PULSE_SCALE × ATK true damage every immo_trigger[reborning].interval s to the units within
+ *     PATRIOT_PULSE_RADIUS;
+ *   * 毁灭姿态 (second form): the 行军 buffs go, ATK +immo_trigger[rage].atk, DEF +…def, ASPD from base_attack_time,
+ *     move +…move_speed, ranged (PATRIOT_RANGE); reborn_invincible s 无敌; immune to stun / freeze / levitate; the same true
+ *     damage pulse (Immo[Rage] atk_scale); every throwspear cd s (first after icd) a spear at the farthest unit on high ground
+ *     — a PATRIOT_SPEAR_WINDUP s telegraph, then atk_scale × ATK physical (none without a unit on high ground).
+ */
+const PATRIOT_PULSE_RADIUS = 1.75, PATRIOT_PULSE_SCALE = 0.05, PATRIOT_RANGE = 0.85, PATRIOT_SPEAR_WINDUP = 3, PATRIOT_HITS = 4;
+function kitPatriot(ab) {
+  const P = { form2: false, pulseAt: 0 };
+  const iv = T(ab, 'immo_trigger[rage].interval') ?? 0.8;
+  const rageScale = (ab.sk['Immo[Rage]'] && ab.sk['Immo[Rage]'].bb.atk_scale) ?? PATRIOT_PULSE_SCALE;
+  const spear = ab.sk['throwspear[Rage]'];
+  const pulse = (b, e, scale) => {
+    if (b.time < P.pulseAt) return;
+    P.pulseAt = b.time + iv;
+    for (const u of areaAllies(b, e, e.x, e.y, PATRIOT_PULSE_RADIUS)) hurt(b, e, u, e.s.atk * scale, 'true', { tags: ['patriotPulse'] });
+  };
+  return [{
+    spawn(b, e) {
+      b.addBuff(e, { key: 'ab:patriotMarch', persist: true, visible: true, mods: {
+        atkPct: T(ab, 'shield.atk') ?? 0, defPct: T(ab, 'shield.def') ?? 0, resFlat: (e.base.res || 0) * (T(ab, 'shield.magic_resistance') ?? 0),
+        taunt: T(ab, 'taunt.taunt_level') ?? 0 } });
+    },
+    iv: 0.1,
+    tick(b, e) {
+      // 【强化】: every other enemy on the field, refreshed while he is up (not while reviving — he is not "on the field")
+      if (e.mem.ab.state !== 'reborn') {
+        for (const o of b.aliveEnemies()) {
+          if (o === e) continue;
+          auraBuff(b, o, `ab:patriotStrength:${e.id}`, 0.2, { atkPct: T(ab, 'strength.atk') ?? 0, defFlat: T(ab, 'strength.def') ?? 0 }, null, true);
+        }
+      }
+      if (P.form2) pulse(b, e, rageScale);
+    },
+    dealt(c, b, e) {                                             // 行军姿态: 4 hits per normal attack
+      if (P.form2 || !c.dmg || !c.dmg.isAttack || c.dmg.tags?.includes('secondHit') || !c.target.alive) return;
+      for (let i = 1; i < PATRIOT_HITS && c.target.alive; i++) {
+        b.dealDamage(e, c.target, { amount: e.s.atk, type: c.dmg.type, canDodge: true, tags: ['enemyAbility', 'secondHit'] });
+      }
+    },
+  },
+  skill(spear, (b, e) => {
+    let far = null, best = -1;
+    for (const u of b.allies()) {
+      if (u.ground !== false || !areaSelectable(e, u)) continue;            // high ground only
+      const d = hypot(u.x - e.x, u.y - e.y);
+      if (d > best) { best = d; far = u; }
+    }
+    if (!far) return;
+    const t = far;
+    b.fx('telegraph', { x: t.x, y: t.y, r: 0.5, dur: PATRIOT_SPEAR_WINDUP, kind: 'patriotSpear', id: e.id });
+    b.after(PATRIOT_SPEAR_WINDUP, () => {
+      if (!e.alive || !t.alive || !t.deployed) return;
+      hurt(b, e, t, e.s.atk * ((spear && spear.bb.atk_scale) ?? 1.35), 'phys', { tags: ['patriotSpear'] });
+    });
+  }, { id: 'spear', cond: (b) => P.form2 && b.allies().some((u) => u.ground === false) }),
+  reborn({
+    dur: T(ab, 'reborn.duration') ?? 0, invincible: T(ab, 'reborn.patrt_t_state_2[reborn_invincible].duration') ?? 0,
+    onKo(b, e) { b.removeBuff(e, 'ab:patriotMarch'); },
+    during(b, e) { pulse(b, e, PATRIOT_PULSE_SCALE); },
+    onReborn(b, e) {
+      P.form2 = true;
+      e.mem.ab.immune = new Set([...(e.mem.ab.immune || []), 'stun', 'frozen', 'levitate']);
+      e.profile.melee = false;
+      e.base.rangeRadius = Math.max(e.base.rangeRadius || 0, PATRIOT_RANGE);
+      b.addBuff(e, { key: 'ab:patriotRage', persist: true, visible: true, mods: {
+        atkPct: T(ab, 'immo_trigger[rage].atk') ?? 0, defFlat: T(ab, 'immo_trigger[rage].def') ?? 0,
+        batPct: (T(ab, 'immo_trigger[rage].base_attack_time') ?? 0) / (e.base.bat || 1), moveFlat: T(ab, 'immo_trigger[rage].move_speed') ?? 0 } });
+    },
+  })];
+}
+
+/**
  * 转译基底·α (PRTS 转译基底·α 天赋; enemy_database talents Passive / Mode_*_Passive / Mode_Fuchou_Anger; skills ChangeToB/C/D):
  * 原始形态 — no attack, every damage instance is cancelled ("受到伤害时取消此伤害"), 失衡免疫, immune to 晕眩/沉睡/寒冷/冻结/浮空/
  * 恐惧. The 4th physical damage instance taken ⇒ 寻仇者, the 4th arts one ⇒ 特战术师, being blocked ⇒ 幽灵 — once ("仅可变化一次");
@@ -765,6 +847,7 @@ export const LEADER_KITS = Object.freeze({
   enemy_1512_mcmstr: kitUglyThing,                                   // “巨大的丑东西” · melee ×3; KO ⇒ stun blast, fleeing 大祭司 (true HP loss/s)
   enemy_1516_jakill: kitWarden,                                      // 杰斯顿·威廉姆斯 · ranged arts + multi-stun ⇒ killer form (frees prisoners, armour piercing)
   enemy_1517_xi: kitXi,                                              // “自在” · cross arts, 破桎而出 barrier blast ⇒ form 2 (double hits, 2 crosses)
+  enemy_1506_patrt: kitPatriot,                                      // 爱国者 (fork, SPA-CC) · 强化 all enemies, 4 hits ⇒ revive ⇒ 毁灭姿态 (spear, true pulse)
   enemy_1525_blkswb: kitMace,                                        // 锏 · 抵抗, DEF pen, 速杀 blink, AoE ⇒ form 2 (stealth, double hits, SP clear)
   enemy_1535_wlfmster: kitWolfLord,                                  // 扎罗 · −30 % damage, 溶血骇惧 ⇒ 远古威慑 rebirth ⇒ ranged double hits
   enemy_10081_mpplai: kitTranslator,                                 // 转译基底·α · damage cancelled; 4th phys / 4th arts hit or blocked ⇒ 2 s change ⇒ 寻仇者 / 特战术师 / 幽灵

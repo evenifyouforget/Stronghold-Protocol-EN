@@ -42,3 +42,39 @@ Every enemy here already has a kit in the sim.
 - Weaving Vinecreeps (纠缠藤蔓)
 - Withered Knight (凋零骑士)
 - Zaaro, Signore dei Lupi (扎罗，“狼之主”)
+
+# Newly prototyped
+
+## Patriot
+
+# Clarifications
+
+## Notes on Degenbrecher and Zaaro (2026-10-15)
+
+Both have their second form and their revive in the sim (`server/sim/content/enemies/leaders.js`; the revive is the
+shared `reborn()` of `enemies/archetypes.js`): the first knock-out is hidden, the enemy stays put invulnerable and
+untargetable while its HP refills, then it stands up in its second form and is invincible for a while. The numbers come
+from the official data.
+
+**Zaaro, Signore dei Lupi** (`enemy_1535_wlfmster`)
+- Revive: **40 s** (`Reborn.duration` 40), with Primal Deterrence slowing the units around him meanwhile; then 10 s
+  invincible (`Passive2.invincible_time`). So yes, 40 s as in the original.
+- First form: −30 % damage taken, can't be stunned, Hemolytic Horror (3 operators: ASPD −70, can't retreat, a bleed
+  that ramps over 40 s, cured once he loses 20 % HP).
+- Second form: ranged double hits, more ATK, longer Hemolytic Horror, Primal Deterrence still on.
+- Not modelled: **Blood Debt** and **Furious Howl** (both feed the event's Blood Debt gauge, which this mode lacks).
+
+**Degenbrecher** (`enemy_1525_blkswb`)
+- Revive: **5 s** (`Reborn.duration` 5), then 10 s invincible (`Reborn.invincible` 10).
+- First form: Status Resistance, DEF penetration against his blocker, Quickslay (blinks through his blocker, hitting
+  everyone on the way), Raging Blizzard (AoE).
+- Second form: stealth, more DEF penetration (40 %), double hits, and at every 25 % HP lost a burst that clears the SP
+  of the operators around him and disarms them.
+- **Gap**: his second form's ATK +50 % (`AtkUp.enemy_blkswb_t_1[reborn].atk` 0.5) is in the data but not applied by the
+  kit — worth fixing before using him in a Risk tag.
+- Not modelled: **Snowfall** (降雪, an event stage mechanic).
+
+**How strong they get.** Leaders in regular rounds scale with the round's enemy multipliers, not the final boss's pool:
+on Ultimate, round 13, co-op ×6.69 HP and ×1.95 ATK (Zaaro ≈ 234,000 HP, Degenbrecher ≈ 187,000), solo ×2.99 HP and
+×1.77 ATK. The final bosses fight from a pool of millions (3–4.2 M on Ultimate). So against a late-game SPA board both
+would fall fast unless a tag scales them up — the same lever as `ccBoss`, applied to a chosen leader.

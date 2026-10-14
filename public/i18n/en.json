@@ -1470,5 +1470,7 @@
   "领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外": "Leaders (the final Leader and Leader-class bounty enemies) take {n}% less Physical and Arts damage, except while under an Elemental burst effect",
   "风险": "Risk",
   "风险 {n}": "Risk {n}",
-  "（风险：整备区的干员不再计入）": " (Risk: Bench Operators no longer count)"
+  "（风险：整备区的干员不再计入）": " (Risk: Bench Operators no longer count)",
+  "{name}（试作）": "{name} (prototype)",
+  "（试作）第{r}回合，每名博士的作战中出现1名【{name}】": "(Prototype) Round {r}: 1 [{name}] appears in every Doctor's battle"
 }

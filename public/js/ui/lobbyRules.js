@@ -63,6 +63,7 @@ export function riskText(key, level) {
     case 'ccSpRecovery': return { short: t('技力回复-{n}', { n: CC.spRecovery[level] }), full: t('干员的自动技力回复每秒-{n}', { n: CC.spRecovery[level] }) };
     case 'ccBoss': return { short: t('最终领袖强化 {n}', { n: level }), full: t('最终领袖（含隐秘核心）最大生命值+{hp}%，攻击力+{atk}%', { hp: pct(CC.bossHp[level]), atk: pct(CC.bossAtk[level]) }) };
     case 'ccLeaderDr': return { short: t('领袖减伤 {n}%', { n: pct(CC.leaderDr[level]) }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
+    case 'ccPatriot': return { short: t('{name}（试作）', { name: enemyName(CC.patriot.key) }), full: t('（试作）第{r}回合，每名博士的作战中出现1名【{name}】', { r: CC.patriot.round, name: enemyName(CC.patriot.key) }) };
     case 'ccSilencers': return { short: enemyName(CC.silencers.key), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
     default: return { short: key, full: key };
   }

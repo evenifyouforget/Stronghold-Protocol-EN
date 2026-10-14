@@ -55,6 +55,7 @@ export const RULES = Object.freeze([
   { key: 'ccBoss', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },    // final boss +50/150/400 % HP, +15/25/50 % ATK
   { key: 'ccLeaderDr', type: 'level', risk: [0, 1, 2], category: 'risk' },   // leaders 50 / 90 % DR outside a burst
   { key: 'ccSilencers', type: 'level', risk: [0, 1], category: 'risk' },     // rounds 10–13: 5 Silencers for the fewest stacks
+  { key: 'ccPatriot', type: 'level', risk: [0, 1], category: 'risk' },       // (provisional) round 9: 爱国者 joins every wave
 ].map((r) => Object.freeze(r)));
 
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));

@@ -82,6 +82,16 @@ export class MatchInfra {
   }
 
   riskBounties(ps) {
+    const out = [];
+    // ccPatriot (provisional): round 9, one 爱国者 in every alive player's wave, no bounty
+    const pt = CC.patriot;
+    if (this.rules?.ccPatriot > 0 && this.round === pt.round && ps.alive && this.gd.enemy(pt.key)) {
+      out.push({ id: 'risk:patriot', roundsLeft: 1, card: { effectId: 'risk:patriot', enemyKey: pt.key, count: pt.count, coin: 0, payout: 'kill', rounds: 1 } });
+    }
+    return out.concat(this.silencerBounties(ps));
+  }
+
+  silencerBounties(ps) {
     const s = CC.silencers;
     if (!(this.rules?.ccSilencers > 0) || !s.rounds.includes(this.round) || !this.gd.enemy(s.key)) return [];
     const alive = this.alivePlayers();

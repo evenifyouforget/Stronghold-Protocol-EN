@@ -44,6 +44,8 @@ export const CC = Object.freeze({
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
   leaderDr: Object.freeze([0, 0.5, 0.9]),
   silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
+  // (provisional, the Patriot pilot — Fish is redesigning the enemy tags) round 9: one 爱国者 in every player's wave
+  patriot: Object.freeze({ key: 'enemy_1506_patrt', count: 1, round: 9 }),
 });
 
 /** msgid of the note added to 投资人's text when the bench no longer counts. */

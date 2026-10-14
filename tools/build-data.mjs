@@ -2199,6 +2199,12 @@ function enemyOverrideRecord(over, label) {
  * Collect every enemy key that can appear in a match (templates, factions, bounties, bands,
  * bosses, summons), transitively through extraEnemyKeyList and enemy blackboards.
  */
+/**
+ * Fork (Fish Edition) enemies outside the mode's own tables, for the SPA-CC Risk tags (remove-before-merge/FINDINGS.md §5):
+ * built like any directly spawned enemy, so the sim, the art and the translations get them too.
+ */
+export const FORK_ENEMY_KEYS = Object.freeze(['enemy_1506_patrt']);
+
 function collectEnemyKeys(ctx) {
   const keys = new Set();
   const add = (k) => { if (typeof k === 'string' && /^enemy_/.test(k)) keys.add(k); };
@@ -2218,6 +2224,7 @@ function collectEnemyKeys(ctx) {
   for (const b of Object.values(ctx.ac.bossInfoDict || {})) add(b.enemyId);
   for (const k of Object.keys(templateSlots(ctx))) add(k);
   for (const m of Object.values(ctx.act.modeDataDict)) (m.inactiveEnemyKey || []).forEach(add);
+  FORK_ENEMY_KEYS.forEach((k) => { if (ctx.enemyDb.has(k)) add(k); });
   for (const buffs of Object.values(ctx.act.effectBuffInfoDataDict || {})) {
     for (const b of buffs) for (const e of b.blackboard || []) {
       if (typeof e.valueStr === 'string') for (const m of e.valueStr.matchAll(/enemy_[A-Za-z0-9_]+/g)) if (ctx.enemyDb.has(m[0])) add(m[0]);
