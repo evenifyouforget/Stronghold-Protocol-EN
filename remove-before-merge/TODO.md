@@ -91,8 +91,7 @@ PR C `wip/spacc` (on `wip/custom-lobby`), SPA-CC first batch — built 2026-10-1
   (2; final bosses and leader-class bounty enemies, none under a burst), Silencers (fewest stacks, ties: earliest seat).
 - [x] Patriot pilot: data (tools/build-data.mjs FORK_ENEMY_KEYS, flagged `fork`), art in the manifest, kit, and a
   provisional tag "round 9: Patriot in every wave" until Fish's enemy tags are designed.
-- [ ] Open: Degenbrecher's second-form ATK +50 % is not applied (enemy-palette/leaders.md); Victoria Mod C's SP
-  reading (PR B); Blood Debt / Asset Liquidation design; the pool-wide boss tags (Arts/Physical thresholds,
+- [ ] Open: Degenbrecher's second-form ATK +50 % is not applied (enemy-palette/leaders.md); Blood Debt / Asset Liquidation design; the pool-wide boss tags (Arts/Physical thresholds,
   invulnerability).
 
 # to be ported to yuri
