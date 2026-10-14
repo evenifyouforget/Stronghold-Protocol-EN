@@ -32,7 +32,7 @@
 // unit — the match always states both for an owned operator: PlayerState.battleInput).
 
 import { Battle } from './Battle.js';
-import { toDataSource, withUnitLoadouts } from './simdata.js';
+import { toDataSource, withUnitLoadouts, withRuleData } from './simdata.js';
 import { isPotential, isCultivate } from '../../shared/potential.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
 
@@ -157,7 +157,8 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
     fieldId: s.fieldId,
     enemyOverrides: s.enemyOverrides ?? {},
     waveId: s.waveId ?? null,
-    data: BattleClass === Battle ? withUnitLoadouts(toDataSource(dataSource), s.players) : dataSource,
+    // the rebalanced alliances of the lobby rules (flags.rules) change records before the loadouts resolve them
+    data: BattleClass === Battle ? withUnitLoadouts(withRuleData(toDataSource(dataSource), s.flags?.rules), s.players) : dataSource,
     content: opts.content ?? s.content ?? 'full',
   };
   if (s.bossId != null) battleOpts.bossId = s.bossId;
