@@ -178,13 +178,15 @@ Don't worry about getting this exactly right on the first try. There will be fee
 
 - (1 risk) Operators on the bench no longer count toward activating Investor
 - (1 risk) Foresight operators have -20 ASPD
+- (1 risk) All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
+- (1 risk) Starting on round 3, the first tier 1 unit you buy that round costs 1 more
 - (1 risk) Final boss gains 50 RES after taking 50% max HP as Arts damage
 - (1 risk) Final boss gains 5000 DEF after taking 50% max HP as Physical damage
 - (1/2/3 risk) Final boss gains +50/150/400% max HP and +15/25/50% ATK
 - (1/2/3 risk) Final boss becomes invulnerable for 10 seconds (in-game time) every 68/28/18% max HP lost
 - (1/2/3 risk) Operators' auto recovery skills gain SP slower by 0.2/0.5/0.8 SP/s
 - (1 risk) Upgrading barge from tier 4 to tier 5 costs 2 additional Funds
-- - (2 risk) Also affects tier 5 to tier 6
+- - (2 risk) Also affects tier 5 to tier 6, and penalty increased to 3 Funds
 - (1 risk) Round 9 improv always offers Deathless Black Snake as an option, worth 0 Funds (no bounty); not taking Mandragora causes final boss to have +200% max HP.
 - - (2 risk) Also adds Patriot and FrostNova to the wave; penalty for skipping also gives final boss +100% ATK
 - (1 risk) On rounds 10~13, the player with the least total stacks will have 5 Vein Guardian added to their wave.
