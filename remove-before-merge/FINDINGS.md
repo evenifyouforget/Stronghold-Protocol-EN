@@ -142,3 +142,61 @@ A follow-up PR could make the tests pin the language themselves, by setting the 
 - `build-data.mjs` downloads the official tables only when they're missing from `.cache/gamedata/` (gitignored), with `--refresh` / `--offline` switches. The output is deterministic. The README says "don't hand-edit `data/*.json`". For a fork that's a style rule, not a technical one: nothing re-downloads or overwrites it at runtime. The real risk is that someone re-runs `build-data` and drops hand edits. **Recommendation:** put fork-specific changes either in code or in a dedicated override layer like `tuning.json`, not in the generated JSON.
 - Numbers come from data, but **mechanics come from code**. A new difficulty or lobby modifiers (Appendix A) would touch `data/config.json` `modes` plus `server/match/*`. Alliance Modules would touch `data/bonds.json` / `effects.json` plus `server/sim/content/bonds/*`.
 - The game art and audio (`public/assets/**`, `public/fonts/**`) are downloaded once by `tools/fetch-assets.mjs` from community mirrors of the official client and served locally. They're presentation only and contain no rules.
+
+## 5. SPA-CC feasibility (2026-10-15)
+
+ROADMAP "SPA-CC": a Contingency-Contract-style difficulty above Ultimate, made of Risk tags. Each tag below is rated by
+effort, given what the code already has after PR B (`wip/custom-lobby`: the rules registry with categories, the
+rules dialog, the result labels, rules in every battle spec).
+
+### Groundwork every tag shares (do first)
+
+- **Risk rules in `shared/rules.js`**: a tag sequence (1/2/3 risk) is one `choice` rule (`off` / level 1 / 2 / 3) with
+  a risk per option; `ruleLabels` already sums risk and forces it to 0 with cheats. Mutually exclusive sidegrades are
+  one choice rule too.
+- **Result title**: "Ultimate+5 seeded" — the label code exists; it needs the `+risk` part.
+- **Rules dialog**: the current list fits ~10 rules. ~20 tags need the CC grid view ROADMAP describes (risk rows,
+  sequences in columns, the combined effects listed below), probably as a "Risk" tab next to today's list. Tag icons
+  are an open art question (no CC tag icons in our assets; text tiles would work first).
+- **Effort**: about one PR, before or with the first batch of tags.
+
+### Per tag
+
+| Tag | Effort | Notes |
+|---|---|---|
+| Bench no longer counts for Investor | Easy | Investor is marked "counts the bench" in data (`countsHand`); the rule flips it in the bond count, and the alliance text needs a variant. |
+| Swift 20 + 0.35 × stacks → 20 + 0.25 × stacks | Easy | Exactly the data's numbers (`base_prob` 0.2, `prob_per_stack` 0.0035): one override in battle, plus the text. |
+| Foresight operators −20 ASPD | Easy | A passive buff on every Foresight member at battle start (active alliance or not — to confirm). |
+| Strategies naming a round trigger 1 round later | Medium | ~15 Strategies name rounds (Justin 1/4/7/10, Jessica 4/7/10/13, Fang 8/10/12/14, Quintus 3, Yu 8, Orchid 10, Lee 1–3, Pith / Dusk / Muelsyse 1, Harold from 4, Duck Lord from 5, Damazti every 5 …). Each is coded separately, so it's one change per Strategy, plus texts. Open: Fang's 14 → 15 is the Hidden Core round (not always played); Lee's "held on 1 and 2, released on 3" → 2/3 → 4? |
+| From round 3, the first tier-1 operator bought each round costs +1 | Easy | The shop has a price hook (`onPrice`, as Sciurus's "first Kjerag operator costs 1"). |
+| Shop upgrade 4→5 +2 Funds (2: also 5→6, +3) | Easy | Upgrade prices are data (`upgradePrices` 5/8/11/12/13 → the 4→5 step is 12): a per-match override. |
+| Auto-recovery skills −0.2/0.5/0.8 SP/s | Easy | `spRecoveryFlat` exists and affects only time-based SP: a passive buff on every operator. |
+| Final boss +50/150/400 % max HP, +15/25/50 % ATK | Easy–Medium | The shared boss pool's size is computed on the server (`bossPoolHp`); ATK through the boss spawns' stat mods. Applies to the Hidden Core boss too. |
+| Leaders 50/90 % Physical and Arts DR unless under an elemental burst | Easy–Medium | A damage hook on leader units; the burst state is on the unit already (`burstLock`). To confirm: "leaders" = the bounty leaders of the regular rounds and the final / hidden bosses? |
+| Final boss +50 RES after 50 % max HP taken as Arts (+5000 DEF after 50 % Physical) | Hard | The boss's HP is a pool shared by every player's field; each browser runs its own field and only reports damage totals. Counting damage **by type** across fields needs new reports, and the server must decide the threshold and broadcast it (with the pool updates, `b.pool`). |
+| Final boss invulnerable 10 s every 68/28/18 % lost | Hard | Same reason: the threshold is pool-wide, so the server detects it and broadcasts "invulnerable for 10 s"; each field applies it on its own clock (fields are already only kept plausible, not re-simulated). |
+| Round 9 Improv always offers Deathless Black Snake (0 Funds); skipping → boss +200 % HP (2: also Patriot and FrostNova; +100 % ATK) | Very hard as written | Improv offers enemy cards with bounties ("bounty drafts"), so a forced card fits. But Deathless Black Snake, Patriot and FrostNova are not in this mode: each needs its data built in, its art downloaded and a hand-written kit (multi-phase story bosses). **Easy–Medium with substitutes** from the 29 leaders this mode already has. |
+| Rounds 10–13: the player with the fewest stacks gets 5 Famiglia Shadow Silencers | Easy–Medium | The enemy is in the data with a kit. Adding units to one player's wave has precedent (the bounty cards). Tie-break to decide. |
+| (2) Blood Debt and Asset Liquidations always on | Hard | Both are event mechanics the sim never modelled (the code lists them as "no counterpart in this mode"): they'd need a spec and a new implementation. |
+| Final round: Rosmontis, Simulated Sentry joins (need not be killed) | Very hard as written | Not in this mode (a Contingency Contract boss with drones): data, art and a kit. Substitute possible. |
+| (2) "Matrix" gives no buffs; boss can't die while the Sentry lives | Unknown | No "Matrix" exists in our texts, data or code — which mechanic is it? The "cannot die while X lives" part is easy (several leaders link HP or immortality already). |
+
+### Suggested order
+
+1. Groundwork (risk rules, grid view, "+risk" title).
+2. The easy batch, about 9 tags: Investor, Swift, Foresight, tier-1 price, shop upgrades, SP recovery, boss
+   HP/ATK, leader DR, Silencers. This gives enough risk to try "Ultimate+10".
+3. Strategies one round later.
+4. The pool-wide boss tags (Arts/Physical thresholds, invulnerability): one shared server mechanism.
+5. Enemy tags: substitutes first; real new enemies only if worth a kit each.
+
+### Questions for Fish
+
+1. Substitutes for Deathless Black Snake / Patriot / FrostNova / Rosmontis, Simulated Sentry from the leaders this mode
+   has? (List on request.)
+2. What is "Matrix"?
+3. Foresight −20 ASPD: every Foresight operator, or only while Foresight is active?
+4. "Leader enemies": the bounty leaders in regular rounds, the final / hidden bosses, or both?
+5. Strategy round shifts: Fang's round 14 → 15 (Hidden Core only), and Lee's held Funds.
+6. Silencers: tie-break when several players share the fewest stacks (all of them? random?).
+7. Blood Debt / Asset Liquidations: the intended mechanics, since the sim has neither.

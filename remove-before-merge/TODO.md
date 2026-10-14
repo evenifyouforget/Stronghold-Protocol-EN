@@ -79,7 +79,7 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
   - Follow ROADMAP SPA-CC's rule categories: modules are Neutral, map / ban picks are RNG Reducers ("seeded" on the end
     screen), the existing +2 Funds / +2 Deploy Limit / untimed are Cheats ("WITH CHEATS" watermark). This needs a
     rules selector with room for many more options, and the end screen listing every rule in force.
-- [ ] Investigate SPA-CC (ROADMAP "SPA-CC"): a Contingency-Contract-style difficulty above Ultimate — difficulty tags
+- [x] Investigate SPA-CC (ROADMAP "SPA-CC") — done 2026-10-15: FINDINGS.md §5 (effort per tag, order, 7 questions). a Contingency-Contract-style difficulty above Ultimate — difficulty tags
   worth risk, shown as e.g. "Ultimate+5 seeded". Go through the tag ideas one by one (which hooks exist, which enemies
   are in the data, effort), and say which tags are cheap, which need new sim hooks, and which need Fish's input.
 
