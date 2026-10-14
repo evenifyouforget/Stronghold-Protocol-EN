@@ -58,9 +58,8 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
   weaker one that outlasts it takes over when it ends. Merged into main (#12).
 - [x] PR B `wip/custom-lobby` (custom lobbies only, behind host options) — built; Fish to playtest. Readings of the
   ROADMAP text to check:
-  - Victoria Mod C: [ ] "+8 SP after skill activation" — waiting for the suggester's meaning (Fish, 2026-10-14). Now
-    +8 initial SP per hammer carried, at every deployment (could also be: all Victoria operators gain SP when any of
-    them activates a skill). "Hammers in the shop are upgraded and free" only while Victoria is active; the 6-member part (stacks to the other alliances, ATK
+  - Victoria Mod C (Fish, 2026-10-15): when a Victoria operator's skill ends, that operator recovers 8 SP per hammer it
+    carries (like Swift). "Hammers in the shop are upgraded and free" only while Victoria is active; the 6-member part (stacks to the other alliances, ATK
     +(200 + 1.2 × stacks)%, 200 % Barrier, Status Resistance) is all one 6-member tier; Mod C replaces Mod A
     entirely, so no hammer every 25 stacks.
   - Laterano Mod B (Fish, 2026-10-14): the bullet-spending Attributes (Mostima, Executor the Ex Foedere, Lemuen) count
