@@ -5,13 +5,16 @@
 //   neutral  free to take: Alliance Modules, rebalanced alliances
 //   cheat    the end screen carries a "WITH CHEATS" watermark (+2 Deployment Limit, +2 Funds, untimed)
 //   seeded   less luck: "seeded" after the result title (the chosen map, chosen alliance bans)
-//   risk     difficulty tags worth Risk ("Ultimate+5"); none yet — SPA-CC adds them here
+//   risk     SPA-CC difficulty tags worth Risk ("Ultimate+5"; remove-before-merge/ROADMAP.md "SPA-CC"); with a cheat on,
+//            the Risk counts as 0
 // A rule's value type:
 //   bool     true / false (default false)
 //   choice   one of `options` (default options[0], the original game)
 //   stage    a stage id of the match's mode, or null = random (the match drops one its mode does not have)
 //   bans     a list of bond ids to ban, at most `max`; the match keeps the valid ones up to the difficulty's counts and
 //            draws the rest at random as usual
+//   level    a Risk tag: 0 = off, 1 … `risk.length - 1`; `risk[level]` is its Risk. A sequence (1 / 2 / 3 Risk) is one
+//            rule, so its levels exclude each other
 // room.setRules merges a partial { [key]: value } into the room's rules; the match reads them once at start
 // (Match opts.rules). Rooms searching for teammates and the solo queue play the original game: a room with any rule
 // set cannot search (Lobby.search).
@@ -25,7 +28,7 @@ export const RULE_BANS_MAX = 12;
 
 /**
  * The rules, in the order the room screen lists them.
- * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number }>}
+ * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number[] }>}
  */
 export const RULES = Object.freeze([
   // cheats
@@ -41,6 +44,17 @@ export const RULES = Object.freeze([
   // less luck
   { key: 'stage', type: 'stage', category: 'seeded' },
   { key: 'bans', type: 'bans', category: 'seeded' },
+  // SPA-CC Risk tags (FINDINGS.md §5)
+  { key: 'ccInvestorBench', type: 'level', risk: [0, 1], category: 'risk' }, // 投资人: the bench no longer counts
+  { key: 'ccSwift', type: 'level', risk: [0, 1], category: 'risk' },         // 迅捷: 20 + 0.25 × stacks % (was 0.35)
+  { key: 'ccForesight', type: 'level', risk: [0, 1], category: 'risk' },     // 远见 operators −20 ASPD, active or not
+  { key: 'ccStrategyLate', type: 'level', risk: [0, 1], category: 'risk' },  // Strategies' named rounds one round later
+  { key: 'ccTier1Price', type: 'level', risk: [0, 1], category: 'risk' },    // from round 3, the first tier-1 operator +1
+  { key: 'ccUpgrade', type: 'level', risk: [0, 1, 2], category: 'risk' },    // shop upgrade 4→5 +2 (2: and 5→6 +3)
+  { key: 'ccSpRecovery', type: 'level', risk: [0, 1, 2, 3], category: 'risk' }, // time SP −0.2 / 0.5 / 0.8 per s
+  { key: 'ccBoss', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },    // final boss +50/150/400 % HP, +15/25/50 % ATK
+  { key: 'ccLeaderDr', type: 'level', risk: [0, 1, 2], category: 'risk' },   // leaders 50 / 90 % DR outside a burst
+  { key: 'ccSilencers', type: 'level', risk: [0, 1], category: 'risk' },     // rounds 10–13: 5 Silencers for the fewest stacks
 ].map((r) => Object.freeze(r)));
 
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));
@@ -51,6 +65,7 @@ const ID = /^[A-Za-z0-9_\-]{1,64}$/;
 /** The default (original game) value of a rule. */
 export function ruleDefault(rule) {
   if (rule.type === 'bool') return false;
+  if (rule.type === 'level') return 0;
   if (rule.type === 'choice') return rule.options[0];
   if (rule.type === 'bans') return Object.freeze([]);
   return null;
@@ -63,6 +78,7 @@ function cleanValue(rule, v) {
   switch (rule.type) {
     case 'bool': return typeof v === 'boolean' ? v : undefined;
     case 'choice': return rule.options.includes(v) ? v : undefined;
+    case 'level': return Number.isInteger(v) && v >= 0 && v < rule.risk.length ? v : undefined;
     case 'stage': return v === null || (typeof v === 'string' && ID.test(v)) ? v : undefined;
     case 'bans': {
       if (!Array.isArray(v)) return undefined;
@@ -123,9 +139,18 @@ export function ruleLabels(rules) {
   const on = rulesInForce(rules).map((k) => BY_KEY.get(k));
   const cheats = on.some((r) => r.category === 'cheat');
   const seeded = on.some((r) => r.category === 'seeded');
-  const risk = cheats ? 0 : on.reduce((n, r) => n + (r.category === 'risk' ? Number(r.risk) || 0 : 0), 0);
+  const risk = cheats ? 0 : on.reduce((n, r) => n + (r.category === 'risk' ? ruleRisk(r.key, rules[r.key]) : 0), 0);
   return { cheats, seeded, risk };
 }
+
+/** The Risk of a rule at `value` (0 for anything but a Risk tag). */
+export function ruleRisk(key, value) {
+  const r = BY_KEY.get(key);
+  return r && r.type === 'level' && Number.isInteger(value) ? Number(r.risk[value]) || 0 : 0;
+}
+
+/** The level of a Risk tag in `rules` (0 = off). */
+export const tagLevel = (rules, key) => (Number.isInteger(rules?.[key]) ? rules[key] : 0);
 
 /** The rule record of `key`, or null. */
 export const ruleOf = (key) => BY_KEY.get(key) || null;
