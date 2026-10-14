@@ -71,3 +71,32 @@ test('a battle from a spec with the rules fields Blaze (her body, S2, her own ki
   const plain = createBattleFromSpec({ ...spec, flags: { layerGainsEnabled: true } });
   assert.equal(plain.units.find((u) => u.uid === 1).def.charId, 'char_4162_cathy');
 });
+
+test('the client shows the match\'s records while its rules are set (data.js setRules), in the player\'s language', async () => {
+  const { createDataStore } = await import('../../public/js/data.js');
+  const { readFileSync, existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const fetch = async (url) => {
+    const abs = path.join(ROOT, url.replace(/^\/data\//, 'data/'));
+    if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
+    const text = readFileSync(abs, 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(text) };
+  };
+  const d = createDataStore({ fetch, retryDelays: [] });
+  await d.loadAll('chess', 'garrisons', 'backups');
+  assert.equal(await d.setLocale('en'), 'en');
+  const seen = [];
+  d.subscribe((n) => seen.push(n));
+  assert.equal(d.lookup('chess', BLAZE.slot.a).name, 'Catherine');
+  d.setRules({ blaze: true, virtuosaBonds: true });
+  assert.ok(seen.includes('chess') && seen.includes('garrisons'), 'subscribers re-render');
+  assert.equal(d.lookup('chess', BLAZE.slot.a).name, 'Blaze');
+  assert.equal(d.lookupBase('chess', BLAZE.slot.a).name, 'Catherine', 'the slot\'s own record stays reachable');
+  assert.deepEqual(d.lookup('chess', VIRTUOSA.ids[0]).bonds, VIRTUOSA.bonds);
+  assert.match(d.lookup('garrisons', BLAZE.garrison.a).desc, /Blaze the Igniting Spark/);
+  d.setRules(null);
+  assert.equal(d.lookup('chess', BLAZE.slot.a).name, 'Catherine');
+  assert.equal(d.lookup('garrisons', BLAZE.garrison.a), null);
+});
