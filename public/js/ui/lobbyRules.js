@@ -14,7 +14,7 @@ import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf } from '../../../shared/rules.js';
-import { VIRTUOSA, BLAZE } from '../../../shared/ruleData.js';
+import { VIRTUOSA, BLAZE, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -211,11 +211,11 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   const spark = chessName(BLAZE.product.a, BLAZE.product.a);
   const lateranoTexts = {
     A: t('原版效果'),
-    B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）', { bond: lat, list: ['chess_char_4_02_a', 'chess_char_5_01_a', 'chess_char_6_01_a'].map((id) => chessName(id, id)).join(t('、')) }),
+    B: t(LATERANO_B_TEXT, { bond: lat, list: LATERANO_B_LIST.map((id) => chessName(id, id)).join(t('、')) }),
   };
   const victoriaTexts = {
     A: t('原版效果'),
-    C: t('【{bond}】干员技能结束时，每携带1件维式重锤回复8点技力；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤', { bond: vic }),
+    C: t(VICTORIA_C_TEXT, { bond: vic }),
   };
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('自定义房间改动')} micro="CUSTOM" width="13rem" class="rules-dialog"
     actions=${html`<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
