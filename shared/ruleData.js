@@ -67,7 +67,7 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
       const rec = composeUnitRecord(identity, unit, body, { skillIndex, moduleId: slot.status?.equipLevel ? BLAZE.moduleId : null, bonds: [...BLAZE.bonds] });
       if (!rec) continue;
       chess[BLAZE.slot[form]] = { ...rec, ruleBody: 'blaze' };
-      const desc = text(form === 'b' ? BLAZE_GARRISON_DESC_ELITE : BLAZE_GARRISON_DESC, { name: own(raw.chess, BLAZE.product[form])?.name ?? '烛煌' });
+      const desc = text(form === 'b' ? BLAZE_GARRISON_DESC_ELITE : BLAZE_GARRISON_DESC, { name: own(raw.chess, BLAZE.product[form])?.name ?? BLAZE.product[form] });
       garrisons[BLAZE.garrison[form]] = {
         garrisonId: BLAZE.garrison[form],
         desc,

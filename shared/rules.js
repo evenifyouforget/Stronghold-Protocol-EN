@@ -25,7 +25,7 @@ export const RULE_BANS_MAX = 12;
 
 /**
  * The rules, in the order the room screen lists them.
- * @type {ReadonlyArray<{ key: string, type: 'bool' | 'choice' | 'stage' | 'bans', category: string, options?: string[] }>}
+ * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number }>}
  */
 export const RULES = Object.freeze([
   // cheats

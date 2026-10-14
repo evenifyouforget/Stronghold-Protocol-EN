@@ -30,8 +30,8 @@ export function ruleLabel(key, rules) {
     case 'untimed': return t('行动阶段不限时');
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
-    case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], '塑心'), a: bondName('swiftShip'), b: bondName('deputShip') });
-    case 'blaze': return t('{name}代替{old}', { name: data.get('backups')?.units?.[BLAZE.charId]?.name || chessName(BLAZE.slot.a, '煌'), old: (data.lookupBase('chess', BLAZE.slot.a)?.name || '凯瑟琳') });
+    case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
+    case 'blaze': return t('{name}代替{old}', { name: data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a) });
     case 'stage': return t('指定战场：{name}', { name: data.lookup('stages', v)?.name || v });
     case 'bans': return t('指定禁用盟约：{list}', { list: (v || []).map(bondName).join(t('、')) });
     default: return key;
@@ -149,8 +149,8 @@ function Seeded({ room, rules, editable, onSet }) {
 export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   useData('chess', 'bonds', 'backups');
   const lat = bondName('lateranoShip'), vic = bondName('victoriaShip');
-  const blazeName = data.get('backups')?.units?.[BLAZE.charId]?.name || '煌';
-  const spark = chessName(BLAZE.product.a, '烛煌');
+  const blazeName = data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId;
+  const spark = chessName(BLAZE.product.a, BLAZE.product.a);
   const lateranoTexts = {
     A: t('原版效果'),
     B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%，“每消耗X发弹药”的特质对其每发弹药计数两次。<在场6名不同【{bond}】干员>与原版相同', { bond: lat }),
@@ -174,9 +174,9 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     <//>
     <${Section} title=${t('盟约调整')} note=${t('不影响结算标签')}>
       <${Toggle} k="virtuosaBonds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('virtuosaBonds', rules)}
-        desc=${t('{name}同时属于【{a}】【{b}】【{c}】', { name: chessName(VIRTUOSA.ids[0], '塑心'), a: lat, b: bondName('swiftShip'), c: bondName('deputShip') })} />
+        desc=${t('{name}同时属于【{a}】【{b}】【{c}】', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: lat, b: bondName('swiftShip'), c: bondName('deputShip') })} />
       <${Toggle} k="blaze" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('blaze', rules)}
-        desc=${t('{name}占据{old}在调度中心的位置（相同的阶级、价格与技能位），属于【{a}】【{b}】；<售出时>获得1名【{spark}】', { name: blazeName, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || '凯瑟琳'), a: bondName('yanShip'), b: vic, spark })} />
+        desc=${t('{name}占据{old}在调度中心的位置（相同的阶级、价格与技能位），属于【{a}】【{b}】；<售出时>获得1名【{spark}】', { name: blazeName, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a), a: bondName('yanShip'), b: vic, spark })} />
     <//>
     <${Section} title=${t('减少随机')} note=${t('结算标题将带有「{mark}」', { mark: 'seeded' })}>
       <${Seeded} room=${room} rules=${rules} editable=${editable} onSet=${onSet} />
