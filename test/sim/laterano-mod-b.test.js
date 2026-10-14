@@ -1,7 +1,7 @@
 // test/sim/laterano-mod-b.test.js — 拉特兰 Mod B (Custom Lobby Modifications lateranoMod 'B', shared/rules.js;
 // server/sim/content/bonds/core.js installLaterano, garrisons/battle.js consume_ammo): ammo +min(5 + L, 75 + 0.3·L) %
-// instead of +(5 + 1.5·L) %; at 100 stacks the members deal 200 % damage and an "every N bullets" 驻守 effect counts each
-// of a 拉特兰 operator's bullets twice. The rule reaches the battle in BattleSpec flags.rules.
+// instead of +(5 + 1.5·L) %; at 100 stacks the members deal 200 % damage and an operator's "every N bullets" 驻守
+// triggers twice each time (the bullets count as usual). The rule reaches the battle in BattleSpec flags.rules.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -54,19 +54,18 @@ test('100 stacks: Mod B members deal 200 % damage; not below 100, never under Mo
   assert.ok(Math.abs(on.mul / below.mul - 2) < 1e-9, `×2: ${on.mul} vs ${below.mul}`);
 });
 
-test('100 stacks: 圣约送葬人\'s "every 7 bullets" 驻守 counts each bullet twice (fires after 4, not 7)', () => {
-  const firstGain = (mod) => {
+test('100 stacks: 圣约送葬人\'s "every 7 bullets" 驻守 triggers twice after 7 bullets (not once after 4)', () => {
+  const gainsAfter = (mod, bullets) => {
     const h = battle({ mod, layers: 100, chessId: 'chess_char_5_01_a' });
     h.step(1);
     const u = h.unit('chess_char_5_01_a');
     const gains = [];
     h.b.on('layerGain', (c) => { if (c.bondId === 'lateranoShip') gains.push(c); });
-    for (let i = 1; i <= 7; i++) {
-      h.b.emit('ammoUsed', { unit: u, left: 10 - i, skill: u.skill });
-      if (gains.length) return i;
-    }
-    return null;
+    for (let i = 1; i <= bullets; i++) h.b.emit('ammoUsed', { unit: u, left: 20 - i, skill: u.skill });
+    return gains.length;
   };
-  assert.equal(firstGain('A'), 7);
-  assert.equal(firstGain('B'), 4);
+  assert.equal(gainsAfter('A', 6), 0);
+  assert.equal(gainsAfter('A', 7), 1);
+  assert.equal(gainsAfter('B', 6), 0, 'the bullets count as usual');
+  assert.equal(gainsAfter('B', 7), 2, 'and the trait triggers twice');
 });

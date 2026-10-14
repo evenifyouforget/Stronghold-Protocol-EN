@@ -269,8 +269,8 @@ function lendAround(battle, from, share, L) {
 // 维多利亚
 
 // Mod C (Custom Lobby Modifications, shared/rules.js victoriaMod; remove-before-merge/ROADMAP.md "Victoria Mod C") replaces
-// Mod A in battle: a member gains VICTORIA_C.spPerHammer SP per 维式重锤 it carries for each skill activation — given
-// when the skill ends ([ASSUMED] a running skill takes no SP, Skill.gainSp); <6 members> at battle start every member
+// Mod A in battle: a member starts with VICTORIA_C.spPerHammer more 初始技力 per 维式重锤 it carries — on every deployment,
+// like 独行's (Fish's reading, 2026-10-14: "+SP" is starting SP); <6 members> at battle start every member
 // gets ATK +(atkBase + atkPerStack·L) (直接乘算), a 屏障 of barrier × max HP and 抵抗. Its prep side (free upgraded
 // hammers in the shop, stacks at the end of the 休整期) is registerMeta below.
 export const VICTORIA_C = Object.freeze({ spPerHammer: 8, atkBase: 2, atkPerStack: 0.012, barrier: 2, members: 6 });
@@ -284,17 +284,10 @@ export function isVictorianHammer(itemOrId) {
 function installVictoriaC(battle, pid, members) {
   const memberSet = new Set(members);
   const hammers = (u) => S.itemsOf(u).filter((id) => isVictorianHammer(id)).length;
-  const owed = new Map();
-  battle.on('skillStart', ({ unit }) => {
-    if (!memberSet.has(unit)) return;
+  battle.on('deploy', ({ unit }) => {
+    if (!memberSet.has(unit) || !unit.skill) return;
     const n = hammers(unit);
-    if (n > 0) owed.set(unit, (owed.get(unit) || 0) + n * VICTORIA_C.spPerHammer);
-  });
-  battle.on('skillEnd', ({ unit }) => {
-    const sp = owed.get(unit);
-    if (!sp) return;
-    owed.delete(unit);
-    if (unit.alive && unit.skill) unit.skill.gainSp(sp, 'bond');
+    if (n > 0) unit.skill.gainSp(n * VICTORIA_C.spPerHammer, 'init');
   });
   if (!reached(battle, pid, 'victoriaShip', VICTORIA_C.members)) return;
   const L = S.bondLayers(battle, pid, 'victoriaShip');
@@ -354,9 +347,9 @@ function installKjerag(battle, pid, bb, members) {
 
 // Mod B (Custom Lobby Modifications, shared/rules.js lateranoMod; remove-before-merge/ROADMAP.md "Laterano Mod B"):
 //   ammo +min(5 + 1.0·L, 75 + 0.3·L) % instead of +(base_ammo_percent + ammo_percent_per_stack·L);
-//   <At 100 stacks> members deal 200 % damage, and the "every N bullets" 驻守 effects (莫斯提马, 圣约送葬人, 蕾缪安:
-//   garrisons/battle.js consume_ammo) count each of their bullets twice (S.lateranoB100); the 6-member ATK per bullet
-//   is Mod A's.
+//   <At 100 stacks> members deal 200 % damage, and the operators' "every N bullets" 驻守 (莫斯提马, 圣约送葬人, 蕾缪安:
+//   garrisons/battle.js consume_ammo) trigger twice each time they trigger (S.lateranoB100; the bullets count as usual);
+//   the 6-member ATK per bullet is Mod A's and is not doubled.
 export const LATERANO_B = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003, dmg: 2 });
 
 function installLaterano(battle, pid, bb, members) {

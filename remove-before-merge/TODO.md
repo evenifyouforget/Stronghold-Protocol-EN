@@ -58,14 +58,16 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
   weaker one that outlasts it takes over when it ends. Merged into main (#12).
 - [x] PR B `wip/custom-lobby` (custom lobbies only, behind host options) — built; Fish to playtest. Readings of the
   ROADMAP text to check:
-  - Victoria Mod C: the +8 SP per hammer lands when the skill ends (a running skill takes no SP); "hammers in the shop
-    are upgraded and free" only while Victoria is active; the 6-member part (stacks to the other alliances, ATK
+  - Victoria Mod C: [ ] "+8 SP after skill activation" — waiting for the suggester's meaning (Fish, 2026-10-14). Now
+    +8 initial SP per hammer carried, at every deployment (could also be: all Victoria operators gain SP when any of
+    them activates a skill). "Hammers in the shop are upgraded and free" only while Victoria is active; the 6-member part (stacks to the other alliances, ATK
     +(200 + 1.2 × stacks)%, 200 % Barrier, Status Resistance) is all one 6-member tier; Mod C replaces Mod A
     entirely, so no hammer every 25 stacks.
-  - Laterano Mod B: "trigger twice" counts each bullet twice for the "every N bullets" traits (Mostima, Executor the
-    Ex Foedere, Lemuen), not the 6-member ATK per bullet.
-  - Blaze: Catherine's slot (tier 4, price 3, S2, the X module on the elite); selling her takes Blaze the Igniting
-    Spark from the shared pool, so none when its copies are gone.
+  - Laterano Mod B (Fish, 2026-10-14): the "every N bullets" traits (Mostima, Executor the Ex Foedere, Lemuen) count
+    bullets as usual and trigger twice each time; the 6-member ATK per bullet does not.
+  - Blaze (Fish, 2026-10-14): Catherine's slot (tier 4, price 3) and the skill / module the player chose for Catherine
+    (default S2, X module on the elite); selling her takes Blaze the Igniting Spark from the shared pool, so none when
+    its copies are gone.
   - A room with any rule set cannot search for teammates (strangers play the original game).
 - PR B scope (as planned):
   - choose the map and the alliance bans (unchosen slots stay random);

@@ -1,6 +1,6 @@
 // test/sim/victoria-mod-c.test.js — 维多利亚 Mod C (Custom Lobby Modifications victoriaMod 'C', shared/rules.js;
 // server/sim/content/bonds/core.js installVictoriaC / victoriaCPrice / victoriaCPrepEnd, server/match/player/economy.js
-// _rollItemSlot). Battle: SP per carried 维式重锤 for each activation, given when the skill ends; <6 members> ATK
+// _rollItemSlot). Battle: 初始技力 +8 per carried 维式重锤 at every deployment; <6 members> ATK
 // +(200 + 1.2·L) %, a 屏障 of 2 × max HP and 抵抗 at battle start; Mod A's damage multiplier is gone. Prep: shop hammers are
 // the upgraded ones and cost 0 while 维多利亚 is active; at the end of the 休整期 a member carrying a hammer adds its tier in
 // 维多利亚 stacks (and, with 6 members, 2 × its tier to its other active alliances).
@@ -31,19 +31,15 @@ test('hammers: every 维式重锤 kind, normal and upgraded, and nothing else', 
   assert.equal(isVictorianHammer('chess_item_1_02_e_a'), false);
 });
 
-test('SP per hammer: given when the skill ends, 8 per hammer; none without a hammer or under Mod A', () => {
-  const spAfter = (mod, items) => {
+test('初始技力 per hammer: +8 for each 维式重锤 at deployment; none without a hammer or under Mod A', () => {
+  const startSp = (mod, items) => {
     const h = battle({ mod, units: [{ chessId: 'chess_char_5_08_a', row: 10, col: 3, items }] });
-    const u = h.unit('chess_char_5_08_a');
     h.step(1);
-    u.skill.activate('test', { free: true });
-    const at = u.skill.sp;
-    assert.ok(h.runUntil(() => !u.skill.active, 60), 'the skill ends');
-    return u.skill.sp - at;
+    return h.unit('chess_char_5_08_a').skill.sp;
   };
-  const one = spAfter('C', [HAMMER]), none = spAfter('C', []), modA = spAfter('A', [HAMMER]);
-  assert.ok(one - none >= VICTORIA_C.spPerHammer - 1e-9, `with a hammer ${one}, without ${none}`);
-  assert.ok(Math.abs(none - modA) < 1e-9 || modA < one, 'Mod A gives no such SP');
+  const two = startSp('C', [HAMMER, 'chess_item_2_03_e_a']), none = startSp('C', []), modA = startSp('A', [HAMMER, 'chess_item_2_03_e_a']);
+  assert.ok(Math.abs(two - none - 2 * VICTORIA_C.spPerHammer) < 1e-6, `two hammers ${two}, none ${none}`);
+  assert.ok(Math.abs(modA - none) < 1e-6, 'Mod A gives no such SP');
 });
 
 test('<6 members>: ATK +(200 + 1.2·L) %, a 屏障 of 2 × max HP and 抵抗; not with 3, and Mod A\'s damage multiplier is gone', () => {

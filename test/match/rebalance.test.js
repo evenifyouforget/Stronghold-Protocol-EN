@@ -100,3 +100,16 @@ test('the client shows the match\'s records while its rules are set (data.js set
   assert.equal(d.lookup('chess', BLAZE.slot.a).name, 'Catherine');
   assert.equal(d.lookup('garrisons', BLAZE.garrison.a), null);
 });
+
+test('煌 takes the skill (and module) the player chose for 凯瑟琳: her loadout belongs to the shop slot', () => {
+  for (const [skillIndex, skill] of [[0, 'skchr_huang_1'], [1, 'skchr_huang_2'], [2, 'skchr_huang_3']]) {
+    const spec = buildBattleSpec({
+      battleId: 'l', fieldId: 'n:p', kind: 'normal', round: 3, stageId: 'act2autochess_m01', timeLimit: 60,
+      players: [{ playerId: 'p', units: [{ uid: 1, kind: 'chess', chessId: BLAZE.slot.b, row: 10, col: 3, skillIndex, moduleId: 'none' }] }],
+      spawns: [], flags: { layerGainsEnabled: true, rules: { blaze: true } },
+    });
+    const u = createBattleFromSpec(spec).units.find((x) => x.uid === 1);
+    assert.equal(u.def.skill?.id ?? u.def.skill?.skillId, skill, `skill ${skillIndex}`);
+    assert.equal(u.def.loadout?.moduleId, 'none', '凯瑟琳 without her module: 煌 without hers');
+  }
+});

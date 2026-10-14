@@ -153,11 +153,11 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   const spark = chessName(BLAZE.product.a, BLAZE.product.a);
   const lateranoTexts = {
     A: t('原版效果'),
-    B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%，“每消耗X发弹药”的特质对其每发弹药计数两次。<在场6名不同【{bond}】干员>与原版相同', { bond: lat }),
+    B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%，干员“每消耗X发弹药”的特质每次触发两次。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）', { bond: lat }),
   };
   const victoriaTexts = {
     A: t('原版效果'),
-    C: t('【{bond}】干员每携带1件维式重锤，技能结束时回复8点技力；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤', { bond: vic }),
+    C: t('【{bond}】干员每携带1件维式重锤，初始技力+8；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤', { bond: vic }),
   };
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('自定义房间改动')} micro="CUSTOM" width="13rem" class="rules-dialog"
     actions=${html`<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
@@ -176,7 +176,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Toggle} k="virtuosaBonds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('virtuosaBonds', rules)}
         desc=${t('{name}同时属于【{a}】【{b}】【{c}】', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: lat, b: bondName('swiftShip'), c: bondName('deputShip') })} />
       <${Toggle} k="blaze" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('blaze', rules)}
-        desc=${t('{name}占据{old}在调度中心的位置（相同的阶级、价格与技能位），属于【{a}】【{b}】；<售出时>获得1名【{spark}】', { name: blazeName, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a), a: bondName('yanShip'), b: vic, spark })} />
+        desc=${t('{name}占据{old}在调度中心的位置（相同的阶级与价格，使用为{old}选择的技能），属于【{a}】【{b}】；<售出时>获得1名【{spark}】', { name: blazeName, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a), a: bondName('yanShip'), b: vic, spark })} />
     <//>
     <${Section} title=${t('减少随机')} note=${t('结算标题将带有「{mark}」', { mark: 'seeded' })}>
       <${Seeded} room=${room} rules=${rules} editable=${editable} onSet=${onSet} />

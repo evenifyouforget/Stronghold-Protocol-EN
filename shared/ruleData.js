@@ -4,8 +4,9 @@
 // records. Data files are generated and never edited by hand: these records are made at run time.
 //
 //   virtuosaBonds  塑心 (Virtuosa, chess_char_6_09) is also in 迅捷 (Swift) and 助力 (Aid), besides 拉特兰
-//   blaze          煌 (Blaze, char_017_huang) takes 凯瑟琳's shop slot (chess_char_4_11_a / _b): her tier, price, merge,
-//                  training status and skill slot (S2; module X), Blaze's own body and kit; in 炎 and 维多利亚; and her
+//   blaze          煌 (Blaze, char_017_huang) takes 凯瑟琳's shop slot (chess_char_4_11_a / _b): her tier, price, merge and
+//                  training status, Blaze's own body and kit; the skill (and module) the player chose for 凯瑟琳 — the
+//                  loadout belongs to the slot — by default S2 and the X module; in 炎 and 维多利亚; and her
 //                  驻守 is "<售出时>获得1名【烛煌】" (an elite Blaze gives an elite one) instead of 凯瑟琳's. The record is
 //                  composed like a 补位 stand-in's (shared/standIn.js) and marked `ruleBody`, so the sim takes its kit by
 //                  charId (server/sim/content/index.js) without the stand-in's 「替补」 marks.
