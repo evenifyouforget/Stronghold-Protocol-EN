@@ -355,6 +355,7 @@
 .rules-badge--cheat { background: rgba(231, 49, 24, .85); color: #fff; }
 .rules-badge--seeded { border: 1px solid var(--gold-2); color: var(--gold-2); text-transform: none; }
 .rules-open { flex: none; }
+.room-rules .rules-summary { order: 0; }
 
 .rules-dialog .rules-note { margin: 0 0 .12rem; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
 .rules-sec { display: flex; flex-direction: column; gap: .1rem; padding: .12rem 0; border-top: 1px solid var(--line-1); }
@@ -444,3 +445,27 @@
 .searchbar__switch.is-on .searchbar__track i { transform: translateX(.3rem); background: var(--mint-400); }
 .searchbar__switch:disabled { cursor: default; }
 .room-ping__pills { display: inline-flex; gap: .08rem; }
+
+/* the map: number buttons beside a preview of the player's field (ui/lobbyRules.js StagePreview) */
+.rules-map { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: .16rem; }
+.rules-map__pick { display: flex; flex-direction: column; gap: .06rem; }
+.rules-seg__opt--num { min-width: .38rem; }
+.stage-prev { display: flex; flex-direction: column; gap: .03rem; margin: 0; }
+.stage-prev svg { width: 2.6rem; height: auto; background: rgba(0, 0, 0, .35); border: 1px solid var(--line-2); padding: .03rem; }
+.stage-prev figcaption { color: var(--text-lo); font-size: calc(.13 * var(--t)); }
+.stage-prev--random .stage-prev__q { display: grid; place-items: center; width: 2.6rem; height: 1rem; background: rgba(0, 0, 0, .35); border: 1px dashed var(--line-2); color: var(--text-lo); font-size: calc(.3 * var(--t)); }
+.stage-prev__t { fill: #5b6360; }
+.stage-prev__t--road { fill: #6f7774; }
+.stage-prev__t--floor { fill: #4a514f; }
+.stage-prev__t--high { fill: #b9c2bf; }
+.stage-prev__t--fence { fill: #8a9aa6; }
+.stage-prev__t--gate { fill: #e74c3c; }
+.stage-prev__t--goal { fill: #3d8bfd; }
+.stage-prev__t--tele { fill: #9b6bd6; }
+.stage-prev__t--deep { fill: #1f5f8b; }
+.stage-prev__t--smog { fill: #8c7aa3; }
+.stage-prev__t--infect { fill: #e8862a; }
+.stage-prev__t--mire { fill: #7a5a35; }
+.rules-ban { position: relative; }
+.rules-ban__x { position: absolute; top: .02rem; right: .02rem; width: .16rem; height: .16rem; color: #ff6b57; }
+.rules-ban.is-active span { text-decoration: line-through; }
