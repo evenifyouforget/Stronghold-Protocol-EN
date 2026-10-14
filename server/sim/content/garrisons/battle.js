@@ -291,8 +291,11 @@ const INSTALLERS = {
       for (let i = 0; i < list.length; i++) {
         const it = list[i];
         if (!ammoScope(it, unit)) continue;
-        it.cnt++;
-        if (it.cnt % Math.max(1, S.num(it.bb.consume_count, 1)) === 0) fireGain(battle, it);
+        // 拉特兰 Mod B at 100 stacks: a 拉特兰 operator's bullet counts twice (each count checked, so no step is skipped)
+        for (let n = S.lateranoB100(battle, unit) ? 2 : 1; n > 0; n--) {
+          it.cnt++;
+          if (it.cnt % Math.max(1, S.num(it.bb.consume_count, 1)) === 0) fireGain(battle, it);
+        }
       }
     });
   },

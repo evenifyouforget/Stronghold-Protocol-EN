@@ -310,11 +310,30 @@ function installKjerag(battle, pid, bb, members) {
 // =====================================================================================================================
 // 拉特兰
 
+// Mod B (Custom Lobby Modifications, shared/rules.js lateranoMod; remove-before-merge/ROADMAP.md "Laterano Mod B"):
+//   ammo +min(5 + 1.0·L, 75 + 0.3·L) % instead of +(base_ammo_percent + ammo_percent_per_stack·L);
+//   <At 100 stacks> members deal 200 % damage, and the "every N bullets" 驻守 effects (莫斯提马, 圣约送葬人, 蕾缪安:
+//   garrisons/battle.js consume_ammo) count each of their bullets twice (S.lateranoB100); the 6-member ATK per bullet
+//   is Mod A's.
+export const LATERANO_B = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003, dmg: 2 });
+
 function installLaterano(battle, pid, bb, members) {
   const memberSet = new Set(members);
+  const modB = S.battleRule(battle, 'lateranoMod') === 'B';
+  const ammoShare = (L) => (modB
+    ? Math.min(LATERANO_B.base + LATERANO_B.perStack * L, LATERANO_B.capBase + LATERANO_B.capPerStack * L)
+    : num(bb.base_ammo_percent, 0) + num(bb.ammo_percent_per_stack, 0) * L);
+  if (modB) {
+    const apply = () => {
+      if (S.bondLayers(battle, pid, 'lateranoShip') < S.LATERANO_B_STACKS) return;
+      for (const u of members) S.passiveBuff(battle, u, 'bond:laterano:b100', { dmgDealtMul: LATERANO_B.dmg });
+    };
+    apply();
+    onLayers(battle, pid, 'lateranoShip', apply);
+  }
   battle.on('skillStart', ({ unit, skill }) => {
     if (!memberSet.has(unit) || !skill || skill.kind !== 'ammo' || !(skill.ammoLeft > 0)) return;
-    const mul = 1 + num(bb.base_ammo_percent, 0) + num(bb.ammo_percent_per_stack, 0) * S.bondLayers(battle, pid, 'lateranoShip');
+    const mul = 1 + ammoShare(S.bondLayers(battle, pid, 'lateranoShip'));
     const n = Math.floor(skill.ammoLeft * mul + 1e-9);
     if (Number.isFinite(n) && n > skill.ammoLeft) skill.ammoLeft = n;
   }, { priority: -10 });
