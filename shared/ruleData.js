@@ -56,9 +56,9 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds };
   // the Alliance Modules: the alliance's text is the module's (its "current effect" line, Mod A's numbers, goes)
   const listNames = LATERANO_B_LIST.map((id) => own(raw.chess, id)?.name ?? id).join(text('、'));
-  for (const [key, bondId, msg, params] of [
-    ['lateranoMod', 'lateranoShip', LATERANO_B_TEXT, { list: listNames }],
-    ['victoriaMod', 'victoriaShip', VICTORIA_C_TEXT, {}],
+  for (const { key, bondId, msg, params } of [
+    { key: 'lateranoMod', bondId: 'lateranoShip', msg: LATERANO_B_TEXT, params: { list: listNames } },
+    { key: 'victoriaMod', bondId: 'victoriaShip', msg: VICTORIA_C_TEXT, params: {} },
   ]) {
     const rec = rules[key] && rules[key] !== 'A' ? own(raw.bonds, bondId) : null;
     if (!rec) continue;
