@@ -172,6 +172,8 @@ All lobby rules regardless of category should be possible to see in the end scre
 
 Tags belonging to a sequence are mutually exclusive with each other. (ex. Operators have -15/25/40% ATK)
 
+In terms of UI, CC traditionally lays out the tags in an implicit square grid, where mutually exclusive (ex. risk 1/2/3 progression) tags are in a column, and mutually exclusive (sidegrade) tags are always next to each other horizontally. The top row is all risk 1, the middle row is all risk 2, and the bottom row is all risk 3. "Support" tags that force the total risk to be 0 (like our cheat tags) are in the top row at the very right. All tags have icons. A text box-like section lists out the combined effects of all selected tags. Not sure how well this works with our extended lobby rules. I suppose there could be a toggle so both the compact view and grid view are possible.
+
 #### Tag Ideas
 
 Don't worry about getting this exactly right on the first try. There will be feedback.
