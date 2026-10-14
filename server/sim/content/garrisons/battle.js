@@ -294,8 +294,9 @@ const INSTALLERS = {
         it.cnt++;
         if (it.cnt % Math.max(1, S.num(it.bb.consume_count, 1)) !== 0) continue;
         fireGain(battle, it);
-        // 拉特兰 Mod B at 100 stacks: the trait of a 拉特兰 operator's bullets triggers twice
-        if (S.lateranoB100(battle, unit)) fireGain(battle, it);
+        // 拉特兰 Mod B at 100 stacks: a 拉特兰 operator's Attribute triggers twice — whoever spent the bullets (莫斯提马's
+        // counts her neighbours', 拉特兰 or not); both triggers count toward its per-battle limit (Fish, 2026-10-14)
+        if (S.lateranoB100(battle, it.unit)) fireGain(battle, it);
       }
     });
   },

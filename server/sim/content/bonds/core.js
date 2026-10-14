@@ -348,8 +348,9 @@ function installKjerag(battle, pid, bb, members) {
 // Mod B (Custom Lobby Modifications, shared/rules.js lateranoMod; remove-before-merge/ROADMAP.md "Laterano Mod B"):
 //   ammo +min(5 + 1.0·L, 75 + 0.3·L) % instead of +(base_ammo_percent + ammo_percent_per_stack·L);
 //   <At 100 stacks> members deal 200 % damage, and the operators' "every N bullets" 驻守 (莫斯提马, 圣约送葬人, 蕾缪安:
-//   garrisons/battle.js consume_ammo) trigger twice each time they trigger (S.lateranoB100; the bullets count as usual);
-//   the 6-member ATK per bullet is Mod A's and is not doubled.
+//   garrisons/battle.js consume_ammo) trigger twice each time they trigger — the Attribute's owner decides
+//   (S.lateranoB100), not whoever spent the bullets; the bullets count as usual and both triggers count toward the
+//   Attribute's per-battle limit; the 6-member ATK per bullet is Mod A's and is not doubled.
 export const LATERANO_B = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003, dmg: 2 });
 
 function installLaterano(battle, pid, bb, members) {

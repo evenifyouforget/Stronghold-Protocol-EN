@@ -153,7 +153,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   const spark = chessName(BLAZE.product.a, BLAZE.product.a);
   const lateranoTexts = {
     A: t('原版效果'),
-    B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%，干员“每消耗X发弹药”的特质每次触发两次。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）', { bond: lat }),
+    B: t('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）', { bond: lat, list: ['chess_char_4_02_a', 'chess_char_5_01_a', 'chess_char_6_01_a'].map((id) => chessName(id, id)).join(t('、')) }),
   };
   const victoriaTexts = {
     A: t('原版效果'),

@@ -69,3 +69,24 @@ test('100 stacks: 圣约送葬人\'s "every 7 bullets" 驻守 triggers twice aft
   assert.equal(gainsAfter('B', 6), 0, 'the bullets count as usual');
   assert.equal(gainsAfter('B', 7), 2, 'and the trait triggers twice');
 });
+
+test('100 stacks: the Attribute\'s owner decides — 莫斯提马\'s triggers twice on a non-拉特兰 neighbour\'s bullets', () => {
+  const gainsAfter = (mod) => {
+    const h = makeBattle({
+      defs: DEFS, timeLimit: 200, seed: 7, autoFinish: false,
+      units: [{ chessId: 'chess_char_4_02_a', row: 10, col: 3 }, { chessId: 'chess_char_3_08_a', row: 10, col: 4 }],
+      enemies: [{ key: 'enemy_dummy', pos: [10, 7] }],
+      bonds: lat(100),
+      flags: { rules: { lateranoMod: mod } },
+    });
+    h.step(1);
+    const mint = h.unit('chess_char_3_08_a');
+    assert.equal(lateranoB100(h.b, mint), false, '薄绿 is no 拉特兰 operator');
+    const gains = [];
+    h.b.on('layerGain', (c) => { if (c.bondId === 'lateranoShip') gains.push(c); });
+    for (let i = 1; i <= 6; i++) h.b.emit('ammoUsed', { unit: mint, left: 10 - i, skill: mint.skill });
+    return gains.length;
+  };
+  assert.equal(gainsAfter('A'), 1, 'her Attribute counts the neighbour\'s bullets');
+  assert.equal(gainsAfter('B'), 2, 'and triggers twice under Mod B');
+});

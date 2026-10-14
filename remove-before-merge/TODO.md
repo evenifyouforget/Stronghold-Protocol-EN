@@ -63,8 +63,10 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
     them activates a skill). "Hammers in the shop are upgraded and free" only while Victoria is active; the 6-member part (stacks to the other alliances, ATK
     +(200 + 1.2 × stacks)%, 200 % Barrier, Status Resistance) is all one 6-member tier; Mod C replaces Mod A
     entirely, so no hammer every 25 stacks.
-  - Laterano Mod B (Fish, 2026-10-14): the "every N bullets" traits (Mostima, Executor the Ex Foedere, Lemuen) count
-    bullets as usual and trigger twice each time; the 6-member ATK per bullet does not.
+  - Laterano Mod B (Fish, 2026-10-14): the bullet-spending Attributes (Mostima, Executor the Ex Foedere, Lemuen) count
+    bullets as usual and trigger twice each time; the Attribute's owner decides (Mostima's doubles on a non-Laterano
+    neighbour's bullets too); both triggers count toward the per-battle limit; the 6-member ATK per bullet does not
+    double. In-game wording = Fish's choice A.
   - Blaze (Fish, 2026-10-14): Catherine's slot (tier 4, price 3) and the skill / module the player chose for Catherine
     (default S2, X module on the elite); selling her takes Blaze the Igniting Spark from the shared pool, so none when
     its copies are gone.
