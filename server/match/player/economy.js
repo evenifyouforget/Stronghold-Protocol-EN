@@ -71,7 +71,12 @@ export class PlayerEconomy {
   }
 
   _rollItemSlot() {
-    const id = this.m.pool.rollItem(this.m.rngShop, this.shop.level, this.m.itemPool);
+    let id = this.m.pool.rollItem(this.m.rngShop, this.shop.level, this.m.itemPool);
+    // 维多利亚 Mod C (shared/rules.js victoriaMod; sim/content/bonds/core.js victoriaCPrice): while 维多利亚 is active a
+    // 维式重锤 in the shop is the upgraded one (when the shared stock still has two copies) — and free
+    const rec = id ? this.gd.item(id) : null;
+    if (rec && this.m.rules?.victoriaMod === 'C' && this.bonds.victoriaShip?.active && rec.giveBondId === 'victoriaShip'
+      && !rec.isGolden && rec.goldenId && this.m.itemPool.canGain(rec.goldenId)) id = rec.goldenId;
     return id ? { kind: 'item', id, basePrice: this.gd.itemPrice(id), frozen: false, sold: false } : null;
   }
 

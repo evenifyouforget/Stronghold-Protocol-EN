@@ -105,6 +105,7 @@
 
 import { randomBytes, randomInt } from 'node:crypto';
 import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, normalizeRules } from '../shared/constants.js';
+import { anyRule, sameRuleValue } from '../shared/rules.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks } from '../shared/protocol.js';
 import { cleanOutfits } from '../shared/outfits.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
@@ -620,9 +621,11 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
-    this.dropReplay(room, session.playerId);
     const next = normalizeRules(rules, room.rules);
-    if (Object.keys(next).some((k) => next[k] !== room.rules[k])) {
+    // searching for teammates plays the original game (shared/rules.js): stop the search before setting a rule
+    if (room.searching && anyRule(next)) return fail(ERR.CUSTOM_RULES);
+    this.dropReplay(room, session.playerId);
+    if (Object.keys(next).some((k) => !sameRuleValue(next[k], room.rules[k]))) {
       room.rules = next;
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
@@ -1108,6 +1111,8 @@ export class Lobby {
     }
     if (room.mode !== 'coop') return fail(ERR.ROOM_FULL, 'solo rooms do not search');
     if (room.searching) return OK;
+    // strangers join a search: it plays the original game (Custom Lobby Modifications are for friends' rooms)
+    if (anyRule(room.rules)) return fail(ERR.CUSTOM_RULES);
     if (roomSize(room) >= MAX_SEATS) return fail(ERR.ROOM_FULL);
     if (!groupReady(room)) return fail(ERR.NOT_READY);
     room.searching = true;

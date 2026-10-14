@@ -106,6 +106,19 @@ export function bondTier(battle, pid, bondId) {
 export const bondActive = (battle, pid, bondId, minTier = 1) => bondTier(battle, pid, bondId) >= minTier;
 /** Live layers (also while the bond is inactive). */
 export const bondLayers = (battle, pid, bondId) => Math.max(0, num(bondState(battle, pid, bondId)?.layers, 0));
+/** A Custom Lobby Modifications rule of this battle (BattleSpec flags.rules, shared/rules.js); undefined without one. */
+export const battleRule = (battle, key) => battle.flags?.rules?.[key];
+/** 拉特兰 Mod B "<At 100 stacks>": the stacks it needs (shared/rules.js lateranoMod). */
+export const LATERANO_B_STACKS = 100;
+/**
+ * Whether `u` gets 拉特兰 Mod B's 100-stack effects now: the rule is on, its owner's 拉特兰 is active with at least
+ * LATERANO_B_STACKS stacks, and it is a 拉特兰 operator (调和 included, isMember).
+ */
+export function lateranoB100(battle, u) {
+  if (battleRule(battle, 'lateranoMod') !== 'B' || !u || u.ownerId == null) return false;
+  if (!bondActive(battle, u.ownerId, 'lateranoShip') || bondLayers(battle, u.ownerId, 'lateranoShip') < LATERANO_B_STACKS) return false;
+  return unitBonds(u).includes('lateranoShip') || isMember(battle, u, 'lateranoShip');
+}
 /** Ids of the player's active bonds. */
 export function activeBondIds(battle, pid) {
   const out = [];

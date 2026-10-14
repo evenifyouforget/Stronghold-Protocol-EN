@@ -72,7 +72,9 @@ export function isDiyDef(def) {
 }
 
 /** A def whose body is another character than its chess id names (补位 stand-in, 自选 piece): its kit is keyed by charId. */
-const isOtherBody = (def) => isStandInDef(def) || isDiyDef(def);
+/** 煌 in 凯瑟琳's slot (Custom Lobby Modifications, shared/ruleData.js): the slot's ids, Blaze's body and kit. */
+export const isRuleBodyDef = (def) => !!(def && def.raw?.ruleBody && def.charId);
+const isOtherBody = (def) => isStandInDef(def) || isDiyDef(def) || isRuleBodyDef(def);
 
 /**
  * The kit builder of an operator def in `reg` ({ [key]: (bb, chess, def) => Kit }), or undefined. A stand-in's and a
