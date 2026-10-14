@@ -105,7 +105,7 @@ Local pro player pointed out the real reason Mod B will likely be preferred, is 
 
 <At 300 stacks> Gain one Damazti Isomorph (once only). When entering Rest Phase, convert excess stacks above 300 to next most stacked active Alliance.
 
-<With 6 different [Victoria] Operators on field> All [Victoria] Operators gain +50% ATK for each piece of equipment; or +80% ATK if equipment is upgraded*
+<With 6 different [Victoria] Operators on field> All [Victoria] Operators gain +50% ATK for each piece of equipment; or +80% ATK if equipment is upgraded\*
 
 #### Victoria Mod C
 
@@ -141,7 +141,7 @@ I'll bundle others into this category if they don't fit as an Alliance Mod B or 
 
 #### Radiant
 
-*Add-on Alliance · ??? · activates at 2*
+_Add-on Alliance · ??? · activates at 2_
 
 Enemies take +(10 + 1 × stacks)% True damage.
 
@@ -157,7 +157,7 @@ Tags can be implemented as lobby rules, which means we need a revamp of the lobb
 
 As some initial design decisions, I'm setting some conventions to hopefully make for efficient communication. Lobby rules can be classified into 4 groups:
 
-- Neutral, which is free to take. (ex. Laterano Mod B)
+- Neutral, which is free to take. (ex. Laterano Mod B, Virtuosa membership in Aid and Swift)
 - Cheats, which add a very visible "WITH CHEATS" watermark to the end screen. This includes +2 Funds, +2 Deploy Limit, and No Time Limit.
 - RNG Reducers, which add "seeded" to the result title. This includes directly selecting alliance bans and map.
 - Difficulty Tags, which increase the Risk.
@@ -177,10 +177,9 @@ Tags belonging to a sequence are mutually exclusive with each other. (ex. Operat
 Don't worry about getting this exactly right on the first try. There will be feedback.
 
 - (1 risk) Operators on the bench no longer count toward activating Investor
+- (1 risk) Foresight operators have -20 ASPD
 - (1 risk) Final boss gains 50 RES after taking 50% max HP as Arts damage
 - (1 risk) Final boss gains 5000 DEF after taking 50% max HP as Physical damage
-- (1/2 risk) Non-leader enemies gain +30/100% max HP
-- (1/2 risk) Non-leader enemies gain +15/40% MSPD and +15/40 ASPD
 - (1/2/3 risk) Final boss gains +50/150/400% max HP and +15/25/50% ATK
 - (1/2/3 risk) Final boss becomes invulnerable for 10 seconds (in-game time) every 68/28/18% max HP lost
 - (1/2/3 risk) Operators' auto recovery skills gain SP slower by 0.2/0.5/0.8 SP/s
@@ -198,3 +197,10 @@ Final boss modifiers affect both the regular final boss and the hidden core boss
 For the tags that involve certain enemies: if these enemies are not available here, I can suggest alternate picks. We also have the option to adjust their stats just for SPA-CC, just as SPA already adjusted boss enemies compared to their normal versions.
 
 DR = damage reduction. This should already be implemented on certain enemies.
+
+##### Rejected after pro player review
+
+Rejected because buffing mobs hurts certain team compositions much more than others: "they become free if you have a kjerag player and they become almost untakeable if you don't"
+
+- (1/2 risk) Non-leader enemies gain +30/100% max HP
+- (1/2 risk) Non-leader enemies gain +15/40% MSPD and +15/40 ASPD
