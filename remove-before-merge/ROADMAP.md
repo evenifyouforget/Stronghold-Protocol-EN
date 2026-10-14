@@ -157,7 +157,7 @@ Tags can be implemented as lobby rules, which means we need a revamp of the lobb
 
 As some initial design decisions, I'm setting some conventions to hopefully make for efficient communication. Lobby rules can be classified into 4 groups:
 
-- Neutral, which is free to take.
+- Neutral, which is free to take. (ex. Laterano Mod B)
 - Cheats, which add a very visible "WITH CHEATS" watermark to the end screen. This includes +2 Funds, +2 Deploy Limit, and No Time Limit.
 - RNG Reducers, which add "seeded" to the result title. This includes directly selecting alliance bans and map.
 - Difficulty Tags, which increase the Risk.
