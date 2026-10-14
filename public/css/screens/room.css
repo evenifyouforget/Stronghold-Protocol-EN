@@ -311,7 +311,7 @@
   align-items: center;
   gap: .22rem;
   padding: 0 .6rem .16rem;
-  font-size: .14rem;
+  font-size: calc(.14 * var(--t));
 }
 .rules-pick { display: flex; flex-wrap: wrap; gap: .1rem; }
 .rules-pick__opt {
@@ -323,7 +323,7 @@
   border: 1px solid var(--line-2);
   background: rgba(0, 0, 0, .3);
   color: var(--text-lo);
-  font-size: .16rem;
+  font-size: calc(.16 * var(--t));
   font-weight: 700;
   letter-spacing: .04em;
   transition: color var(--t-fast), background-color var(--t-med), border-color var(--t-med);
