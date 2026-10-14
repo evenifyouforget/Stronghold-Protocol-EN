@@ -113,3 +113,40 @@ test('煌 takes the skill (and module) the player chose for 凯瑟琳: her loado
     assert.equal(u.def.loadout?.moduleId, 'none', '凯瑟琳 without her module: 煌 without hers');
   }
 });
+
+test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod A "current effect") in the match and the client', async () => {
+  const h = makeMatch({ mode: 'solo', seed: 3, rules: { lateranoMod: 'B', victoriaMod: 'C' } });
+  try {
+    const lat = h.m.gd.bond('lateranoShip'), vic = h.m.gd.bond('victoriaShip');
+    assert.match(lat.desc, /min\(5 \+ 1×层数/);
+    assert.match(lat.desc, /莫斯提马/);
+    assert.equal(lat.effectDesc, undefined);
+    assert.match(vic.desc, /每携带1件维式重锤回复8点技力/);
+  } finally { h.m.dispose(); }
+  const { createDataStore } = await import('../../public/js/data.js');
+  const { readFileSync, existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { setLang, addMessages } = await import('../../shared/i18n.js');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const fetch = async (url) => {
+    const abs = path.join(ROOT, url.replace(/^\/data\//, 'data/'));
+    if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
+    const text = readFileSync(abs, 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(text) };
+  };
+  addMessages('en', JSON.parse(readFileSync(path.join(ROOT, 'public/i18n/en.json'), 'utf8')));
+  setLang('en');
+  try {
+    const d = createDataStore({ fetch, retryDelays: [] });
+    await d.loadAll('chess', 'bonds', 'backups');
+    await d.setLocale('en');
+    d.setRules({ lateranoMod: 'B' });
+    const lat = d.lookup('bonds', 'lateranoShip');
+    assert.match(lat.desc, /\[Laterano\] Operators gain \+min/);
+    assert.match(lat.desc, /Mostima/);
+    assert.ok(!lat.effectDescRaw && !lat.effectDesc, 'no Mod A current-effect line');
+    d.setRules(null);
+    assert.ok(d.lookup('bonds', 'lateranoShip').effectDescRaw, 'Mod A again');
+  } finally { setLang('zh'); }
+});
