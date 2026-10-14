@@ -46,7 +46,7 @@ export class MatchCombat {
     const wave = this.wave;
     const input = ps.battleInput({ side: 'L', colOffset: 0 });
     // the client's list: bounty units inserted among their host action's own units, which are re-timed around them
-    const spawns = withBounties(this.gd, this.round, wave, ps.bounties, ps.playerId).map((s) => ({ ...s, ownerPlayerId: ps.playerId }));
+    const spawns = withBounties(this.gd, this.round, wave, this.waveBounties(ps), ps.playerId).map((s) => ({ ...s, ownerPlayerId: ps.playerId }));
     const ev = { input, kind: 'normal', round: this.round, spawns };
     this.dispatch(ps, 'onBattleStart', ev);
     return {

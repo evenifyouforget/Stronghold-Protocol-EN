@@ -240,7 +240,7 @@ export class MatchViews {
       return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]);
     }
     if (!this.wave) return [];
-    const bounty = bountySpawns(this.gd, this.round, this.wave, ps.bounties, ps.playerId, { solo: this.isSolo });
+    const bounty = bountySpawns(this.gd, this.round, this.wave, this.waveBounties(ps), ps.playerId, { solo: this.isSolo });
     return previewOf([...this.wave.spawns, ...bounty]);
   }
 
