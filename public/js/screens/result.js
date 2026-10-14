@@ -25,6 +25,8 @@ import { store, useStore, emptyMatch } from '../store.js';
 import { audio } from '../audio.js';
 import { useDamageLog, DamageSummary } from '../ui/damageChart.js';
 import { sentText } from '../ui/lang.js';
+import { ruleLabel, ruleBadges } from '../ui/lobbyRules.js';
+import { rulesInForce, ruleOf } from '../../../shared/rules.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -157,6 +159,11 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
   const bg = uiUrl(gd.m, r.victory ? 'settle/settlemen_teamshow_success' : 'settle/settlemen_teamshow_fail');
   const mins = r.durationMs ? Math.round(r.durationMs / 60000) : null;
 
+  // Custom Lobby Modifications of the match (shared/rules.js): "seeded" after the difficulty, the WITH CHEATS mark, and the
+  // list of every rule in force (shown in full: a recording of the screen shows how the result was made)
+  const rules = pub?.rules || null;
+  const inForce = rules ? rulesInForce(rules) : [];
+  const badges = ruleBadges(rules);
   return html`<div class=${cx('screen', 'result', r.victory ? 'is-win' : 'is-lose', r.altArt && 'has-alt-art')}>
     <div class="result__bg" aria-hidden="true" style=${bg ? `--result-bg:url("${bg}")` : undefined}></div>
     ${r.altArt ? html`<div class="result__alt" aria-hidden="true" style=${`--alt-art:url("${ALT_ART_BG}")`}></div>` : null}
@@ -167,7 +174,11 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
       <section class="result__hero">
         <div class="result__summary">
         <div class="result__logo"><${Sprite} k="entry/season_logo_settle" class="result__logoimg" fallback=${html`<${MicroLabel} tone="mint">STRONGHOLD PROTOCOL</${MicroLabel}>`} /></div>
-        ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
+        ${r.difficulty || badges.seeded ? html`<div class="result__tagline">
+          ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
+          ${badges.seeded ? html`<span class="result__seeded">${badges.seeded}</span>` : null}
+        </div>` : null}
+        ${badges.cheats ? html`<div class="result__cheats" role="note">${badges.cheats}</div>` : null}
         <h1 class="result__headline">${r.victory ? t('模拟完成') : t('模拟失败')}</h1>
         <p class="result__sub">${r.victory ? t('成功卫戍 · 敌方领袖已被击败') : t('防线已被突破')}</p>
         <div class="result__rounds">
@@ -183,6 +194,10 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
             <${Img} src=${enemyIconUrl(gd.m, hidden.enemyKey)} /><span class="medal__check">${r.hiddenCleared ? html`<${Icon} name="check" />` : html`<${Icon} name="close" />`}</span>
             <span class="medal__label">${t('隐秘核心')}</span></div>` : null}
         </div>
+        ${inForce.length ? html`<div class="result__rules">
+          <span class="result__rlabel">${t('本局房间改动')}</span>
+          <ul>${inForce.map((k) => html`<li key=${k} class=${`rules-chip rules-chip--${ruleOf(k).category}`}>${ruleLabel(k, rules)}</li>`)}</ul>
+        </div>` : null}
         ${mins ? html`<p class="result__time t-lo">${tParts('本局耗时 {n} 分钟', { n: html`<b class="num">${mins}</b>`, mins })}</p>` : null}
         </div>
         <footer class="result__foot">

@@ -11,6 +11,7 @@
 //                  charId (server/sim/content/index.js) without the stand-in's 「替补」 marks.
 
 import { composeUnitRecord, unitForm } from './standIn.js';
+import { N_ } from './i18n.js';
 
 export const VIRTUOSA = Object.freeze({ ids: Object.freeze(['chess_char_6_09_a', 'chess_char_6_09_b']), bonds: Object.freeze(['lateranoShip', 'swiftShip', 'deputShip']) });
 
@@ -26,9 +27,9 @@ export const BLAZE = Object.freeze({
 
 /** The effect key of Blaze's 驻守 (server/match/effectsMeta.js): when the piece is sold, gain bbStr.chessId. */
 export const SOLD_GAIN_CHESS = 'FISH_SOLD_GAIN_CHESS';
-/** msgid of Blaze's 驻守 (translated by the client's `text`). */
-export const BLAZE_GARRISON_DESC = '<售出时>获得1名【烛煌】';
-export const BLAZE_GARRISON_DESC_ELITE = '<售出时>获得1名精锐【烛煌】';
+/** msgids of Blaze's 驻守 (translated by the client's `text`; {name} = 烛煌's name in the data). */
+export const BLAZE_GARRISON_DESC = N_('<售出时>获得1名【{name}】');
+export const BLAZE_GARRISON_DESC_ELITE = N_('<售出时>获得1名精锐【{name}】');
 
 const own = (o, k) => (o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null);
 
@@ -40,9 +41,9 @@ export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === t
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
  * @param {{ chess?: object, garrisons?: object, backups?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
- * @param {{ text?: (msgid: string) => string }} [opts] translates the made-up texts (the client passes t)
+ * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
-export function ruleDataPatch(raw, rules, { text = (s) => s } = {}) {
+export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
   const chess = {}, garrisons = {};
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons };
   if (rules.virtuosaBonds === true) {
@@ -66,11 +67,12 @@ export function ruleDataPatch(raw, rules, { text = (s) => s } = {}) {
       const rec = composeUnitRecord(identity, unit, body, { skillIndex, moduleId: slot.status?.equipLevel ? BLAZE.moduleId : null, bonds: [...BLAZE.bonds] });
       if (!rec) continue;
       chess[BLAZE.slot[form]] = { ...rec, ruleBody: 'blaze' };
+      const desc = text(form === 'b' ? BLAZE_GARRISON_DESC_ELITE : BLAZE_GARRISON_DESC, { name: own(raw.chess, BLAZE.product[form])?.name ?? '烛煌' });
       garrisons[BLAZE.garrison[form]] = {
         garrisonId: BLAZE.garrison[form],
-        desc: text(form === 'b' ? BLAZE_GARRISON_DESC_ELITE : BLAZE_GARRISON_DESC),
-        descRaw: text(form === 'b' ? BLAZE_GARRISON_DESC_ELITE : BLAZE_GARRISON_DESC),
-        eventType: 'SERVER_CHESS_SOLD', eventTypeDesc: text('整备能力'), eventTypeIcon: 'icon_gold',
+        desc,
+        descRaw: desc,
+        eventType: 'SERVER_CHESS_SOLD', eventTypeDesc: text(N_('整备能力')), eventTypeIcon: 'icon_gold',
         effectType: SOLD_GAIN_CHESS, effectKey: SOLD_GAIN_CHESS, battleRuneKey: null, charLevel: 0,
         bb: {}, bbStr: { chessId: BLAZE.product[form] },
       };
