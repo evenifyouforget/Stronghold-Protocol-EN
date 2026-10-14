@@ -91,4 +91,62 @@ describe('爱国者 in headless Chrome', { skip }, () => {
       await page.close();
     }
   });
+
+  test('the revive: his kneeling clip and an HP bar that refills; then the spear\'s wind-up reticle on a high-ground unit', async () => {
+    // 能天使 on the high ground (row 10, col 2), 薄绿 blocking him; KO at 1 s, revive to 61 s, then the spear
+    const h = makeBattle({ seed: 5, autoFinish: false, timeLimit: 900,
+      units: [{ chessId: 'chess_char_3_01_a', row: 10, col: 2 }, { chessId: 'chess_char_3_08_a', row: 10, col: 5 }] });
+    h.step();
+    const pid = h.spawn('enemy_1506_patrt', { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } }).id;
+    h.step();
+    const b = h.b;
+    for (const u of b.allies()) { b.addBuff(u, { key: 'test:wall', persist: true, mods: { hpFlat: 1e8 } }); u.hp = u.s.maxHp; }
+    const meta = { ...b.fieldMeta(), stageId: 'act2autochess_m01' };
+    b.drainEvents();
+    const frames = [];
+    const p = b.enemies.find((e) => e.id === pid);
+    let markAt = -1;
+    for (let i = 0; i < 90 * 30; i++) {
+      if (i === 30) b.dealDamage(null, p, { amount: p.hp + 1, type: 'true', sourceless: true });
+      b.step();
+      const { t, ...rest } = b.snapshot();
+      const ev = b.drainEvents();
+      if (markAt < 0 && ev.some((x) => x[0] === 'fx' && x[1] === 'patriotSpearMark')) markAt = i;
+      frames.push({ snap: { ...rest, t: 'b.snap', gt: t }, ev, gt: t });
+      if (markAt >= 0 && i >= markAt + 30) break;
+    }
+    assert.ok(markAt > 0, 'a spear was thrown in the replay');
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: 1280, height: 720 });
+      await page.goto(`http://127.0.0.1:${srv.port}/dev/render-demo.html?scene=normal-m01&paused=1&panel=0`);
+      await page.waitForFunction('window.__demo && (window.__demo.ready || window.__demo.error)', { timeout: 30000 });
+      await page.evaluate((meta) => {
+        const v = window.__demo.view;
+        v.enterBattle(meta);
+        v.setCamera('normal', { rect: meta.rect, side: 'L', instant: true });
+        v.setLocalFeed({ on: true, speed: 1 });
+      }, meta);
+      const feed = (chunk) => page.evaluate(async (c) => {
+        const v = window.__demo.view;
+        for (const f of c) {
+          if (f.ev.length) v.pushEvents({ t: 'b.ev', fieldId: f.snap.fieldId, gt: f.gt, ev: f.ev });
+          v.pushSnapshot(f.snap);
+          await new Promise((r) => requestAnimationFrame(() => r()));
+        }
+      }, chunk);
+      const mid = 30 + 30 * 30;   // 30 s into the revive
+      for (let i = 0; i < mid; i += 60) await feed(frames.slice(i, Math.min(mid, i + 60)));
+      await new Promise((r) => setTimeout(r, 400));
+      const revive = await page.evaluate((id) => { const u = window.__demo.view.debug.views.get(id); return { hp: u.hp / u.maxHp, clip: u.actor?.current?.name ?? u.actor?.clip ?? null }; }, pid);
+      await page.screenshot({ path: path.join(OUT, 'patriot-revive.png') });
+      for (let i = mid; i < markAt + 20; i += 60) await feed(frames.slice(i, Math.min(markAt + 20, i + 60)));
+      await new Promise((r) => setTimeout(r, 300));
+      await page.screenshot({ path: path.join(OUT, 'patriot-spear.png') });
+      assert.ok(Math.abs(revive.hp - 0.5) < 0.1, `HP bar at the revive's midpoint: ${revive.hp}`);
+    } finally {
+      await page.close();
+    }
+  });
 });
+

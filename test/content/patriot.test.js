@@ -53,6 +53,7 @@ test('KO: a 60 s revive with the true-damage pulse, then 毁灭姿态 with its i
   h.b.on('hit', (c) => { if (c.source === p && c.dmg.tags?.includes('patriotPulse')) pulses.push(h.b.time); });
   h.run(30);
   assert.ok(pulses.length > 0, 'the pulse during the revive');
+  assert.ok(Math.abs(p.hp / p.s.maxHp - 0.5) < 0.05, `the HP bar refills over the revive: ${(p.hp / p.s.maxHp).toFixed(2)} at 30 of 60 s`);
   h.run(32);
   assert.ok(!p.buffs.some((b) => b.key === 'ab:reborn'), 'stood up after 60 s');
   assert.ok(p.buffs.some((b) => b.key === 'ab:patriotRage'), '毁灭姿态');
@@ -61,6 +62,8 @@ test('KO: a 60 s revive with the true-damage pulse, then 毁灭姿态 with its i
   const spears = [];
   h.b.on('hit', (c) => { if (c.source === p && c.dmg.tags?.includes('patriotSpear')) spears.push(c.target); });
   h.run(45);
+  const fx = h.eventsOf('fx').map((ev) => ev[1]);
+  assert.ok(fx.includes('patriotSpearMark') && fx.includes('patriotSpear') && fx.includes('patriotSpearHit'), 'the wind-up mark, the throw and the impact are shown');
   assert.ok(spears.length >= 1, 'a spear');
   assert.ok(spears.every((t) => t.ground === false), 'at the unit on high ground');
 });

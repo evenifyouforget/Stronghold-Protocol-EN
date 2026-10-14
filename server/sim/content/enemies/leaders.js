@@ -646,6 +646,8 @@ function kitWolfLord(ab) {
  *     — a PATRIOT_SPEAR_WINDUP s telegraph, then atk_scale × ATK physical (none without a unit on high ground).
  */
 const PATRIOT_PULSE_RADIUS = 1.75, PATRIOT_PULSE_SCALE = 0.05, PATRIOT_RANGE = 0.85, PATRIOT_SPEAR_WINDUP = 3, PATRIOT_HITS = 4;
+/** When the spear leaves his hand in his Skill clip (data/assets.json … spine hits.Skill). */
+const PATRIOT_SPEAR_CLIP_HIT = 1.7;
 function kitPatriot(ab) {
   const P = { form2: false, pulseAt: 0 };
   const iv = T(ab, 'immo_trigger[rage].interval') ?? 0.8;
@@ -689,16 +691,27 @@ function kitPatriot(ab) {
     }
     if (!far) return;
     const t = far;
-    b.fx('telegraph', { x: t.x, y: t.y, r: 0.5, dur: PATRIOT_SPEAR_WINDUP, kind: 'patriotSpear', id: e.id });
+    // the wind-up: a reticle on the target and a ring on its tile for PATRIOT_SPEAR_WINDUP s (the wiki's red crosshair);
+    // his throw clip (Skill, its strike PATRIOT_SPEAR_CLIP_HIT s in) is timed to land with the spear
+    b.fx('patriotSpearMark', { x: t.x, y: t.y, id: t.id, dur: PATRIOT_SPEAR_WINDUP });
+    b.fx('telegraph', { x: t.x, y: t.y, r: 0.6, dur: PATRIOT_SPEAR_WINDUP, kind: 'patriotSpear' });
+    e.skillAnimUntil = -1;
+    b.after(Math.max(0, PATRIOT_SPEAR_WINDUP - PATRIOT_SPEAR_CLIP_HIT), () => { if (e.alive) e.skillAnimUntil = b.time + PATRIOT_SPEAR_CLIP_HIT + 0.3; });
     b.after(PATRIOT_SPEAR_WINDUP, () => {
       if (!e.alive || !t.alive || !t.deployed) return;
+      b.fx('patriotSpear', { x: t.x, y: t.y, from: e.id, to: t.id });
+      b.fx('patriotSpearHit', { x: t.x, y: t.y, id: t.id });
       hurt(b, e, t, e.s.atk * ((spear && spear.bb.atk_scale) ?? 1.35), 'phys', { tags: ['patriotSpear'] });
     });
   }, { id: 'spear', cond: (b) => P.form2 && b.allies().some((u) => u.ground === false) }),
   reborn({
     dur: T(ab, 'reborn.duration') ?? 0, invincible: T(ab, 'reborn.patrt_t_state_2[reborn_invincible].duration') ?? 0,
     onKo(b, e) { b.removeBuff(e, 'ab:patriotMarch'); },
-    during(b, e) { pulse(b, e, PATRIOT_PULSE_SCALE); },
+    // the HP bar fills back up over the revive (Fish's playtest: it shows how close he is to standing up)
+    during(b, e, a, t) {
+      e.hp = Math.max(1, e.s.maxHp * Math.min(1, t / Math.max(TICK, T(ab, 'reborn.duration') ?? 1)));
+      pulse(b, e, PATRIOT_PULSE_SCALE);
+    },
     onReborn(b, e) {
       P.form2 = true;
       e.mem.ab.immune = new Set([...(e.mem.ab.immune || []), 'stun', 'frozen', 'levitate']);

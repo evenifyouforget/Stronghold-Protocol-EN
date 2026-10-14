@@ -52,6 +52,9 @@ export const FX_KINDS = Object.freeze({
   redistribute: { a: 'wave', c: 0x62f08a }, dilemma: { a: 'wave', c: 0xc9a2ff },
   // marks
   taunt: { a: 'mark', c: 0xff9c33 }, palsy: { a: 'mark', c: 0xc77dff }, emergency: { a: 'mark', c: 0xff5a4a },
+  // 爱国者's spear (fork, SPA-CC): the reticle on its target during the wind-up, the throw, the impact
+  patriotSpearMark: { a: 'reticle', c: 0xff3b30, dur: 3 }, patriotSpear: { a: 'beam', c: 0xffd9a0 },
+  patriotSpearHit: { a: 'blast', c: 0xff8a3d, r: 0.7, heavy: true },
   lock: { a: 'reticle', c: 0xff5a4a }, droneLock: { a: 'reticle', c: 0x8fe6ff }, wanted: { a: 'reticle', c: 0xffc600 }, expose: { a: 'reticle', c: 0xff7b8a },
   reveal: { a: 'reticle', c: 0x9fd4ff }, anchor: { a: 'reticle', c: 0x9fd4ff },
   // buffs

@@ -391,6 +391,8 @@ export function collectEnemyIds({ assets07, enemies05, maps05, ops03 }) {
  *   lines a battle can play, null plans every slot of audio.mjs VOICE_SLOTS (`--voice-all`). The prep-only slots
  *   (干员报到 / 编入队伍 / 任命队长) are never requested by the client and cost 360 files / 19.3 MB of downloads.
  * @param {string[]} [p.extraEnemyIds] more enemy ids that can spawn (e.g. keys of data/enemies.json)
+ * @param {string[]} [p.eventSfxEnemyIds] enemies whose animation-event sounds (`ON_SPINE_EVENT_TRIGGER.<event>` banks) are
+ *   planned as sfx.units[id].events — the fork's own enemies (data/enemies.json `fork`), whose kits play them
  * @param {string[]} [p.extraTokenIds] more token ids (e.g. token_* keys of data/tokens.json)
  * @param {Record<string,string>} [p.extraHandbook] enemyId → handbook/model id (e.g. from data/bosses.json)
  * @param {Record<string, import('./spine.mjs').LocalSpineMeta>} [p.localEnemySpines] metadata of the enemy models the
@@ -412,7 +414,7 @@ export function collectEnemyIds({ assets07, enemies05, maps05, ops03 }) {
  */
 export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsData, charword = null, voiceLang = 'cn',
   voiceJp = true, voiceSlots = VOICE_BATTLE_SLOTS, optionalVoice = false,
-  extraEnemyIds = [], extraTokenIds = [], extraHandbook = {}, localEnemySpines = {}, localTokenSpines = {}, extraOperators = {},
+  extraEnemyIds = [], eventSfxEnemyIds = [], extraTokenIds = [], extraHandbook = {}, localEnemySpines = {}, localTokenSpines = {}, extraOperators = {},
   moduleTypes = [], outfits = null, outfitChars = [] }) {
   const notes = [];
   /** @type {Map<string, any>} */
@@ -630,6 +632,13 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     }
     const { roles: u, mix } = unitSounds(audio, pickUnitSfx(banks));
     if (mix) u.mix = mix;
+    // animation-event sounds (爱国者's revive and spear: ON_SPINE_EVENT_TRIGGER.reborn_1 / reborn_3 / spear_1), by event name
+    if (eventSfxEnemyIds.includes(id) && banks) {
+      for (const [key, paths] of banks) {
+        const m = /^ON_SPINE_EVENT_TRIGGER\.(.+)$/.exec(key);
+        if (m && paths.length) (u.events || (u.events = {}))[m[1]] = soundLeaf(paths);
+      }
+    }
     if (Object.keys(u).length) unitsSfx[id] = u;
   }
 
