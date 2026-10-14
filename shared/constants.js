@@ -25,23 +25,8 @@ export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const DIFFICULTY_NAMES = { FUNNY: N_('标准模拟'), NORMAL: N_('险境模拟'), HARD: N_('绝境模拟'), ABYSS: N_('终极模拟') };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
-// Lobby rules (Fish Edition): host-set gameplay modifiers of a room, all off by default. room.setRules merges a partial
-// { [key]: boolean } into the room's rules; the match reads them once at start (Match opts.rules).
-//   extraDeploy  +RULE_EXTRA_DEPLOY deployment limit for every player
-//   extraFunds   +RULE_EXTRA_FUNDS Funds at every round start, on top of the round's income
-//   untimed      no countdown on the screens players act on (strategy draft, 机变, 休整期), like a solo match; the
-//                battles keep their time limit
-export const RULE_KEYS = Object.freeze(['extraDeploy', 'extraFunds', 'untimed']);
-export const DEFAULT_RULES = Object.freeze({ extraDeploy: false, extraFunds: false, untimed: false });
-export const RULE_EXTRA_DEPLOY = 2;
-export const RULE_EXTRA_FUNDS = 2;
-
-/** A complete, frozen rules object: known keys only, booleans only, missing keys from `base` (default: all off). */
-export function normalizeRules(rules, base = DEFAULT_RULES) {
-  const out = {};
-  for (const k of RULE_KEYS) out[k] = rules && typeof rules[k] === 'boolean' ? rules[k] : !!base[k];
-  return Object.freeze(out);
-}
+// Lobby rules (Fish Edition): shared/rules.js (the registry, categories and labels); re-exported for older imports.
+export { RULE_KEYS, DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, normalizeRules } from './rules.js';
 
 // modeId in data/config.json = `mode_${type}_${difficulty.toLowerCase()}` with type single|multi
 export const modeIdFor = (roomMode, difficulty) =>
@@ -168,6 +153,7 @@ export const ERR = Object.freeze({
   SPECTATOR: 'SPECTATOR',         // a spectator seat only watches (MAX_SPECTATORS)
   RETIRING: 'RETIRING',           // this server generation is being replaced (server/generation.js): reload
   MAINTENANCE: 'MAINTENANCE',     // planned maintenance: no new matches (server/maintenance.js)
+  CUSTOM_RULES: 'CUSTOM_RULES',   // a room with Custom Lobby Modifications cannot search for teammates (shared/rules.js)
   INTERNAL: 'INTERNAL',
 });
 
@@ -178,7 +164,7 @@ export const ERR_TEXT = {
   WRONG_PHASE: N_('当前阶段无法进行该操作'), NO_FUNDS: N_('资金不足'), HAND_FULL: N_('整备区已满'), BOARD_FULL: N_('已达到部署上限'),
   BAD_TILE: N_('无法部署在该位置'), BAD_TARGET: N_('无效的目标'), SOLD_OUT: N_('已售出'), MAX_LEVEL: N_('调度中心已达最高等级'),
   NOT_YOUR_TURN: N_('尚未轮到你'), ALREADY: N_('已完成该操作'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
-  SPECTATOR: N_('观战中无法进行该操作'), MAINTENANCE: N_('服务器即将维护，暂时无法开始新的模拟'), INTERNAL: N_('服务器内部错误'),
+  SPECTATOR: N_('观战中无法进行该操作'), MAINTENANCE: N_('服务器即将维护，暂时无法开始新的模拟'), CUSTOM_RULES: N_('使用自定义房间改动时无法搜寻队友'), INTERNAL: N_('服务器内部错误'),
   RETIRING: N_('服务器正在更新，页面即将刷新'), // en: "The server is updating. The page will refresh."
 };
 
