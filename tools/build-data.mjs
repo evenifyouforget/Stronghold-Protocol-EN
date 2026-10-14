@@ -2504,6 +2504,8 @@ function buildEnemies(ctx) {
     const attackAnim = enemyAttackAnim(ctx.manifest, mv(data.prefabKey) || key);
     out[key] = {
       key, name, level: wantLevel, rank: mv(data.levelType, 'NORMAL'), handbookIndex: hb?.enemyIndex || null,
+      // a fork enemy (FORK_ENEMY_KEYS): not in the official mode — only Risk tags bring it (tools/golden.mjs leaves it out)
+      ...(FORK_ENEMY_KEYS.includes(key) ? { fork: true } : {}),
       desc: stripRich(descRaw), descRaw: richRaw(descRaw),
       applyWay, stats,
       abilities,

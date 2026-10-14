@@ -58,7 +58,7 @@ export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === t
 /**
  * The records `rules` change: `{ chess: { [id]: record }, garrisons: { [id]: record } }` — new objects, the inputs are not
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
- * @param {{ chess?: object, garrisons?: object, backups?: object }} raw the raw data maps (id → record)
+ * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
  * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
