@@ -189,7 +189,7 @@ Don't worry about getting this exactly right on the first try. There will be fee
 - (1 risk) Round 9 improv always offers Deathless Black Snake as an option, worth 0 Funds (no bounty); not taking Mandragora causes final boss to have +200% max HP.
 - - (2 risk) Also adds Patriot and FrostNova to the wave; penalty for skipping also gives final boss +100% ATK
 - (1 risk) On rounds 10~13, the player with the least total stacks will have 5 Vein Guardian added to their wave.
-- (1/2 risk) Leader enemies have 50/90% Physical/Arts DR while not under an elemental burst effect.
+- (1/2 risk) Leader enemies have 50/90% Physical and Arts DR while not under an elemental burst effect.
 - (1 risk) On final boss round, Rosmontis, Simulated Sentry is added to the wave. (does not need to be killed to be victorious)
 - - (2 risk) Matrix no longer provides any buffs; final boss cannot die as long as Rosmontis, Simulated Sentry is alive
 
