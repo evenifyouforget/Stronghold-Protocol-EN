@@ -200,3 +200,22 @@ rules dialog, the result labels, rules in every battle spec).
 5. Strategy round shifts: Fang's round 14 → 15 (Hidden Core only), and Lee's held Funds.
 6. Silencers: tie-break when several players share the fewest stacks (all of them? random?).
 7. Blood Debt / Asset Liquidations: the intended mechanics, since the sim has neither.
+
+### Fish's answers (2026-10-15)
+
+1. Keep the chosen bosses (related, uniquely challenging). This mode has 249 enemies, 29 of them leaders with kits —
+   mostly ones that already appear as bounties, so not hard enough. The four are in the full game data
+   (`enemy_1515_bsnake`, `enemy_1506_patrt`, `enemy_1505_frstar` / `_1510_frstar2`, `enemy_8007_eltrsm`): each needs its
+   data built into the mode, its art in the download list and a kit. Suggestion: one as a pilot to measure the cost.
+2. "Matrix" = what that Rosmontis (a different event's version) spawns when her sub-entity dies; it buffs her allies.
+   Part of her kit.
+3. Foresight −20 ASPD: every Foresight operator, even when Foresight is not active.
+4. "Leaders" as worded: the final / hidden bosses and the leader-class bounty enemies.
+5. Strategy shifts: yes, Fang 14 → 15 (Hidden Core) and Lee's held Funds 2 / 3 → released on 4.
+6. Silencers: one player, ties to the earliest seat (p1 before p2).
+7. Blood Debt / Asset Liquidation are stage mechanics of their Siracusa event, not of the enemies: a Blood Debt gauge
+   fills as enemies fall (Zaaro's lines add to it), and 清算时刻 (Asset Liquidation) follows from it. The level files
+   that define them are not in our data. What the enemy data does hold: the Silencers' buffs while it is on (+50 ASPD,
+   +15 % ATK, +15 % DEF, up to 5 stacks); in this mode only the two Silencers react to it (5 enemies do in the whole
+   game). This mode's Silencer kit is stealth only. A custom version needs: when the gauge fills, what Asset
+   Liquidation does, how long it lasts, and how the Silencers' 5 stacks build.
