@@ -177,6 +177,7 @@ Tags belonging to a sequence are mutually exclusive with each other. (ex. Operat
 Don't worry about getting this exactly right on the first try. There will be feedback.
 
 - (1 risk) Operators on the bench no longer count toward activating Investor
+- (1 risk) Swift formula nerfed from 20 + 0.35 × stacks to 20 + 0.25 × stacks
 - (1 risk) Foresight operators have -20 ASPD
 - (1 risk) All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
 - (1 risk) Starting on round 3, the first tier 1 unit you buy that round costs 1 more
@@ -189,10 +190,11 @@ Don't worry about getting this exactly right on the first try. There will be fee
 - - (2 risk) Also affects tier 5 to tier 6, and penalty increased to 3 Funds
 - (1 risk) Round 9 improv always offers Deathless Black Snake as an option, worth 0 Funds (no bounty); not taking Deathless Black Snake causes final boss to have +200% max HP.
 - - (2 risk) Also adds Patriot and FrostNova to the wave; penalty for skipping also gives final boss +100% ATK
-- (1 risk) On rounds 10~13, the player with the least total stacks will have 5 Vein Guardian added to their wave.
+- (1 risk) On rounds 10~13, the player with the least total stacks will have 5 Famiglia Shadow Silencer added to their wave.
+- - (2 risk) Blood Debt and Asset Liquidations are permanently active, for everyone (Asset Liquidations does not summon more Famiglia Shadow Silencer)
 - (1/2 risk) Leader enemies have 50/90% Physical and Arts DR while not under an elemental burst effect.
 - (1 risk) On final boss round, Rosmontis, Simulated Sentry is added to the wave. (does not need to be killed to be victorious)
-- - (2 risk) Matrix no longer provides any buffs; final boss cannot die as long as Rosmontis, Simulated Sentry is alive
+- - (2 risk) Matrix no longer provides any buffs to Operators; final boss cannot die as long as Rosmontis, Simulated Sentry is alive
 
 Final boss modifiers affect both the regular final boss and the hidden core boss.
 
