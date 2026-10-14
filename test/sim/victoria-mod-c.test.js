@@ -1,6 +1,6 @@
 // test/sim/victoria-mod-c.test.js — 维多利亚 Mod C (Custom Lobby Modifications victoriaMod 'C', shared/rules.js;
 // server/sim/content/bonds/core.js installVictoriaC / victoriaCPrice / victoriaCPrepEnd, server/match/player/economy.js
-// _rollItemSlot). Battle: 初始技力 +8 per carried 维式重锤 at every deployment; <6 members> ATK
+// _rollItemSlot). Battle: when a member's skill ends, 8 SP per carried 维式重锤; <6 members> ATK
 // +(200 + 1.2·L) %, a 屏障 of 2 × max HP and 抵抗 at battle start; Mod A's damage multiplier is gone. Prep: shop hammers are
 // the upgraded ones and cost 0 while 维多利亚 is active; at the end of the 休整期 a member carrying a hammer adds its tier in
 // 维多利亚 stacks (and, with 6 members, 2 × its tier to its other active alliances).
@@ -31,15 +31,18 @@ test('hammers: every 维式重锤 kind, normal and upgraded, and nothing else', 
   assert.equal(isVictorianHammer('chess_item_1_02_e_a'), false);
 });
 
-test('初始技力 per hammer: +8 for each 维式重锤 at deployment; none without a hammer or under Mod A', () => {
-  const startSp = (mod, items) => {
+test('SP per hammer: when a member\'s skill ends it recovers 8 per 维式重锤 (like 迅捷); none without a hammer or under Mod A', () => {
+  const spAfter = (mod, items) => {
     const h = battle({ mod, units: [{ chessId: 'chess_char_5_08_a', row: 10, col: 3, items }] });
+    const u = h.unit('chess_char_5_08_a');
     h.step(1);
-    return h.unit('chess_char_5_08_a').skill.sp;
+    u.skill.sp = 0;
+    h.b.emit('skillEnd', { unit: u, skill: u.skill, reason: 'end' });
+    return u.skill.sp;
   };
-  const two = startSp('C', [HAMMER, 'chess_item_2_03_e_a']), none = startSp('C', []), modA = startSp('A', [HAMMER, 'chess_item_2_03_e_a']);
-  assert.ok(Math.abs(two - none - 2 * VICTORIA_C.spPerHammer) < 1e-6, `two hammers ${two}, none ${none}`);
-  assert.ok(Math.abs(modA - none) < 1e-6, 'Mod A gives no such SP');
+  assert.equal(spAfter('C', [HAMMER, 'chess_item_2_03_e_a']), 2 * VICTORIA_C.spPerHammer, 'two hammers');
+  assert.equal(spAfter('C', []), 0, 'no hammer');
+  assert.equal(spAfter('A', [HAMMER]), 0, 'Mod A');
 });
 
 test('<6 members>: ATK +(200 + 1.2·L) %, a 屏障 of 2 × max HP and 抵抗; not with 3, and Mod A\'s damage multiplier is gone', () => {

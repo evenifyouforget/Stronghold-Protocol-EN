@@ -269,8 +269,8 @@ function lendAround(battle, from, share, L) {
 // 维多利亚
 
 // Mod C (Custom Lobby Modifications, shared/rules.js victoriaMod; remove-before-merge/ROADMAP.md "Victoria Mod C") replaces
-// Mod A in battle: a member starts with VICTORIA_C.spPerHammer more 初始技力 per 维式重锤 it carries — on every deployment,
-// like 独行's (Fish's reading, 2026-10-14: "+SP" is starting SP); <6 members> at battle start every member
+// Mod A in battle: when a member's skill ends, that member recovers VICTORIA_C.spPerHammer SP per 维式重锤 it carries — like
+// 迅捷's (not on a knock-out; Fish, 2026-10-15); <6 members> at battle start every member
 // gets ATK +(atkBase + atkPerStack·L) (直接乘算), a 屏障 of barrier × max HP and 抵抗. Its prep side (free upgraded
 // hammers in the shop, stacks at the end of the 休整期) is registerMeta below.
 export const VICTORIA_C = Object.freeze({ spPerHammer: 8, atkBase: 2, atkPerStack: 0.012, barrier: 2, members: 6 });
@@ -284,10 +284,10 @@ export function isVictorianHammer(itemOrId) {
 function installVictoriaC(battle, pid, members) {
   const memberSet = new Set(members);
   const hammers = (u) => S.itemsOf(u).filter((id) => isVictorianHammer(id)).length;
-  battle.on('deploy', ({ unit }) => {
-    if (!memberSet.has(unit) || !unit.skill) return;
+  battle.on('skillEnd', ({ unit, reason }) => {
+    if (!memberSet.has(unit) || reason === 'death' || !unit.alive || !unit.skill) return;
     const n = hammers(unit);
-    if (n > 0) unit.skill.gainSp(n * VICTORIA_C.spPerHammer, 'init');
+    if (n > 0) unit.skill.gainSp(n * VICTORIA_C.spPerHammer, 'bond');
   });
   if (!reached(battle, pid, 'victoriaShip', VICTORIA_C.members)) return;
   const L = S.bondLayers(battle, pid, 'victoriaShip');
