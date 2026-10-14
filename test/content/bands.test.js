@@ -22,8 +22,8 @@ const A = (k) => `chess_item_${k}_e_a`;
 // ---------------------------------------------------------------------------------------------------------------
 // prep helpers
 
-function setup({ band, mode = 'solo', humans = 1, seed = 41, bands: perPlayer = null } = {}) {
-  const h = makeMatch({ mode, humans, seed, registry: REG, fake: true }).start();
+function setup({ band, mode = 'solo', humans = 1, seed = 41, bands: perPlayer = null, rules = undefined } = {}) {
+  const h = makeMatch({ mode, humans, seed, registry: REG, fake: true, rules }).start();
   h.toPrep(1);
   const m = h.m;
   for (const ps of m.players.values()) {
@@ -173,6 +173,36 @@ test('fixed-round grants: 小贾斯汀 / 昆图斯 / 马克维茨 / 变形者集
     }
     cover(band);
   }
+});
+
+test('SPA-CC ccStrategyLate: every named round one round later; 达马兹提 and the even-round ones keep theirs', () => {
+  const CASES = [
+    ['band_justin', A('3_12'), [2, 5, 8, 11]],
+    ['band_quintus', A('5_08'), [4]],
+    ['band_damaztic', A('6_09'), [5, 10, 15]],
+    ['band_jesica', A('4_01'), [5, 8, 11, 14]],
+    ['band_fang', A('5_04'), [9, 11, 13, 15]],
+    ['band_pith', 'chess_char_1_15_a', [2]],
+  ];
+  for (const [band, id, rounds] of CASES) {
+    const { ps, roundStart } = setup({ band, seed: 5, rules: { ccStrategyLate: 1 } });
+    for (let r = 1; r <= 15; r++) {
+      const before = handIds(ps).filter((x) => x === id).length;
+      roundStart(r);
+      const got = handIds(ps).filter((x) => x === id).length - before;
+      assert.equal(got, rounds.includes(r) ? 1 : 0, `${band} R${r}`);
+      ps.hand.fill(null); ps.temp.fill(null);
+    }
+  }
+  const dob = setup({ band: 'band_doberm', rules: { ccStrategyLate: 1 } });
+  const even = [];
+  for (let r = 1; r <= 6; r++) { dob.roundStart(r); if (handIds(dob.ps, 'item').includes('chess_item_6_03_m')) even.push(r); dob.ps.hand.fill(null); }
+  assert.deepEqual(even, [2, 4, 6], '杜宾: even rounds');
+  // 老鲤: Funds held on rounds 2 and 3, released on 4 (Fish, 2026-10-15)
+  const lee = setup({ band: 'band_lmlee', seed: 14, rules: { ccStrategyLate: 1 } });
+  const got = [];
+  for (const r of [1, 2, 3, 4]) { lee.at(r); lee.ps.funds = 0; lee.ps.startRound(r); got.push(lee.ps.funds); }
+  assert.deepEqual(got, [lee.m.gd.income(1), 0, 0, 15]);
 });
 
 test('杜宾 加练！: a 教鞭 every 2 rounds (even rounds)', () => {
