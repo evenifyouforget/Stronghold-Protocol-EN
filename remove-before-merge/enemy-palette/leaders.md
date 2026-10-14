@@ -47,6 +47,13 @@ Every enemy here already has a kit in the sim.
 
 ## Patriot
 
+Prototype feedback:
+
+- The animation and sound effects for the revive seems to be missing.
+- His health bar should refill over the revive duration, to communicate how close he is to finishing.
+- Spear throwing skill is missing any kind of visual cue, sound effect, or hit vfx. It wasn't obvious to me that he was doing it at all, other than I noticed some back line operators had surprisingly low HP.
+- On Perilous (all cheats) vs a Siracusa build, he wasn't that threatening, but he didn't die instantly either. Probably difficulty is already fine for risk 1.
+
 # Clarifications
 
 ## Notes on Degenbrecher and Zaaro (2026-10-15)
@@ -57,6 +64,7 @@ untargetable while its HP refills, then it stands up in its second form and is i
 from the official data.
 
 **Zaaro, Signore dei Lupi** (`enemy_1535_wlfmster`)
+
 - Revive: **40 s** (`Reborn.duration` 40), with Primal Deterrence slowing the units around him meanwhile; then 10 s
   invincible (`Passive2.invincible_time`). So yes, 40 s as in the original.
 - First form: −30 % damage taken, can't be stunned, Hemolytic Horror (3 operators: ASPD −70, can't retreat, a bleed
@@ -65,6 +73,7 @@ from the official data.
 - Not modelled: **Blood Debt** and **Furious Howl** (both feed the event's Blood Debt gauge, which this mode lacks).
 
 **Degenbrecher** (`enemy_1525_blkswb`)
+
 - Revive: **5 s** (`Reborn.duration` 5), then 10 s invincible (`Reborn.invincible` 10).
 - First form: Status Resistance, DEF penetration against his blocker, Quickslay (blinks through his blocker, hitting
   everyone on the way), Raging Blizzard (AoE).
