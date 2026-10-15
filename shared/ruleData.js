@@ -51,6 +51,24 @@ export const CC = Object.freeze({
   lockout: Object.freeze({ every: Object.freeze([0, 0.68, 0.28, 0.18]), seconds: 10 }), // invulnerable 10 game s per step
   // Famiglia: Cleaner — rounds 10–13, the fewest stacks
   silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
+  // Famiglia Unending / Seasonal — the Blood Ledger (血债账款) of every battle (arknights.wiki.gg Blood_Ledger): it fills
+  // perSec per game second (+zaaroPerSec while Zaaro lives, + his Furious Howl, data skill WildCalling), and at max an
+  // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
+  // +15 %, +50 ASPD) per Liquidation so far in the battle, up to 5; one Shadow Silencer comes (Seasonal); the gauge drains
+  // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
+  // Seasonal: fresh every battle, from round halfFrom it starts at halfStart. Tier 3: Zaaro joins Cleaner's sub-wave and
+  // costs zaaro.leakLp when he leaks.
+  famiglia: Object.freeze({
+    max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, halfFrom: 10, halfStart: 250,
+    atkPct: 0.2, defPct: 0.15,
+    silencerKeys: Object.freeze(['enemy_1283_sgkill', 'enemy_1283_sgkill_2']),
+    silencer: Object.freeze({ atkPct: 0.15, defPct: 0.15, aspd: 50, maxStacks: 5 }),
+    summonKey: 'enemy_1283_sgkill_2',
+    zaaro: Object.freeze({ key: 'enemy_1535_wlfmster', leakLp: 5 }),
+    // Furious Howl (WildCalling: cooldown 40 s, the first 5 s after his second form starts, duration 5.5 s, sp 35): the
+    // data's numbers when his record has them; +35 per s while it lasts, outside a Liquidation only
+    howl: Object.freeze({ icd: 5, cd: 40, duration: 5.5, perSec: 35 }),
+  }),
   // Patriot: Undying 1 — the round-9 Improv always offers him (no bounty); nobody taking him: the final boss +200 % HP
   // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — Marching Stance: 90 % less Physical / Arts
   // damage from operators not blocking him, +200 % HP, the listed statuses cannot touch him, never slower than his base
@@ -58,7 +76,7 @@ export const CC = Object.freeze({
   // rounds (every player's half); Support 3: his spear picks up to 3 targets and adds 135 % ATK as Necrosis; Rampage 3:
   // every enemy +40 % move speed and +40 ASPD while he lives.
   patriot: Object.freeze({
-    key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1,
+    key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1, // Level 1 stats (data enemies.json level1)
     marchDr: 0.9, hpPct: 2,
     // the sim's status keys of Slow, Stun, Bind, Cold, Frozen, Frighten (战栗 tremble), Sleep, Fear, Levitate, Lure (attract)
     marchImmune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
@@ -74,7 +92,7 @@ export const CC = Object.freeze({
       Object.freeze({ key: 'enemy_1387_winshd', count: 10 }),
       Object.freeze({ key: 'enemy_1389_winbab_2', count: 10 }),
     ]),
-    degen: 'enemy_1525_blkswb', clones: 2,
+    degen: 'enemy_1525_blkswb', clones: 2, // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
     hpMul: Object.freeze({ united1: 5, united2: 10, resilient3: 15 }), atkMul: Object.freeze({ united2: 1.5 }),
     gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),

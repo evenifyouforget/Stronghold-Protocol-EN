@@ -190,3 +190,18 @@ test('round LP: ccLastLine +2 past the cap when the own battle leaked; a leaked 
   const off = makeMatch({ mode: 'solo', seed: 3 });
   try { assert.equal(off.m.riskLoss([{ enemyKey: CC.patriot.key, counted: true }], 1), 1); } finally { off.m.dispose(); }
 });
+
+test('ccFamiglia tier 3: Zaaro joins Cleaner\'s sub-wave and costs 5 LP when he leaks; tier 2 adds no one', () => {
+  const z = CC.famiglia.zaaro.key;
+  for (const [level, want] of [[2, false], [3, true], [4, false], [5, true]]) {
+    const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccFamiglia: level } });
+    try {
+      h.m.round = 10;
+      const keys = h.m.riskBounties(h.ps('p_0')).map((b) => b.card.enemyKey);
+      assert.ok(keys.includes(CC.silencers.key), `level ${level}: Cleaner is included`);
+      assert.equal(keys.includes(z), want, `level ${level}`);
+      if (want) assert.equal(h.m.riskLoss([{ enemyKey: z, counted: true }], 1), CC.famiglia.zaaro.leakLp);
+      else assert.equal(h.m.riskLoss([{ enemyKey: z, counted: true }], 1), 1);
+    } finally { h.m.dispose(); }
+  }
+});

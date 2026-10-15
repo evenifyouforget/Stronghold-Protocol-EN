@@ -2204,6 +2204,16 @@ function enemyOverrideRecord(over, label) {
  * built like any directly spawned enemy, so the sim, the art and the translations get them too.
  */
 export const FORK_ENEMY_KEYS = Object.freeze(['enemy_1506_patrt']);
+/** `{ level1: { maxHp, atk, def, res } }` from an enemy's Level 1 entry, or {} when it has none. */
+function level1Stats(levels, base) {
+  const lv = levels.find((l) => l.level === 1);
+  if (!lv) return {};
+  const at = mergeEnemyData(base, lv.enemyData).attributes || {};
+  return { level1: { maxHp: mv(at.maxHp, 0), atk: mv(at.atk, 0), def: mv(at.def, 0), res: cleanNum(mv(at.magicResistance, 0)) } };
+}
+
+/** Enemies whose Level 1 stats (the stronger set hard stages use) the SPA-CC Risk tags need (`level1` in their record). */
+export const LEVEL1_ENEMY_KEYS = Object.freeze(['enemy_1506_patrt', 'enemy_1525_blkswb']);
 
 function collectEnemyKeys(ctx) {
   const keys = new Set();
@@ -2506,6 +2516,8 @@ function buildEnemies(ctx) {
       key, name, level: wantLevel, rank: mv(data.levelType, 'NORMAL'), handbookIndex: hb?.enemyIndex || null,
       // a fork enemy (FORK_ENEMY_KEYS): not in the official mode — only Risk tags bring it (tools/golden.mjs leaves it out)
       ...(FORK_ENEMY_KEYS.includes(key) ? { fork: true } : {}),
+      // Level 1 stats for the SPA-CC Risk tags (LEVEL1_ENEMY_KEYS; shared/ruleData.js CC)
+      ...(LEVEL1_ENEMY_KEYS.includes(key) ? level1Stats(levels, base) : {}),
       desc: stripRich(descRaw), descRaw: richRaw(descRaw),
       applyWay, stats,
       abilities,

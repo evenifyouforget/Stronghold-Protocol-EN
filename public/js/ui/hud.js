@@ -94,6 +94,7 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
         <span class="bossbar__txt num">${frac == null ? t('敌方领袖') : bossPctText(frac)}</span>
       </div>
+      <${LedgerBar} ledger=${hud?.ledger} />
     </div>`;
   }
   if (isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null)) {
@@ -103,11 +104,28 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
       <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
       ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
       ${phase === PHASE.UNITE && Number.isFinite(miss) ? html`<${MissTag} n=${miss} />` : null}
+      <${LedgerBar} ledger=${hud?.ledger} />
     </div>`;
   }
   return html`<div class="capsule capsule--prep" role="status">
     <${Sprite} k="hudPanel/icon_rest" class="capsule__icon" fallback=${html`<${Icon} name="rook" class="capsule__icon" />`} />
     <span class="capsule__label">${prepCapsuleLabel(phase)}</span>
+  </div>`;
+}
+
+/**
+ * The SPA-CC Blood Ledger of the battle on screen (ccFamiglia Unending / Seasonal; snapHud `ledger`): the gauge filling
+ * toward an Asset Liquidation, then draining while it lasts (pulsing); a permanent Liquidation (Unending) reads so.
+ * @param {{ ledger?: { value: number, max: number, liquidating: boolean, permanent: boolean } | null }} p
+ */
+export function LedgerBar({ ledger }) {
+  if (!ledger) return null;
+  const frac = Math.max(0, Math.min(1, ledger.value / ledger.max));
+  const label = ledger.liquidating ? t('清算时刻') : `${Math.floor(ledger.value)}/${ledger.max}`; // Unending: always liquidating
+  return html`<div class=${cx('ledger', ledger.liquidating && 'is-liquidating')} data-testid="ledger"
+    title=${t('血债账款：达到{max}时触发清算时刻（敌人攻击力+20%、防御力+15%）', { max: ledger.max })}>
+    <div class="ledger__fill" style=${`width:${frac * 100}%`}></div>
+    <span class="ledger__txt num">${label}</span>
   </div>`;
 }
 

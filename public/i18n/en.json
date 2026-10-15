@@ -1506,5 +1506,14 @@
   "额外出现{n}名【{degen}】": "{n} more 【{degen}】",
   "上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】（原为25%），释放完成前生命值不会继续减少": "Those enemies have {hp}% max HP; 【{degen}】 casts Momentum Murder every {p}% of max HP lost (normally 25%), and loses no HP until the cast ends",
   "【{name}】加入本回合作战（无赏金，漏过时扣除{lp}点目标生命）。若无人选择，最终领袖最大生命值+{hp}%，攻击力+{atk}%": "【{name}】 joins this round's battle (no bounty; costs {lp} Life Points if leaked). If nobody takes him, the final Leader gets +{hp}% max HP and +{atk}% ATK",
-  "【{name}】加入本回合作战（无赏金，漏过时扣除{lp}点目标生命）。若无人选择，最终领袖最大生命值+{hp}%": "【{name}】 joins this round's battle (no bounty; costs {lp} Life Points if leaked). If nobody takes him, the final Leader gets +{hp}% max HP"
+  "【{name}】加入本回合作战（无赏金，漏过时扣除{lp}点目标生命）。若无人选择，最终领袖最大生命值+{hp}%": "【{name}】 joins this round's battle (no bounty; costs {lp} Life Points if leaked). If nobody takes him, the final Leader gets +{hp}% max HP",
+  "家族：无尽 2": "Famiglia: Unending 2",
+  "家族：无尽 3": "Famiglia: Unending 3",
+  "家族：季节 2": "Famiglia: Seasonal 2",
+  "家族：季节 3": "Famiglia: Seasonal 3",
+  "每场作战全程处于清算时刻：敌人攻击力+{atk}%，防御力+{def}%（不会因此出现【{silencer}】）": "Every battle is an Asset Liquidation from start to end: enemies +{atk}% ATK, +{def}% DEF (no 【{silencer}】 comes from it)",
+  "每场作战都有血债账款：每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时已有{half}": "Every battle has a Blood Ledger: +{n} per second; at {max}, an Asset Liquidation (enemies +{atk}% ATK and +{def}% DEF, 1 【{silencer}】 comes, the Ledger empties over {s} seconds); from round {r} it starts at {half}",
+  "【{zaaro}】加入上述额外敌人，漏过时扣除{lp}点目标生命": "【{zaaro}】 joins those extra enemies, and costs {lp} Life Points if leaked",
+  "清算时刻": "Asset Liquidation",
+  "血债账款：达到{max}时触发清算时刻（敌人攻击力+20%、防御力+15%）": "Blood Ledger: at {max}, an Asset Liquidation (enemies +20% ATK, +15% DEF)"
 }

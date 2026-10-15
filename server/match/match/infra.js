@@ -78,7 +78,8 @@ export class MatchInfra {
    * A player's bounties for this round's wave plus the SPA-CC Risk tag extras (shared/rules.js; numbers: CC). Every wave
    * builder takes its bounties from here; `boss`: the wave of a final boss round (Final Assault / Hidden Core).
    *   ccFamiglia Cleaner   rounds 10–13: the alive player with the fewest stacks in all (Σ of its alliance layers; a tie:
-   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty
+   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty; Unending 3 /
+   *                        Seasonal 3: and Zaaro (his leak costs CC.famiglia.zaaro.leakLp, riskLoss)
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
    *                        Support 3 / Rampage 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final
    *                        boss rounds Patriot and his escort come again on every player's half
@@ -130,7 +131,13 @@ export class MatchInfra {
     let low = alive[0];
     for (const p of alive) if (total(p) < total(low)) low = p;
     if (low !== ps) return [];
-    return [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave
+    const z = CC.famiglia.zaaro;
+    if ((tagHas(this.rules, 'ccFamiglia', 'unending3') || tagHas(this.rules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {
+      out.push({ id: 'risk:zaaro', roundsLeft: 1, card: { effectId: 'risk:zaaro', enemyKey: z.key, count: 1, coin: 0, payout: 'kill', rounds: 1 } });
+    }
+    return out;
   }
 
   /**
@@ -156,7 +163,7 @@ export class MatchInfra {
 
   /**
    * The LP a player's round costs (settle(), the live pendingLp): `base` (min(cap, …) as before) with the SPA-CC tags —
-   * a leaked Patriot (ccPatriot) costs CC.patriot.leakLp instead of 1, still within the cap; ccLastLine adds
+   * a leaked Patriot (ccPatriot) or Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap; ccLastLine adds
    * CC.lastLineLp when the player's own battle leaked at all, past the cap (and even when the 联防 caught every leak).
    * @param {object[]} leaked the player's own battle's leaked list
    * @param {number} base the loss without the tags
@@ -166,8 +173,13 @@ export class MatchInfra {
     if (!this.rules) return base;
     const counted = (leaked || []).filter((l) => l && l.counted !== false);
     let loss = base;
-    if (weigh && tagHas(this.rules, 'ccPatriot', 'undying1')) {
-      const extra = counted.filter((l) => l.enemyKey === CC.patriot.key).length * (CC.patriot.leakLp - 1);
+    if (weigh) {
+      // a leaked Patriot (ccPatriot) / Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap
+      const weights = [];
+      if (tagHas(this.rules, 'ccPatriot', 'undying1')) weights.push([CC.patriot.key, CC.patriot.leakLp]);
+      if (tagHas(this.rules, 'ccFamiglia', 'unending3') || tagHas(this.rules, 'ccFamiglia', 'seasonal3')) weights.push([CC.famiglia.zaaro.key, CC.famiglia.zaaro.leakLp]);
+      let extra = 0;
+      for (const [key, lp] of weights) extra += counted.filter((l) => l.enemyKey === key).length * (lp - 1);
       if (extra > 0) loss = Math.min(this.gd.lpCapPerRound, base + extra);
     }
     if (tagLevel(this.rules, 'ccLastLine') > 0 && counted.length > 0) loss += CC.lastLineLp;

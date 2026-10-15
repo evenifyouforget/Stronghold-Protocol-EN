@@ -2,7 +2,7 @@
 
 Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
 
-State as of 2026-10-15, branch `wip/spacc-tags` (on `wip/spacc`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
+State as of 2026-10-15, branch `wip/famiglia` (on `main`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
 cheat on, the total Risk counts as 0.
 
@@ -125,13 +125,22 @@ grid tile today.
 
 - **Cleaner** (Risk 1), formerly `ccSilencers`: on rounds 10–13, the Doctor with the fewest stacks across all alliances
   gets 5 Famiglia Shadow Silencers in their battle, with no bounty. Ties go to the earliest seat.
-- **Unending 2 / 3, Seasonal 2 / 3:** not built yet, they wait for the Blood Debt design (see Questions).
+- **Unending 2** (Risk 2, includes Cleaner): every battle is an Asset Liquidation from start to end: every enemy +20 %
+  ATK and +15 % DEF, the Silencers also +15 % ATK / DEF and +50 ASPD. No Silencer comes from it.
+- **Seasonal 2** (Risk 2, includes Cleaner, not with Unending): every battle has its own Blood Ledger, fresh each time.
+  It fills 3 per game second (+1 per living Zaaro, +35 per second during his Furious Howl). At 500, an Asset
+  Liquidation: the same buffs, one Famiglia Shadow Silencer comes, and the Ledger empties over 35 game seconds without
+  filling. From round 10 it starts at 250.
+- **Unending 3 / Seasonal 3** (Risk 3): Zaaro joins Cleaner's sub-wave (rounds 10–13, the fewest stacks) and costs 5 LP
+  when he leaks.
+- **Every battle:** normal rounds, the Unite Phase and the final boss rounds. A Ledger bar sits in the phase capsule at
+  the top of the battle screen (the count while it fills, "Asset Liquidation" and a pulse while one lasts).
 
 ### 17. `ccPatriot` (group, replaces the provisional tag)
 
 - **Undying 1** (Risk 1): the round-9 Improv always offers a Patriot card (no bounty). Whoever takes it fights him that
   round. If nobody takes him, the final boss gets +200 % max HP. A leaked Patriot costs 5 LP (still within the 10-per-
-  round limit).
+  round limit). He uses his Level 1 stats (60000 HP, 2000 ATK).
 - **Undying 2** (Risk 2, includes 1): in Marching Stance he takes 90 % less Physical and Arts damage from units not
   blocking him, and is immune to Slow, Stun, Bind, Cold, Freeze, Tremble (Frighten), Sleep, Fear, Levitate and Lure
   (Attract). +200 % max HP and never slower than his base speed, in both stances. Not taking him also gives the final
@@ -145,7 +154,8 @@ grid tile today.
 ### 18. `ccDelegation` (group)
 
 - **United 1** (Risk 1): in the final boss rounds, every player's half gets 1 Degenbrecher, 10 Delegation
-  Shieldbearers and 10 Delegation Centurion Champions, at 500 % of their HP that round.
+  Shieldbearers and 10 Delegation Centurion Champions, at 500 % of their HP that round. This Degenbrecher uses her Level
+  1 stats (45000 HP, 1000 ATK, 800 DEF); a bounty Degenbrecher in a normal round keeps Level 0.
 - **United 2** (Risk 2): the final boss cannot die while a Degenbrecher lives on any field (its pool stops at 1 HP).
   The sub-wave has 1000 % HP and 150 % ATK.
 - **Cloned 3** (Risk 3): 2 more Degenbrecher (3 per half).
@@ -167,11 +177,48 @@ lit, and the tiers it includes are lit faintly.
    him. In co-op's 6-card draft, the Patriot card replaces the last card (a draft shows at most 6).
 3. **Support / Rampage 3's final-round sub-wave comes whether or not anyone took Patriot on round 9.** A mode without a
    round-9 Improv (training, solo Funny) never offers him, so there's no penalty there.
-4. **Patriot / Degenbrecher "Level 1 stats":** this mode has only one level of each, so nothing to change.
+4. **Level 1 stats:** answered (Fish's note below). The data build now keeps both enemies' Level 1 stats from the game
+   data (`level1` in `data/enemies.json`; they match the wiki), and the sim uses them as above.
 5. **Delegation's HP / ATK multipliers** apply on top of the round's usual enemy scaling.
 6. **Momentum Murder's cast:** this mode had it instant. I gave it 1 s (an assumption) so the gate means something; the
    burst comes at the end of the cast.
 7. **Lockout's 10 s** are game seconds (the battles run at 2×, so 5 real seconds).
+8. **Blood Ledger, the parts the wiki leaves open:**
+   - The Silencers' Liquidation bonus is in their data as a Passive with up to 5 stacks. I read it as one stack per
+     Liquidation so far in the battle, only while one lasts (Unending: always 1).
+   - A Liquidation's Silencer comes on the field's first ground route, scaled like that round's enemies.
+   - Kills add nothing in this mode: the wiki's per-kill amounts are for Famiglia soldiers, casters and capos, which
+     this mode doesn't have (only the two Silencers and Zaaro).
+   - Furious Howl (Zaaro's `WildCalling` in the data: every 40 s, the first 5 s into his second form, 5.5 s long) only
+     adds to the Ledger here; whatever else it does in the event isn't modelled.
+
+Level 1 stats - Level 0 is the default. Some enemies have Level 1 stats used on hard stages, such as Patriot (https://arknights.wiki.gg/wiki/Patriot/Enemy) and Degenbrecher (https://arknights.wiki.gg/wiki/Degenbrecher/Enemy)
+
+Compare:
+
+Level 0 stats
+
+HP ATK DEF RES
+28000
+A+
+900
+B+
+600
+B
+50
+A
+
+Level 1 stats
+
+HP ATK DEF RES
+45000
+A+
+1000
+A
+800
+B+
+50
+A
 
 ## Questions
 
@@ -179,13 +226,17 @@ lit, and the tiers it includes are lit faintly.
    does Asset Liquidation do and for how long? With that, the Zaaro part of tier 3 is quick (he's in the data with his
    kit).
 
+See https://arknights.wiki.gg/wiki/Blood_Ledger
+
+→ Answered (2026-10-15): built as Famiglia Unending / Seasonal above. Fish: Unending = always in Liquidation, Seasonal =
+the running gauge; the Ledger is fresh every battle and runs in every battle.
+
 ## Backlog (ideas not built yet)
 
-| Idea | Risk | Status |
-|---|---|---|
-| Famiglia Unending 2 / 3, Seasonal 2 / 3 (Blood Debt, Asset Liquidation, Zaaro) | 2 / 3 | waits for the Blood Debt design |
-| Vengeance group | | Fish is rewriting it (the mob Hateful Avenger, not Reid) |
-| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
+| Idea                                                                           | Risk  | Status                                                   |
+| ------------------------------------------------------------------------------ | ----- | -------------------------------------------------------- |
+| Vengeance group                                                                |       | Fish is rewriting it (the mob Hateful Avenger, not Reid) |
+| Final round: Rosmontis, Simulated Sentry joins                                 | 1 / 2 | needs a new enemy (kit with Matrix)                      |
 
 ## New suggestions
 

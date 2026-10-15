@@ -17,7 +17,10 @@
 //                 2: the final bosses' ATK +100 % more. Undying 2: in Marching Stance (his 'ab:patriotMarch' buff) 90 % less
 //                 Physical / Arts damage from units not blocking him and immune to CC.patriot.marchImmune; +200 % HP and
 //                 never slower than his base speed (both forms). Rampage 3: every enemy +40 % move speed, +40 ASPD while
-//                 he lives. (Support 3's spear: his kit, enemies/leaders.js)
+//                 he lives. (Support 3's spear: his kit, enemies/leaders.js) Patriot, and the Degenbrecher of the
+//                 Delegation sub-wave, use their Level 1 stats (data enemies.json `level1`).
+//   ccFamiglia    Unending / Seasonal: the Blood Ledger of every battle (installFamiglia; battle.ledger, the snapshot's
+//                 `bl`); tier 3: Zaaro's leak costs CC.famiglia.zaaro.leakLp
 
 import * as S from './support/index.js';
 import { CC } from '../../../shared/ruleData.js';
@@ -64,6 +67,113 @@ export function install(battle) {
   }
   installBossPool(battle, rules);
   installPatriot(battle, rules);
+  installLevel1(battle, rules);
+  installFamiglia(battle, rules);
+  installZaaro(battle, rules);
+}
+
+/**
+ * Level 1 stats (the stronger set hard stages use; data enemies.json `level1`) for Patriot under ccPatriot and the
+ * Degenbrecher of the ccDelegation sub-wave (spawn mods bountyId 'risk:delegation:…'): her base stats × level1 / level 0,
+ * so the round's multipliers and the tag's stay on top.
+ */
+function installLevel1(battle, rules) {
+  const patriot = tagHas(rules, 'ccPatriot', 'undying1'), delegation = tagHas(rules, 'ccDelegation', 'united1');
+  if (!patriot && !delegation) return;
+  battle.on('enemySpawn', ({ enemy }) => {
+    const key = keyOf(enemy);
+    const wants = (patriot && key === CC.patriot.key)
+      || (delegation && key === CC.delegation.degen && String(enemy.mods?.bountyId ?? '').startsWith('risk:delegation'));
+    if (!wants) return;
+    const rec = battle.data && typeof battle.data.rawEnemy === 'function' ? battle.data.rawEnemy(key) : null;
+    const l1 = rec && rec.level1, l0 = rec && rec.stats;
+    if (!l1 || !l0) return;
+    const ratio = (a, b) => (Number.isFinite(a) && Number.isFinite(b) && b > 0 ? a / b : 1);
+    const hp = ratio(l1.maxHp, l0.maxHp);
+    enemy.base.maxHp *= hp;
+    enemy.base.atk *= ratio(l1.atk, l0.atk);
+    enemy.base.def *= ratio(l1.def, l0.def);
+    enemy.base.res = Number.isFinite(l1.res) ? l1.res : enemy.base.res;
+    enemy.markDirty();
+    if (!enemy.bossPool) enemy.hp = enemy.s.maxHp;
+  });
+}
+
+/**
+ * ccFamiglia Unending / Seasonal — the Blood Ledger (血债账款; arknights.wiki.gg Blood_Ledger), one per battle, fresh
+ * every battle: `battle.ledger` { value, max, liquidating, count, permanent } (the snapshot's `bl`).
+ *   Unending   the whole battle is an Asset Liquidation (permanent; no Silencer comes)
+ *   Seasonal   the gauge fills CC.famiglia.perSec per game second (+zaaroPerSec per living Zaaro, + his Furious Howl);
+ *              from round halfFrom it starts at halfStart; at max an Asset Liquidation: one Shadow Silencer comes, the
+ *              gauge drains over drainSeconds and does not fill meanwhile
+ * An Asset Liquidation: every enemy ATK +20 %, DEF +15 % (spawned during it too); the Silencers their data Passive
+ * (ATK / DEF +15 %, +50 ASPD) × the Liquidations of this battle so far, up to 5 [ASSUMED: the data's max_stack_cnt read
+ * as one stack per Liquidation].
+ */
+function installFamiglia(battle, rules) {
+  const unending = tagHas(rules, 'ccFamiglia', 'unending2'), seasonal = tagHas(rules, 'ccFamiglia', 'seasonal2');
+  if (!unending && !seasonal) return;
+  const F = CC.famiglia;
+  const silencers = new Set(F.silencerKeys);
+  const L = { value: 0, max: F.max, liquidating: false, count: 0, permanent: unending };
+  battle.ledger = L;
+  const buff = (e) => {
+    battle.addBuff(e, { key: 'risk:liquidation', persist: true, visible: true, refresh: 'replace', mods: { atkPct: F.atkPct, defPct: F.defPct } });
+    if (silencers.has(keyOf(e))) {
+      const n = Math.min(L.count, F.silencer.maxStacks);
+      battle.addBuff(e, { key: 'risk:liquidationSilencer', persist: true, visible: true, refresh: 'replace',
+        mods: { atkPct: F.silencer.atkPct * n, defPct: F.silencer.defPct * n, aspd: F.silencer.aspd * n } });
+    }
+  };
+  const start = () => {
+    L.liquidating = true;
+    L.count++;
+    L.value = L.max;
+    for (const e of battle.aliveEnemies()) buff(e);
+  };
+  const end = () => {
+    L.liquidating = false;
+    L.value = 0;
+    for (const e of battle.aliveEnemies()) { battle.removeBuff(e, 'risk:liquidation'); battle.removeBuff(e, 'risk:liquidationSilencer'); }
+  };
+  battle.on('enemySpawn', ({ enemy }) => { if (L.liquidating) buff(enemy); });
+  if (unending) { L.liquidating = true; L.count = 1; L.value = L.max; return; }
+  if (Number(battle.round) >= F.halfFrom) L.value = F.halfStart;
+  const howlSince = new Map(); // Zaaro → the time his second form started
+  battle.on('tick', ({ dt }) => {
+    if (battle.finished || !(dt > 0)) return;
+    if (L.liquidating) {
+      L.value -= (L.max / F.drainSeconds) * dt;
+      if (L.value <= 0) end();
+      return;
+    }
+    let rate = F.perSec;
+    for (const e of battle.aliveEnemies()) {
+      if (keyOf(e) !== F.zaaro.key) continue;
+      rate += F.zaaroPerSec;
+      if (!e.findBuff('ab:wolfRage')) continue;                // Furious Howl: his second form only
+      if (!howlSince.has(e)) howlSince.set(e, battle.time);
+      const sk = e.mem?.ab?.sk?.WildCalling;
+      const h = { icd: sk?.icd ?? F.howl.icd, cd: sk?.cd ?? F.howl.cd, dur: sk?.bb?.duration ?? F.howl.duration, perSec: sk?.bb?.sp ?? F.howl.perSec };
+      const t = battle.time - howlSince.get(e) - h.icd;
+      if (t >= 0 && h.cd > 0 && t % h.cd < h.dur) rate += h.perSec;
+    }
+    L.value = Math.min(L.max, L.value + rate * dt);
+    if (L.value >= L.max - 1e-9) {
+      start();
+      summonSilencer(battle, F.summonKey);
+    }
+  });
+}
+
+/** A Liquidation's Shadow Silencer (Seasonal): on the field's first ground route, the round's enemy scaling. */
+function summonSilencer(battle, key) {
+  const routes = Array.isArray(battle.routes) ? battle.routes : [];
+  let routeIndex = routes.findIndex((r) => r && r.motion !== 'FLY');
+  if (routeIndex < 0) routeIndex = 0;
+  const s = battle.flags && battle.flags.enemyScale;
+  const mods = s && typeof s === 'object' ? { hpMul: s.hpMul, atkMul: s.atkMul, speedMul: s.speedMul } : undefined;
+  try { battle.spawnEnemy(key, { routeIndex, mods, tag: 'liquidation' }); } catch (e) { battle._internalError?.('liquidation summon', e); }
 }
 
 const keyOf = (u) => u.def?.key ?? u.key;
@@ -97,6 +207,11 @@ function toggle(battle, e, key, on, buff) {
   const has = !!e.findBuff(key);
   if (on && !has) battle.addBuff(e, { key, persist: true, visible: true, ...buff });
   else if (!on && has) battle.removeBuff(e, key);
+}
+
+function installZaaro(battle, rules) {
+  if (!tagHas(rules, 'ccFamiglia', 'unending3') && !tagHas(rules, 'ccFamiglia', 'seasonal3')) return;
+  battle.on('enemySpawn', ({ enemy }) => { if (keyOf(enemy) === CC.famiglia.zaaro.key) enemy.lpr = CC.famiglia.zaaro.leakLp; });
 }
 
 function installPatriot(battle, rules) {

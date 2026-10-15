@@ -69,7 +69,7 @@ export function riskText(key, level) {
     case 'ccOzArts': return { short: t('源石区域：法术'), full: t('最终领袖受到的法术伤害累计达到其最大生命值的{p}%后，法术抗性+{n}', { p: pct(CC.ozArts.share), n: CC.ozArts.res }) };
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
-    case 'ccFamiglia': return { short: t('家族：清道夫'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'ccFamiglia': return famigliaText(nodeOf(key, level), enemyName);
     case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);
     case 'ccDelegation': return delegationText(nodeOf(key, level), enemyName);
     default: return { short: key, full: key };
@@ -77,6 +77,19 @@ export function riskText(key, level) {
 }
 
 const nodeOf = (key, level) => ruleOf(key)?.nodes?.[level] ?? null;
+
+function famigliaText(node, enemyName) {
+  const F = CC.famiglia;
+  const zaaro = enemyName(F.zaaro.key), silencer = enemyName(F.summonKey);
+  switch (node) {
+    case 'cleaner': return { short: t('家族：清道夫'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'unending2': return { short: t('家族：无尽 2'), full: t('每场作战全程处于清算时刻：敌人攻击力+{atk}%，防御力+{def}%（不会因此出现【{silencer}】）', { atk: pct(F.atkPct), def: pct(F.defPct), silencer }) };
+    case 'seasonal2': return { short: t('家族：季节 2'), full: t('每场作战都有血债账款：每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时已有{half}', { n: F.perSec, max: F.max, atk: pct(F.atkPct), def: pct(F.defPct), silencer, s: F.drainSeconds, r: F.halfFrom, half: F.halfStart }) };
+    case 'unending3':
+    case 'seasonal3': return { short: node === 'unending3' ? t('家族：无尽 3') : t('家族：季节 3'), full: t('【{zaaro}】加入上述额外敌人，漏过时扣除{lp}点目标生命', { zaaro, lp: F.zaaro.leakLp }) };
+    default: return { short: '?', full: '?' };
+  }
+}
 
 function patriotText(node, enemyName) {
   const pt = CC.patriot;
