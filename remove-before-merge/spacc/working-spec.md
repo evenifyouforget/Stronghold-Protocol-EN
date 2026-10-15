@@ -324,12 +324,38 @@ See https://arknights.wiki.gg/wiki/Blood_Ledger
 → Answered (2026-10-15): built as Famiglia Unending / Seasonal above. Fish: Unending = always in Liquidation, Seasonal =
 the running gauge; the Ledger is fresh every battle and runs in every battle.
 
+2. For Cursed Hammer, how is it drawn? Is the current convention to serve a png? Do we have postprocessing effects available ex. screenspace distortion or an animated particle overlay? What solution to make it visually distinct would avoid undue code maintenance problems?
+
+   → Claude: item icons are PNGs from the asset manifest (`data/assets.json` `items`: icon id → `/assets/…` URL, downloaded
+   by `fetch-assets`), drawn as plain `<img>` in the DOM — the hand, shop, detail panel, choice cards, the 2D fallback
+   board. The 3D battle view (Pixi) never draws item icons. The Cursed Hammer reuses the Victorian Hammer's icon, so it
+   currently looks identical. The DOM side has CSS only: filters (hue-rotate, saturate, brightness, drop-shadow), CSS
+   animations, `::after` overlays; screen-space distortion is possible with SVG filters but heavier and browser-
+   inconsistent. Pixi has particles / filters, but items aren't there. Suggestion, the way golden items already work
+   (just an `is-golden` class: gold border + glow): the hammer's generated record gets `cursed: true`, the ~5 components
+   that draw an item icon add `is-cursed` next to `is-golden`, and one CSS rule gives it a dark-red / purple hue shift,
+   darkening and a slow pulsing red glow (optionally a small corner glyph via `::after`). One flag, one rule, a one-line
+   hook per place, no assets to maintain. Custom art would look best but needs an image source and the asset pipeline.
+
+3. Is there any current visual representation of invulnerability?
+
+   → Claude: only a status icon: a unit with the invulnerable flag (`UF.INVULN` in the snapshot) gets a gold-rimmed disc
+   among the up to 4 status icons above it (`render/units.js _iconKeys`, drawn in `render/textures.js`). That covers
+   Reid's 15 s, Patriot's / Degenbrecher's revive invincibility and the final boss during a Lockout. Nothing on the
+   model itself (no tint, no shield bubble), and the boss bar in the phase capsule doesn't show it. If Lockout needs to
+   read better: a lock marker on the boss bar while the pool is invulnerable, and/or a tint on the model (cheap in
+   Pixi).
+
 ## Backlog (ideas not built yet)
 
-| Idea                                                                           | Risk  | Status                                                   |
-| ------------------------------------------------------------------------------ | ----- | -------------------------------------------------------- |
-| Final round: Rosmontis, Simulated Sentry joins                                 | 1 / 2 | needs a new enemy (kit with Matrix)                      |
+| Idea                                           | Risk  | Status                              |
+| ---------------------------------------------- | ----- | ----------------------------------- |
+| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
 
 ## New suggestions
 
-(add here)
+UI tweak for Cursed Hammer: make the "Destroy" button greyed out and unclickable, and change the text to "Cannot be destroyed".
+
+I want to try developing a visual for the Cursed Hammer that makes it stand out more and not look like a buff item. I'm thinking of a gloomy sinking effect, which could be done with a flame-like overlay (so with varying transparency, and different parts moving at different speeds), but moving down instead of up, dark blue instead of red~yellow, and slow (takes around 5 seconds to cross the height). Flame should be on top of the icon rather than inside it, so it can go outside the square. Not sure if this would be accomplished with particle systems or something else. For the sprite itself, we can give it a purple tint.
+
+For invulnerability, I want to try developing a visual that is close to the original game. The unit will have two ribbons rotating around them as if in 3D space. Ribbon can be considered a cylinder that is not very tall (thickness around 1/4 the size of a tile), that spins around its own axis. Colour should be gold. Addition, overlay, or a similar colour mixing setting can be used. Ribbon should fade transparent to gold to transparent, with 180 degrees being transparent. (the "back side") Ribbon rotates around 1 rotation per second, with the side closer to the camera moving left. Ribbons should be in opposite phase to each other. First ribbon's axis is screen +Y, then tilted 20 degrees left (counterclockwise around the Z axis that cuts through the screen) then 10 degrees toward the camera. Second ribbon is same but 20 degrees right instead of left.
