@@ -41,13 +41,14 @@ test('Unending: every battle is a Liquidation — enemies +20 % ATK, +15 % DEF, 
 test('Seasonal: fills 3 per game second; at 500 a Liquidation with one Shadow Silencer, the buffs, a 35 s drain without filling', () => {
   const h = field({ ccFamiglia: 4 });
   const d = h.spawn('enemy_dummy', { pos: [10, 7], routeIndex: 0 });
-  assert.ok(h.b.ledger.value < 1, 'fresh: from 0 before round 10');
-  h.run(100);
-  assert.ok(Math.abs(h.b.ledger.value - 300) < 2, `${h.b.ledger.value}`);
+  const start = F.max * F.startShare;
+  assert.ok(Math.abs(h.b.ledger.value - start) < 4, `fresh: ${start} before round 10, ${h.b.ledger.value}`);
+  h.run(50);
+  assert.ok(Math.abs(h.b.ledger.value - (start + 150)) < 4, `${h.b.ledger.value}`);
   assert.equal(h.b.ledger.liquidating, false);
   assert.ok(!d.buffs.some((b) => b.key === 'risk:liquidation'));
   h.runUntil(() => h.b.ledger.liquidating, 80);
-  assert.ok(Math.abs(h.b.time - (1 + 500 / 3)) < 1.5, `at ${h.b.time}`);
+  assert.ok(Math.abs(h.b.time - (1 + (F.max - start) / 3)) < 1.5, `at ${h.b.time}`);
   assert.ok(d.buffs.some((b) => b.key === 'risk:liquidation'), 'the enemies on the field');
   const sils = () => h.enemies().filter((e) => e.defId === F.summonKey);
   h.run(0.1);
@@ -62,11 +63,12 @@ test('Seasonal: fills 3 per game second; at 500 a Liquidation with one Shadow Si
   assert.equal(h.snapshot().bl[2], 0);
 });
 
-test('Seasonal from round 10 starts half full; Unending / Seasonal are separate paths over Cleaner', () => {
+test('Seasonal from round 10 starts 75 % full', () => {
   const h = field({ ccFamiglia: 4 }, { round: 10 });
-  assert.ok(h.b.ledger.value >= F.halfStart);
+  const late = F.max * F.lateShare;
+  assert.ok(h.b.ledger.value >= late);
   h.runUntil(() => h.b.ledger.liquidating, 120);
-  assert.ok(Math.abs(h.b.time - (1 + F.halfStart / 3)) < 1.5, `at ${h.b.time}`);
+  assert.ok(Math.abs(h.b.time - (1 + (F.max - late) / 3)) < 1.5, `at ${h.b.time}`);
 });
 
 test('Zaaro adds 1 per second, and 35 per second while his Furious Howl lasts (second form, outside a Liquidation)', () => {
@@ -96,7 +98,7 @@ test('the snapshot carries the Ledger', () => {
   h.run(10);
   const bl = h.snapshot().bl;
   assert.equal(bl.length, 4);
-  assert.ok(Math.abs(bl[0] - 30) <= 2 && bl[1] === F.max && bl[2] === 0 && bl[3] === 0, JSON.stringify(bl));
+  assert.ok(Math.abs(bl[0] - (F.max * F.startShare + 30)) <= 4 && bl[1] === F.max && bl[2] === 0 && bl[3] === 0, JSON.stringify(bl));
 });
 
 test('Level 1 stats: Patriot under ccPatriot; the Delegation sub-wave Degenbrecher only', () => {

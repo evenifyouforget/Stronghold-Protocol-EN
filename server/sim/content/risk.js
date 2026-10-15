@@ -16,9 +16,11 @@
 //   ccPatriot     Undying 1: Patriot's leak costs CC.patriot.leakLp; nobody took him (flags.ccPatriotSkipped) and Undying
 //                 2: the final bosses' ATK +100 % more. Undying 2: in Marching Stance (his 'ab:patriotMarch' buff) 90 % less
 //                 Physical / Arts damage from units not blocking him and immune to CC.patriot.marchImmune; +200 % HP and
-//                 never slower than his base speed (both forms). Rampage 3: every enemy +40 % move speed, +40 ASPD while
-//                 he lives. (Support 3's spear: his kit, enemies/leaders.js) Patriot, and the Degenbrecher of the
-//                 Delegation sub-wave, use their Level 1 stats (data enemies.json `level1`).
+//                 never slower than his base speed (both forms). Undying 3: every enemy +40 % move speed, +40 ASPD while
+//                 he lives. Patriot, and the Degenbrecher of the Delegation sub-wave, use their Level 1 stats (data
+//                 enemies.json `level1`).
+//   ccDelegation  United 2: the sub-wave's Degenbrecher charges while unblocked (installDegenCharge); United 3's gate is in
+//                 her kit (enemies/leaders.js)
 //   ccFamiglia    Unending / Seasonal: the Blood Ledger of every battle (installFamiglia; battle.ledger, the snapshot's
 //                 `bl`); tier 3: Zaaro's leak costs CC.famiglia.zaaro.leakLp
 
@@ -68,6 +70,7 @@ export function install(battle) {
   installBossPool(battle, rules);
   installPatriot(battle, rules);
   installLevel1(battle, rules);
+  installDegenCharge(battle, rules);
   installFamiglia(battle, rules);
   installZaaro(battle, rules);
 }
@@ -77,6 +80,28 @@ export function install(battle) {
  * Degenbrecher of the ccDelegation sub-wave (spawn mods bountyId 'risk:delegation:…'): her base stats × level1 / level 0,
  * so the round's multipliers and the tag's stay on top.
  */
+/**
+ * ccDelegation United 2: the sub-wave's Degenbrecher (spawn mods bountyId 'risk:delegation:…') charges — move speed
+ * +CC.delegation.chargePct × (unblocked time / chargeSeconds), at most +chargePct, back to 0 when she is blocked — so a
+ * field whose operators fell does not wait long for her to cross it (Fish 2026-10-15).
+ */
+function installDegenCharge(battle, rules) {
+  if (!tagHas(rules, 'ccDelegation', 'united2')) return;
+  const dg = CC.delegation;
+  const free = new Map(); // Degenbrecher → unblocked seconds
+  battle.on('tick', ({ dt }) => {
+    if (!(dt > 0)) return;
+    for (const e of battle.aliveEnemies()) {
+      if (keyOf(e) !== dg.degen || !String(e.mods?.bountyId ?? '').startsWith('risk:delegation')) continue;
+      const t = e.blockedBy ? 0 : Math.min(dg.chargeSeconds, (free.get(e) || 0) + dt);
+      free.set(e, t);
+      const pct = dg.chargePct * (t / dg.chargeSeconds);
+      if (pct > 0) battle.addBuff(e, { key: 'risk:degenCharge', persist: true, visible: true, refresh: 'replace', mods: { moveMul: 1 + pct } });
+      else if (e.findBuff('risk:degenCharge')) battle.removeBuff(e, 'risk:degenCharge');
+    }
+  });
+}
+
 function installLevel1(battle, rules) {
   const patriot = tagHas(rules, 'ccPatriot', 'undying1'), delegation = tagHas(rules, 'ccDelegation', 'united1');
   if (!patriot && !delegation) return;
@@ -104,7 +129,7 @@ function installLevel1(battle, rules) {
  * every battle: `battle.ledger` { value, max, liquidating, count, permanent } (the snapshot's `bl`).
  *   Unending   the whole battle is an Asset Liquidation (permanent; no Silencer comes)
  *   Seasonal   the gauge fills CC.famiglia.perSec per game second (+zaaroPerSec per living Zaaro, + his Furious Howl);
- *              from round halfFrom it starts at halfStart; at max an Asset Liquidation: one Shadow Silencer comes, the
+ *              it starts at startShare of max (from round lateFrom at lateShare); at max an Asset Liquidation: one Shadow Silencer comes, the
  *              gauge drains over drainSeconds and does not fill meanwhile
  * An Asset Liquidation: every enemy ATK +20 %, DEF +15 % (spawned during it too); the Silencers their data Passive
  * (ATK / DEF +15 %, +50 ASPD) × the Liquidations of this battle so far, up to 5 [ASSUMED: the data's max_stack_cnt read
@@ -138,7 +163,7 @@ function installFamiglia(battle, rules) {
   };
   battle.on('enemySpawn', ({ enemy }) => { if (L.liquidating) buff(enemy); });
   if (unending) { L.liquidating = true; L.count = 1; L.value = L.max; return; }
-  if (Number(battle.round) >= F.halfFrom) L.value = F.halfStart;
+  L.value = L.max * (Number(battle.round) >= F.lateFrom ? F.lateShare : F.startShare);
   const howlSince = new Map(); // Zaaro → the time his second form started
   battle.on('tick', ({ dt }) => {
     if (battle.finished || !(dt > 0)) return;
@@ -218,7 +243,7 @@ function installPatriot(battle, rules) {
   if (!tagHas(rules, 'ccPatriot', 'undying1')) return;
   const pt = CC.patriot;
   const isPatriot = (u) => !!u && u.side === 'enemy' && keyOf(u) === pt.key;
-  const undying2 = tagHas(rules, 'ccPatriot', 'undying2'), rampage = tagHas(rules, 'ccPatriot', 'rampage3');
+  const undying2 = tagHas(rules, 'ccPatriot', 'undying2'), rampage = tagHas(rules, 'ccPatriot', 'undying3');
   battle.on('enemySpawn', ({ enemy }) => {
     if (!isPatriot(enemy)) return;
     enemy.lpr = pt.leakLp;

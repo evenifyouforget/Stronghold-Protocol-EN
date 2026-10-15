@@ -65,8 +65,8 @@ export const RULES = Object.freeze([
   { key: 'ccLockout', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },  // final boss invulnerable 10 s every 68/28/18 %
   // tag groups (trees: see `level` above)
   { key: 'ccFamiglia', type: 'level', risk: [0, 1, 2, 3, 2, 3], nodes: [null, 'cleaner', 'unending2', 'unending3', 'seasonal2', 'seasonal3'], parent: [0, 0, 1, 2, 1, 4], category: 'risk' },
-  { key: 'ccPatriot', type: 'level', risk: [0, 1, 2, 3, 3], nodes: [null, 'undying1', 'undying2', 'support3', 'rampage3'], parent: [0, 0, 1, 2, 2], category: 'risk' },
-  { key: 'ccDelegation', type: 'level', risk: [0, 1, 2, 3, 3], nodes: [null, 'united1', 'united2', 'cloned3', 'resilient3'], parent: [0, 0, 1, 2, 2], category: 'risk' },
+  { key: 'ccPatriot', type: 'level', risk: [0, 1, 2, 3], nodes: [null, 'undying1', 'undying2', 'undying3'], parent: [0, 0, 1, 2], category: 'risk' },
+  { key: 'ccDelegation', type: 'level', risk: [0, 1, 2, 3], nodes: [null, 'united1', 'united2', 'united3'], parent: [0, 0, 1, 2], category: 'risk' },
 ].map((r) => Object.freeze(r)));
 
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));

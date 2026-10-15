@@ -83,8 +83,8 @@ export class MatchBoss {
       // bounties with battles left (a multi-round card lasts MULTI_ROUND_BOUNTY_BATTLES) follow their player into the
       // boss field, on the player's half
       g.forEach((ps, j) => {
-        // with the SPA-CC sub-waves of the final boss rounds (Match.waveBounties: Patriot Support / Rampage, Delegation)
-        for (const b of bountySpawns(this.gd, this.round, wave, this.waveBounties(ps, { boss: true }), ps.playerId, { solo: this.isSolo, side: j === 0 ? 'L' : 'R' })) spawns.push(b);
+        // with the SPA-CC sub-waves of the final boss rounds, once per field (Match.bossSubWave: Patriot, Delegation)
+        for (const b of bountySpawns(this.gd, this.round, wave, this.waveBounties(ps, { boss: true, field: g.map((p) => p.playerId) }), ps.playerId, { solo: this.isSolo, side: j === 0 ? 'L' : 'R' })) spawns.push(b);
       });
       const inputs = g.map((ps, j) => {
         const input = ps.battleInput({ side: j === 0 ? 'L' : 'R', colOffset: j === 0 ? 0 : 8 });

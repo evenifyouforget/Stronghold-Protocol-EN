@@ -57,10 +57,10 @@ export const CC = Object.freeze({
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
   // +15 %, +50 ASPD) per Liquidation so far in the battle, up to 5; one Shadow Silencer comes (Seasonal); the gauge drains
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
-  // Seasonal: fresh every battle, from round halfFrom it starts at halfStart. Tier 3: Zaaro joins Cleaner's sub-wave and
+  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
   famiglia: Object.freeze({
-    max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, halfFrom: 10, halfStart: 250,
+    max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0.25, lateFrom: 10, lateShare: 0.75,
     atkPct: 0.2, defPct: 0.15,
     silencerKeys: Object.freeze(['enemy_1283_sgkill', 'enemy_1283_sgkill_2']),
     silencer: Object.freeze({ atkPct: 0.15, defPct: 0.15, aspd: 50, maxStacks: 5 }),
@@ -73,28 +73,30 @@ export const CC = Object.freeze({
   // Patriot: Undying 1 — the round-9 Improv always offers him (no bounty); nobody taking him: the final boss +200 % HP
   // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — Marching Stance: 90 % less Physical / Arts
   // damage from operators not blocking him, +200 % HP, the listed statuses cannot touch him, never slower than his base
-  // speed. Support 3 / Rampage 3 — 5 Guerrilla Shieldguards join him, and the sub-wave comes again in the final boss
-  // rounds (every player's half); Support 3: his spear picks up to 3 targets and adds 135 % ATK as Necrosis; Rampage 3:
-  // every enemy +40 % move speed and +40 ASPD while he lives.
+  // speed. Undying 3 — 5 Guerrilla Shieldguards join him, the sub-wave comes again in the final boss rounds (once per
+  // field), and every enemy +40 % move speed and +40 ASPD while he lives (Fish's playtest nerf, 2026-10-15: Support 3 /
+  // Rampage 3 became this one level).
   patriot: Object.freeze({
     key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1, // Level 1 stats (data enemies.json level1)
     marchDr: 0.9, hpPct: 2,
     // the sim's status keys of Slow, Stun, Bind, Cold, Frozen, Frighten (战栗 tremble), Sleep, Fear, Levitate, Lure (attract)
     marchImmune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
     escort: Object.freeze({ key: 'enemy_1081_sotisd', count: 5 }),
-    spearTargets: 3, spearNecrosis: 1.35,
     rampage: Object.freeze({ movePct: 0.4, aspd: 40 }),
   }),
-  // Delegation: the sub-wave of the final boss round(s), every player's half; United 2 — the final boss cannot die while
-  // a Degenbrecher lives; Cloned 3 — 2 more Degenbrecher; Resilient 3 — Momentum Murder every 9 % with a hard HP gate
+  // Delegation: the sub-wave of the final boss round(s), once per field; United 2 — the final boss cannot die while a
+  // Degenbrecher lives, and she charges: move speed +up to chargePct while unblocked, reached after chargeSeconds, reset
+  // when blocked; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
+  // 300 / 500 %, Cloned 3 gone)
   delegation: Object.freeze({
     wave: Object.freeze([
       Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
       Object.freeze({ key: 'enemy_1387_winshd', count: 10 }),
       Object.freeze({ key: 'enemy_1389_winbab_2', count: 10 }),
     ]),
-    degen: 'enemy_1525_blkswb', clones: 2, // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
-    hpMul: Object.freeze({ united1: 5, united2: 10, resilient3: 15 }), atkMul: Object.freeze({ united2: 1.5 }),
+    degen: 'enemy_1525_blkswb', // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
+    hpMul: Object.freeze({ united1: 2, united2: 3, united3: 5 }), atkMul: Object.freeze({ united2: 1.5 }),
+    chargePct: 3, chargeSeconds: 10,
     gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),
 });

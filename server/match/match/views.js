@@ -240,7 +240,7 @@ export class MatchViews {
     if (this.bossWaves) {
       const g = this.bossGroupOf(ps);
       if (!g) return [];
-      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, this.waveBounties(ps, { boss: true }), ps.playerId, { solo: this.isSolo, side: g.side })]);
+      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, this.waveBounties(ps, { boss: true, field: g.players }), ps.playerId, { solo: this.isSolo, side: g.side })]);
     }
     if (!this.wave) return [];
     const bounty = bountySpawns(this.gd, this.round, this.wave, this.waveBounties(ps), ps.playerId, { solo: this.isSolo });
