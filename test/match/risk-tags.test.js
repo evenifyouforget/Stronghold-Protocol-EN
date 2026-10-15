@@ -205,3 +205,28 @@ test('ccFamiglia tier 3: Zaaro joins Cleaner\'s sub-wave and costs 5 LP when he 
     } finally { h.m.dispose(); }
   }
 });
+
+test('a Patriot who leaks and survives the Unite Phase still costs his leaker 5 LP (and 1 without the tag)', () => {
+  for (const [rules, want] of [[{ ccPatriot: 1 }, CC.patriot.leakLp], [{}, 1]]) {
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules }).start();
+    try {
+      h.toPrep(2);
+      h.m.round = 9;
+      const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
+      const clean = () => ({ leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 });
+      h.m.lastResults = new Map([[p0.playerId, { ...clean(), perfect: false, leaked: [{ enemyKey: CC.patriot.key, counted: true }] }], [p1.playerId, clean()]]);
+      const plan = { helpers: [p1], leakers: [p0], leaked: [{ enemyKey: CC.patriot.key, sourcePlayerId: p0.playerId }], notReentered: new Map() };
+      const unite = { perPlayer: { [p1.playerId]: { leaked: [{ enemyKey: CC.patriot.key, counted: true, sourcePlayerId: p0.playerId }] } }, unspawned: [] };
+      const before = p0.lp;
+      h.m.settle(plan, unite);
+      assert.equal(before - p0.lp, want, JSON.stringify(rules));
+    } finally { h.m.dispose(); }
+  }
+});
+
+test('the battle\'s live leak count weighs a Patriot like the settlement (the HUD\'s pending LP)', async () => {
+  const { battleProgress } = await import('../../server/sim/spec.js');
+  const fake = (rules) => ({ flags: { rules }, _perPlayer: { p_0: { leaked: [{ enemyKey: CC.patriot.key, counted: true }, { enemyKey: 'enemy_x', counted: true }] } } });
+  assert.equal(battleProgress(fake({ ccPatriot: 1 })).leaks, CC.patriot.leakLp + 1);
+  assert.equal(battleProgress(fake({})).leaks, 2);
+});

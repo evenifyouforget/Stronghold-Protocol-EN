@@ -5,7 +5,7 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { buildDeployMap } from '../board.js';
-import { CC } from '../../../shared/ruleData.js';
+import { CC, riskLeakWeight } from '../../../shared/ruleData.js';
 import { tagHas, tagLevel } from '../../../shared/rules.js';
 
 /** The effect id of ccPatriot Undying 1's round-9 card (its bounty keeps it). */
@@ -161,6 +161,9 @@ export class MatchInfra {
     return tagHas(this.rules, 'ccPatriot', 'undying1') && !!this.ccPatriotOffered && !this.ccPatriotTaken;
   }
 
+  /** The LP one leak of `enemyKey` costs in a normal round or a 联防 (1; a Patriot / tier-3 Zaaro under their tags more). */
+  riskLeakWeight(enemyKey) { return riskLeakWeight(this.rules, enemyKey); }
+
   /**
    * The LP a player's round costs (settle(), the live pendingLp): `base` (min(cap, …) as before) with the SPA-CC tags —
    * a leaked Patriot (ccPatriot) or Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap; ccLastLine adds
@@ -175,11 +178,8 @@ export class MatchInfra {
     let loss = base;
     if (weigh) {
       // a leaked Patriot (ccPatriot) / Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap
-      const weights = [];
-      if (tagHas(this.rules, 'ccPatriot', 'undying1')) weights.push([CC.patriot.key, CC.patriot.leakLp]);
-      if (tagHas(this.rules, 'ccFamiglia', 'unending3') || tagHas(this.rules, 'ccFamiglia', 'seasonal3')) weights.push([CC.famiglia.zaaro.key, CC.famiglia.zaaro.leakLp]);
       let extra = 0;
-      for (const [key, lp] of weights) extra += counted.filter((l) => l.enemyKey === key).length * (lp - 1);
+      for (const l of counted) extra += this.riskLeakWeight(l.enemyKey) - 1;
       if (extra > 0) loss = Math.min(this.gd.lpCapPerRound, base + extra);
     }
     if (tagLevel(this.rules, 'ccLastLine') > 0 && counted.length > 0) loss += CC.lastLineLp;

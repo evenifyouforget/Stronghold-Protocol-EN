@@ -13,6 +13,7 @@
 
 import { composeUnitRecord, unitForm } from './standIn.js';
 import { N_ } from './i18n.js';
+import { tagHas } from './rules.js';
 
 export const VIRTUOSA = Object.freeze({ ids: Object.freeze(['chess_char_6_09_a', 'chess_char_6_09_b']), bonds: Object.freeze(['lateranoShip', 'swiftShip', 'deputShip']) });
 
@@ -97,6 +98,18 @@ export const CC = Object.freeze({
     gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),
 });
+
+/**
+ * The LP one leak of `enemyKey` costs in a normal round or a 联防 under `rules` (1; the SPA-CC tags' heavier leaks: a
+ * Patriot under ccPatriot, Zaaro under ccFamiglia tier 3). One rule for the match's settlement (Match.riskLoss,
+ * uniteSurvivors) and the battle's live count (server/sim/spec.js battleProgress `leaks`, the HUD's pending LP).
+ */
+export function riskLeakWeight(rules, enemyKey) {
+  if (!rules || typeof enemyKey !== 'string') return 1;
+  if (enemyKey === CC.patriot.key && tagHas(rules, 'ccPatriot', 'undying1')) return CC.patriot.leakLp;
+  if (enemyKey === CC.famiglia.zaaro.key && (tagHas(rules, 'ccFamiglia', 'unending3') || tagHas(rules, 'ccFamiglia', 'seasonal3'))) return CC.famiglia.zaaro.leakLp;
+  return 1;
+}
 
 /** msgid of the note added to 投资人's text when the bench no longer counts. */
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
