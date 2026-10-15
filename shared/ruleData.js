@@ -62,7 +62,8 @@ export const CC = Object.freeze({
   // Junk 1: every player gets a Cursed Hammer at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
   // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
   // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
-  junk: Object.freeze({ itemId: 'fish_item_cursed_hammer', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1041_acarm041' }),
+  // its icon: 源石溶剂 (Originium Solvent)'s vial, drawn colour-inverted — a cyan vial on white (Fish 2026-10-16)
+  junk: Object.freeze({ itemId: 'fish_item_cursed_hammer', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1125_acarm125' }),
   // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
   // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
   // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
@@ -145,7 +146,8 @@ function cursedHammerRecord(level, text) {
     shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1, giveBondId: null, givePowerId: null,
     canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc, descRaw: desc, buffs: [], params: {},
     category: 'STAT', kind: 'passive', family: null, implFormula: 'ATK% += −0.5 (server/sim/content/risk.js)', fork: true,
-    // drawn cursed: a purple tint and a sinking dark-blue flame (ui/gameComponents.js UnitThumb, render/units.js ItemView)
+    // drawn cursed: the icon colour-inverted and a sinking dark-blue flame (ui/gameComponents.js UnitThumb, render/units.js
+    // ItemView)
     cursed: true,
   };
 }

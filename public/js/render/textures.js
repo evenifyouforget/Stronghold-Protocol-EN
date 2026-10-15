@@ -1290,8 +1290,12 @@ export function cursedFlameTexture() {
   return _cursedFlame;
 }
 
-export function itemTexture(key, img, color) {
-  const k = `${key}|${img ? 1 : 0}|${color}`;
+/**
+ * An item's plate: a dark rounded square in `color` with the icon. `invert` (the SPA-CC Cursed Hammer): the finished
+ * plate's colours inverted — a white plate, the icon's colours turned to their complements (its red vial cyan).
+ */
+export function itemTexture(key, img, color, { invert = false } = {}) {
+  const k = `${key}|${img ? 1 : 0}|${color}|${invert ? 1 : 0}`;
   let tex = _items.get(k);
   if (tex) return tex;
   const P = PIXI();
@@ -1307,6 +1311,14 @@ export function itemTexture(key, img, color) {
     try { c.drawImage(img, S / 2 - (img.width * sc) / 2, S / 2 - (img.height * sc) / 2, img.width * sc, img.height * sc); } catch { /* ignore */ }
   } else {
     c.fillStyle = col; c.font = 'bold 44px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', S / 2, S / 2 + 2);
+  }
+  if (invert) {
+    try {
+      const d = c.getImageData(0, 0, S, S);
+      const px = d.data;
+      for (let i = 0; i < px.length; i += 4) { px[i] = 255 - px[i]; px[i + 1] = 255 - px[i + 1]; px[i + 2] = 255 - px[i + 2]; }
+      c.putImageData(d, 0, 0);
+    } catch { /* a tainted canvas: keep the plain plate */ }
   }
   tex = P.Texture.from(canvas);
   _items.set(k, tex);

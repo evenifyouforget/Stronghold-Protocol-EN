@@ -378,6 +378,12 @@ half in front. One turn per second with the near side moving left, gold → tran
 half a turn apart, axes tilted ±20° then 10° toward the camera (`render/units.js InvulnRibbons`, numbers in `RIBBON`).
 Check: `RENDER_E2E=1 node --test test/render/invuln.browser.test.js` → `test/e2e/out/invuln-*.png`.
 
+→ Claude (2026-10-16, after Fish's look at it — "3× as many particles; blue on black reads badly; maybe the originium
+potion inverted, a cyan potion on white"): the Cursed Hammer's icon is now 源石溶剂 (Originium Solvent)'s vial drawn
+colour-inverted — a white plate with a cyan vial (field: the plate canvas inverted, `textures.js itemTexture { invert }`;
+DOM: the image inverted on a light tile, so the CSS flames keep their colour) — and the flame has 21 tongues on the field
+(`CURSED_TONGUES`), three times the blobs in the CSS layers. The purple tint is gone (the inversion replaces it).
+
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
 
 → Claude (2026-10-16): done — Junk 2's −1 starts from round 2.

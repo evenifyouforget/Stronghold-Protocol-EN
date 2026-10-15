@@ -844,7 +844,7 @@ export class UnitView {
     this.countText.visible = true;
   }
 
-  /** Equipped item pips (prep): list of item icon URLs (or { url, cursed }). */
+  /** Equipped item pips (prep): list of item icon URLs (or { url, cursed }: the Cursed Hammer's, drawn inverted). */
   setItems(urls) {
     const P = this.P;
     const list = Array.isArray(urls) ? urls.slice(0, 2) : [];
@@ -854,12 +854,13 @@ export class UnitView {
       const u = entry && typeof entry === 'object' ? entry.url : entry;
       let s = this.itemPips[i];
       if (!s) { s = new P.Sprite(P.Texture.EMPTY); s.anchor.set(0.5); this.hud.addChild(s); this.itemPips[i] = s; }
-      s.tint = entry && typeof entry === 'object' && entry.cursed ? CURSED_TINT : 0xffffff;
-      if (s._url === u) return;
+      const invert = !!(entry && typeof entry === 'object' && entry.cursed);
+      if (s._url === u && s._invert === invert) return;
       s._url = u;
+      s._invert = invert;
       const a = this.ctx.assets;
-      s.texture = itemTexture(u || 'none', null, 0x4ed8af);
-      if (u && a?.image) a.image(u).then((img) => { if (!s.destroyed && s._url === u) s.texture = itemTexture(u, img, 0x4ed8af); }, () => {});
+      s.texture = itemTexture(u || 'none', null, 0x4ed8af, { invert });
+      if (u && a?.image) a.image(u).then((img) => { if (!s.destroyed && s._url === u) s.texture = itemTexture(u, img, 0x4ed8af, { invert }); }, () => {});
     });
   }
 
@@ -2000,13 +2001,14 @@ export class ItemView {
     ctx.layers.shadow.addChild(this.shadow);
     this.root = new P.Container();
     ctx.layers.units.addChild(this.root);
-    this.plate = new P.Sprite(itemTexture(String(info.defId || 'item'), null, info.color || 0x9aa5a0));
+    // the SPA-CC Cursed Hammer (item record `cursed`): the plate colour-inverted and the sinking flame on top, spilling
+    // past the plate
+    this.invert = !!info.cursed;
+    this.plate = new P.Sprite(itemTexture(String(info.defId || 'item'), null, info.color || 0x9aa5a0, { invert: this.invert }));
     this.plate.anchor.set(0.5, 1);
     this.root.addChild(this.plate);
-    // the SPA-CC Cursed Hammer (item record `cursed`): a purple cast and the sinking flame on top, spilling past the plate
     this.flame = null;
     if (info.cursed) {
-      this.plate.tint = CURSED_TINT;
       this.flame = new CursedFlame(P);
       this.root.addChild(this.flame.root);
     }
@@ -2019,7 +2021,7 @@ export class ItemView {
     if (this.destroyed || !url || url === this.info.icon) return;
     this.info.icon = url;
     const a = this.ctx.assets;
-    if (a?.image) a.image(url).then((img) => { if (!this.destroyed && img && this.info.icon === url) this.plate.texture = itemTexture(String(this.info.defId), img, this.info.color || 0x9aa5a0); }, () => {});
+    if (a?.image) a.image(url).then((img) => { if (!this.destroyed && img && this.info.icon === url) this.plate.texture = itemTexture(String(this.info.defId), img, this.info.color || 0x9aa5a0, { invert: this.invert }); }, () => {});
   }
   setWorld(x, y, z = 0) { this.x = x; this.y = y; this.z = z; }
   /** A battle snapshot sample (syncBattle syncs every unit of the field): a hand item on a scouted prep board rides
@@ -2117,10 +2119,8 @@ class InvulnRibbons {
   }
 }
 
-/** The Cursed Hammer's purple cast (a sprite tint multiplies the icon's colours). */
-const CURSED_TINT = 0xb98cff;
-/** Its flame: tongues, the seconds one takes to cross (5 ± 1), the height it crosses (× the plate). */
-const CURSED_TONGUES = 7, CURSED_PERIOD = 5, CURSED_SPAN = 1.5;
+/** The Cursed Hammer's flame: tongues, the seconds one takes to cross (5 ± 1), the height it crosses (× the plate). */
+const CURSED_TONGUES = 21, CURSED_PERIOD = 5, CURSED_SPAN = 1.5;
 
 /**
  * The Cursed Hammer's flame (Fish 2026-10-16: "a gloomy sinking effect … like a flame overlay, but moving down instead of
@@ -2139,9 +2139,9 @@ class CursedFlame {
       const sp = new P.Sprite(tex);
       sp.anchor.set(0.5);
       this.root.addChild(sp);
-      // spread evenly: phase, column, period and size differ per tongue (fixed, so every hammer looks alike)
-      const f = i / CURSED_TONGUES;
-      this.tongues.push({ sp, phase: (f * 0.61803) % 1, col: ((i * 0.37) % 1) - 0.5, period: CURSED_PERIOD - 1 + ((i * 0.53) % 1) * 2, scale: 0.75 + ((i * 0.29) % 1) * 0.5 });
+      // spread evenly: phase, column, period and size differ per tongue (fixed, so every hammer looks alike; the golden
+      // ratio and coprime steps keep 21 of them from lining up)
+      this.tongues.push({ sp, phase: (i * 0.61803) % 1, col: ((i * 0.37) % 1) - 0.5, period: CURSED_PERIOD - 1 + ((i * 0.53) % 1) * 2, scale: 0.75 + ((i * 0.29) % 1) * 0.5 });
     }
   }
   /** @param {number} t seconds @param {number} size the plate's on-screen size @param {number} cy the plate centre's y in the root */
