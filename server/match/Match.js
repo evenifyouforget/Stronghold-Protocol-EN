@@ -258,7 +258,7 @@ export class Match {
     // the rebalanced alliances of the lobby rules (shared/ruleData.js): this match's records, the shared data untouched
     if (rulesChangeData(this.rules)) {
       const patch = ruleDataPatch(this.data, this.rules);
-      this.data = { ...this.data, chess: { ...(this.data.chess || {}), ...patch.chess }, garrisons: { ...(this.data.garrisons || {}), ...patch.garrisons }, bonds: { ...(this.data.bonds || {}), ...patch.bonds } };
+      this.data = { ...this.data, chess: { ...(this.data.chess || {}), ...patch.chess }, garrisons: { ...(this.data.garrisons || {}), ...patch.garrisons }, bonds: { ...(this.data.bonds || {}), ...patch.bonds }, items: { ...(this.data.items || {}), ...patch.items } };
     }
     this.gd = new GameData(this.data, this.modeId);
     if (!this.difficulty) this.difficulty = this.gd.difficulty;

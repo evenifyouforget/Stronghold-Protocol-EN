@@ -83,7 +83,7 @@ function kitDekght(ab) {
   return partnerRage;
 }
 
-function kitLeaderMisc(key, ab, e) {
+function kitLeaderMisc(key, ab, e, b = null) {
   switch (key) {
     case 'enemy_1050_lslime': {
       const dot = { dmg: T(ab, 'dot.damage') ?? 0, iv: T(ab, 'dot.interval') ?? 1, dur: T(ab, 'dot.duration') ?? 0 };
@@ -224,7 +224,10 @@ function kitLeaderMisc(key, ab, e) {
         return targetsNear(b, e2, RUSH_RADIUS).filter((u) => u.ground && keys.has(u.tileR * COLS + u.tileC));
       };
       return [lowHpBuff(T(ab, 'atkup.hp_ratio') ?? 0.5, { atkPct: T(ab, 'AtkUp.atk', 'atkup.atk') ?? 0 }),
-        reborn({ dur: T(ab, 'Reborn.duration') ?? 0, hpRatio: T(ab, 'Reborn.hp_ratio') ?? 0.5, invincible: T(ab, 'Reborn.invincible') ?? 0 }),
+        // SPA-CC ccVengeance Invincible Blade 2: a Reid the tag added is invulnerable for 15 s after his revive
+        reborn({ dur: T(ab, 'Reborn.duration') ?? 0, hpRatio: T(ab, 'Reborn.hp_ratio') ?? 0.5,
+          invincible: tagHas(b?.flags?.rules, 'ccVengeance', 'blade2') && String(e?.mods?.bountyId ?? '').startsWith('risk:vengeance')
+            ? CC.vengeance.reviveInvincible : T(ab, 'Reborn.invincible') ?? 0 }),
         skill(rush, (b, e2) => {
           b.addBuff(e2, { key: 'ab:rush', duration: rush.bb.duration ?? 0, refresh: 'replace', visible: true, mods: { moveMul: 1 + (rush.bb.move_speed ?? 0) } });
           b.fx('charge', { x: e2.x, y: e2.y, id: e2.id, kind: 'avengerRush' });
@@ -875,7 +878,7 @@ export const LEADER_KITS = Object.freeze({
   enemy_1511_mdrock: (ab, e) => kitLeaderMisc('enemy_1511_mdrock', ab, e),   // 泥岩 · stacking ATK, refreshed barrier (+HP/ASPD while up)
   enemy_1513_dekght: (ab, e) => kitLeaderMisc('enemy_1513_dekght', ab, e),   // 腐败骑士 · plus-shaped hits; rage when 凋零骑士 dies
   enemy_1513_dekght_2: (ab, e) => kitLeaderMisc('enemy_1513_dekght_2', ab, e), // 凋零骑士 · 2 targets; rage when 腐败骑士 dies
-  enemy_1539_reid: (ab, e) => kitLeaderMisc('enemy_1539_reid', ab, e),       // “复仇者” · ATK up below half; revives once at 50 %
+  enemy_1539_reid: (ab, e, b) => kitLeaderMisc('enemy_1539_reid', ab, e, b),       // “复仇者” · ATK up below half; revives once at 50 %
   enemy_2003_rockman: (ab, e) => kitLeaderMisc('enemy_2003_rockman', ab, e), // 迷路的巨像 · long-stun boulder on a non-stunned unit
   enemy_2004_balloon: (ab, e) => kitLeaderMisc('enemy_2004_balloon', ab, e), // 喷气人 · takes off when blocked: 7 s hovering, unblockable, 失衡免疫
   enemy_2005_axetro: (ab, e) => kitLeaderMisc('enemy_2005_axetro', ab, e),   // “遗弃者” · attack stacks, reset after 4 s idle

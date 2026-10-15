@@ -35,7 +35,7 @@ import { ruleDataPatch, rulesChangeData } from '../../shared/ruleData.js';
 import { t } from '../../shared/i18n.js';
 
 /** Files the lobby rules change (setRules). */
-const RULED_FILES = new Set(['chess', 'garrisons', 'bonds']);
+const RULED_FILES = new Set(['chess', 'garrisons', 'bonds', 'items']);
 
 /** Known data files (name → URL basename). Unknown names are allowed too (`/data/<name>.json`). */
 export const DATA_FILES = Object.freeze({
@@ -318,7 +318,7 @@ export function createDataStore(opts = {}) {
 
   /** Show the records of a match with these lobby rules (shared/rules.js); null / no data change = the files as they are. */
   function setRules(rules) {
-    const next = rulesChangeData(rules) ? { virtuosaBonds: rules.virtuosaBonds === true, blaze: rules.blaze === true, lateranoMod: rules.lateranoMod ?? 'A', victoriaMod: rules.victoriaMod ?? 'A', ccInvestorBench: rules.ccInvestorBench || 0, ccSwift: rules.ccSwift || 0 } : null;
+    const next = rulesChangeData(rules) ? { virtuosaBonds: rules.virtuosaBonds === true, blaze: rules.blaze === true, lateranoMod: rules.lateranoMod ?? 'A', victoriaMod: rules.victoriaMod ?? 'A', ccInvestorBench: rules.ccInvestorBench || 0, ccSwift: rules.ccSwift || 0, ccJunk: rules.ccJunk || 0 } : null;
     if (JSON.stringify(next) === JSON.stringify(ruleSet)) return;
     ruleSet = next;
     ruled.clear();

@@ -2,7 +2,7 @@
 
 Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
 
-State as of 2026-10-15, branch `wip/famiglia` (on `main`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
+State as of 2026-10-15, branch `wip/vengeance-junk` (on `wip/famiglia`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
 cheat on, the total Risk counts as 0.
 
@@ -159,6 +159,27 @@ grid tile today.
 - **United 3** (Risk 3): the sub-wave has 500 % HP. Her Momentum Murder comes every 9 % of her HP (normally 25 %), and
   each step is a hard gate: she loses no HP until the cast ends. (Cloned 3 is gone.)
 
+### 19. `ccJunk` (Objective: Junk 1 / 2, prototype)
+
+- **Junk 1** (Risk 1): every player starts with a **Cursed Hammer** (a Fish Edition item, made at run time; the Victorian
+  Hammer's icon). Its carrier has −50 % ATK. It cannot be sold (no item can be), is never the item a third equip
+  replaces (picking it is refused; the default "oldest" skips it), and never expires in the temporary hand. It gives no
+  alliance, so it has no interaction with the Damazti Isomorph.
+- **Junk 2** (Risk 2): a round's income is 1 lower while the Cursed Hammer is in the hand or temporary hand (not
+  equipped).
+
+### 20. `ccVengeance` (Vengeance: Invincible Blade 1 / 2 / 3, prototype)
+
+Reid, "Hateful Avenger" (`enemy_1539_reid`, the leader), shown in the tag texts as `Reid, <his name>`.
+
+- **Invincible Blade 1** (Risk 1): every normal battle gets 1 Reid per 200 total stacks of that player (at most 20). In
+  the final boss rounds: by the total stacks of all alive players, once per field, on the left-first route.
+- **Invincible Blade 2** (Risk 2): those Reids have +150 % max HP, +50 % ATK, Status Resistance, 30 % less Physical /
+  Arts damage below 50 % HP, and are invulnerable for 15 s after their revive.
+- **Invincible Blade 3** (Risk 3): twice as many, +100 ASPD; below 50 % HP 60 % less damage instead and immune to Slow,
+  Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure.
+- Only the Reids the tag adds get these; a Reid that comes as an ordinary bounty keeps his data.
+
 ### Sub-waves on the final boss fields (Patriot Undying 3, Delegation)
 
 Once per field, not once per player (Fish 2026-10-15). Every unit takes a route that goes to the left portal first and
@@ -169,8 +190,8 @@ mobs take (the other half go right first). A one-player field's routes all go le
 
 The Risk grid's tiles show the tags' names (Fish's, "part of the branding"): Objective: Investor / Swift / Foresight /
 Strategy / Intern / Barge 1–2 / Deep Infiltration / Low Efficiency / Last Line of Defense, Environment: Suffocation 1–3,
-Originium Zone: Arts / Physical / Activation 1–3 / Lockout 1–3 / Elements 1–2, Famiglia: Cleaner 1 / Unending 2–3 /
-Seasonal 2–3, Patriot: Undying 1–3, Delegation: United 1–3. English is Fish's wording; the Chinese source strings are
+Originium Zone: Arts / Physical / Activation 1–3 / Lockout 1–3 / Elements 1–2, Objective: Junk 1–2, Famiglia: Cleaner 1
+/ Unending 2–3 / Seasonal 2–3, Patriot: Undying 1–3, Delegation: United 1–3, Vengeance: Invincible Blade 1–3. English is Fish's wording; the Chinese source strings are
 translations of it, and Japanese / Korean / Traditional Chinese fall back to the Chinese until someone translates them.
 
 ## How the groups work
@@ -245,7 +266,6 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
 
 | Idea                                                                           | Risk  | Status                                                   |
 | ------------------------------------------------------------------------------ | ----- | -------------------------------------------------------- |
-| Vengeance group                                                                |       | Fish is rewriting it (the mob Hateful Avenger, not Reid) |
 | Final round: Rosmontis, Simulated Sentry joins                                 | 1 / 2 | needs a new enemy (kit with Matrix)                      |
 
 ## New suggestions

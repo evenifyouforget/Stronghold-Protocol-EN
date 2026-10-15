@@ -21,6 +21,8 @@
 //                 enemies.json `level1`).
 //   ccDelegation  United 2: the sub-wave's Degenbrecher charges while unblocked (installDegenCharge); United 3's gate is in
 //                 her kit (enemies/leaders.js)
+//   ccJunk        the Cursed Hammer's carrier ATK −50 % (installJunk; the item itself: shared/ruleData.js, the match)
+//   ccVengeance   Invincible Blade 2 / 3 on the Reids the tag adds (installVengeance)
 //   ccFamiglia    Unending / Seasonal: the Blood Ledger of every battle (installFamiglia; battle.ledger, the snapshot's
 //                 `bl`); tier 3: Zaaro's leak costs CC.famiglia.zaaro.leakLp
 
@@ -73,6 +75,43 @@ export function install(battle) {
   installDegenCharge(battle, rules);
   installFamiglia(battle, rules);
   installZaaro(battle, rules);
+  installJunk(battle, rules);
+  installVengeance(battle, rules);
+}
+
+/** ccJunk: the Cursed Hammer's carrier ATK −50 % (its item record has no buffs; this is its effect). */
+function installJunk(battle, rules) {
+  if (!(tagLevel(rules, 'ccJunk') > 0)) return;
+  battle.on('deploy', ({ unit }) => {
+    if (S.isOp(unit) && Array.isArray(unit.items) && unit.items.includes(CC.junk.itemId)) S.passiveBuff(battle, unit, 'risk:cursedHammer', { atkPct: CC.junk.atkPct });
+  });
+}
+
+/**
+ * ccVengeance — the Reids the tag adds (spawn mods bountyId 'risk:vengeance'): Invincible Blade 2: +150 % HP, +50 % ATK,
+ * Status Resistance, 30 % less Physical / Arts damage below 50 % HP (his revive's 15 s 无敌: his kit, enemies/leaders.js);
+ * Invincible Blade 3: +100 ASPD, below 50 % HP 60 % less damage instead and immune to CC.vengeance.immune.
+ */
+function installVengeance(battle, rules) {
+  const V = CC.vengeance;
+  const blade2 = tagHas(rules, 'ccVengeance', 'blade2'), blade3 = tagHas(rules, 'ccVengeance', 'blade3');
+  if (!blade2) return;
+  const isRisk = (u) => !!u && u.side === 'enemy' && keyOf(u) === V.key && String(u.mods?.bountyId ?? '').startsWith('risk:vengeance');
+  const low = (u) => u.hpRatio < V.lowHp;
+  battle.on('enemySpawn', ({ enemy }) => {
+    if (!isRisk(enemy)) return;
+    S.passiveBuff(battle, enemy, 'risk:vengeance', { hpPct: V.hpPct, atkPct: V.atkPct, ...(blade3 ? { aspd: V.aspd } : {}) });
+    battle.applyStatus(enemy, 'resist', { source: enemy });
+  });
+  battle.on('hit', (c) => {
+    const t = c.target;
+    if (!isRisk(t) || !low(t) || !c.dmg || (c.dmg.type !== 'phys' && c.dmg.type !== 'arts')) return;
+    c.dmg.mul *= 1 - (blade3 ? V.lowDr3 : V.lowDr2);
+  });
+  if (blade3) {
+    const immune = new Set(V.immune);
+    battle.on('beforeStatus', (c) => { if (isRisk(c.target) && low(c.target) && immune.has(c.status)) c.cancel = true; });
+  }
 }
 
 /**
