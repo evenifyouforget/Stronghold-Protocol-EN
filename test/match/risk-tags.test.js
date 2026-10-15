@@ -148,8 +148,8 @@ test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5,
   const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
   const u1 = byKey(wave(1));
   assert.equal(u1[dg.degen].count, 1);
-  assert.equal(u1[dg.wave[1].key].count, 10);
-  assert.equal(u1[dg.wave[2].key].count, 10);
+  assert.equal(u1[dg.wave[1].key].count, 5);
+  assert.equal(u1[dg.wave[2].key].count, 5);
   assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2, atkMul: 1 });
   assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
   assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
@@ -283,6 +283,11 @@ test('ccJunk 1: everyone starts with a Cursed Hammer; it never expires in the te
     assert.equal(ps.equip(b.uid, op.uid).ok, true, 'the default replaces the other item');
     assert.ok(!op.items.some((x) => x.uid === a.uid), 'the other item went');
     assert.ok(op.items.some((x) => x.id === CC.junk.itemId), 'the hammer stays on');
+    // and the player cannot destroy it in the hand (g.destroy): sell its carrier to get it back there
+    const h2 = ps.newPiece('item', CC.junk.itemId);
+    ps.stow(h2, { allowTemp: true });
+    assert.ok(ps.destroy(h2.uid).error, 'destroying the Cursed Hammer is refused');
+    assert.ok(ps.find(h2.uid), 'still there');
   } finally { h.m.dispose(); }
 });
 
@@ -318,10 +323,10 @@ test('ccVengeance: Reids by the player\'s stacks in a normal battle (×2 at leve
       const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
       p0.layers = { yanShip: 250, kjeragShip: 200 }; p1.layers = { yanShip: 150 };
       const reids = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === V.key).reduce((n, b) => n + b.card.count, 0);
-      assert.equal(reids(p0), 2 * mul, `level ${level}: 450 stacks`);
+      assert.equal(reids(p0), 1 * mul, `level ${level}: 450 stacks`);
       assert.equal(reids(p1), 0, `level ${level}: 150 stacks`);
       const sub = h.m.bossSubWave(['p_0', 'p_1']).get('p_0').filter((b) => b.card.enemyKey === V.key);
-      assert.equal(sub[0].card.count, 3 * mul, '600 stacks over both');
+      assert.equal(sub[0].card.count, 2 * mul, '600 stacks over both');
       assert.ok(sub[0].card.leftFirst);
     } finally { h.m.dispose(); }
   }

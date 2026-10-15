@@ -60,15 +60,15 @@ export const CC = Object.freeze({
   // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
   // Junk 1: every player gets a Cursed Hammer at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
-  // sold, replaced away or left to expire in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
+  // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
   // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
   junk: Object.freeze({ itemId: 'fish_item_cursed_hammer', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1041_acarm041' }),
-  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 200
+  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
   // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
   // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
   // after his revive. 3: twice as many, +100 ASPD, below 50 % HP 60 % less damage and immune to the listed statuses.
   vengeance: Object.freeze({
-    key: 'enemy_1539_reid', perStacks: 200, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
+    key: 'enemy_1539_reid', perStacks: 300, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
     reviveInvincible: 15, aspd: 100,
     immune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
   }),
@@ -99,13 +99,13 @@ export const CC = Object.freeze({
   }),
   // Delegation: the sub-wave of the final boss round(s), once per field; United 2 — the final boss cannot die while a
   // Degenbrecher lives, and she charges: move speed +up to chargePct while unblocked, reached after chargeSeconds, reset
-  // when blocked; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
+  // when blocked or unable to move; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
   // 300 / 500 %, Cloned 3 gone)
   delegation: Object.freeze({
     wave: Object.freeze([
       Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
-      Object.freeze({ key: 'enemy_1387_winshd', count: 10 }),
-      Object.freeze({ key: 'enemy_1389_winbab_2', count: 10 }),
+      Object.freeze({ key: 'enemy_1387_winshd', count: 5 }),
+      Object.freeze({ key: 'enemy_1389_winbab_2', count: 5 }),
     ]),
     degen: 'enemy_1525_blkswb', // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
     hpMul: Object.freeze({ united1: 2, united2: 3, united3: 5 }), atkMul: Object.freeze({ united2: 1.5 }),
@@ -132,8 +132,8 @@ export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计�
 
 /** msgids of the Cursed Hammer (Junk; translated by the client's `text`). */
 export const CURSED_HAMMER_NAME = N_('诅咒重锤');
-export const CURSED_HAMMER_DESC = N_('攻击力-50%。无法出售，不会被替换或在临时区消失');
-export const CURSED_HAMMER_DESC_2 = N_('攻击力-50%。无法出售，不会被替换或在临时区消失；未装备时每回合收入-1');
+export const CURSED_HAMMER_DESC = N_('攻击力-50%。无法被销毁');
+export const CURSED_HAMMER_DESC_2 = N_('攻击力-50%。无法被销毁；未装备时每回合收入-1');
 
 /** The Cursed Hammer's item record (ccJunk) in data/items.json's shape. */
 function cursedHammerRecord(level, text) {

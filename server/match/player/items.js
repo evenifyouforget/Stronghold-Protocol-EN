@@ -148,6 +148,7 @@ export class PlayerItems {
     const loc = this.find(uid);
     if (!loc || loc.piece.kind !== 'item') return fail(ERR.BAD_TARGET, 'only items can be destroyed');
     if (loc.area === 'equipped') return fail(ERR.BAD_TARGET, 'equipped items are locked');
+    if (loc.piece.id === CC.junk.itemId) return fail(ERR.BAD_TARGET, 'the Cursed Hammer cannot be destroyed'); // SPA-CC Junk
     this._detach(loc);
     this.m.dispatchItem(this, loc.piece, loc.holder || null, 'onDestroy', { item: loc.piece, holder: loc.holder || null, reason: 'player' });
     this.recompute();

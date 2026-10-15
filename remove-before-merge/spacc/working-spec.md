@@ -150,20 +150,22 @@ grid tile today.
 
 ### 18. `ccDelegation` (group: United 1 / 2 / 3, a chain since 2026-10-15)
 
-- **United 1** (Risk 1): in the final boss rounds, every field gets 1 Degenbrecher, 10 Delegation Shieldbearers and 10
+- **United 1** (Risk 1): in the final boss rounds, every field gets 1 Degenbrecher, 5 Delegation Shieldbearers and 5
   Delegation Centurion Champions, at 200 % of their HP that round. This Degenbrecher uses her Level 1 stats (45000 HP,
   1000 ATK, 800 DEF); a bounty Degenbrecher in a normal round keeps Level 0.
 - **United 2** (Risk 2): the final boss cannot die while a Degenbrecher lives on any field (its pool stops at 1 HP).
   The sub-wave has 300 % HP and 150 % ATK. Degenbrecher charges: while unblocked her move speed climbs to +300 % over
-  10 s, back to normal when she is blocked.
+  10 s, back to normal when she is blocked or can't move (stunned, frozen, asleep, levitated, bound).
 - **United 3** (Risk 3): the sub-wave has 500 % HP. Her Momentum Murder comes every 9 % of her HP (normally 25 %), and
   each step is a hard gate: she loses no HP until the cast ends. (Cloned 3 is gone.)
 
 ### 19. `ccJunk` (Objective: Junk 1 / 2, prototype)
 
 - **Junk 1** (Risk 1): every player starts with a **Cursed Hammer** (a Fish Edition item, made at run time; the Victorian
-  Hammer's icon). Its carrier has −50 % ATK. It cannot be sold (no item can be), is never the item a third equip
-  replaces (picking it is refused; the default "oldest" skips it), and never expires in the temporary hand. It gives no
+  Hammer's icon). Its carrier has −50 % ATK. It cannot be destroyed: not sold (no item can be), not destroyed by the
+  player (refused), never the item a third equip replaces (picking it is refused; the default "oldest" skips it), never
+  expiring in the temporary hand. (One edge left: an item coming back off an operator with the hand and temporary hand
+  both full is lost, the Cursed Hammer too — the same for every item.) It gives no
   alliance, so it has no interaction with the Damazti Isomorph.
 - **Junk 2** (Risk 2): a round's income is 1 lower while the Cursed Hammer is in the hand or temporary hand (not
   equipped).
@@ -172,7 +174,7 @@ grid tile today.
 
 Reid, "Hateful Avenger" (`enemy_1539_reid`, the leader), shown in the tag texts as `Reid, <his name>`.
 
-- **Invincible Blade 1** (Risk 1): every normal battle gets 1 Reid per 200 total stacks of that player (at most 20). In
+- **Invincible Blade 1** (Risk 1): every normal battle gets 1 Reid per 300 total stacks of that player (at most 20). In
   the final boss rounds: by the total stacks of all alive players, once per field, on the left-first route.
 - **Invincible Blade 2** (Risk 2): those Reids have +150 % max HP, +50 % ATK, Status Resistance, 30 % less Physical /
   Arts damage below 50 % HP, and are invulnerable for 15 s after their revive.

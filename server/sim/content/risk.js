@@ -121,7 +121,8 @@ function installVengeance(battle, rules) {
  */
 /**
  * ccDelegation United 2: the sub-wave's Degenbrecher (spawn mods bountyId 'risk:delegation:…') charges — move speed
- * +CC.delegation.chargePct × (unblocked time / chargeSeconds), at most +chargePct, back to 0 when she is blocked — so a
+ * +CC.delegation.chargePct × (unblocked time / chargeSeconds), at most +chargePct, back to 0 when she is blocked or
+ * cannot move (stunned, frozen, asleep, levitated, bound) — so a
  * field whose operators fell does not wait long for her to cross it (Fish 2026-10-15).
  */
 function installDegenCharge(battle, rules) {
@@ -132,7 +133,9 @@ function installDegenCharge(battle, rules) {
     if (!(dt > 0)) return;
     for (const e of battle.aliveEnemies()) {
       if (keyOf(e) !== dg.degen || !String(e.mods?.bountyId ?? '').startsWith('risk:delegation')) continue;
-      const t = e.blockedBy ? 0 : Math.min(dg.chargeSeconds, (free.get(e) || 0) + dt);
+      // reset when blocked or unable to move (stunned / frozen / asleep / levitated: the stun flag; bound: noMove)
+      const stuck = !!e.blockedBy || !!e.s.flags.stun || !!e.s.flags.noMove;
+      const t = stuck ? 0 : Math.min(dg.chargeSeconds, (free.get(e) || 0) + dt);
       free.set(e, t);
       const pct = dg.chargePct * (t / dg.chargeSeconds);
       if (pct > 0) battle.addBuff(e, { key: 'risk:degenCharge', persist: true, visible: true, refresh: 'replace', mods: { moveMul: 1 + pct } });
