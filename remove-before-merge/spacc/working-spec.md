@@ -9,7 +9,67 @@ cheat on, the total Risk counts as 0.
 **Name** is the tag's player-facing name (blank = not named yet). The **current label** is the placeholder shown on the
 grid tile today.
 
-## Implemented tags
+## Spec (Fish's)
+
+The tags as Fish designs them — the source of truth; the implementation notes below follow it. (Merged in from
+`remove-before-merge/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
+
+### Clarifications
+
+Sub-waves added to all fields should be only one per field, not one per side. Path should all start going leftward, then alternate left and right per loop (rather than going left every loop) (for fields with 2 players alive).
+
+### General
+
+- Objective: Investor - Operators on the bench no longer count toward activating Investor
+- Objective: Swift - Swift formula nerfed from 20 + 0.35 × stacks to 20 + 0.25 × stacks
+- Objective: Foresight - Foresight operators have -20 ASPD
+- Objective: Strategy - All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
+- Objective: Intern - Starting on round 3, the first tier 1 unit you buy that round costs 1 more
+- Originium Zone: Arts - Final boss gains 50 RES after taking 50% max HP as Arts damage
+- Originium Zone: Physical - Final boss gains 5000 DEF after taking 50% max HP as Physical damage
+- Originium Zone: Activation 1/2/3 - Final boss gains +50/150/400% max HP and +15/25/50% ATK
+- Originium Zone: Lockout 1/2/3 - Final boss becomes invulnerable for 10 seconds (in-game time) every 68/28/18% max HP lost
+- Environment: Suffocation 1/2/3 - Operators' auto recovery skills gain SP slower by 0.2/0.5/0.8 SP/s
+- Objective: Barge 1 - Upgrading barge from tier 4 to tier 5 costs 2 additional Funds
+- - Objective: Barge 2 - Also affects tier 5 to tier 6, and penalty increased to 3 Funds
+- Originium Zone: Elements 1/2 - Leader enemies have 50/90% Physical and Arts DR while not under an elemental burst effect.
+- Objective: Deep Infiltration - DP generation rate reduced by 50%
+- Objective: Low Efficiency - Friendly units have their redeployment time increased by 75%
+- Objective: Last Line of Defense - First leak each round deducts an additional 2 life points. Applies even if Unite Phase has no leaks. Ignores 10 life points loss per round limit.
+- Objective: Junk 1 - At the start of the match, all players receive a Cursed Hammer: Cannot be destroyed, equipped operator has -50% ATK, does not have any interaction with Damazti Isomorph.
+- - Objective: Junk 2 - Cursed Hammer additionally reduces income for the round by 1 if not equipped.
+
+### Famiglia group (pick one)
+
+- Famiglia: Cleaner 1 - On rounds 10~13, the player with the least total stacks will have 5 Famiglia Shadow Silencer added to their wave.
+- - Famiglia: Unending 2 (2 risk) - Blood Debt and Asset Liquidations are permanently active, for everyone (Asset Liquidations does not summon more Famiglia Shadow Silencer)
+- - Famiglia: Unending 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
+- - Famiglia: Seasonal 2 (2 risk) - Blood Debt is permanently active, for everyone. Blood Debt starts 25% full. Starting on round 10, Blood Debt starts 75% full. (Asset Liquidation summons Famiglia Shadow Silencer as normal)
+- - Famiglia: Seasonal 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
+
+This branch is the tradeoff between having all enemies constantly buffed, or a risk of spawning more Famiglia Shadow Silencer for everyone due to Asset Liquidation triggering.
+
+### Patriot group (pick one)
+
+- Patriot: Undying 1 - Round 9 improv always offers Patriot as an option, worth 0 Funds (no bounty). Not taking Patriot causes final boss to have +200% max HP. Patriot costs 5 life points if leaked. Patriot uses Level 1 stats.
+- - Patriot: Undying 2 - In Marching Stance, <Patriot> receives 90% less physical and Arts damage from Operators who are not blocking him. <Patriot> gains +200% HP, is immune to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure while in Marching Stance, and Movement Speed cannot be lower than base speed (both phases). Penalty for not taking Patriot also gives final boss +100% ATK.
+- - Patriot: Undying 3 - Adds 5 Guerrilla Shieldguard to the sub-wave. Adds the sub-wave again to final boss round(s). (all fields, not just the player who selected Patriot) All enemies have +40% MSPD and +40 ASPD while Patriot is alive.
+
+### Delegation group (pick one)
+
+- Delegation: United 1 - Degenbrecher, 5 Delegation Shieldbearer, and 5 Delegation Centurion Champion are added to the final boss round(s). Degenbrecher uses Level 1 stats. Degenbrecher, Delegation Shieldbearer, and Delegation Centurion Champion from this sub-wave have 200% max HP.
+- Delegation: United 2 - Final boss cannot die as long as Degenbrecher is alive. Sub-wave max HP increased to 300%, and ATK increased to 150%. Degenbrecher gains MSPD while unblocked, up to +300% after 10 seconds, resetting when blocked or unable to move.
+- Delegation: United 3 - Sub-wave max HP increased to 500%. Degenbrecher's Momentum Murder triggers every 9% max HP instead of 25%. Degenbrecher has a hard HP gate every 9% max HP, and cannot lose further HP until she finishes casting Momentum Murder.
+
+### Vengeance group (pick one)
+
+Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (as known by players). Not the mid-tier mob. It's probably best for the in-game text to say Reid, "Hateful Avenger" for clarity even though that's not the official name.
+
+- Vengeance: Invincible Blade 1 - At battle start, add 1 Hateful Avenger to the wave for every 300 total stacks the player has. In final boss round(s), Hateful Avenger is added to every field based on total stacks across all players.
+- Vengeance: Invincible Blade 2 - Hateful Avengers have +150% max HP and +50% ATK. Hateful Avengers have Status Resistance, 30% Physical and Arts DR when at <50% HP, and are invulnerable for 15 seconds after revival.
+- Vengeance: Invincible Blade 3 - Spawns twice as many Hateful Avengers. Hateful Avengers have +100 ASPD. When Hateful Avengers are below 50% HP, they have 60% Physical and Arts DR and immunity to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure.
+
+## Implementation notes
 
 ### 1. `ccInvestorBench`
 
