@@ -13,7 +13,7 @@ import { html, Button, Modal, Icon, MicroLabel, Tooltip } from './components.js'
 import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
-import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk } from '../../../shared/rules.js';
+import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
 import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -63,10 +63,71 @@ export function riskText(key, level) {
     case 'ccSpRecovery': return { short: t('技力回复-{n}', { n: CC.spRecovery[level] }), full: t('干员的自动技力回复每秒-{n}', { n: CC.spRecovery[level] }) };
     case 'ccBoss': return { short: t('最终领袖强化 {n}', { n: level }), full: t('最终领袖（含隐秘核心）最大生命值+{hp}%，攻击力+{atk}%', { hp: pct(CC.bossHp[level]), atk: pct(CC.bossAtk[level]) }) };
     case 'ccLeaderDr': return { short: t('领袖减伤 {n}%', { n: pct(CC.leaderDr[level]) }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
-    case 'ccPatriot': return { short: t('{name}（试作）', { name: enemyName(CC.patriot.key) }), full: t('（试作）第{r}回合，每名博士的作战中出现1名【{name}】', { r: CC.patriot.round, name: enemyName(CC.patriot.key) }) };
-    case 'ccSilencers': return { short: enemyName(CC.silencers.key), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'ccDeepInfiltration': return { short: t('深入敌阵'), full: t('部署费用的回复速度-{n}%', { n: pct(1 - CC.dpPerSecMul) }) };
+    case 'ccLowEfficiency': return { short: t('低效'), full: t('我方单位的再部署时间+{n}%', { n: pct(CC.redeployMul - 1) }) };
+    case 'ccLastLine': return { short: t('最后防线'), full: t('每回合自己的作战漏过敌人时额外扣除{n}点目标生命（即使联防中没有漏怪；不受每回合扣除上限限制）', { n: CC.lastLineLp }) };
+    case 'ccOzArts': return { short: t('源石区域：法术'), full: t('最终领袖受到的法术伤害累计达到其最大生命值的{p}%后，法术抗性+{n}', { p: pct(CC.ozArts.share), n: CC.ozArts.res }) };
+    case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
+    case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
+    case 'ccFamiglia': return { short: t('家族：清道夫'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);
+    case 'ccDelegation': return delegationText(nodeOf(key, level), enemyName);
     default: return { short: key, full: key };
   }
+}
+
+const nodeOf = (key, level) => ruleOf(key)?.nodes?.[level] ?? null;
+
+function patriotText(node, enemyName) {
+  const pt = CC.patriot;
+  const name = enemyName(pt.key), escort = enemyName(pt.escort.key);
+  switch (node) {
+    case 'undying1': return { short: t('爱国者：不死 1'), full: t('第{r}回合的机变必定提供【{name}】（无赏金，漏过时扣除{lp}点目标生命）；若无人选择，最终领袖最大生命值+{hp}%', { r: pt.round, name, lp: pt.leakLp, hp: pct(pt.skipHp) }) };
+    case 'undying2': return { short: t('爱国者：不死 2'), full: t('【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导；最大生命值+{hp}%，移动速度不会低于基础值；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { name, dr: pct(pt.marchDr), hp: pct(pt.hpPct), atk: pct(pt.skipAtk) }) };
+    case 'support3': return { short: t('爱国者：支援 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现在每名博士的战场；【{name}】的投矛最多选择{k}个目标，并额外造成攻击力{p}%的坏死损伤', { n: pt.escort.count, escort, name, k: pt.spearTargets, p: pct(pt.spearNecrosis) }) };
+    case 'rampage3': return { short: t('爱国者：暴走 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现在每名博士的战场；【{name}】存活时所有敌人移动速度+{m}%，攻击速度+{a}', { n: pt.escort.count, escort, name, m: pct(pt.rampage.movePct), a: pt.rampage.aspd }) };
+    default: return { short: '?', full: '?' };
+  }
+}
+
+function delegationText(node, enemyName) {
+  const dg = CC.delegation;
+  const [degen, shield, champ] = dg.wave.map((w) => enemyName(w.key));
+  switch (node) {
+    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每名博士的战场额外出现1名【{degen}】、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
+    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2) }) };
+    case 'cloned3': return { short: t('访问团：克隆 3'), full: t('额外出现{n}名【{degen}】', { n: dg.clones, degen }) };
+    case 'resilient3': return { short: t('访问团：坚韧 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】（原为25%），释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.resilient3), degen, p: pct(dg.gateRatio) }) };
+    default: return { short: '?', full: '?' };
+  }
+}
+
+/** The levels a tag's chosen level includes, top first (a tag group's ancestors; a chain's level alone). */
+function levelsInForce(r, level) {
+  if (!Array.isArray(r.parent)) return level > 0 ? [level] : [];
+  const out = [];
+  for (let l = level; l > 0 && out.length < 16; l = tagParent(r.key, l)) out.unshift(l);
+  return out;
+}
+
+/**
+ * Where each level of a tag sits in the grid: `{ level, row, col, span }` (col 0-based within the tag's columns), and
+ * `width` (its columns: a tag group's leaves side by side, its shared tiers spanning them).
+ */
+function tagLayout(r) {
+  const n = r.risk.length;
+  const kids = Array.from({ length: n }, () => []);
+  for (let l = 1; l < n; l++) kids[tagParent(r.key, l)].push(l);
+  const cells = [];
+  let col = 0;
+  const place = (l, depth) => {
+    const start = col;
+    if (!kids[l].length) col++;
+    for (const k of kids[l]) place(k, depth + 1);
+    if (l > 0) cells.push({ level: l, row: depth, col: start, span: Math.max(1, col - start) });
+  };
+  place(0, 0);
+  return { cells, width: Math.max(1, col) };
 }
 
 /** The Risk tags (SPA-CC) as Contingency Contract lays them out: one column per tag, its levels top (1) to bottom. */
@@ -75,23 +136,31 @@ function RiskGrid({ rules, editable, onSet }) {
   const tags = RULES.filter((r) => r.type === 'level');
   const labels = ruleLabels(rules);
   const on = tags.filter((r) => rules[r.key] > 0);
-  const rows = Math.max(...tags.map((r) => r.risk.length - 1));
+  // a column per tag; a tag group (Famiglia, Patriot, Delegation) takes a column per branch, its shared tiers spanning
+  // them; a level the chosen one builds on is lit too (it is in force)
+  let col = 1;
+  const cells = [];
+  for (const r of tags) {
+    const { cells: own, width } = tagLayout(r);
+    const inForce = new Set(levelsInForce(r, rules[r.key]));
+    for (const c of own) cells.push({ r, ...c, col: col + c.col, inForce: inForce.has(c.level) });
+    col += width;
+  }
   return html`<div class="risk">
     <div class="risk__total"><b class="num">${t('风险 {n}', { n: labels.risk })}</b>
       ${labels.cheats ? html`<span class="t-dim">${t('使用作弊时风险计为0')}</span>` : null}</div>
-    <div class="risk__grid" style=${`--risk-cols:${tags.length}`}>
-      ${Array.from({ length: rows }, (_, i) => i + 1).map((level) => tags.map((r) => {
-        if (level >= r.risk.length) return html`<span key=${`${r.key}:${level}`} class="risk__gap"></span>`;
+    <div class="risk__grid" style=${`--risk-cols:${col - 1}`}>
+      ${cells.map(({ r, level, row, col: c, span, inForce }) => {
         const active = rules[r.key] === level;
-        return html`<${Tooltip} key=${`${r.key}:${level}`} text=${riskText(r.key, level).full}>
-          <button type="button" class=${cx('risk__tile', active && 'is-active')} aria-pressed=${active ? 'true' : 'false'}
+        return html`<${Tooltip} key=${`${r.key}:${level}`} text=${riskText(r.key, level).full} style=${`grid-row:${row};grid-column:${c} / span ${span}`}>
+          <button type="button" class=${cx('risk__tile', active && 'is-active', !active && inForce && 'is-included')} aria-pressed=${active ? 'true' : 'false'}
             data-risk=${r.key} data-level=${level} disabled=${!editable} onClick=${() => onSet({ [r.key]: active ? 0 : level })}>
             <span class="risk__lv num">${ruleRisk(r.key, level)}</span><span>${riskText(r.key, level).short}</span>
           </button>
         <//>`;
-      }))}
+      })}
     </div>
-    ${on.length ? html`<ul class="risk__effects">${on.map((r) => html`<li key=${r.key}>${riskText(r.key, rules[r.key]).full}</li>`)}</ul>` : null}
+    ${on.length ? html`<ul class="risk__effects">${on.flatMap((r) => levelsInForce(r, rules[r.key]).map((l) => html`<li key=${`${r.key}:${l}`}>${riskText(r.key, l).full}</li>`))}</ul>` : null}
   </div>`;
 }
 

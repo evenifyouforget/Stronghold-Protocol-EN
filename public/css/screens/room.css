@@ -463,6 +463,7 @@
 }
 .risk__tile:disabled { cursor: default; }
 .risk__tile.is-active { border-color: rgba(231, 90, 26, .85); background: rgba(231, 90, 26, .16); color: #ffd2b8; }
+.risk__tile.is-included { border-color: rgba(231, 90, 26, .5); background: rgba(231, 90, 26, .07); }
 .risk__lv { font-size: calc(.16 * var(--t)); font-weight: 800; color: #ff9a5a; }
 .risk__gap { min-height: .62rem; }
 .risk__effects { margin: 0; padding-left: .2rem; color: var(--text-lo); font-size: calc(.14 * var(--t)); line-height: 1.45; }

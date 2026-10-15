@@ -63,3 +63,111 @@ test('迅捷 at 100 stacks: 20 + 0.25 × stacks % with the tag (55 % → 45 %), 
   assert.ok(Math.abs(nerf - 0.45) < 0.08, `nerf ${nerf}`);
   assert.ok(nerf < base);
 });
+
+test('Deep Infiltration halves DP generation; Low Efficiency: redeployment time × 1.75', () => {
+  const on = battle({ ccDeepInfiltration: 1, ccLowEfficiency: 1 }, [{ chessId: 'chess_char_3_08_a', row: 10, col: 3 }]);
+  const off = battle({}, [{ chessId: 'chess_char_3_08_a', row: 10, col: 3 }]);
+  assert.equal(on.b.flags.dpPerSec, off.b.flags.dpPerSec * CC.dpPerSecMul);
+  assert.ok(Math.abs(on.allies()[0].s.redeployMul / off.allies()[0].s.redeployMul - CC.redeployMul) < 1e-9);
+});
+
+/** Patriot on a field with two operators (薄绿 blocks in front of him, 芬 behind), not walking. */
+function patriotField(rules) {
+  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules },
+    units: [{ chessId: 'chess_char_3_01_a', row: 10, col: 2 }, { chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
+  h.step(1);
+  const p = h.spawn(CC.patriot.key, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
+  const d = h.spawn('enemy_dummy', { pos: [11, 9], routeIndex: 0, mods: { speedMul: 0 } });
+  h.run(0.5);
+  return { h, p, d };
+}
+
+test('Patriot Undying 1: his leak costs 5; Undying 2: +200 % HP, 90 % less damage from non-blockers and the statuses refused in Marching Stance, never below base speed', () => {
+  const one = patriotField({ ccPatriot: 1 });
+  assert.equal(one.p.lpr, CC.patriot.leakLp);
+  const base = one.p.s.maxHp;
+  const { h, p } = patriotField({ ccPatriot: 2 });
+  assert.ok(Math.abs(p.s.maxHp / base - (1 + CC.patriot.hpPct)) < 1e-9);
+  const ally = h.allies().find((u) => u !== p.blockedBy);
+  const hit = (src, type) => { const c = { source: src, target: p, dmg: { type, mul: 1 } }; h.b.emit('hit', c); return c.dmg.mul; };
+  assert.ok(Math.abs(hit(ally, 'phys') - (1 - CC.patriot.marchDr)) < 1e-9);
+  assert.ok(Math.abs(hit(ally, 'arts') - (1 - CC.patriot.marchDr)) < 1e-9);
+  assert.equal(hit(ally, 'true'), 1);
+  if (p.blockedBy) assert.equal(hit(p.blockedBy, 'phys'), 1, 'his blocker');
+  for (const st of ['stun', 'slow', 'freeze', 'attract']) assert.equal(h.b.applyStatus(p, st, { duration: 3, source: ally }), false, st);
+  h.b.addBuff(p, { key: 'test:slow', duration: 5, mods: { moveMul: 0.1 } });
+  assert.ok(p.s.moveSpeed >= p.base.moveSpeed - 1e-9, 'never below his base speed');
+  // out of Marching Stance (the kit drops 'ab:patriotMarch' at his knock-out): no reduction, statuses land again
+  h.b.removeBuff(p, 'ab:patriotMarch');
+  assert.equal(hit(ally, 'phys'), 1);
+  assert.equal(h.b.applyStatus(p, 'slow', { duration: 3, source: ally }), true);
+});
+
+test('Patriot Rampage 3: every enemy +40 % move speed, +40 ASPD while he lives', () => {
+  const { h, p, d } = patriotField({ ccPatriot: 4 });
+  const buff = (u) => u.buffs.find((b) => b.key === 'risk:patriotRampage');
+  assert.ok(buff(d) && buff(p));
+  h.b.kill(p, null);                                         // his revive: still alive, still on
+  h.run(1);
+  assert.ok(buff(d), 'while he revives');
+  h.runUntil(() => p.mem.ab.state !== 'reborn', 120);
+  h.b.kill(p, null);                                         // the second form's knock-out is for good
+  h.run(1);
+  assert.ok(!p.alive);
+  assert.ok(!buff(d), 'gone with him');
+});
+
+test('Patriot Support 3: the spear picks up to 3 units on high ground and adds Necrosis', () => {
+  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccPatriot: 3 } },
+    units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }, ...[[10, 2], [11, 2], [12, 2], [10, 1]].map(([row, col]) => ({ chessId: 'chess_char_3_01_a', row, col }))] });
+  h.step(1);
+  const p = h.spawn(CC.patriot.key, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
+  h.run(0.5);
+  assert.ok(h.allies().filter((u) => u.ground === false).length >= 4, 'operators on high ground');
+  for (const u of h.allies()) { h.b.addBuff(u, { key: 'test:wall', persist: true, mods: { hpFlat: 1e8 } }); u.hp = u.s.maxHp; }
+  const marks = () => h.eventsOf('fx').filter((e) => e[1] === 'patriotSpearMark' || e[1]?.kind === 'patriotSpearMark');
+  const necro = [];
+  // element 损伤 runs no 'hit' hook: record the calls
+  const deal = h.b.dealDamage.bind(h.b);
+  h.b.dealDamage = (src, tgt, o) => { if (src === p && o && o.type === 'element') necro.push([tgt, o.element, o.amount]); return deal(src, tgt, o); };
+  h.b.dealDamage(null, p, { amount: p.hp + 1, type: 'true', sourceless: true }); // to the second form (revive, then 毁灭姿态)
+  h.runUntil(() => marks().length > 0, 200);
+  const n = marks().length;
+  assert.ok(n > 1 && n <= CC.patriot.spearTargets, `${n} targets`);
+  h.run(4);
+  assert.ok(necro.length > 0, 'Necrosis on the spear targets');
+  assert.ok(necro.every(([, el, n]) => el === 'necrosis' && Math.abs(n - p.s.atk * CC.patriot.spearNecrosis) < 1e-6), JSON.stringify(necro.map(([, el]) => el)));
+});
+
+test('Delegation Resilient 3: Degenbrecher\'s second form stops at every 9 %, loses nothing while casting, bursts after the cast', () => {
+  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 4 } },
+    units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
+  h.step(1);
+  const dg = h.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
+  h.run(0.5);
+  const hitHard = (n) => h.b.dealDamage(null, dg, { amount: n, type: 'true', sourceless: true });
+  hitHard(dg.hp + 1);                                          // the knock-out: her 5 s revive, then 10 s 无敌
+  h.runUntil(() => !dg.s.flags.invulnerable && !dg.buffs.some((b) => b.key === 'ab:reborn'), 60);
+  const max = dg.s.maxHp;
+  assert.ok(Math.abs(dg.hp - max) < 1e-6, 'full after the revive');
+  const bursts = () => h.eventsOf('fx').filter((e) => e[1] === 'explode' && JSON.stringify(e).includes('clearSp')).length;
+  const b0 = bursts();
+  hitHard(max * 0.5);
+  assert.ok(Math.abs(dg.hp / max - (1 - CC.delegation.gateRatio)) < 1e-6, `stopped at 91 %: ${dg.hp / max}`);
+  hitHard(max * 0.5);
+  assert.ok(Math.abs(dg.hp / max - (1 - CC.delegation.gateRatio)) < 1e-6, 'nothing while casting');
+  assert.equal(bursts(), b0, 'the burst waits for the cast');
+  h.run(CC.delegation.castSeconds + 0.2);
+  assert.equal(bursts(), b0 + 1);
+  hitHard(max * 0.5);
+  assert.ok(Math.abs(dg.hp / max - (1 - 2 * CC.delegation.gateRatio)) < 1e-6, 'the next step at 82 %');
+  // without the tag: 25 % steps, no gate
+  const plain = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
+  plain.step(1);
+  const d2 = plain.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
+  plain.run(0.5);
+  plain.b.dealDamage(null, d2, { amount: d2.hp + 1, type: 'true', sourceless: true });
+  plain.runUntil(() => !d2.s.flags.invulnerable && !d2.buffs.some((b) => b.key === 'ab:reborn'), 60);
+  plain.b.dealDamage(null, d2, { amount: d2.s.maxHp * 0.5, type: 'true', sourceless: true });
+  assert.ok(Math.abs(d2.hp / d2.s.maxHp - 0.5) < 1e-6, 'no gate');
+});

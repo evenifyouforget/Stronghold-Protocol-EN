@@ -394,7 +394,7 @@ export function applyHpLoss(battle, source, target, amount, dmg, mark) {
     const before = pool.hp;
     const pid = source && source.side === 'ally' ? source.ownerId : null;
     if (amount > 0) {
-      try { pool.damage(pid, amount); } catch (e) { battle._internalError('bossPool.damage', e); pool.hp = Math.max(0, pool.hp - amount); }
+      try { pool.damage(pid, amount, dmg ? dmg.type : undefined); } catch (e) { battle._internalError('bossPool.damage', e); pool.hp = Math.max(0, pool.hp - amount); }
     }
     dealt = Math.max(0, before - pool.hp);
     if (!Number.isFinite(dealt)) dealt = 0; // a misbehaving pool (NaN hp) must not poison damage stats
