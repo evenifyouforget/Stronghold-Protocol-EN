@@ -39,6 +39,17 @@ import { metaBonds } from '../support/meta.js';
 import * as garrisons from '../garrisons.js';
 
 const int = (v, d = 0) => Math.trunc(num(v, d));
+
+/**
+ * SPA-CC ccStrategyLate (shared/rules.js): a Strategy's named round comes one round later (杰西卡 4/7/10/13 → 5/8/11/14,
+ * 老鲤's held Funds 1–2 → 2–3 and its payout 3 → 4, 芬 14 → 15 — the Hidden Core round, only when it is played). Rules
+ * by period keep theirs: "every N rounds" / even rounds (杜宾, 松桐, 娜仁图亚) and 达马兹提 — "every 5 rounds" in its text,
+ * rounds 5 / 10 / 15 in the data (Fish, 2026-10-15).
+ */
+const PERIODIC_BANDS = new Set(['band_damaztic']);
+const roundLate = (ctx, bandId) => (ctx.rules?.ccStrategyLate > 0 && !PERIODIC_BANDS.has(bandId) ? 1 : 0);
+/** The round a Strategy's `round` names, after ccStrategyLate. */
+const namedRound = (ctx, p, bandId, d = -1) => int(p.round, d) + roundLate(ctx, bandId);
 const list = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const hasBond = (ctx, id, bond) => { const c = ctx.gd.chess(id); return !!(c && Array.isArray(c.bonds) && c.bonds.includes(bond)); };
 const isNormalChess = (ctx, id) => { const c = ctx.gd.chess(id); return !!(c && !c.isGolden); };
@@ -131,11 +142,11 @@ K.band_shop_refresh_copy_max_lv_char = () => ({
   },
 });
 
-K.preparation_start_gain_chess_from_round = (ps) => ({
+K.preparation_start_gain_chess_from_round = (ps, bandId) => ({
   onRoundStart(ctx) {
     for (const p of ps) {
       const id = p.chess ?? p.chess_id;
-      if (ctx.round !== int(p.round, -1) || !id) continue;
+      if (ctx.round !== namedRound(ctx, p, bandId) || !id) continue;
       for (let k = 0; k < Math.max(1, int(p.count, 1)); k++) grant(ctx, id, { requirePool: false, source: 'band' });
     }
   },
@@ -152,16 +163,16 @@ K.preparation_start_gain_chess_every_n_round = (ps) => ({
   },
 });
 
-K.give_coin_in_round = (ps) => ({
+K.give_coin_in_round = (ps, bandId) => ({
   onIncome(ctx, ev) {
-    for (const p of ps) if (ctx.round === int(p.round, -1)) ev.income = Math.max(0, int(p.coin, 0));
+    for (const p of ps) if (ctx.round === namedRound(ctx, p, bandId)) ev.income = Math.max(0, int(p.coin, 0));
   },
 });
 
-K.prep_start_gain_chess_from_pool_in_round = (ps) => ({
+K.prep_start_gain_chess_from_pool_in_round = (ps, bandId) => ({
   onRoundStart(ctx) {
     for (const p of ps) {
-      if (ctx.round !== int(p.round, -1)) continue;
+      if (ctx.round !== namedRound(ctx, p, bandId)) continue;
       for (let k = 0; k < Math.max(1, int(p.count, 1)); k++) {
         const r = ctx.rollPool(p.pool);
         if (r) grant(ctx, r.id, { source: 'band' });
@@ -210,10 +221,10 @@ K.up_shop_next_refresh_must_present_bond_char = (ps) => ({
   },
 });
 
-K.gain_bond_char_per_round = (ps) => ({
+K.gain_bond_char_per_round = (ps, bandId) => ({
   onRoundStart(ctx) {
     const p = ps[0];
-    const r0 = int(p.round, 1), every = Math.max(1, int(p.preround, 1));
+    const r0 = namedRound(ctx, p, bandId, 1), every = Math.max(1, int(p.preround, 1));
     if (ctx.round < r0 || (ctx.round - r0) % every !== 0) return;
     for (let k = 0; k < Math.max(1, int(p.count, 1)); k++) {
       const id = rollBond(ctx, p.bond, { anyTier: true });
@@ -252,10 +263,10 @@ K.band_cost_coin_reach_cnt_gain_chess_from_pool = (ps) => ({
  * that is such a bond means nothing is added, and with two active bonds a layered one still gets count2. Only this
  * strategy: 协防's 「使所有已激活的盟约层数」 (bonds/addon/meta.js) and 华法琳's 【重点监护】 keep adding to every bond they name.
  */
-K.round_start_bond_check_gain_layer = (ps) => ({
+K.round_start_bond_check_gain_layer = (ps, bandId) => ({
   onRoundStart(ctx) {
     const p = ps[0];
-    if (ctx.round !== int(p.round, -1)) return;
+    if (ctx.round !== namedRound(ctx, p, bandId)) return;
     const active = Object.entries(ctx.bonds()).filter(([, b]) => b && b.active).map(([id]) => id);
     const n = active.length === int(p.factioncount, 1) ? int(p.count1, 0) : int(p.count2, 0);
     for (const b of active) {
@@ -472,7 +483,7 @@ const duckGlobal = {
   onBattleStart(ctx, ev) {
     if (!ev || !DUCK_KINDS.has(ev.kind) || !Array.isArray(ev.spawns)) return;
     const p = duckParams();
-    if (!p || ctx.round < int(p.round, 1)) return;
+    if (!p || ctx.round < namedRound(ctx, p, DUCK_BAND, 1)) return;
     const held = ctx.bandId() === DUCK_BAND || ctx.teammates().some((t) => t.bandId() === DUCK_BAND);
     if (!held) return;
     duckReplace(ctx, ev.spawns, p, ctx.playerId, { routes: ev.routes, side: ev.side });

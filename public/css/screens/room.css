@@ -446,6 +446,26 @@
 .searchbar__switch:disabled { cursor: default; }
 .room-ping__pills { display: inline-flex; gap: .08rem; }
 
+/* SPA-CC Risk tags (ui/lobbyRules.js RiskGrid): a column per tag, its levels top to bottom */
+.rules-badge--risk { background: rgba(231, 90, 26, .9); color: #fff; }
+.rules-chip--risk { border-color: rgba(231, 90, 26, .7); color: #ffb48a; }
+.risk { display: flex; flex-direction: column; gap: .08rem; }
+.risk__total { display: flex; align-items: baseline; gap: .12rem; font-size: calc(.18 * var(--t)); }
+.risk__total b { color: #ffb48a; }
+.risk__grid > * { display: flex; min-width: 0; }
+.risk__grid { display: grid; grid-template-columns: repeat(var(--risk-cols), minmax(.9rem, 1fr)); gap: .05rem; overflow-x: auto; }
+.risk__tile {
+  flex: 1; width: 100%;
+  display: flex; flex-direction: column; align-items: flex-start; gap: .02rem;
+  min-height: .62rem; padding: .05rem .07rem;
+  border: 1px solid var(--line-2); background: rgba(0, 0, 0, .3); color: var(--text-md);
+  font-size: calc(.13 * var(--t)); line-height: 1.25; text-align: left;
+}
+.risk__tile:disabled { cursor: default; }
+.risk__tile.is-active { border-color: rgba(231, 90, 26, .85); background: rgba(231, 90, 26, .16); color: #ffd2b8; }
+.risk__lv { font-size: calc(.16 * var(--t)); font-weight: 800; color: #ff9a5a; }
+.risk__gap { min-height: .62rem; }
+.risk__effects { margin: 0; padding-left: .2rem; color: var(--text-lo); font-size: calc(.14 * var(--t)); line-height: 1.45; }
 /* the map: number buttons beside a preview of the player's field (ui/lobbyRules.js StagePreview) */
 .rules-map { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: .16rem; }
 .rules-map__pick { display: flex; flex-direction: column; gap: .06rem; }

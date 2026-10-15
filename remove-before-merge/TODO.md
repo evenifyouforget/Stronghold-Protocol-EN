@@ -82,6 +82,18 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
   worth risk, shown as e.g. "Ultimate+5 seeded". Go through the tag ideas one by one (which hooks exist, which enemies
   are in the data, effort), and say which tags are cheap, which need new sim hooks, and which need Fish's input.
 
+PR C `wip/spacc` (on `wip/custom-lobby`), SPA-CC first batch — built 2026-10-15; Fish to playtest
+
+- [x] Risk tags as lobby rules (`level` type, Risk per level), the Risk grid in the rules dialog, "+Risk" on the
+  strip and the result title; cheats make the Risk 0.
+- [x] Tags: Investor bench, Swift nerf, Foresight −20 ASPD (active or not), Strategies one round later (periodic ones
+  and Damazti keep theirs), tier-1 price, shop upgrades (2 levels), SP recovery (3), final boss HP/ATK (3), leader DR
+  (2; final bosses and leader-class bounty enemies, none under a burst), Silencers (fewest stacks, ties: earliest seat).
+- [x] Patriot pilot: data (tools/build-data.mjs FORK_ENEMY_KEYS, flagged `fork`), art in the manifest, kit, and a
+  provisional tag "round 9: Patriot in every wave" until Fish's enemy tags are designed.
+- [ ] Open: Degenbrecher's second-form ATK +50 % is not applied (enemy-palette/leaders.md); Blood Debt / Asset Liquidation design; the pool-wide boss tags (Arts/Physical thresholds,
+  invulnerability).
+
 # to be ported to yuri
 
 - [x] English docs (README, CHANGELOG, NOTICE, DEPLOY, PLAYING, WINDOWS `.en.md`): Yuri #3, merged, then updated by Yuri for the current repo state.

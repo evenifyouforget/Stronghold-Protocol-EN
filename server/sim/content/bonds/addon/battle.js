@@ -77,6 +77,7 @@ import { bodyKeys, bodyInKeys } from '../../../body.js';
 import { applyRedirectCut, isHpLoss, redirectShare } from '../../../damage.js';
 import { BOSS_ROW_OFFSET } from '../../../constants.js';
 import { GEO } from '../../../../../shared/constants.js';
+import { CC } from '../../../../../shared/ruleData.js';
 import {
   num, bondRecord, buffParams, bondTier, bondLayers, isMember, isElite, isGroundOp, onField, playerOps, passiveBuff,
   fxOn, N4, N8, directMods, COLS,
@@ -520,7 +521,8 @@ export function install(battle) {
       if (!u || u.kind !== 'op' || c.reason === 'death' || !u.alive || !u.skill) return;
       const st = byPid[u.ownerId];
       if (!st || !st.tiers[ID.swift]) return;
-      const bb = st.bb[ID.swift];
+      // SPA-CC ccSwift (shared/rules.js): 20 + 0.25 × stacks % instead of the data's 0.35
+      const bb = battle.flags?.rules?.ccSwift > 0 ? { ...st.bb[ID.swift], prob_per_stack: CC.swiftPerStack } : st.bb[ID.swift];
       const lv = L(battle, st, ID.swift);
       const p = prob(bb, lv);
       let gained = 0;

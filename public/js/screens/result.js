@@ -174,8 +174,9 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
       <section class="result__hero">
         <div class="result__summary">
         <div class="result__logo"><${Sprite} k="entry/season_logo_settle" class="result__logoimg" fallback=${html`<${MicroLabel} tone="mint">STRONGHOLD PROTOCOL</${MicroLabel}>`} /></div>
-        ${r.difficulty || badges.seeded ? html`<div class="result__tagline">
+        ${r.difficulty || badges.seeded || badges.risk > 0 ? html`<div class="result__tagline">
           ${r.difficulty ? html`<${DifficultyTag} difficulty=${r.difficulty} size="lg" />` : null}
+          ${badges.risk > 0 ? html`<span class="result__risk num">+${badges.risk}</span>` : null}
           ${badges.seeded ? html`<span class="result__seeded">${badges.seeded}</span>` : null}
         </div>` : null}
         ${badges.cheats ? html`<div class="result__cheats" role="note">${badges.cheats}</div>` : null}

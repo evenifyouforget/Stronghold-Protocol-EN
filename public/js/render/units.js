@@ -388,6 +388,10 @@ export const FORMS = Object.freeze({
     revived: Object.freeze({ change: null, roles: Object.freeze({}) }),
   }),
   enemy_1525_blkswb: rebirth('Revive1', 'Revive2', 'Revive3', clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack')),
+  // 爱国者 (fork, SPA-CC): kneels into his revive and rises in 毁灭姿态; its spear throw is the Skill clip
+  enemy_1506_patrt: rebirth('revive_1', 'revive_2', 'revive_3', Object.freeze({
+    ...clipSet('Idle_2', 'Move_2', 'Die', 'Attack_2'), skill: Object.freeze({ begin: null, loop: 'Skill', end: null, index: 0, idle: null }),
+  })),
   enemy_1535_wlfmster: rebirth('A_revive_1', 'A_revive_2', 'A_revive_3', clipSet('B_Idle', 'B_Move', 'B_Die', 'B_Attack')),
   enemy_1539_reid: rebirth('Revive_Begin', 'Revive_Loop', 'Revive_End'),
   // 重生 on the skeleton's own Revive clip (PR #275 by @xcdoge; content/enemies/leaders.js kitUglyThing / kitXi): 巨大的丑东西

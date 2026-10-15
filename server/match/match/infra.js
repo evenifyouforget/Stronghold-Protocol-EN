@@ -5,6 +5,7 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { buildDeployMap } from '../board.js';
+import { CC } from '../../../shared/ruleData.js';
 
 export class MatchInfra {
   /** Run a callback with error isolation, then flush the views. */
@@ -68,6 +69,39 @@ export class MatchInfra {
   get soloUntimed() { return this.isSolo || this.loneHuman || !!this.rules?.untimed; }
 
   nextUid() { return ++this.uidSeq; }
+
+  /**
+   * A player's bounties for this round's wave plus the SPA-CC Risk tag extras (shared/rules.js): ccSilencers — on rounds
+   * 10–13 the alive player with the fewest stacks in all (Σ of its alliance layers; a tie: the earliest seat, Fish
+   * 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty. Every wave builder takes its bounties from here.
+   * @param {import('../PlayerState.js').PlayerState} ps
+   */
+  waveBounties(ps) {
+    const extra = this.riskBounties(ps);
+    return extra.length ? [...ps.bounties, ...extra] : ps.bounties;
+  }
+
+  riskBounties(ps) {
+    const out = [];
+    // ccPatriot (provisional): round 9, one 爱国者 in every alive player's wave, no bounty
+    const pt = CC.patriot;
+    if (this.rules?.ccPatriot > 0 && this.round === pt.round && ps.alive && this.gd.enemy(pt.key)) {
+      out.push({ id: 'risk:patriot', roundsLeft: 1, card: { effectId: 'risk:patriot', enemyKey: pt.key, count: pt.count, coin: 0, payout: 'kill', rounds: 1 } });
+    }
+    return out.concat(this.silencerBounties(ps));
+  }
+
+  silencerBounties(ps) {
+    const s = CC.silencers;
+    if (!(this.rules?.ccSilencers > 0) || !s.rounds.includes(this.round) || !this.gd.enemy(s.key)) return [];
+    const alive = this.alivePlayers();
+    if (!alive.length) return [];
+    const total = (p) => Object.values(p.layers || {}).reduce((n, v) => n + (Number.isFinite(v) ? v : 0), 0);
+    let low = alive[0];
+    for (const p of alive) if (total(p) < total(low)) low = p;
+    if (low !== ps) return [];
+    return [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+  }
 
   alivePlayers() { return this.order.filter((p) => p.alive); }
 

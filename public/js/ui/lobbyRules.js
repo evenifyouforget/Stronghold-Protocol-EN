@@ -13,8 +13,8 @@ import { html, Button, Modal, Icon, MicroLabel, Tooltip } from './components.js'
 import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
-import { rulesInForce, ruleLabels, ruleOf } from '../../../shared/rules.js';
-import { VIRTUOSA, BLAZE, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
+import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk } from '../../../shared/rules.js';
+import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -34,14 +34,65 @@ export function ruleLabel(key, rules) {
     case 'blaze': return t('{name}代替{old}', { name: data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a) });
     case 'stage': return t('指定战场：{name}', { name: data.lookup('stages', v)?.name || v });
     case 'bans': return t('指定禁用盟约：{list}', { list: (v || []).map(bondName).join(t('、')) });
-    default: return key;
+    default: return ruleOf(key)?.type === 'level' ? riskText(key, v).short : key;
   }
 }
 
-/** The result-title suffix and watermark of `rules`: `{ seeded, cheats }` texts (null when not labelled). */
+/** The result-title suffix and watermark of `rules`: `{ seeded, cheats, risk }` (null / 0 when not labelled). */
 export function ruleBadges(rules) {
   const l = ruleLabels(rules);
-  return { seeded: l.seeded ? 'seeded' : null, cheats: l.cheats ? 'WITH CHEATS' : null };
+  return { seeded: l.seeded ? 'seeded' : null, cheats: l.cheats ? 'WITH CHEATS' : null, risk: l.risk };
+}
+
+const pct = (v) => Math.round(v * 100);
+/**
+ * The texts of SPA-CC Risk tag `key` at `level` (1 …): `short` (the grid tile, the strip) and `full` (the effects list).
+ * Alliance and enemy names come from the data.
+ */
+export function riskText(key, level) {
+  const enemyName = (k) => data.lookup('enemies', k)?.name || k;
+  switch (key) {
+    case 'ccInvestorBench': return { short: t('{bond}不计整备区', { bond: bondName('investShip') }), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
+    case 'ccSwift': return { short: t('{bond}削弱', { bond: bondName('swiftShip') }), full: t('【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）', { bond: bondName('swiftShip') }) };
+    case 'ccForesight': return { short: t('{bond}攻速-{n}', { bond: bondName('visiShip'), n: -CC.foresightAspd }), full: t('【{bond}】干员攻击速度-{n}（无论盟约是否激活）', { bond: bondName('visiShip'), n: -CC.foresightAspd }) };
+    case 'ccStrategyLate': return { short: t('策略延后'), full: t('指定回合数的策略推迟1回合生效（按奇偶或每N回合生效的策略不受影响）') };
+    case 'ccTier1Price': return { short: t('I阶干员加价'), full: t('从第{r}回合起，每回合购买的第一名I阶干员价格+{n}', { r: CC.tier1FromRound, n: CC.tier1Extra }) };
+    case 'ccUpgrade': return level >= 2
+      ? { short: t('升级加价 {n}', { n: level }), full: t('调度中心从4级升到5级、从5级升到6级的价格各+{n}', { n: CC.upgradeExtra[2][4] }) }
+      : { short: t('升级加价 {n}', { n: level }), full: t('调度中心从4级升到5级的价格+{n}', { n: CC.upgradeExtra[1][4] }) };
+    case 'ccSpRecovery': return { short: t('技力回复-{n}', { n: CC.spRecovery[level] }), full: t('干员的自动技力回复每秒-{n}', { n: CC.spRecovery[level] }) };
+    case 'ccBoss': return { short: t('最终领袖强化 {n}', { n: level }), full: t('最终领袖（含隐秘核心）最大生命值+{hp}%，攻击力+{atk}%', { hp: pct(CC.bossHp[level]), atk: pct(CC.bossAtk[level]) }) };
+    case 'ccLeaderDr': return { short: t('领袖减伤 {n}%', { n: pct(CC.leaderDr[level]) }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
+    case 'ccPatriot': return { short: t('{name}（试作）', { name: enemyName(CC.patriot.key) }), full: t('（试作）第{r}回合，每名博士的作战中出现1名【{name}】', { r: CC.patriot.round, name: enemyName(CC.patriot.key) }) };
+    case 'ccSilencers': return { short: enemyName(CC.silencers.key), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    default: return { short: key, full: key };
+  }
+}
+
+/** The Risk tags (SPA-CC) as Contingency Contract lays them out: one column per tag, its levels top (1) to bottom. */
+function RiskGrid({ rules, editable, onSet }) {
+  useData('bonds', 'enemies');
+  const tags = RULES.filter((r) => r.type === 'level');
+  const labels = ruleLabels(rules);
+  const on = tags.filter((r) => rules[r.key] > 0);
+  const rows = Math.max(...tags.map((r) => r.risk.length - 1));
+  return html`<div class="risk">
+    <div class="risk__total"><b class="num">${t('风险 {n}', { n: labels.risk })}</b>
+      ${labels.cheats ? html`<span class="t-dim">${t('使用作弊时风险计为0')}</span>` : null}</div>
+    <div class="risk__grid" style=${`--risk-cols:${tags.length}`}>
+      ${Array.from({ length: rows }, (_, i) => i + 1).map((level) => tags.map((r) => {
+        if (level >= r.risk.length) return html`<span key=${`${r.key}:${level}`} class="risk__gap"></span>`;
+        const active = rules[r.key] === level;
+        return html`<${Tooltip} key=${`${r.key}:${level}`} text=${riskText(r.key, level).full}>
+          <button type="button" class=${cx('risk__tile', active && 'is-active')} aria-pressed=${active ? 'true' : 'false'}
+            data-risk=${r.key} data-level=${level} disabled=${!editable} onClick=${() => onSet({ [r.key]: active ? 0 : level })}>
+            <span class="risk__lv num">${ruleRisk(r.key, level)}</span><span>${riskText(r.key, level).short}</span>
+          </button>
+        <//>`;
+      }))}
+    </div>
+    ${on.length ? html`<ul class="risk__effects">${on.map((r) => html`<li key=${r.key}>${riskText(r.key, rules[r.key]).full}</li>`)}</ul>` : null}
+  </div>`;
 }
 
 /** The strip between the seats and the bottom bar: the rules in force, the labels, and the button to the dialog. */
@@ -59,6 +110,7 @@ export function RulesBar({ room, isHost, busy, onSet }) {
         : html`<span class="t-dim">${t('原版规则')}</span>`}
       ${badges.cheats ? html`<span class="rules-badge rules-badge--cheat">${badges.cheats}</span>` : null}
       ${badges.seeded ? html`<span class="rules-badge rules-badge--seeded">${badges.seeded}</span>` : null}
+      ${badges.risk > 0 ? html`<span class="rules-badge rules-badge--risk num">+${badges.risk}</span>` : null}
     </div>
     <${RulesDialog} open=${open} onClose=${() => setOpen(false)} room=${room} rules=${rules} editable=${isHost && !busy} onSet=${onSet} />
   </div>`;
@@ -238,6 +290,9 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     <//>
     <${Section} title=${t('减少随机')} note=${t('结算标题将带有「{mark}」', { mark: 'seeded' })}>
       <${Seeded} room=${room} rules=${rules} editable=${editable} onSet=${onSet} />
+    <//>
+    <${Section} title=${t('风险')} note=${t('结算标题将带有「+风险」')}>
+      <${RiskGrid} rules=${rules} editable=${editable} onSet=${onSet} />
     <//>
   <//>`;
 }

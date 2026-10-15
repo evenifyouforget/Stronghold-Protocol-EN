@@ -439,6 +439,7 @@ async function main() {
     voiceSlots: opts.voiceAll ? null : undefined,
     optionalVoice: opts.optionalVoice,
     extraEnemyIds: Object.keys(dataEnemies || {}),
+    eventSfxEnemyIds: Object.keys(dataEnemies || {}).filter((k) => dataEnemies[k]?.fork === true),
     extraTokenIds: [...Object.keys(dataTokens || {}), ...extras.tokenIds],
     extraHandbook,
     localEnemySpines,

@@ -227,7 +227,7 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
       if (res && res.ok) check('levelUp', () => {
         if (ps.shop.level !== lv + 1) fail(`${ps.playerId}: level ${lv} → ${ps.shop.level}`);
         if (f0 - ps.funds !== price && !fx && !hasSpendEffects(m, ps)) fail(`${ps.playerId}: level-up paid ${f0 - ps.funds}, price ${price}`);
-        const next = gd.upgradeBase(ps.shop.level) ?? 0;
+        const next = typeof ps.upgradeBaseOf === 'function' ? ps.upgradeBaseOf(ps.shop.level) : (gd.upgradeBase(ps.shop.level) ?? 0);
         if (ps.shop.upgradePrice !== next) fail(`${ps.playerId}: upgrade price after level-up ${ps.shop.upgradePrice}, expected ${next}`);
         // the new level's extra slots open at once, empty (GitHub #332 / PR #333); the cards shown before stay in place
         const { chess, item } = gd.shopSlots(ps.shop.level);
@@ -469,7 +469,7 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
       m.fields.forEach((f, i) => { if (f.fieldId !== `b${i + 1}`) fail(`boss field id ${f.fieldId}`); });
       if (!hidden && m.teamLp !== lpSum) fail(`team LP ${m.teamLp} != Σ alive LP ${lpSum}`);
       if (hidden && m.teamLp !== teamLp0) fail(`hidden core changed team LP ${teamLp0} → ${m.teamLp}`);
-      const want = bossPoolHp(gd, hidden ? m.hiddenBossId : m.bossId, alive.length);
+      const want = bossPoolHp(gd, hidden ? m.hiddenBossId : m.bossId, alive.length, m.rules);
       if (!m.bossPool || m.bossPool.maxHp !== want) fail(`boss pool ${m.bossPool && m.bossPool.maxHp} != ${want}`);
       if (hidden && !hiddenEligible(gd, { layerSum: m.hiddenLayerSum, teamLp: m.teamLp })) fail('hidden core entered while not eligible');
       if (hidden && gd.difficulty === 'FUNNY') fail('hidden core on FUNNY');

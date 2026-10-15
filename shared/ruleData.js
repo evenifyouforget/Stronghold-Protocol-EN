@@ -34,6 +34,24 @@ export const BLAZE_GARRISON_DESC_ELITE = N_('<售出时>获得1名精锐【{name
 
 const own = (o, k) => (o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null);
 
+/** SPA-CC Risk tags' numbers (shared/rules.js; remove-before-merge/FINDINGS.md §5). */
+export const CC = Object.freeze({
+  swiftPerStack: 0.0025,                       // 迅捷 20 + 0.25 × stacks % (data: 0.0035)
+  foresightAspd: -20,                          // 远见 operators, active or not
+  tier1Extra: 1, tier1FromRound: 3,            // the first tier-1 operator bought each round from round 3
+  upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
+  spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
+  bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
+  leaderDr: Object.freeze([0, 0.5, 0.9]),
+  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
+  // (provisional, the Patriot pilot — Fish is redesigning the enemy tags) round 9: one 爱国者 in every player's wave
+  patriot: Object.freeze({ key: 'enemy_1506_patrt', count: 1, round: 9 }),
+});
+
+/** msgid of the note added to 投资人's text when the bench no longer counts. */
+export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
+
+
 /** The Alliance Modules' texts (the rules dialog, and the alliance's own text while the module is on): {bond} = the
  *  alliance's name, {list} = the names of LATERANO_B_LIST. */
 export const LATERANO_B_TEXT = N_('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）');
@@ -42,7 +60,7 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C'));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0));
 
 /**
  * The records `rules` change: `{ chess: { [id]: record }, garrisons: { [id]: record } }` — new objects, the inputs are not
@@ -54,6 +72,17 @@ export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === t
 export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
   const chess = {}, garrisons = {}, bonds = {};
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds };
+  // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
+  const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;
+  if (investor) {
+    const note = text(INVESTOR_BENCH_NOTE);
+    bonds.investShip = { ...investor, countMode: 'BOARD', countsHand: false, desc: `${investor.desc ?? ''}${note}`, descRaw: `${investor.descRaw ?? investor.desc ?? ''}${note}` };
+  }
+  const swift = rules.ccSwift > 0 ? own(raw.bonds, 'swiftShip') : null;
+  if (swift) {
+    const bb = (o) => (o && typeof o === 'object' ? { ...o, prob_per_stack: CC.swiftPerStack } : o);
+    bonds.swiftShip = { ...swift, bb: bb(swift.bb), buffs: Array.isArray(swift.buffs) ? swift.buffs.map((x) => ({ ...x, bb: bb(x.bb) })) : swift.buffs };
+  }
   // the Alliance Modules: the alliance's text is the module's (its "current effect" line, Mod A's numbers, goes)
   const listNames = LATERANO_B_LIST.map((id) => own(raw.chess, id)?.name ?? id).join(text('、'));
   for (const { key, bondId, msg, params } of [
