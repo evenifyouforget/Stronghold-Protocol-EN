@@ -37,6 +37,35 @@
 .uthumb.is-golden .uthumb__art { border-color: var(--gold); box-shadow: inset 0 0 calc(var(--ut) * .18) rgba(255, 198, 0, .45); }
 .uthumb.is-golden::after { content: ''; position: absolute; inset: -2px; border: 1px solid rgba(255, 198, 0, .7); pointer-events: none; clip-path: inherit; }
 .uthumb.is-dim .uthumb__art img { filter: grayscale(.85) brightness(.55); }
+/* the SPA-CC Cursed Hammer (item record `cursed`): a purple cast and a slow, gloomy dark-blue flame sinking over it —
+   two layers of flame tongues (soft vertical ellipses) at different speeds, fading in at the top and out below the
+   square they spill past; the field's plate does the same in Pixi (render/units.js CursedFlame) */
+.uthumb.is-cursed .uthumb__art img, .dhead__icon.is-cursed img { filter: sepia(.45) hue-rotate(215deg) saturate(1.7) brightness(.82); }
+.uthumb.is-cursed .uthumb__art, .dhead__icon.is-cursed { border-color: #6a4bb8; }
+.uthumb.is-cursed::before, .uthumb.is-cursed::after, .dhead__icon.is-cursed::before, .dhead__icon.is-cursed::after {
+  content: ''; position: absolute; inset: -30% -18% -40%; pointer-events: none; z-index: 1;
+  background:
+    radial-gradient(ellipse 16% 36% at 28% 30%, rgba(40, 70, 170, .6), transparent 70%),
+    radial-gradient(ellipse 12% 30% at 62% 52%, rgba(25, 45, 130, .55), transparent 70%),
+    radial-gradient(ellipse 14% 26% at 44% 74%, rgba(55, 85, 190, .45), transparent 70%);
+  filter: blur(1px); animation: cursed-sink 5s linear infinite;
+}
+.uthumb.is-cursed::after, .dhead__icon.is-cursed::after {
+  background:
+    radial-gradient(ellipse 13% 32% at 70% 26%, rgba(30, 55, 150, .55), transparent 70%),
+    radial-gradient(ellipse 17% 34% at 36% 58%, rgba(20, 35, 110, .5), transparent 70%);
+  animation-duration: 6.5s; animation-delay: -2.4s;
+}
+.dhead__icon.is-cursed { position: relative; }
+@keyframes cursed-sink {
+  0% { transform: translateY(-30%); opacity: 0; }
+  25% { opacity: .9; }
+  75% { opacity: .9; }
+  100% { transform: translateY(30%); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uthumb.is-cursed::before, .uthumb.is-cursed::after, .dhead__icon.is-cursed::before, .dhead__icon.is-cursed::after { animation: none; opacity: .6; }
+}
 .uthumb__tag { position: absolute; right: 0; bottom: 0; font-size: calc(var(--ut) * .17); line-height: 1.2; padding: 0 .03rem; background: #a9c3d8; color: #0b1520; font-weight: 700; }
 /* 0.2.0 补位: the small 「替补」 mark of a stand-in's thumbnail (the result lineup, bond popup members — screens/result.js,
    ui/bondStrip.js) */

@@ -327,8 +327,9 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
 2. For Cursed Hammer, how is it drawn? Is the current convention to serve a png? Do we have postprocessing effects available ex. screenspace distortion or an animated particle overlay? What solution to make it visually distinct would avoid undue code maintenance problems?
 
    → Claude: item icons are PNGs from the asset manifest (`data/assets.json` `items`: icon id → `/assets/…` URL, downloaded
-   by `fetch-assets`), drawn as plain `<img>` in the DOM — the hand, shop, detail panel, choice cards, the 2D fallback
-   board. The 3D battle view (Pixi) never draws item icons. The Cursed Hammer reuses the Victorian Hammer's icon, so it
+   by `fetch-assets`), drawn as plain `<img>` in the DOM — item thumbnails, the detail panel, choice cards, the 2D fallback
+   board. (Correction, 2026-10-16: the 3D field (Pixi) does draw them too — an item lying in the hand on the board is a
+   plate with its icon, `render/units.js ItemView`, and an operator shows small pips of its equipped items.) The Cursed Hammer reuses the Victorian Hammer's icon, so it
    currently looks identical. The DOM side has CSS only: filters (hue-rotate, saturate, brightness, drop-shadow), CSS
    animations, `::after` overlays; screen-space distortion is possible with SVG filters but heavier and browser-
    inconsistent. Pixi has particles / filters, but items aren't there. Suggestion, the way golden items already work
@@ -356,8 +357,20 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
 
 UI tweak for Cursed Hammer: make the "Destroy" button greyed out and unclickable, and change the text to "Cannot be destroyed".
 
+→ Claude (2026-10-16): done — the selection's Destroy button stays, greyed out, reading "Cannot be destroyed".
+
 I want to try developing a visual for the Cursed Hammer that makes it stand out more and not look like a buff item. I'm thinking of a gloomy sinking effect, which could be done with a flame-like overlay (so with varying transparency, and different parts moving at different speeds), but moving down instead of up, dark blue instead of red~yellow, and slow (takes around 5 seconds to cross the height). Flame should be on top of the icon rather than inside it, so it can go outside the square. Not sure if this would be accomplished with particle systems or something else. For the sprite itself, we can give it a purple tint.
+
+→ Claude (2026-10-16): built in both places it shows. The field (Pixi): the hand plate is tinted purple, with 7 soft
+dark-blue flame tongues on top that sink from above the plate to below it, each over its own 4–6 s with its own phase,
+sway and fading alpha (`render/units.js CursedFlame`, texture `textures.js cursedFlameTexture`); an operator wearing it
+shows a purple pip. The DOM thumbnails and the detail panel's icon: a CSS purple filter and two flame layers sinking at
+5 s and 6.5 s (`game-panels.css` `.is-cursed`). Both come from one flag on the item record (`cursed: true`). Try it in the
+mock: `/dev/game-mock.html?variant=junk`. Numbers to tune: CURSED_TONGUES / CURSED_PERIOD / CURSED_SPAN and the tint in
+`render/units.js`, the colours in `cursedFlameTexture`.
 
 For invulnerability, I want to try developing a visual that is close to the original game. The unit will have two ribbons rotating around them as if in 3D space. Ribbon can be considered a cylinder that is not very tall (thickness around 1/4 the size of a tile), that spins around its own axis. Colour should be gold. Addition, overlay, or a similar colour mixing setting can be used. Ribbon should fade transparent to gold to transparent, with 180 degrees being transparent. (the "back side") Ribbon rotates around 1 rotation per second, with the side closer to the camera moving left. Ribbons should be in opposite phase to each other. First ribbon's axis is screen +Y, then tilted 20 degrees left (counterclockwise around the Z axis that cuts through the screen) then 10 degrees toward the camera. Second ribbon is same but 20 degrees right instead of left.
 
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
+
+→ Claude (2026-10-16): done — Junk 2's −1 starts from round 2.

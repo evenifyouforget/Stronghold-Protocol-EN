@@ -145,6 +145,8 @@ function cursedHammerRecord(level, text) {
     shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1, giveBondId: null, givePowerId: null,
     canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc, descRaw: desc, buffs: [], params: {},
     category: 'STAT', kind: 'passive', family: null, implFormula: 'ATK% += −0.5 (server/sim/content/risk.js)', fork: true,
+    // drawn cursed: a purple tint and a sinking dark-blue flame (ui/gameComponents.js UnitThumb, render/units.js ItemView)
+    cursed: true,
   };
 }
 

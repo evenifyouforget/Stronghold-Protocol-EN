@@ -1258,6 +1258,38 @@ export function shadowTexture() {
 
 /** Item pedestal composite (icon in a rounded frame coloured by tier). */
 const _items = new Map();
+let _cursedFlame = null;
+/**
+ * One tongue of the Cursed Hammer's sinking flame (render/units.js CursedFlame): a soft vertical teardrop, dark blue,
+ * widest near its top and tapering to the bottom (the flame "falls"), alpha fading to the edges. 64×128, white-free so
+ * normal blending reads as a gloomy shadow-light rather than a glow.
+ */
+export function cursedFlameTexture() {
+  if (_cursedFlame) return _cursedFlame;
+  const P = PIXI();
+  const W = 64, H = 128;
+  const canvas = makeCanvas(W, H);
+  const c = canvas.getContext('2d');
+  c.save();
+  c.translate(W / 2, H * 0.36);
+  c.scale(1, 2.1);
+  const g = c.createRadialGradient(0, 0, 0, 0, 0, W * 0.46);
+  g.addColorStop(0, 'rgba(70, 110, 220, 0.85)');
+  g.addColorStop(0.45, 'rgba(35, 60, 160, 0.55)');
+  g.addColorStop(1, 'rgba(15, 25, 90, 0)');
+  c.fillStyle = g;
+  c.beginPath(); c.arc(0, 0, W * 0.46, 0, Math.PI * 2); c.fill();
+  c.restore();
+  // the tapering tail below the body
+  const t = c.createLinearGradient(0, H * 0.5, 0, H);
+  t.addColorStop(0, 'rgba(30, 50, 150, 0.45)');
+  t.addColorStop(1, 'rgba(15, 25, 90, 0)');
+  c.fillStyle = t;
+  c.beginPath(); c.moveTo(W * 0.3, H * 0.5); c.quadraticCurveTo(W / 2, H * 1.02, W * 0.7, H * 0.5); c.closePath(); c.fill();
+  _cursedFlame = P.Texture.from(canvas);
+  return _cursedFlame;
+}
+
 export function itemTexture(key, img, color) {
   const k = `${key}|${img ? 1 : 0}|${color}`;
   let tex = _items.get(k);
