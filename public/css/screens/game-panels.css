@@ -590,6 +590,8 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   animation: uframe-in 200ms var(--ease-out);
 }
 .uframe__btn:disabled { opacity: .5; cursor: default; }
+/* the SPA-CC Cursed Hammer: its 销毁 stays visible, greyed out, as 无法销毁 */
+.uframe__btn--destroy.is-locked { opacity: .55; cursor: not-allowed; filter: grayscale(1); }
 .uframe__btn--retreat { left: 25%; top: 25%; transform: translate(-80%, -90%); }
 .uframe__btn--sell, .uframe__btn--destroy { left: 75%; top: 25%; transform: translate(-20%, -90%); }
 /* the octagon plate every button stands on (the official util_btn plates are octagons) */

@@ -28,7 +28,8 @@ export class PlayerRound {
     // not equipped (in the hand or the temporary hand)
     const junk = tagLevel(this.m.rules, 'ccJunk');
     if (junk > 0 && r === 1 && this.gd.item(CC.junk.itemId)) this.stow(this.newPiece('item', CC.junk.itemId), { allowTemp: true });
-    const cursed = junk >= 2 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
+    // (not on round 1: the hammer has just arrived — Fish 2026-10-16, starting on 3 Funds was too harsh)
+    const cursed = junk >= 2 && r > 1 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
     this.addFunds(Math.max(0, nonNeg(ev.income) - cursed) + nonNeg(ev.pending) + extra, { reason: 'income' });
     // temp is NOT wiped here: the last prep's deadline resolved what the player could act on (endPrep); what overflowed
     // after it (battle-result grants, SETTLE merges, returned equipment) is shown and usable in this prep (tempDue).

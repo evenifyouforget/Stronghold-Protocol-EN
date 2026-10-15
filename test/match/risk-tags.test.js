@@ -312,6 +312,9 @@ test('ccJunk 2: a round\'s income −1 while the Cursed Hammer is not equipped',
   assert.equal(income({ ccJunk: 1 }, false), base, 'Junk 1: no income loss');
   assert.equal(income({ ccJunk: 2 }, false), base - CC.junk.incomeLoss);
   assert.equal(income({ ccJunk: 2 }, true), base, 'equipped: no loss');
+  // round 1: no loss (the hammer has just arrived)
+  const first = (rules) => { const h = makeMatch({ mode: 'solo', seed: 3, rules }).start(); try { h.toPrep(1); return h.ps('p_0').funds; } finally { h.m.dispose(); } };
+  assert.equal(first({ ccJunk: 2 }), first({}), 'round 1 starts with the usual Funds');
 });
 
 test('ccVengeance: Reids by the player\'s stacks in a normal battle (×2 at level 3); the final rounds by everyone\'s, once per field', () => {

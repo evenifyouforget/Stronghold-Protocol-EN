@@ -1524,5 +1524,6 @@
   "攻击力-50%。无法被销毁": "ATK −50%. Cannot be destroyed",
   "攻击力-50%。无法被销毁；未装备时每回合收入-1": "ATK −50%. Cannot be destroyed; while not equipped, −1 income each round",
   "开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动": "Every Doctor starts with a 【{item}】: its carrier has −{n}% ATK; it cannot be destroyed and has no interaction with the Damazti Isomorph",
-  "【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置": "The final Leader cannot die while a 【{degen}】 lives; those enemies have {hp}% max HP and {atk}% ATK; while unblocked, 【{degen}】 speeds up, reaching +{c}% Movement Speed after {s} seconds, reset when blocked or unable to move"
+  "【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置": "The final Leader cannot die while a 【{degen}】 lives; those enemies have {hp}% max HP and {atk}% ATK; while unblocked, 【{degen}】 speeds up, reaching +{c}% Movement Speed after {s} seconds, reset when blocked or unable to move",
+  "无法销毁": "Cannot be destroyed"
 }
