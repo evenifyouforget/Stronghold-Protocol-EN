@@ -122,41 +122,61 @@ test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6t
   } finally { h.m.dispose(); }
 });
 
-test('ccPatriot Support / Rampage 3: 5 Shieldguards with the Patriot taken on round 9; the sub-wave again on every half of the final rounds', () => {
+test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 3 } });
   try {
     h.m.round = 9;
     const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
     h.m.addBounty(p0, h.m.riskPatriotCard());
-    const escort = (ps, o) => h.m.riskBounties(ps, o).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
+    const escort = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
     assert.equal(escort(p0)[0].card.count, CC.patriot.escort.count);
     assert.equal(escort(p1).length, 0, 'only with the one who took him');
-    for (const ps of [p0, p1]) {
-      const keys = h.m.riskBounties(ps, { boss: true }).map((b) => b.card.enemyKey);
-      assert.ok(keys.includes(CC.patriot.key) && keys.includes(CC.patriot.escort.key), ps.playerId);
-    }
+    const sub = h.m.bossSubWave(['p_0', 'p_1']);
+    assert.deepEqual([...sub.keys()], ['p_0'], 'one group per field, with its left player');
+    const cards = sub.get('p_0');
+    assert.deepEqual(cards.map((b) => [b.card.enemyKey, b.card.count]), [[CC.patriot.key, 1], [CC.patriot.escort.key, CC.patriot.escort.count]]);
+    assert.ok(cards.every((b) => b.card.leftFirst));
   } finally { h.m.dispose(); }
 });
 
-test('ccDelegation: the sub-wave of the final rounds per player, HP × 5 / 10 / 15, ATK × 1.5 from United 2, Cloned 3: 3 Degenbrecher', () => {
+test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5, ATK × 1.5 from United 2', () => {
   const wave = (level) => {
-    const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccDelegation: level } });
-    try { return h.m.riskBounties(h.ps('p_0'), { boss: true }); } finally { h.m.dispose(); }
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, rules: { ccDelegation: level } });
+    try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
   };
   const dg = CC.delegation;
-  const byKey = (list) => Object.fromEntries(list.map((b) => [b.card.enemyKey, b.card]));
+  const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
   const u1 = byKey(wave(1));
   assert.equal(u1[dg.degen].count, 1);
   assert.equal(u1[dg.wave[1].key].count, 10);
   assert.equal(u1[dg.wave[2].key].count, 10);
-  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 5, atkMul: 1 });
-  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 10, atkMul: 1.5 });
-  assert.equal(byKey(wave(3))[dg.degen].count, 3, 'Cloned 3');
-  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 10, atkMul: 1.5 });
-  assert.deepEqual(byKey(wave(4))[dg.degen].riskMods, { hpMul: 15, atkMul: 1.5 }, 'Resilient 3');
-  assert.equal(byKey(wave(4))[dg.degen].count, 1);
+  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2, atkMul: 1 });
+  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
+  assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
   const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccDelegation: 1 } });
-  try { assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
+  try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
+});
+
+test('the sub-wave takes the left-first route of a pair field (left portal, then right), the left one of a one-player field', async () => {
+  const { buildBossWave, bountySpawns, leftFirstRoute } = await import('../../server/match/waves.js');
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccDelegation: 1, ccPatriot: 3 } }).start();
+  try {
+    h.toPrep(2);
+    const m = h.m;
+    for (const solo of [false, true]) {
+      const wave = buildBossWave(m.gd, m.rngWaves, m.factions, 14, { bossId: m.bossId, solo });
+      const specs = bountySpawns(m.gd, 14, wave, m.bossSubWave(solo ? ['p_0'] : ['p_0', 'p_1']).get('p_0'), 'p_0', { side: 'L' });
+      const lf = leftFirstRoute(wave.routes, false);
+      assert.ok(lf >= 0);
+      assert.ok(specs.length > 0 && specs.every((s) => s.routeIndex === lf), wave.templateId);
+      const r = wave.routes[lf];
+      if (!solo) {
+        assert.ok(r.steps.find((x) => x.t === 'move').p[1] < 10, 'to the left first');
+        assert.ok(r.end[1] > 10, 'then to the right');
+      } else assert.ok(r.end[1] < 10, 'the left route');
+    }
+  } finally { h.m.dispose(); }
 });
 
 test('a sub-wave riskMods multiply the round spawn mods', async () => {
@@ -164,13 +184,13 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
   const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccDelegation: 2 } });
   try {
     const ps = h.ps('p_0');
-    const list = h.m.riskBounties(ps, { boss: true });
+    const list = h.m.bossSubWave(['p_0']).get('p_0');
     const plain = list.map((b) => ({ ...b, card: { ...b.card, riskMods: undefined } }));
     const a = bountySpawns(h.m.gd, h.m.round, h.m.wave, list, ps.playerId);
     const b = bountySpawns(h.m.gd, h.m.round, h.m.wave, plain, ps.playerId);
     assert.ok(a.length > 0 && a.length === b.length);
     for (let i = 0; i < a.length; i++) {
-      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * 10) < 1e-9);
+      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * 3) < 1e-9);
       assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * 1.5) < 1e-9);
     }
   } finally { h.m.dispose(); }
@@ -189,4 +209,44 @@ test('round LP: ccLastLine +2 past the cap when the own battle leaked; a leaked 
   } finally { h.m.dispose(); }
   const off = makeMatch({ mode: 'solo', seed: 3 });
   try { assert.equal(off.m.riskLoss([{ enemyKey: CC.patriot.key, counted: true }], 1), 1); } finally { off.m.dispose(); }
+});
+
+test('ccFamiglia tier 3: Zaaro joins Cleaner\'s sub-wave and costs 5 LP when he leaks; tier 2 adds no one', () => {
+  const z = CC.famiglia.zaaro.key;
+  for (const [level, want] of [[2, false], [3, true], [4, false], [5, true]]) {
+    const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccFamiglia: level } });
+    try {
+      h.m.round = 10;
+      const keys = h.m.riskBounties(h.ps('p_0')).map((b) => b.card.enemyKey);
+      assert.ok(keys.includes(CC.silencers.key), `level ${level}: Cleaner is included`);
+      assert.equal(keys.includes(z), want, `level ${level}`);
+      if (want) assert.equal(h.m.riskLoss([{ enemyKey: z, counted: true }], 1), CC.famiglia.zaaro.leakLp);
+      else assert.equal(h.m.riskLoss([{ enemyKey: z, counted: true }], 1), 1);
+    } finally { h.m.dispose(); }
+  }
+});
+
+test('a Patriot who leaks and survives the Unite Phase still costs his leaker 5 LP (and 1 without the tag)', () => {
+  for (const [rules, want] of [[{ ccPatriot: 1 }, CC.patriot.leakLp], [{}, 1]]) {
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules }).start();
+    try {
+      h.toPrep(2);
+      h.m.round = 9;
+      const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
+      const clean = () => ({ leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 });
+      h.m.lastResults = new Map([[p0.playerId, { ...clean(), perfect: false, leaked: [{ enemyKey: CC.patriot.key, counted: true }] }], [p1.playerId, clean()]]);
+      const plan = { helpers: [p1], leakers: [p0], leaked: [{ enemyKey: CC.patriot.key, sourcePlayerId: p0.playerId }], notReentered: new Map() };
+      const unite = { perPlayer: { [p1.playerId]: { leaked: [{ enemyKey: CC.patriot.key, counted: true, sourcePlayerId: p0.playerId }] } }, unspawned: [] };
+      const before = p0.lp;
+      h.m.settle(plan, unite);
+      assert.equal(before - p0.lp, want, JSON.stringify(rules));
+    } finally { h.m.dispose(); }
+  }
+});
+
+test('the battle\'s live leak count weighs a Patriot like the settlement (the HUD\'s pending LP)', async () => {
+  const { battleProgress } = await import('../../server/sim/spec.js');
+  const fake = (rules) => ({ flags: { rules }, _perPlayer: { p_0: { leaked: [{ enemyKey: CC.patriot.key, counted: true }, { enemyKey: 'enemy_x', counted: true }] } } });
+  assert.equal(battleProgress(fake({ ccPatriot: 1 })).leaks, CC.patriot.leakLp + 1);
+  assert.equal(battleProgress(fake({})).leaks, 2);
 });

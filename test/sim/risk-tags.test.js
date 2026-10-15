@@ -103,8 +103,8 @@ test('Patriot Undying 1: his leak costs 5; Undying 2: +200 % HP, 90 % less damag
   assert.equal(h.b.applyStatus(p, 'slow', { duration: 3, source: ally }), true);
 });
 
-test('Patriot Rampage 3: every enemy +40 % move speed, +40 ASPD while he lives', () => {
-  const { h, p, d } = patriotField({ ccPatriot: 4 });
+test('Patriot Undying 3: every enemy +40 % move speed, +40 ASPD while he lives', () => {
+  const { h, p, d } = patriotField({ ccPatriot: 3 });
   const buff = (u) => u.buffs.find((b) => b.key === 'risk:patriotRampage');
   assert.ok(buff(d) && buff(p));
   h.b.kill(p, null);                                         // his revive: still alive, still on
@@ -117,30 +117,8 @@ test('Patriot Rampage 3: every enemy +40 % move speed, +40 ASPD while he lives',
   assert.ok(!buff(d), 'gone with him');
 });
 
-test('Patriot Support 3: the spear picks up to 3 units on high ground and adds Necrosis', () => {
-  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccPatriot: 3 } },
-    units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }, ...[[10, 2], [11, 2], [12, 2], [10, 1]].map(([row, col]) => ({ chessId: 'chess_char_3_01_a', row, col }))] });
-  h.step(1);
-  const p = h.spawn(CC.patriot.key, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
-  h.run(0.5);
-  assert.ok(h.allies().filter((u) => u.ground === false).length >= 4, 'operators on high ground');
-  for (const u of h.allies()) { h.b.addBuff(u, { key: 'test:wall', persist: true, mods: { hpFlat: 1e8 } }); u.hp = u.s.maxHp; }
-  const marks = () => h.eventsOf('fx').filter((e) => e[1] === 'patriotSpearMark' || e[1]?.kind === 'patriotSpearMark');
-  const necro = [];
-  // element 损伤 runs no 'hit' hook: record the calls
-  const deal = h.b.dealDamage.bind(h.b);
-  h.b.dealDamage = (src, tgt, o) => { if (src === p && o && o.type === 'element') necro.push([tgt, o.element, o.amount]); return deal(src, tgt, o); };
-  h.b.dealDamage(null, p, { amount: p.hp + 1, type: 'true', sourceless: true }); // to the second form (revive, then 毁灭姿态)
-  h.runUntil(() => marks().length > 0, 200);
-  const n = marks().length;
-  assert.ok(n > 1 && n <= CC.patriot.spearTargets, `${n} targets`);
-  h.run(4);
-  assert.ok(necro.length > 0, 'Necrosis on the spear targets');
-  assert.ok(necro.every(([, el, n]) => el === 'necrosis' && Math.abs(n - p.s.atk * CC.patriot.spearNecrosis) < 1e-6), JSON.stringify(necro.map(([, el]) => el)));
-});
-
-test('Delegation Resilient 3: Degenbrecher\'s second form stops at every 9 %, loses nothing while casting, bursts after the cast', () => {
-  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 4 } },
+test('Delegation United 3: Degenbrecher\'s second form stops at every 9 %, loses nothing while casting, bursts after the cast', () => {
+  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 3 } },
     units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
   h.step(1);
   const dg = h.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0 } });
@@ -170,4 +148,27 @@ test('Delegation Resilient 3: Degenbrecher\'s second form stops at every 9 %, lo
   plain.runUntil(() => !d2.s.flags.invulnerable && !d2.buffs.some((b) => b.key === 'ab:reborn'), 60);
   plain.b.dealDamage(null, d2, { amount: d2.s.maxHp * 0.5, type: 'true', sourceless: true });
   assert.ok(Math.abs(d2.hp / d2.s.maxHp - 0.5) < 1e-6, 'no gate');
+});
+
+test('Delegation United 2: the sub-wave Degenbrecher charges while unblocked (+300 % after 10 s), reset when blocked', () => {
+  const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 2 } },
+    units: [{ chessId: 'chess_char_3_08_a', row: 12, col: 2 }] });
+  h.step(1);
+  const dg = h.spawn(CC.delegation.degen, { pos: [10, 9], routeIndex: 0, mods: { speedMul: 0.0001, bountyId: `risk:delegation:${CC.delegation.degen}` } });
+  const other = h.spawn(CC.delegation.degen, { pos: [11, 9], routeIndex: 0, mods: { speedMul: 0.0001 } });
+  const mul = (u) => u.findBuff('risk:degenCharge')?.mods?.moveMul ?? 1;
+  h.run(5);
+  assert.ok(Math.abs(mul(dg) - (1 + CC.delegation.chargePct * 0.5)) < 0.05, `half way: ${mul(dg)}`);
+  h.run(10);
+  assert.ok(Math.abs(mul(dg) - (1 + CC.delegation.chargePct)) < 1e-9, `full: ${mul(dg)}`);
+  assert.equal(mul(other), 1, 'a bounty Degenbrecher does not charge');
+  dg.blockedBy = h.allies()[0];
+  h.run(0.2);
+  dg.blockedBy = null;
+  assert.ok(mul(dg) < 1 + CC.delegation.chargePct * 0.05, `reset when blocked: ${mul(dg)}`);
+  const off = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 1 } }, units: [] });
+  off.step(1);
+  const d1 = off.spawn(CC.delegation.degen, { pos: [10, 9], routeIndex: 0, mods: { speedMul: 0.0001, bountyId: `risk:delegation:${CC.delegation.degen}` } });
+  off.run(5);
+  assert.equal(mul(d1), 1, 'United 1: no charge');
 });

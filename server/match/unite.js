@@ -157,19 +157,21 @@ export function uniteBattleOpts(m, plan, timeLimit) {
  * capped per round.
  * @returns {Map<string, number>} playerId → survivors (uncapped)
  */
-export function uniteSurvivors(plan, uniteResult) {
+export function uniteSurvivors(plan, uniteResult, weight = null) {
   const out = new Map();
+  // `weight(enemyKey)`: the LP one survivor costs (1 when absent; the SPA-CC tags' heavier leaks, Match.riskLeakWeight)
+  const w = (key) => { const n = weight ? Number(weight(key)) : 1; return Number.isFinite(n) && n > 0 ? n : 1; };
   for (const [pid, n] of plan.notReentered) out.set(pid, (out.get(pid) || 0) + n);
   const perPlayer = (uniteResult && uniteResult.perPlayer) || {};
   for (const pp of Object.values(perPlayer)) {
     for (const l of (pp && pp.leaked) || []) {
       if (!l || l.counted === false || !l.sourcePlayerId) continue;
-      out.set(l.sourcePlayerId, (out.get(l.sourcePlayerId) || 0) + 1);
+      out.set(l.sourcePlayerId, (out.get(l.sourcePlayerId) || 0) + w(l.enemyKey));
     }
   }
   for (const u of (uniteResult && uniteResult.unspawned) || []) {
     if (!u || !u.sourcePlayerId) continue;
-    out.set(u.sourcePlayerId, (out.get(u.sourcePlayerId) || 0) + 1);
+    out.set(u.sourcePlayerId, (out.get(u.sourcePlayerId) || 0) + w(u.enemyKey));
   }
   return out;
 }

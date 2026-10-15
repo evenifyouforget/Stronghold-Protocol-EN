@@ -52,24 +52,24 @@ const pct = (v) => Math.round(v * 100);
 export function riskText(key, level) {
   const enemyName = (k) => data.lookup('enemies', k)?.name || k;
   switch (key) {
-    case 'ccInvestorBench': return { short: t('{bond}不计整备区', { bond: bondName('investShip') }), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
-    case 'ccSwift': return { short: t('{bond}削弱', { bond: bondName('swiftShip') }), full: t('【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）', { bond: bondName('swiftShip') }) };
-    case 'ccForesight': return { short: t('{bond}攻速-{n}', { bond: bondName('visiShip'), n: -CC.foresightAspd }), full: t('【{bond}】干员攻击速度-{n}（无论盟约是否激活）', { bond: bondName('visiShip'), n: -CC.foresightAspd }) };
-    case 'ccStrategyLate': return { short: t('策略延后'), full: t('指定回合数的策略推迟1回合生效（按奇偶或每N回合生效的策略不受影响）') };
-    case 'ccTier1Price': return { short: t('I阶干员加价'), full: t('从第{r}回合起，每回合购买的第一名I阶干员价格+{n}', { r: CC.tier1FromRound, n: CC.tier1Extra }) };
+    case 'ccInvestorBench': return { short: t('目标：投资人'), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
+    case 'ccSwift': return { short: t('目标：迅捷'), full: t('【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）', { bond: bondName('swiftShip') }) };
+    case 'ccForesight': return { short: t('目标：远见'), full: t('【{bond}】干员攻击速度-{n}（无论盟约是否激活）', { bond: bondName('visiShip'), n: -CC.foresightAspd }) };
+    case 'ccStrategyLate': return { short: t('目标：策略'), full: t('指定回合数的策略推迟1回合生效（按奇偶或每N回合生效的策略不受影响）') };
+    case 'ccTier1Price': return { short: t('目标：实习'), full: t('从第{r}回合起，每回合购买的第一名I阶干员价格+{n}', { r: CC.tier1FromRound, n: CC.tier1Extra }) };
     case 'ccUpgrade': return level >= 2
-      ? { short: t('升级加价 {n}', { n: level }), full: t('调度中心从4级升到5级、从5级升到6级的价格各+{n}', { n: CC.upgradeExtra[2][4] }) }
-      : { short: t('升级加价 {n}', { n: level }), full: t('调度中心从4级升到5级的价格+{n}', { n: CC.upgradeExtra[1][4] }) };
-    case 'ccSpRecovery': return { short: t('技力回复-{n}', { n: CC.spRecovery[level] }), full: t('干员的自动技力回复每秒-{n}', { n: CC.spRecovery[level] }) };
-    case 'ccBoss': return { short: t('最终领袖强化 {n}', { n: level }), full: t('最终领袖（含隐秘核心）最大生命值+{hp}%，攻击力+{atk}%', { hp: pct(CC.bossHp[level]), atk: pct(CC.bossAtk[level]) }) };
-    case 'ccLeaderDr': return { short: t('领袖减伤 {n}%', { n: pct(CC.leaderDr[level]) }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
-    case 'ccDeepInfiltration': return { short: t('深入敌阵'), full: t('部署费用的回复速度-{n}%', { n: pct(1 - CC.dpPerSecMul) }) };
-    case 'ccLowEfficiency': return { short: t('低效'), full: t('我方单位的再部署时间+{n}%', { n: pct(CC.redeployMul - 1) }) };
-    case 'ccLastLine': return { short: t('最后防线'), full: t('每回合自己的作战漏过敌人时额外扣除{n}点目标生命（即使联防中没有漏怪；不受每回合扣除上限限制）', { n: CC.lastLineLp }) };
+      ? { short: t('目标：驳船 {n}', { n: level }), full: t('调度中心从4级升到5级、从5级升到6级的价格各+{n}', { n: CC.upgradeExtra[2][4] }) }
+      : { short: t('目标：驳船 {n}', { n: level }), full: t('调度中心从4级升到5级的价格+{n}', { n: CC.upgradeExtra[1][4] }) };
+    case 'ccSpRecovery': return { short: t('环境：窒息 {n}', { n: level }), full: t('干员的自动技力回复每秒-{n}', { n: CC.spRecovery[level] }) };
+    case 'ccBoss': return { short: t('源石区域：激活 {n}', { n: level }), full: t('最终领袖（含隐秘核心）最大生命值+{hp}%，攻击力+{atk}%', { hp: pct(CC.bossHp[level]), atk: pct(CC.bossAtk[level]) }) };
+    case 'ccLeaderDr': return { short: t('源石区域：元素 {n}', { n: level }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
+    case 'ccDeepInfiltration': return { short: t('目标：深入敌阵'), full: t('部署费用的回复速度-{n}%', { n: pct(1 - CC.dpPerSecMul) }) };
+    case 'ccLowEfficiency': return { short: t('目标：低效'), full: t('我方单位的再部署时间+{n}%', { n: pct(CC.redeployMul - 1) }) };
+    case 'ccLastLine': return { short: t('目标：最后防线'), full: t('每回合自己的作战漏过敌人时额外扣除{n}点目标生命（即使联防中没有漏怪；不受每回合扣除上限限制）', { n: CC.lastLineLp }) };
     case 'ccOzArts': return { short: t('源石区域：法术'), full: t('最终领袖受到的法术伤害累计达到其最大生命值的{p}%后，法术抗性+{n}', { p: pct(CC.ozArts.share), n: CC.ozArts.res }) };
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
-    case 'ccFamiglia': return { short: t('家族：清道夫'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'ccFamiglia': return famigliaText(nodeOf(key, level), enemyName);
     case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);
     case 'ccDelegation': return delegationText(nodeOf(key, level), enemyName);
     default: return { short: key, full: key };
@@ -78,14 +78,26 @@ export function riskText(key, level) {
 
 const nodeOf = (key, level) => ruleOf(key)?.nodes?.[level] ?? null;
 
+function famigliaText(node, enemyName) {
+  const F = CC.famiglia;
+  const zaaro = enemyName(F.zaaro.key), silencer = enemyName(F.summonKey);
+  switch (node) {
+    case 'cleaner': return { short: t('家族：清道夫 1'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'unending2': return { short: t('家族：无尽 2'), full: t('每场作战全程处于清算时刻：敌人攻击力+{atk}%，防御力+{def}%（不会因此出现【{silencer}】）', { atk: pct(F.atkPct), def: pct(F.defPct), silencer }) };
+    case 'seasonal2': return { short: t('家族：季节 2'), full: t('每场作战都有血债账款：开始时为{start}%，每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时为{late}%', { start: pct(F.startShare), n: F.perSec, max: F.max, atk: pct(F.atkPct), def: pct(F.defPct), silencer, s: F.drainSeconds, r: F.lateFrom, late: pct(F.lateShare) }) };
+    case 'unending3':
+    case 'seasonal3': return { short: node === 'unending3' ? t('家族：无尽 3') : t('家族：季节 3'), full: t('【{zaaro}】加入上述额外敌人，漏过时扣除{lp}点目标生命', { zaaro, lp: F.zaaro.leakLp }) };
+    default: return { short: '?', full: '?' };
+  }
+}
+
 function patriotText(node, enemyName) {
   const pt = CC.patriot;
   const name = enemyName(pt.key), escort = enemyName(pt.escort.key);
   switch (node) {
-    case 'undying1': return { short: t('爱国者：不死 1'), full: t('第{r}回合的机变必定提供【{name}】（无赏金，漏过时扣除{lp}点目标生命）；若无人选择，最终领袖最大生命值+{hp}%', { r: pt.round, name, lp: pt.leakLp, hp: pct(pt.skipHp) }) };
+    case 'undying1': return { short: t('爱国者：不死 1'), full: t('第{r}回合的机变必定提供【{name}】（1级属性，无赏金，漏过时扣除{lp}点目标生命）；若无人选择，最终领袖最大生命值+{hp}%', { r: pt.round, name, lp: pt.leakLp, hp: pct(pt.skipHp) }) };
     case 'undying2': return { short: t('爱国者：不死 2'), full: t('【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导；最大生命值+{hp}%，移动速度不会低于基础值；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { name, dr: pct(pt.marchDr), hp: pct(pt.hpPct), atk: pct(pt.skipAtk) }) };
-    case 'support3': return { short: t('爱国者：支援 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现在每名博士的战场；【{name}】的投矛最多选择{k}个目标，并额外造成攻击力{p}%的坏死损伤', { n: pt.escort.count, escort, name, k: pt.spearTargets, p: pct(pt.spearNecrosis) }) };
-    case 'rampage3': return { short: t('爱国者：暴走 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现在每名博士的战场；【{name}】存活时所有敌人移动速度+{m}%，攻击速度+{a}', { n: pt.escort.count, escort, name, m: pct(pt.rampage.movePct), a: pt.rampage.aspd }) };
+    case 'undying3': return { short: t('爱国者：不死 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现（每个战场1组）；【{name}】存活时所有敌人移动速度+{m}%，攻击速度+{a}', { n: pt.escort.count, escort, name, m: pct(pt.rampage.movePct), a: pt.rampage.aspd }) };
     default: return { short: '?', full: '?' };
   }
 }
@@ -94,10 +106,9 @@ function delegationText(node, enemyName) {
   const dg = CC.delegation;
   const [degen, shield, champ] = dg.wave.map((w) => enemyName(w.key));
   switch (node) {
-    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每名博士的战场额外出现1名【{degen}】、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
-    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2) }) };
-    case 'cloned3': return { short: t('访问团：克隆 3'), full: t('额外出现{n}名【{degen}】', { n: dg.clones, degen }) };
-    case 'resilient3': return { short: t('访问团：坚韧 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】（原为25%），释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.resilient3), degen, p: pct(dg.gateRatio) }) };
+    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性）、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
+    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡时重置', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
+    case 'united3': return { short: t('访问团：联合 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】（原为25%），释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.united3), degen, p: pct(dg.gateRatio) }) };
     default: return { short: '?', full: '?' };
   }
 }

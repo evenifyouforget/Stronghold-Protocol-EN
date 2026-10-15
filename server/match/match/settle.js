@@ -20,7 +20,8 @@ export class MatchSettle {
     const cap = this.gd.lpCapPerRound;
     // a 联防 battle that could not run at all (synthetic result) must not wipe the leakers' losses: charge their own leaks
     const uniteRan = !!(plan && uniteResult && !uniteResult.synthetic);
-    const survivors = uniteRan ? uniteSurvivors(plan, uniteResult) : null;
+    // a survivor costs its LP weight (a leaked Patriot / tier-3 Zaaro: Match.riskLeakWeight; 1 otherwise)
+    const survivors = uniteRan ? uniteSurvivors(plan, uniteResult, (k) => this.riskLeakWeight(k)) : null;
     // The 联防's outcome as data for the SETTLE view (m.public.uniteResult, views.js; GitHub #235, PR #112 by @Convey123):
     // each client pops the official result box from it (ui/gameLogic/phases.js uniteResultBox) — `through` = the leakers'
     // enemies that still got through (uncapped; only decides whether 「全员无伤！」 is true), `losses` = every alive

@@ -423,6 +423,19 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
 const BOSS_MID_COL = 10;
 
 /**
+ * The first route of the requested motion whose first move goes to the left half of a boss field (the left portal,
+ * then — its end — the right one; pair templates have them, e.g. act1autochess_h07_04 routes 2 / 3 / 5), else the first
+ * route of that motion ending on the left (a one-player `_s` field: every route is the left one), else −1.
+ */
+export function leftFirstRoute(routes, fly) {
+  const ok = (r) => r && (fly ? r.motion === 'FLY' : r.motion !== 'FLY' && r.motion !== 'E_NUM');
+  const firstMove = (r) => (Array.isArray(r.steps) ? r.steps.find((x) => x && x.t === 'move' && Array.isArray(x.p)) : null);
+  const i = (routes || []).findIndex((r) => ok(r) && firstMove(r) && firstMove(r).p[1] < BOSS_MID_COL && Array.isArray(r.end) && r.end[1] > BOSS_MID_COL);
+  if (i >= 0) return i;
+  return (routes || []).findIndex((r) => ok(r) && Array.isArray(r.end) && r.end[1] < BOSS_MID_COL);
+}
+
+/**
  * Route index of the first template route with the requested motion (fallback 0). `side` ('L' | 'R') prefers a route
  * that ends on that player's half of a boss field (pair templates route to both goals).
  */
@@ -540,6 +553,8 @@ function bountyPlan(gd, round, wave, bounties, playerId, side) {
       const motionOk = r && (fly ? r.motion === 'FLY' : r.motion !== 'FLY' && r.motion !== 'E_NUM');
       const sideOk = !(side === 'L' || side === 'R') || (r && Array.isArray(r.end) && (side === 'R' ? r.end[1] > BOSS_MID_COL : r.end[1] < BOSS_MID_COL));
       if (!motionOk || !sideOk) routeIndex = routeByMotion(routes, fly, side);
+      // an SPA-CC sub-wave of a boss field (Match.bossSubWave): a route to the left portal first, then the right
+      if (c.leftFirst) { const lf = leftFirstRoute(routes, fly); if (lf >= 0) routeIndex = lf; }
       const spec = {
         time: time + run.start * step,
         enemyKey: c.enemyKey,

@@ -35,6 +35,7 @@ import { Battle } from './Battle.js';
 import { toDataSource, withUnitLoadouts, withRuleData } from './simdata.js';
 import { isPotential, isCultivate } from '../../shared/potential.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
+import { riskLeakWeight } from '../../shared/ruleData.js';
 
 export const SPEC_VERSION = 1;
 
@@ -303,7 +304,9 @@ export function battleProgress(battle) {
   const r = battle && typeof battle.result === 'function' && battle.finished ? battle.result() : null;
   let leaks = 0;
   const pp = battle && battle._perPlayer ? battle._perPlayer : (r && r.perPlayer) || {};
-  for (const k of Object.keys(pp)) for (const l of pp[k].leaked || []) if (l && l.counted !== false) leaks++;
+  // each counted leak at its LP weight (1; a Patriot / tier-3 Zaaro under their SPA-CC tags more: riskLeakWeight)
+  const rules = battle && battle.flags ? battle.flags.rules : null;
+  for (const k of Object.keys(pp)) for (const l of pp[k].leaked || []) if (l && l.counted !== false) leaks += riskLeakWeight(rules, l.enemyKey);
   const pool = battle && battle.sharedBoss;
   const gt = Number(battle && battle.time) || 0;
   const total = Math.max(0, Math.trunc(Number(battle && battle.total) || 0));

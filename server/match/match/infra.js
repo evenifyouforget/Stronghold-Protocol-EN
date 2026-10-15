@@ -5,11 +5,14 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { buildDeployMap } from '../board.js';
-import { CC } from '../../../shared/ruleData.js';
+import { CC, riskLeakWeight } from '../../../shared/ruleData.js';
 import { tagHas, tagLevel } from '../../../shared/rules.js';
 
 /** The effect id of ccPatriot Undying 1's round-9 card (its bounty keeps it). */
 export const RISK_PATRIOT_CARD = 'risk:patriot';
+
+/** A bounty entry of an SPA-CC sub-wave: no Funds, one battle. */
+const riskCard = (id, key, count, extra = {}) => ({ id, roundsLeft: 1, card: { effectId: id, enemyKey: key, count, coin: 0, payout: 'kill', rounds: 1, ...extra } });
 
 export class MatchInfra {
   /** Run a callback with error isolation, then flush the views. */
@@ -78,46 +81,60 @@ export class MatchInfra {
    * A player's bounties for this round's wave plus the SPA-CC Risk tag extras (shared/rules.js; numbers: CC). Every wave
    * builder takes its bounties from here; `boss`: the wave of a final boss round (Final Assault / Hidden Core).
    *   ccFamiglia Cleaner   rounds 10–13: the alive player with the fewest stacks in all (Σ of its alliance layers; a tie:
-   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty
+   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty; Unending 3 /
+   *                        Seasonal 3: and Zaaro (his leak costs CC.famiglia.zaaro.leakLp, riskLoss)
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
-   *                        Support 3 / Rampage 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final
-   *                        boss rounds Patriot and his escort come again on every player's half
-   *   ccDelegation         the final boss rounds: Degenbrecher (Cloned 3: 3 of her), 10 Delegation Shieldbearers and 10
-   *                        Delegation Centurion Champions on every player's half, HP × 5 / 10 / 15, ATK × 1.5 from United 2
+   *                        Undying 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
+   *                        Patriot and his escort come again, once per field (bossSubWave)
+   *   ccDelegation         the final boss rounds: Degenbrecher, 10 Delegation Shieldbearers and 10 Delegation Centurion
+   *                        Champions once per field (bossSubWave), HP × 2 / 3 / 5, ATK × 1.5 from United 2
    * @param {import('../PlayerState.js').PlayerState} ps
-   * @param {{ boss?: boolean }} [o]
+   * @param {{ boss?: boolean, field?: string[] }} [o] `field`: the boss field's player ids, left first (bossSubWave)
    */
-  waveBounties(ps, { boss = false } = {}) {
-    const extra = this.riskBounties(ps, { boss });
+  waveBounties(ps, { boss = false, field = null } = {}) {
+    const extra = boss ? this.bossSubWave(field || [ps.playerId]).get(ps.playerId) || [] : this.riskBounties(ps);
     return extra.length ? [...ps.bounties, ...extra] : ps.bounties;
   }
 
-  riskBounties(ps, { boss = false } = {}) {
+  /** A player's SPA-CC extras in a normal round: Patriot's escort with the Patriot this player took, Cleaner's sub-wave. */
+  riskBounties(ps) {
     if (!this.rules || !ps.alive) return [];
     const out = [];
-    const card = (id, key, count, extra = {}) => ({ id, roundsLeft: 1, card: { effectId: id, enemyKey: key, count, coin: 0, payout: 'kill', rounds: 1, ...extra } });
     const pt = CC.patriot;
-    const escort = tagHas(this.rules, 'ccPatriot', 'support3') || tagHas(this.rules, 'ccPatriot', 'rampage3');
-    if (escort && this.gd.enemy(pt.escort.key)) {
-      // round 9: with the Patriot this player took; the final boss rounds: the whole sub-wave on every half
-      if (!boss && ps.bounties.some((b) => b.card && b.card.effectId === RISK_PATRIOT_CARD && b.roundsLeft > 0)) out.push(card('risk:patriotEscort', pt.escort.key, pt.escort.count));
-      if (boss && this.gd.enemy(pt.key)) {
-        out.push(card('risk:patriot', pt.key, 1));
-        out.push(card('risk:patriotEscort', pt.escort.key, pt.escort.count));
-      }
+    if (tagHas(this.rules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.escort.key)
+      && ps.bounties.some((b) => b.card && b.card.effectId === RISK_PATRIOT_CARD && b.roundsLeft > 0)) {
+      out.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count));
+    }
+    out.push(...this.silencerBounties(ps));
+    return out;
+  }
+
+  /**
+   * The SPA-CC sub-waves of a final boss round's field (Patriot Undying 3: Patriot and his escort; Delegation: the
+   * Degenbrecher, Shieldbearers and Centurion Champions with their multipliers) — once per field, not per player, every
+   * unit on a route that goes to the left portal first and then the right (Fish 2026-10-15; waves.js `leftFirst`). They
+   * go with the field's first living player (left). Map playerId → bounty cards.
+   * @param {string[]} field the field's player ids, left first
+   */
+  bossSubWave(field) {
+    const out = new Map();
+    if (!this.rules) return out;
+    const first = (field || []).map((id) => this.players.get(id)).find((p) => p && p.alive);
+    if (!first) return out;
+    const cards = [];
+    const pt = CC.patriot;
+    if (tagHas(this.rules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.key)) {
+      cards.push(riskCard('risk:patriot', pt.key, 1, { leftFirst: true }));
+      if (this.gd.enemy(pt.escort.key)) cards.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count, { leftFirst: true }));
     }
     const dg = CC.delegation;
-    if (boss && tagHas(this.rules, 'ccDelegation', 'united1')) {
+    if (tagHas(this.rules, 'ccDelegation', 'united1')) {
       const has = (n) => tagHas(this.rules, 'ccDelegation', n);
-      const hpMul = has('resilient3') ? dg.hpMul.resilient3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
+      const hpMul = has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
       const atkMul = has('united2') ? dg.atkMul.united2 : 1;
-      for (const w of dg.wave) {
-        if (!this.gd.enemy(w.key)) continue;
-        const n = w.count + (w.key === dg.degen && has('cloned3') ? dg.clones : 0);
-        out.push(card(`risk:delegation:${w.key}`, w.key, n, { riskMods: { hpMul, atkMul } }));
-      }
+      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
     }
-    if (!boss) out.push(...this.silencerBounties(ps));
+    if (cards.length) out.set(first.playerId, cards);
     return out;
   }
 
@@ -130,7 +147,13 @@ export class MatchInfra {
     let low = alive[0];
     for (const p of alive) if (total(p) < total(low)) low = p;
     if (low !== ps) return [];
-    return [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave
+    const z = CC.famiglia.zaaro;
+    if ((tagHas(this.rules, 'ccFamiglia', 'unending3') || tagHas(this.rules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {
+      out.push({ id: 'risk:zaaro', roundsLeft: 1, card: { effectId: 'risk:zaaro', enemyKey: z.key, count: 1, coin: 0, payout: 'kill', rounds: 1 } });
+    }
+    return out;
   }
 
   /**
@@ -154,9 +177,12 @@ export class MatchInfra {
     return tagHas(this.rules, 'ccPatriot', 'undying1') && !!this.ccPatriotOffered && !this.ccPatriotTaken;
   }
 
+  /** The LP one leak of `enemyKey` costs in a normal round or a 联防 (1; a Patriot / tier-3 Zaaro under their tags more). */
+  riskLeakWeight(enemyKey) { return riskLeakWeight(this.rules, enemyKey); }
+
   /**
    * The LP a player's round costs (settle(), the live pendingLp): `base` (min(cap, …) as before) with the SPA-CC tags —
-   * a leaked Patriot (ccPatriot) costs CC.patriot.leakLp instead of 1, still within the cap; ccLastLine adds
+   * a leaked Patriot (ccPatriot) or Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap; ccLastLine adds
    * CC.lastLineLp when the player's own battle leaked at all, past the cap (and even when the 联防 caught every leak).
    * @param {object[]} leaked the player's own battle's leaked list
    * @param {number} base the loss without the tags
@@ -166,8 +192,10 @@ export class MatchInfra {
     if (!this.rules) return base;
     const counted = (leaked || []).filter((l) => l && l.counted !== false);
     let loss = base;
-    if (weigh && tagHas(this.rules, 'ccPatriot', 'undying1')) {
-      const extra = counted.filter((l) => l.enemyKey === CC.patriot.key).length * (CC.patriot.leakLp - 1);
+    if (weigh) {
+      // a leaked Patriot (ccPatriot) / Zaaro (ccFamiglia tier 3) costs its leakLp instead of 1, still within the cap
+      let extra = 0;
+      for (const l of counted) extra += this.riskLeakWeight(l.enemyKey) - 1;
       if (extra > 0) loss = Math.min(this.gd.lpCapPerRound, base + extra);
     }
     if (tagLevel(this.rules, 'ccLastLine') > 0 && counted.length > 0) loss += CC.lastLineLp;
