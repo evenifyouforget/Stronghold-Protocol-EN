@@ -11,6 +11,8 @@ import { buildBossWave, bountySpawns } from '../waves.js';
 import { pairPlayers, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
 import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_TICKS_PER_INTERVAL } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
+import { bossRiskConfig } from '../../sim/bossRisk.js';
+import { CC } from '../../../shared/ruleData.js';
 
 /** b.pool broadcasts at most this often (ms). */
 const POOL_MIN_GAP_MS = 250;
@@ -50,7 +52,11 @@ export class MatchBoss {
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.rules), {
+    // SPA-CC: ccPatriot Undying 1 — nobody took the round-9 Patriot (riskPatriotSkipped); the boss-pool tags (bossRisk.js)
+    const patriotSkipped = this.riskPatriotSkipped();
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.rules, { patriotSkipped }), {
+      risk: bossRiskConfig(this.rules),
+      onRisk: (changes) => this._bossRisk(changes),
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;
@@ -77,7 +83,8 @@ export class MatchBoss {
       // bounties with battles left (a multi-round card lasts MULTI_ROUND_BOUNTY_BATTLES) follow their player into the
       // boss field, on the player's half
       g.forEach((ps, j) => {
-        for (const b of bountySpawns(this.gd, this.round, wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: j === 0 ? 'L' : 'R' })) spawns.push(b);
+        // with the SPA-CC sub-waves of the final boss rounds (Match.waveBounties: Patriot Support / Rampage, Delegation)
+        for (const b of bountySpawns(this.gd, this.round, wave, this.waveBounties(ps, { boss: true }), ps.playerId, { solo: this.isSolo, side: j === 0 ? 'L' : 'R' })) spawns.push(b);
       });
       const inputs = g.map((ps, j) => {
         const input = ps.battleInput({ side: j === 0 ? 'L' : 'R', colOffset: j === 0 ? 0 : 8 });
@@ -101,7 +108,8 @@ export class MatchBoss {
         routes: wave.routes,
         sharedBoss: this.bossPool,
         // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods)
-        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round), rules: this.rules },
+        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round), rules: this.rules,
+          ...(patriotSkipped ? { ccPatriotSkipped: true } : {}) },
         fieldId,
         enemyOverrides: wave.overrides,
         waveId: wave.templateId,
@@ -140,7 +148,7 @@ export class MatchBoss {
 
   _startFinalClient(hidden) {
     const pool = this.bossPool;
-    const recs = this.fields.map((x) => this._ccField({ fieldId: x.fieldId, kind: x.kind, players: x.players, opts: x.opts, boss: { poolHp: pool.hp, poolMax: pool.maxHp } }));
+    const recs = this.fields.map((x) => this._ccField({ fieldId: x.fieldId, kind: x.kind, players: x.players, opts: x.opts, boss: { poolHp: pool.hp, poolMax: pool.maxHp, ...(pool.risk ? { risk: pool.riskView() } : {}) } }));
     this._finalEnding = null;
     this._bossStartAt = this.sched.now();
     this.watchers.clear();
@@ -173,6 +181,21 @@ export class MatchBoss {
     this._broadcastPool(true);
     this._bossClockOn = true;
     this._bossClock = this.later(BOSS_CLOCK_MS, () => this._bossClockTick());
+  }
+
+  /**
+   * The boss-pool Risk tags changed something (server/sim/bossRisk.js): every field hears it at once (b.pool `risk`;
+   * server-run battles read the pool itself), and a lockout's invulnerability ends CC.lockout.seconds game seconds later.
+   */
+  _bossRisk(changes) {
+    const pool = this.bossPool;
+    if (!pool || this.disposed) return;
+    if (changes.includes('inv')) {
+      const ms = (CC.lockout.seconds * 1000) / (this.gameSpeed || 1);
+      this.later(ms, () => { if (this.bossPool === pool) { pool.releaseLock(); this._broadcastPool(true); } });
+    }
+    this._lastPoolAt = -Infinity; // now, not after POOL_MIN_GAP_MS
+    this._broadcastPool(true);
   }
 
   /** The most shared-pool damage a boss field's client reports may have credited by now (server field clock). */
@@ -399,6 +422,7 @@ export class MatchBoss {
       t: 'b.pool', hp: Math.max(0, this.bossPool.hp), max: this.bossPool.maxHp,
       teamLp: this.teamLp == null ? null : Math.max(0, Math.round(this.teamLp)), acked,
     };
+    if (this.bossPool.risk) msg.risk = this.bossPool.riskView();
     const key = JSON.stringify(msg);
     if (!force && key === this._lastPoolKey) return;
     this._lastPoolKey = key;

@@ -23,6 +23,7 @@ import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';
 import { richTextPlain } from './richText.js';
 import { sortedPlayers } from './gameLogic.js';
 import { data } from '../data.js';
+import { CC } from '../../../shared/ruleData.js';
 import { t, tName } from '../../../shared/i18n.js';
 import { sentText } from './lang.js';
 
@@ -69,10 +70,15 @@ export function resolveSpCard(card, family) {
   else if ((card.tacticKind || tactic?.kind) === 'terrain') icon = uiUrl(m, 'buffIcon/icon_stage_buff');
   else if ((card.tacticKind || tactic?.kind) === 'enemyDebuff') icon = uiUrl(m, 'buffIcon/icon_enemy_debuff');
   else icon = uiUrl(m, `buffIcon/${team ? 'icon_team_buff' : 'icon_player_buff'}`);
+  // SPA-CC ccPatriot Undying 1 (server Match.riskPatriotCard): the round-9 Patriot card's text is made here
+  const name = tName(card.name) || item?.name || eff?.name || bounty?.name || tactic?.name || t('机变');
+  const riskDesc = card.risk ? (card.skipAtk
+    ? t('【{name}】加入本回合作战（无赏金，漏过时扣除{lp}点目标生命）。若无人选择，最终领袖最大生命值+{hp}%，攻击力+{atk}%', { name, lp: CC.patriot.leakLp, hp: Math.round(CC.patriot.skipHp * 100), atk: Math.round(CC.patriot.skipAtk * 100) })
+    : t('【{name}】加入本回合作战（无赏金，漏过时扣除{lp}点目标生命）。若无人选择，最终领袖最大生命值+{hp}%', { name, lp: CC.patriot.leakLp, hp: Math.round(CC.patriot.skipHp * 100) })) : null;
   return {
     kind,
-    name: tName(card.name) || item?.name || eff?.name || bounty?.name || tactic?.name || t('机变'),
-    desc: cardText(card, item?.descRaw || eff?.descRaw || '', rawRich) || item?.desc || eff?.desc || bounty?.desc || tactic?.desc || '',
+    name,
+    desc: riskDesc || cardText(card, item?.descRaw || eff?.descRaw || '', rawRich) || item?.desc || eff?.desc || bounty?.desc || tactic?.desc || '',
     tier: Number.isFinite(card.tier) ? card.tier : item?.tier ?? bounty?.tier ?? null,
     icon,
     team: !!team,

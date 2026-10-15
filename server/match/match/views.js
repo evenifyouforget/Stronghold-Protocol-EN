@@ -221,13 +221,16 @@ export class MatchViews {
       return loss > 0 ? { uniteLeft: left, pendingLp: loss } : { uniteLeft: left };
     }
     let n = 0;
-    if (this.lastResults.has(ps.playerId)) n = counted(this.lastResults.get(ps.playerId));
+    let leaked = null;
+    if (this.lastResults.has(ps.playerId)) { const r = this.lastResults.get(ps.playerId); n = counted(r); leaked = r && r.leaked; }
     else if (this.phase === PHASE.COMBAT) {
       const f = this.fields.find((x) => x && x.kind === 'normal' && Array.isArray(x.players) && x.players.includes(ps.playerId));
       if (f && f.cc) n = f.done && f.result ? counted(f.result.perPlayer && f.result.perPlayer[ps.playerId]) : Number(f.progress && f.progress.leaks) || 0;
       else if (f && f.battle) { try { n = battleProgress(f.battle).leaks; } catch { n = 0; } }
     }
-    const loss = Math.min(this.gd.lpCapPerRound, Math.max(0, Math.trunc(Number(n) || 0)));
+    const base = Math.min(this.gd.lpCapPerRound, Math.max(0, Math.trunc(Number(n) || 0)));
+    // SPA-CC (Match.riskLoss): a leaked Patriot's weight (once the leaked list is known), ccLastLine's extra LP
+    const loss = this.riskLoss(leaked || (base > 0 ? [{ counted: true }] : []), base, !!leaked);
     return loss > 0 ? { pendingLp: loss } : {};
   }
 
@@ -237,7 +240,7 @@ export class MatchViews {
     if (this.bossWaves) {
       const g = this.bossGroupOf(ps);
       if (!g) return [];
-      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, ps.bounties, ps.playerId, { solo: this.isSolo, side: g.side })]);
+      return previewOf([...g.wave.spawns, ...bountySpawns(this.gd, this.round, g.wave, this.waveBounties(ps, { boss: true }), ps.playerId, { solo: this.isSolo, side: g.side })]);
     }
     if (!this.wave) return [];
     const bounty = bountySpawns(this.gd, this.round, this.wave, this.waveBounties(ps), ps.playerId, { solo: this.isSolo });

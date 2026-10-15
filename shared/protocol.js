@@ -480,7 +480,10 @@ export const C2S = {
     by: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, BIG)), done: isBool,
     left: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isInt(x, 0, 1e5)),
     leaksBy: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, 1e6)),
-    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy'],
+    // SPA-CC boss-pool Risk tags (server/sim/bossRisk.js): this field's cumulative Arts / Physical damage to the pool, and
+    // whether a Degenbrecher of the Delegation sub-wave lives on it (United 2)
+    bossArts: (v) => isNum(v, 0, BIG), bossPhys: (v) => isNum(v, 0, BIG), hold: isBool,
+    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy', 'bossArts', 'bossPhys', 'hold'],
   },
   'b.result': { battleId: isId, result: isBattleResult },
 };
@@ -495,7 +498,8 @@ export const S2C = [
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,
-  // speed, watch? } · b.pool { hp, max, teamLp, acked: { [fieldId]: cumulative boss damage counted } } ·
+  // speed, watch? } · b.pool { hp, max, teamLp, acked: { [fieldId]: cumulative boss damage counted }, risk? (the SPA-CC
+  // boss-pool view, server/sim/bossRisk.js) } ·
   // b.end { battleId, fieldId, reason }
   'b.start', 'b.pool', 'b.end',
   // server-run combat streaming (legacy / SP_COMBAT=server only)

@@ -6,13 +6,15 @@ import { aggroCmp, areaSelectable } from '../../targeting.js';
 import { periodicDamage } from '../../damage.js';
 import {
   nthOf, T, hurt, alliesInTiles, targetsNear, allTargets, areaAllies, areaAlliesInTiles, auraAllies, targetAndArea,
-  byPriority, setForm, auraBuff, watchDeaths, unbalancedNow,
+  byPriority, setForm, auraBuff, watchDeaths, unbalancedNow, elem,
 } from './helpers.js';
 import {
   unblockable, maxTargets, onHitStatus, splashAttack, pathKeysAhead, noAirTargets, resist, nthAttackStatus, lowHpBuff,
   freeAllPrisoners, reborn, frontGuard, faceCrowd, unbalanced, artsBarrier, skill, blinkForward,
 } from './archetypes.js';
 import { hypot, powi } from '../../detmath.js';
+import { tagHas } from '../../../../shared/rules.js';
+import { CC } from '../../../../shared/ruleData.js';
 
 // ---------------------------------------------------------------------------------------------------------------
 // constants (numbers that exist nowhere in the data)
@@ -500,7 +502,9 @@ function kitXi(ab) {
 function kitMace(ab) {
   const pen1 = T(ab, 'DefPenetrate.enemy_blkswb_t_2.def_penetrate') ?? 0, pen2 = T(ab, 'DefPenetrate.enemy_blkswb_t_2[reborn].def_penetrate') ?? pen1;
   const cs = { ratio: T(ab, 'ClearSp.hp_ratio') ?? 0, dur: T(ab, 'ClearSp.duration') ?? 0, r: T(ab, 'ClearSp.range_radius') ?? 0 };
-  const P = { form2: false, next: 1 };
+  // SPA-CC ccDelegation Resilient 3 (spawn: the battle's rules): 【瞬息杀机】 every CC.delegation.gateRatio of max HP, and a
+  // hard HP gate at each step — no HP lost past it until the cast (CC.delegation.castSeconds) ends with the burst
+  const P = { form2: false, next: 1, gate: false, casting: false };
   const penOn = (c, e) => (c.target === e.blockedBy ? (P.form2 ? pen2 : pen1) : 0);
   // its blocker is hit (PRTS 技能 "对之前阻挡自身的单位造成…"); the others on the way are an area selection (areaSelectable)
   const blink = (s) => (b, e) => {
@@ -520,18 +524,42 @@ function kitMace(ab) {
   // cast with a target in the circle — the trigger selection (targetsNear: PRTS 选择器 "所有触发选择器通常不无视迷彩"): no
   // airborne (起飞) operator for a ground enemy (§21.22), no unblocking 隐匿 or 迷彩 one
   const inR = (b, e, s) => targetsNear(b, e, (s && s.bb.range_radius) || 0).length > 0;
+  const burst = (b, e) => {
+    b.fx('explode', { x: e.x, y: e.y, r: cs.r, kind: 'clearSp', id: e.id });
+    for (const u of areaAllies(b, e, e.x, e.y, cs.r)) {
+      const sk = u.skill;
+      if (sk && !sk.noSkill && sk.kind !== 'passive' && !sk.active && sk.spCost > 0) { sk.sp = 0; sk.charges = 0; }   // 清空技力 (stored charges too)
+      if (cs.dur > 0) b.applyStatus(u, 'disarm', { duration: cs.dur, source: e });
+    }
+  };
   return [resist(), {
+    spawn(b, e) {
+      if (!tagHas(b.flags?.rules, 'ccDelegation', 'resilient3')) return;
+      P.gate = true;
+      cs.ratio = CC.delegation.gateRatio;
+      b.on('hpDamage', (c) => {                                  // the hard gate (second form)
+        if (c.target !== e || !P.form2 || !e.alive) return;
+        if (P.casting) { c.amount = 0; return; }
+        const floor = (P.next - cs.ratio) * e.s.maxHp;
+        if (P.next - cs.ratio > 1e-9 && e.hp - c.amount < floor) c.amount = Math.max(0, e.hp - floor);
+      }, { owner: e });
+    },
     hitOut(c, b, e) { const p = penOn(c, e); if (c.dmg.isAttack && p > 0) c.dmg.defIgnorePct = Math.min(1, (c.dmg.defIgnorePct || 0) + p); },
     taken(c, b, e) {                                             // 【瞬息杀机】 every hp_ratio of max HP lost (second form)
-      if (!P.form2 || !(cs.ratio > 0)) return;
+      if (!P.form2 || !(cs.ratio > 0) || P.casting) return;
       while (e.alive && e.hpRatio <= P.next - cs.ratio + 1e-9 && P.next - cs.ratio > 1e-9) {
-        P.next -= cs.ratio;
-        b.fx('explode', { x: e.x, y: e.y, r: cs.r, kind: 'clearSp', id: e.id });
-        for (const u of areaAllies(b, e, e.x, e.y, cs.r)) {
-          const sk = u.skill;
-          if (sk && !sk.noSkill && sk.kind !== 'passive' && !sk.active && sk.spCost > 0) { sk.sp = 0; sk.charges = 0; }   // 清空技力 (stored charges too)
-          if (cs.dur > 0) b.applyStatus(u, 'disarm', { duration: cs.dur, source: e });
+        if (P.gate) {                                            // Resilient 3: the cast, then the burst and the next step
+          P.casting = true;
+          b.fx('telegraph', { x: e.x, y: e.y, r: cs.r, dur: CC.delegation.castSeconds, kind: 'clearSp', id: e.id });
+          b.after(CC.delegation.castSeconds, () => {
+            P.casting = false;
+            P.next -= cs.ratio;
+            if (e.alive) burst(b, e);
+          }, { owner: e });
+          return;
         }
+        P.next -= cs.ratio;
+        burst(b, e);
       }
     },
   }, doubleHit(() => P.form2, (c, b, e) => ({ defIgnorePct: penOn(c, e) })),
@@ -683,25 +711,34 @@ function kitPatriot(ab) {
     },
   },
   skill(spear, (b, e) => {
-    let far = null, best = -1;
+    // the farthest unit on high ground; SPA-CC ccPatriot Support 3: up to CC.patriot.spearTargets of them, farthest first,
+    // each also taking CC.patriot.spearNecrosis × ATK as Necrosis 损伤
+    const support = tagHas(b.flags?.rules, 'ccPatriot', 'support3');
+    const cands = [];
     for (const u of b.allies()) {
       if (u.ground !== false || !areaSelectable(e, u)) continue;            // high ground only
-      const d = hypot(u.x - e.x, u.y - e.y);
-      if (d > best) { best = d; far = u; }
+      cands.push([hypot(u.x - e.x, u.y - e.y), u]);
     }
-    if (!far) return;
-    const t = far;
+    if (!cands.length) return;
+    cands.sort((p, q) => q[0] - p[0] || p[1].id - q[1].id);
+    const targets = cands.slice(0, support ? CC.patriot.spearTargets : 1).map((p) => p[1]);
     // the wind-up: a reticle on the target and a ring on its tile for PATRIOT_SPEAR_WINDUP s (the wiki's red crosshair);
     // his throw clip (Skill, its strike PATRIOT_SPEAR_CLIP_HIT s in) is timed to land with the spear
-    b.fx('patriotSpearMark', { x: t.x, y: t.y, id: t.id, dur: PATRIOT_SPEAR_WINDUP });
-    b.fx('telegraph', { x: t.x, y: t.y, r: 0.6, dur: PATRIOT_SPEAR_WINDUP, kind: 'patriotSpear' });
+    for (const t of targets) {
+      b.fx('patriotSpearMark', { x: t.x, y: t.y, id: t.id, dur: PATRIOT_SPEAR_WINDUP });
+      b.fx('telegraph', { x: t.x, y: t.y, r: 0.6, dur: PATRIOT_SPEAR_WINDUP, kind: 'patriotSpear' });
+    }
     e.skillAnimUntil = -1;
     b.after(Math.max(0, PATRIOT_SPEAR_WINDUP - PATRIOT_SPEAR_CLIP_HIT), () => { if (e.alive) e.skillAnimUntil = b.time + PATRIOT_SPEAR_CLIP_HIT + 0.3; });
     b.after(PATRIOT_SPEAR_WINDUP, () => {
-      if (!e.alive || !t.alive || !t.deployed) return;
-      b.fx('patriotSpear', { x: t.x, y: t.y, from: e.id, to: t.id });
-      b.fx('patriotSpearHit', { x: t.x, y: t.y, id: t.id });
-      hurt(b, e, t, e.s.atk * ((spear && spear.bb.atk_scale) ?? 1.35), 'phys', { tags: ['patriotSpear'] });
+      if (!e.alive) return;
+      for (const t of targets) {
+        if (!t.alive || !t.deployed) continue;
+        b.fx('patriotSpear', { x: t.x, y: t.y, from: e.id, to: t.id });
+        b.fx('patriotSpearHit', { x: t.x, y: t.y, id: t.id });
+        hurt(b, e, t, e.s.atk * ((spear && spear.bb.atk_scale) ?? 1.35), 'phys', { tags: ['patriotSpear'] });
+        if (support && t.alive) elem(b, e, t, 'necrosis', e.s.atk * CC.patriot.spearNecrosis, { tags: ['patriotSpear'] });
+      }
     });
   }, { id: 'spear', cond: (b) => P.form2 && b.allies().some((u) => u.ground === false) }),
   reborn({

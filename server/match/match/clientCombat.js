@@ -214,6 +214,8 @@ export class MatchClientCombat {
   _fieldDone(f) {
     if (!f || f.done) return;
     f.done = true;
+    // a finished field holds the boss pool no more (SPA-CC United 2, server/sim/bossRisk.js)
+    if ((f.kind === 'boss' || f.kind === 'hidden') && this.bossPool && this.bossPool.risk) this.bossPool.setHold(f.fieldId, false);
     f.live = false;
     this._clearFieldTimers(f);
     if (!f.result) f.result = syntheticResult(f.players, { bossBy: f.bossBy });

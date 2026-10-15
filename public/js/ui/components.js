@@ -543,11 +543,11 @@ const setTip = (s) => { tipState = s; for (const fn of [...tipListeners]) fn(); 
 /**
  * Hover/focus tooltip around its children. Content renders in <TooltipLayer/> (fixed, viewport-clamped).
  * `aside`: a second section in the same clamped, scrollable box; stacked on narrow screens.
- * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, children?: any }} props
+ * @param {{ text: any, aside?: any, placement?: 'top'|'bottom', delay?: number, block?: boolean, class?: string, style?: string, children?: any }} props
  */
 const TOUCH_TIP_MS = 450;
 
-export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, children }) {
+export function Tooltip({ text, aside = null, placement = 'top', delay = 120, block = false, class: cls, style = undefined, children }) {
   const ref = useRef(null);
   const idRef = useRef(0);
   const timer = useRef(null);
@@ -609,7 +609,7 @@ export function Tooltip({ text, aside = null, placement = 'top', delay = 120, bl
     if (text == null || text === '') setTip(null);
     else setTip({ ...tipState, content: text, aside: asideRef.current });
   }, [text, aside]);
-  return html`<span ref=${ref} class=${cx('tt-anchor', block && 'tt-anchor--block', cls)}
+  return html`<span ref=${ref} class=${cx('tt-anchor', block && 'tt-anchor--block', cls)} style=${style}
       onMouseEnter=${onMouseEnter} onMouseLeave=${onLeave} onFocusIn=${onFocusIn} onFocusOut=${onLeave} onPointerDown=${onPointerDown}
       onPointerUp=${onPointerEnd} onPointerCancel=${onPointerEnd} onContextMenu=${(e) => { if (Date.now() - touchAt.current < 900) e.preventDefault(); }}>
     ${children}

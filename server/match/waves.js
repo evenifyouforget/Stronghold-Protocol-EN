@@ -475,6 +475,13 @@ export function bountySpawns(gd, round, wave, bounties, playerId, { solo = false
   return bountyPlan(gd, round, wave, bounties, playerId, side).specs;
 }
 
+/** A bounty spec's mods × an SPA-CC sub-wave's `riskMods` { hpMul, atkMul } (Match.riskBounties). */
+function riskModsOf(mods, rm) {
+  if (!rm || typeof rm !== 'object') return mods;
+  for (const k of ['hpMul', 'atkMul']) if (Number.isFinite(rm[k]) && rm[k] > 0) mods[k] = (Number.isFinite(mods[k]) ? mods[k] : 1) * rm[k];
+  return mods;
+}
+
 /** Runs of consecutive equal markers: [{ v, start, len }]. */
 function runsOf(list) {
   const out = [];
@@ -539,7 +546,7 @@ function bountyPlan(gd, round, wave, bounties, playerId, side) {
         routeIndex,
         count: run.len,
         interval: run.len > 1 ? step : 0,
-        mods: { ...roundMods(scale), slot: classOf(gd, c.enemyKey), bountyId: b.id },
+        mods: riskModsOf({ ...roundMods(scale), slot: classOf(gd, c.enemyKey), bountyId: b.id }, c.riskMods),
         tag: 'bounty',
         ownerPlayerId: playerId,
         preview: previewInfo(gd, c.enemyKey, routes[routeIndex], false, leader),

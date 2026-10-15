@@ -461,6 +461,8 @@ export function createBattleRunner(deps) {
         for (const pid of Object.keys(pool.byPlayer).slice(0, 4)) by[pid] = pool.byPlayer[pid];
         msg.by = by;
       }
+      // SPA-CC boss-pool Risk tags (server/sim/bossRisk.js): Arts / Physical damage and United 2's hold
+      if (Number.isFinite(p.bossArts)) { msg.bossArts = p.bossArts; msg.bossPhys = p.bossPhys; msg.hold = !!p.hold; }
     } else {
       msg.leaks = Math.min(1e6, p.leaks);
       // 联防: the leakers' enemies still standing (shared/protocol.js b.progress `left`, ≤ 4 players)
@@ -713,7 +715,7 @@ export function createBattleRunner(deps) {
       e.meter = sim.spec.attachLpMeter(battle);
       e.t0 = clock() - (e.elapsed / e.speed) * 1000;
       if (lastPool && battle.sharedBoss && typeof battle.sharedBoss.sync === 'function') {
-        battle.sharedBoss.sync(lastPool.hp, lastPool.acked ? lastPool.acked[e.fieldId] : undefined);
+        battle.sharedBoss.sync(lastPool.hp, lastPool.acked ? lastPool.acked[e.fieldId] : undefined, lastPool.risk);
       }
       if (e.endReason) endBattle(e);
       // silent catch-up to the field's clock before it is shown (a reconnect / observing a running field) — for the view
@@ -748,7 +750,7 @@ export function createBattleRunner(deps) {
     // a pending battle not built yet takes lastPool when it is built
     for (const e of [...entries.values(), ...pending.values()]) {
       const pool = e.battle ? e.battle.sharedBoss : null;
-      if (pool && typeof pool.sync === 'function') pool.sync(msg.hp, msg.acked ? msg.acked[e.fieldId] : undefined);
+      if (pool && typeof pool.sync === 'function') pool.sync(msg.hp, msg.acked ? msg.acked[e.fieldId] : undefined, msg.risk);
     }
     emit('pool', msg);
   }

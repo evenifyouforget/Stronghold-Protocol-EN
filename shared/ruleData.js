@@ -43,9 +43,41 @@ export const CC = Object.freeze({
   spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
   leaderDr: Object.freeze([0, 0.5, 0.9]),
+  dpPerSecMul: 0.5,                            // Deep Infiltration
+  redeployMul: 1.75,                           // Low Efficiency
+  lastLineLp: 2,                               // Last Line of Defense: the first leak each round, past lpCapPerRound
+  ozArts: Object.freeze({ share: 0.5, res: 50 }),     // the final boss, once 50 % of its pool is taken as Arts
+  ozPhys: Object.freeze({ share: 0.5, def: 5000 }),   // … as Physical
+  lockout: Object.freeze({ every: Object.freeze([0, 0.68, 0.28, 0.18]), seconds: 10 }), // invulnerable 10 game s per step
+  // Famiglia: Cleaner — rounds 10–13, the fewest stacks
   silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
-  // (provisional, the Patriot pilot — Fish is redesigning the enemy tags) round 9: one 爱国者 in every player's wave
-  patriot: Object.freeze({ key: 'enemy_1506_patrt', count: 1, round: 9 }),
+  // Patriot: Undying 1 — the round-9 Improv always offers him (no bounty); nobody taking him: the final boss +200 % HP
+  // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — Marching Stance: 90 % less Physical / Arts
+  // damage from operators not blocking him, +200 % HP, the listed statuses cannot touch him, never slower than his base
+  // speed. Support 3 / Rampage 3 — 5 Guerrilla Shieldguards join him, and the sub-wave comes again in the final boss
+  // rounds (every player's half); Support 3: his spear picks up to 3 targets and adds 135 % ATK as Necrosis; Rampage 3:
+  // every enemy +40 % move speed and +40 ASPD while he lives.
+  patriot: Object.freeze({
+    key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1,
+    marchDr: 0.9, hpPct: 2,
+    // the sim's status keys of Slow, Stun, Bind, Cold, Frozen, Frighten (战栗 tremble), Sleep, Fear, Levitate, Lure (attract)
+    marchImmune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
+    escort: Object.freeze({ key: 'enemy_1081_sotisd', count: 5 }),
+    spearTargets: 3, spearNecrosis: 1.35,
+    rampage: Object.freeze({ movePct: 0.4, aspd: 40 }),
+  }),
+  // Delegation: the sub-wave of the final boss round(s), every player's half; United 2 — the final boss cannot die while
+  // a Degenbrecher lives; Cloned 3 — 2 more Degenbrecher; Resilient 3 — Momentum Murder every 9 % with a hard HP gate
+  delegation: Object.freeze({
+    wave: Object.freeze([
+      Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
+      Object.freeze({ key: 'enemy_1387_winshd', count: 10 }),
+      Object.freeze({ key: 'enemy_1389_winbab_2', count: 10 }),
+    ]),
+    degen: 'enemy_1525_blkswb', clones: 2,
+    hpMul: Object.freeze({ united1: 5, united2: 10, resilient3: 15 }), atkMul: Object.freeze({ united2: 1.5 }),
+    gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
+  }),
 });
 
 /** msgid of the note added to 投资人's text when the bench no longer counts. */

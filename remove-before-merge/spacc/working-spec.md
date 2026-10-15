@@ -2,7 +2,7 @@
 
 Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
 
-State as of 2026-10-15, branch `wip/spacc`. Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
+State as of 2026-10-15, branch `wip/spacc-tags` (on `wip/spacc`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
 cheat on, the total Risk counts as 0.
 
@@ -86,34 +86,106 @@ grid tile today.
 - **Leaders here:** the final / Hidden Core bosses and the leader-class enemies (`enemy-palette/leaders.md`), bounty
   ones included.
 
-### 10. `ccSilencers`
+### 10. `ccDeepInfiltration`
 
-- **Name:**
-- **Current label:** "Famiglia Shadow Silencer"
+- **Name:** Deep Infiltration
 - **Risk:** 1
-- **Effect:** on rounds 10–13, the Doctor with the fewest stacks across all alliances gets 5 Famiglia Shadow Silencers
-  added to their battle, with no bounty.
-- **Ties:** go to the earliest seat (p1 before p2).
+- **Effect:** DP generation −50 %.
 
-### 11. `ccPatriot` (provisional)
+### 11. `ccLowEfficiency`
 
-- **Name:**
-- **Current label:** "Patriot (prototype)"
+- **Name:** Low Efficiency
 - **Risk:** 1
-- **Effect:** on round 9, one Patriot appears in every Doctor's battle, with no bounty.
-- **Notes:** a stand-in to playtest the Patriot pilot until the enemy tags are designed. Feedback is in
-  `enemy-palette/leaders.md`.
+- **Effect:** every operator's redeployment time +75 %.
 
-## Backlog (ROADMAP ideas not built yet)
+### 12. `ccLastLine`
+
+- **Name:** Last Line of Defense
+- **Risk:** 1
+- **Effect:** when a player's own battle leaks at least one enemy in a round, that player loses 2 more LP, past the
+  10-per-round limit. It still applies when the Unite Phase catches every leak.
+- **Reading:** normal rounds only; the final boss rounds charge the team's LP their own way and don't get the +2.
+
+### 13. `ccOzArts` / 14. `ccOzPhys`
+
+- **Name:** Originium Zone: Arts / Originium Zone: Physical
+- **Risk:** 1 each
+- **Effect:** once the final boss has taken 50 % of its pool as Arts (Physical) damage, counting every field together,
+  it gets +50 RES (+5000 DEF) for the rest of the fight. The Hidden Core boss too (its own pool, counted afresh).
+
+### 15. `ccLockout`
+
+- **Name:** Originium Zone: Lockout 1 / 2 / 3
+- **Risk:** 1 / 2 / 3
+- **Effect:** every 68 / 28 / 18 % of the pool lost, the final boss is invulnerable for 10 game seconds. Each step is a
+  hard gate: one big hit stops at it. Steps: Lockout 1 at 68 % lost (once), 2 at 28 / 56 / 84 %, 3 at 18 / 36 / 54 /
+  72 / 90 %.
+
+### 16. `ccFamiglia` (group)
+
+- **Cleaner** (Risk 1), formerly `ccSilencers`: on rounds 10–13, the Doctor with the fewest stacks across all alliances
+  gets 5 Famiglia Shadow Silencers in their battle, with no bounty. Ties go to the earliest seat.
+- **Unending 2 / 3, Seasonal 2 / 3:** not built yet, they wait for the Blood Debt design (see Questions).
+
+### 17. `ccPatriot` (group, replaces the provisional tag)
+
+- **Undying 1** (Risk 1): the round-9 Improv always offers a Patriot card (no bounty). Whoever takes it fights him that
+  round. If nobody takes him, the final boss gets +200 % max HP. A leaked Patriot costs 5 LP (still within the 10-per-
+  round limit).
+- **Undying 2** (Risk 2, includes 1): in Marching Stance he takes 90 % less Physical and Arts damage from units not
+  blocking him, and is immune to Slow, Stun, Bind, Cold, Freeze, Tremble (Frighten), Sleep, Fear, Levitate and Lure
+  (Attract). +200 % max HP and never slower than his base speed, in both stances. Not taking him also gives the final
+  boss +100 % ATK.
+- **Support 3** (Risk 3, includes 1–2): 5 Guerrilla Shieldguards come with him. In the final boss rounds, Patriot and
+  his 5 Shieldguards come again on every player's half. His spear picks up to 3 targets on high ground (farthest
+  first) and adds 135 % ATK as Necrosis.
+- **Rampage 3** (Risk 3, includes 1–2, not with Support 3): the same sub-wave, and while he is alive (his revive
+  included) every enemy on his field has +40 % move speed and +40 ASPD.
+
+### 18. `ccDelegation` (group)
+
+- **United 1** (Risk 1): in the final boss rounds, every player's half gets 1 Degenbrecher, 10 Delegation
+  Shieldbearers and 10 Delegation Centurion Champions, at 500 % of their HP that round.
+- **United 2** (Risk 2): the final boss cannot die while a Degenbrecher lives on any field (its pool stops at 1 HP).
+  The sub-wave has 1000 % HP and 150 % ATK.
+- **Cloned 3** (Risk 3): 2 more Degenbrecher (3 per half).
+- **Resilient 3** (Risk 3, not with Cloned 3): the sub-wave has 1500 % HP. Degenbrecher's Momentum Murder comes every
+  9 % of her HP (normally 25 %), and each step is a hard gate: she loses no HP until the cast ends.
+
+## How the groups work
+
+A group is one rule whose levels form a tree. A level includes the ones above it (Seasonal 3 = Seasonal 2 + Cleaner)
+and excludes its siblings (Support 3 or Rampage 3). Its Risk is the chosen level's number, not a sum (Rampage 3 = 3
+Risk), as with the other leveled tags. The grid shows siblings side by side under the shared tiers; the chosen tile is
+lit, and the tiers it includes are lit faintly.
+
+## Readings I made (correct me)
+
+1. **"All fields" / "added to the final boss round(s)":** every player's half of a boss field gets its own sub-wave, so
+   a pair field has two. One per field would put it all on one player's side.
+2. **Undying 1 in co-op:** the draft is shared, so one Patriot card for the team; the penalty applies when nobody took
+   him. In co-op's 6-card draft, the Patriot card replaces the last card (a draft shows at most 6).
+3. **Support / Rampage 3's final-round sub-wave comes whether or not anyone took Patriot on round 9.** A mode without a
+   round-9 Improv (training, solo Funny) never offers him, so there's no penalty there.
+4. **Patriot / Degenbrecher "Level 1 stats":** this mode has only one level of each, so nothing to change.
+5. **Delegation's HP / ATK multipliers** apply on top of the round's usual enemy scaling.
+6. **Momentum Murder's cast:** this mode had it instant. I gave it 1 s (an assumption) so the gate means something; the
+   burst comes at the end of the cast.
+7. **Lockout's 10 s** are game seconds (the battles run at 2×, so 5 real seconds).
+
+## Questions
+
+1. **Blood Debt / Asset Liquidation** (Famiglia Unending / Seasonal): how does the gauge fill, how full is "full", what
+   does Asset Liquidation do and for how long? With that, the Zaaro part of tier 3 is quick (he's in the data with his
+   kit).
+
+## Backlog (ideas not built yet)
 
 | Idea | Risk | Status |
 |---|---|---|
-| Final boss gains 50 RES after taking 50 % max HP as Arts damage | 1 | needs the pool-wide mechanism (FINDINGS §5) |
-| Final boss gains 5000 DEF after taking 50 % max HP as Physical damage | 1 | same |
-| Final boss invulnerable for 10 s every 68 / 28 / 18 % max HP lost | 1 / 2 / 3 | same |
-| Round 9 Improv offers Deathless Black Snake; skipping it → final boss +200 % HP (2: also Patriot and FrostNova, +100 % ATK) | 1 / 2 | needs new enemies (each a kit); Patriot exists now |
-| Blood Debt and Asset Liquidations always on | 2 (with Silencers) | needs a custom design (FINDINGS §5, answer 7) |
-| Final round: Rosmontis, Simulated Sentry joins (2: Matrix gives no buffs; the boss can't die while she lives) | 1 / 2 | needs a new enemy (kit with Matrix) |
+| Famiglia Unending 2 / 3, Seasonal 2 / 3 (Blood Debt, Asset Liquidation, Zaaro) | 2 / 3 | waits for the Blood Debt design |
+| Vengeance group | | Fish is rewriting it (the mob Hateful Avenger, not Reid) |
+| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
 
 ## New suggestions
 

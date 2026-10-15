@@ -14,7 +14,10 @@
 //   bans     a list of bond ids to ban, at most `max`; the match keeps the valid ones up to the difficulty's counts and
 //            draws the rest at random as usual
 //   level    a Risk tag: 0 = off, 1 … `risk.length - 1`; `risk[level]` is its Risk. A sequence (1 / 2 / 3 Risk) is one
-//            rule, so its levels exclude each other
+//            rule, so its levels exclude each other. A tag group (Famiglia, Patriot, Delegation) is a tree: `nodes` names
+//            each level and `parent` gives the level it builds on (0 = none); a level includes its ancestors' effects
+//            (Seasonal 3 = Seasonal 2 + Cleaner) and excludes its siblings' (tagNodes). Without `parent` the levels are a
+//            chain (each includes the ones above it only by its own numbers, as before)
 // room.setRules merges a partial { [key]: value } into the room's rules; the match reads them once at start
 // (Match opts.rules). Rooms searching for teammates and the solo queue play the original game: a room with any rule
 // set cannot search (Lobby.search).
@@ -28,7 +31,7 @@ export const RULE_BANS_MAX = 12;
 
 /**
  * The rules, in the order the room screen lists them.
- * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number[] }>}
+ * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number[], nodes?: (string|null)[], parent?: number[] }>}
  */
 export const RULES = Object.freeze([
   // cheats
@@ -54,8 +57,16 @@ export const RULES = Object.freeze([
   { key: 'ccSpRecovery', type: 'level', risk: [0, 1, 2, 3], category: 'risk' }, // time SP −0.2 / 0.5 / 0.8 per s
   { key: 'ccBoss', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },    // final boss +50/150/400 % HP, +15/25/50 % ATK
   { key: 'ccLeaderDr', type: 'level', risk: [0, 1, 2], category: 'risk' },   // leaders 50 / 90 % DR outside a burst
-  { key: 'ccSilencers', type: 'level', risk: [0, 1], category: 'risk' },     // rounds 10–13: 5 Silencers for the fewest stacks
-  { key: 'ccPatriot', type: 'level', risk: [0, 1], category: 'risk' },       // (provisional) round 9: 爱国者 joins every wave
+  { key: 'ccDeepInfiltration', type: 'level', risk: [0, 1], category: 'risk' }, // DP generation −50 %
+  { key: 'ccLowEfficiency', type: 'level', risk: [0, 1], category: 'risk' },  // redeployment time +75 %
+  { key: 'ccLastLine', type: 'level', risk: [0, 1], category: 'risk' },       // the first leak each round: +2 LP, past the cap
+  { key: 'ccOzArts', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +50 RES after 50 % of its pool as Arts
+  { key: 'ccOzPhys', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +5000 DEF after 50 % as Physical
+  { key: 'ccLockout', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },  // final boss invulnerable 10 s every 68/28/18 %
+  // tag groups (trees: see `level` above)
+  { key: 'ccFamiglia', type: 'level', risk: [0, 1], nodes: [null, 'cleaner'], parent: [0, 0], category: 'risk' },
+  { key: 'ccPatriot', type: 'level', risk: [0, 1, 2, 3, 3], nodes: [null, 'undying1', 'undying2', 'support3', 'rampage3'], parent: [0, 0, 1, 2, 2], category: 'risk' },
+  { key: 'ccDelegation', type: 'level', risk: [0, 1, 2, 3, 3], nodes: [null, 'united1', 'united2', 'cloned3', 'resilient3'], parent: [0, 0, 1, 2, 2], category: 'risk' },
 ].map((r) => Object.freeze(r)));
 
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));
@@ -152,6 +163,35 @@ export function ruleRisk(key, value) {
 
 /** The level of a Risk tag in `rules` (0 = off). */
 export const tagLevel = (rules, key) => (Number.isInteger(rules?.[key]) ? rules[key] : 0);
+
+/** The level `level` of Risk tag `key` builds on (0 = none): its tree parent, else the chain's previous level. */
+export function tagParent(key, level) {
+  const r = BY_KEY.get(key);
+  if (!r || r.type !== 'level' || !(level > 0)) return 0;
+  return Array.isArray(r.parent) ? r.parent[level] || 0 : level - 1;
+}
+
+/** The depth of a level of Risk tag `key` (1 = the top row of its column). */
+export function tagDepth(key, level) {
+  let d = 0;
+  for (let l = level; l > 0 && d < 16; l = tagParent(key, l)) d++;
+  return d;
+}
+
+/**
+ * The node names in force for a tag group in `rules`: the chosen level's and its ancestors' (a Set; empty when off or
+ * for a tag without `nodes`).
+ */
+export function tagNodes(rules, key) {
+  const r = BY_KEY.get(key);
+  const out = new Set();
+  if (!r || !Array.isArray(r.nodes)) return out;
+  for (let l = tagLevel(rules, key), n = 0; l > 0 && n < 16; l = tagParent(key, l), n++) if (r.nodes[l]) out.add(r.nodes[l]);
+  return out;
+}
+
+/** Whether node `node` of tag group `key` is in force in `rules` (chosen, or under a chosen level). */
+export const tagHas = (rules, key, node) => tagNodes(rules, key).has(node);
 
 /** The rule record of `key`, or null. */
 export const ruleOf = (key) => BY_KEY.get(key) || null;

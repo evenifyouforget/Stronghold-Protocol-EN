@@ -139,7 +139,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
   const s = jsonClone(spec);
   const bossLike = s.kind === 'boss' || s.kind === 'hidden';
   let sharedBoss = opts.sharedBoss ?? null;
-  if (!sharedBoss && bossLike && s.boss) sharedBoss = new LocalBossPool(s.boss.poolMax, s.boss.poolHp);
+  if (!sharedBoss && bossLike && s.boss) sharedBoss = new LocalBossPool(s.boss.poolMax, s.boss.poolHp, s.boss.risk ?? null);
   const BattleClass = typeof opts.BattleClass === 'function' ? opts.BattleClass : Battle;
   const battleOpts = {
     seed: s.seed,
@@ -183,7 +183,8 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
  * changes nothing — so the leader stood at "0 HP" and the field never ended.
  */
 export class LocalBossPool {
-  constructor(maxHp, hp = maxHp) {
+  /** @param {object|null} [risk] the boss-pool Risk view the field starts from (server/sim/bossRisk.js; b.pool `risk`) */
+  constructor(maxHp, hp = maxHp, risk = null) {
     this.maxHp = Math.max(1, Number(maxHp) || 1);
     const h = Number(hp);
     this.serverHp = Number.isFinite(h) ? Math.max(0, Math.min(this.maxHp, h)) : this.maxHp;
@@ -191,7 +192,16 @@ export class LocalBossPool {
     this.acked = 0;
     /** @type {Record<string, number>} */
     this.byPlayer = {};
+    /** SPA-CC boss-pool Risk tags: the server's view, this field's Arts / Physical damage, its own hold (bossRisk.js) */
+    this.risk = risk && typeof risk === 'object' ? { ...risk } : null;
+    this.typed = { arts: 0, phys: 0 };
+    this.localHold = false;
   }
+
+  riskView() { return this.risk; }
+
+  /** United 2: whether a Degenbrecher lives on this field (reported as b.progress `hold`). */
+  setHold(fieldId, on) { void fieldId; this.localHold = !!on; }
 
   get hp() {
     const h = this.serverHp - Math.max(0, this.cum - this.acked);
@@ -204,21 +214,30 @@ export class LocalBossPool {
     if (Number.isFinite(n)) this.serverHp = Math.max(0, n) + Math.max(0, this.cum - this.acked);
   }
 
-  damage(playerId, amount) {
-    const a = Number(amount);
+  damage(playerId, amount, type) {
+    let a = Number(amount);
     const left = this.hp;
     if (!Number.isFinite(a) || a <= 0 || left <= 0) return 0;
+    if (this.risk) {
+      // the server's gate / hold (and this field's own hold) before the server has heard of this damage
+      if (this.risk.inv) return 0;
+      const floor = Math.max(Number(this.risk.floor) || 0, this.localHold ? 1 : 0);
+      a = Math.min(a, left - floor);
+      if (!(a > 0)) return 0;
+    }
     const dealt = left - a < BOSS_POOL_MIN_HP ? left : a;
     this.cum += dealt;
     if (playerId != null) this.byPlayer[playerId] = (this.byPlayer[playerId] || 0) + dealt;
+    if (this.risk && (type === 'arts' || type === 'phys')) this.typed[type] += dealt;
     return dealt;
   }
 
-  sync(serverHp, ackedCum) {
+  sync(serverHp, ackedCum, risk) {
     const h = Number(serverHp);
     if (Number.isFinite(h)) this.serverHp = Math.max(0, Math.min(this.maxHp, h));
     const a = Number(ackedCum);
     if (Number.isFinite(a) && a >= 0) this.acked = a;
+    if (risk && typeof risk === 'object') this.risk = { ...risk };
   }
 }
 
@@ -299,6 +318,12 @@ export function battleProgress(battle) {
     bossDmg: pool && Number.isFinite(pool.cum) ? pool.cum : 0,
     done: !!(battle && battle.finished),
   };
+  // SPA-CC boss-pool Risk tags (bossRisk.js): this field's Arts / Physical damage and whether it holds the pool
+  if (pool && pool.risk && pool.typed) {
+    out.bossArts = pool.typed.arts;
+    out.bossPhys = pool.typed.phys;
+    out.hold = !!pool.localHold;
+  }
   if (battle && battle.kind === 'unite') {
     const left = uniteLeft(battle);
     if (left) out.left = left;

@@ -37,7 +37,9 @@ export class MatchSettle {
     for (const ps of alive) {
       const r = this.lastResults.get(ps.playerId) || { leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 };
       const counted = (r.leaked || []).filter((l) => l && l.counted !== false).length;
-      const loss = uniteRan && plan.leakers.includes(ps) ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted);
+      const leaker = uniteRan && plan.leakers.includes(ps);
+      // SPA-CC (Match.riskLoss): a leaked Patriot's weight, ccLastLine's extra LP past the cap
+      const loss = this.riskLoss(r.leaked, leaker ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted), !leaker);
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
       ps.stats.lpLost += loss;
