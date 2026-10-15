@@ -847,13 +847,13 @@ export class UnitView {
     this.countText.visible = true;
   }
 
-  /** Equipped item pips (prep): list of item icon URLs (or { url, cursed }: the Cursed Hammer's, drawn inverted). */
+  /** Equipped item pips (prep): list of item icon URLs (or { url, cursed }: the Toxic Waste's, drawn inverted). */
   setItems(urls) {
     const P = this.P;
     const list = Array.isArray(urls) ? urls.slice(0, 2) : [];
     while (this.itemPips.length > list.length) this.itemPips.pop().destroy();
     list.forEach((entry, i) => {
-      // an entry: the icon URL, or { url, cursed } (the Cursed Hammer: its pip takes the purple cast)
+      // an entry: the icon URL, or { url, cursed } (the Toxic Waste: its pip takes the purple cast)
       const u = entry && typeof entry === 'object' ? entry.url : entry;
       let s = this.itemPips[i];
       if (!s) { s = new P.Sprite(P.Texture.EMPTY); s.anchor.set(0.5); this.hud.addChild(s); this.itemPips[i] = s; }
@@ -2004,7 +2004,7 @@ export class ItemView {
     ctx.layers.shadow.addChild(this.shadow);
     this.root = new P.Container();
     ctx.layers.units.addChild(this.root);
-    // the SPA-CC Cursed Hammer (item record `cursed`): the plate colour-inverted and the sinking flame on top, spilling
+    // the SPA-CC Toxic Waste (item record `cursed`): the plate colour-inverted and the sinking flame on top, spilling
     // past the plate
     this.invert = !!info.cursed;
     this.plate = new P.Sprite(itemTexture(String(info.defId || 'item'), null, info.color || 0x9aa5a0, { invert: this.invert }));
@@ -2123,11 +2123,11 @@ class InvulnRibbons {
   }
 }
 
-/** The Cursed Hammer's flame: tongues, the seconds one takes to cross (5 ± 1), the height it crosses (× the plate). */
+/** The Toxic Waste's flame: tongues, the seconds one takes to cross (5 ± 1), the height it crosses (× the plate). */
 const CURSED_TONGUES = 21, CURSED_PERIOD = 5, CURSED_SPAN = 1.5;
 
 /**
- * The Cursed Hammer's flame (Fish 2026-10-16: "a gloomy sinking effect … like a flame overlay, but moving down instead of
+ * The Toxic Waste's flame (Fish 2026-10-16: "a gloomy sinking effect … like a flame overlay, but moving down instead of
  * up, dark blue instead of red-yellow, and slow — around 5 s to cross the height; on top of the icon, so it can go
  * outside the square"): CURSED_TONGUES soft tongues (textures.js cursedFlameTexture), each sinking from above the plate
  * to below it over its own period (CURSED_PERIOD ± 1 s) from its own phase, swaying a little, its alpha rising and

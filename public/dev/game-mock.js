@@ -224,7 +224,7 @@ function buildState() {
  * The 0.1.1 gaps (DESIGN §21.26): `funny` — the match is 标准 (its 本局禁用 bonds: 5 of 变形同构体's 14 pairings off);
  * `morph` — a 变形同构体 in the hand and in the shop's item slot, the first board operator wearing 变形同构体 + 维式重锤 (its
  * card highlights that pairing); `harmony` — 缪尔赛思 (调和) in place of the second board operator, so the core bonds with a
- * member count +1 and carry `harmony` (the bond popup's 调和 row); `junk` — the SPA-CC Cursed Hammer in the hand and on
+ * member count +1 and carry `harmony` (the bond popup's 调和 row); `junk` — the SPA-CC Toxic Waste in the hand and on
  * the first board operator.
  */
 function applyGapVariants() {
@@ -239,7 +239,7 @@ function applyGapVariants() {
       if (S.priv.board[0] && hammer) S.priv.board[0].items = [{ uid: nextUid(), id: iso.id }, { uid: nextUid(), id: hammer.id }];
     }
   }
-  // `junk` — SPA-CC Objective: Junk 2: the Cursed Hammer in the hand (its sinking flame on the field, the cursed thumb) and
+  // `junk` — SPA-CC Objective: Junk 2: the Toxic Waste in the hand (its sinking flame on the field, the cursed thumb) and
   // on the first board operator (its purple pip); data.setRules makes the client know the run-time item record
   if (VARIANTS.has('junk')) {
     data.setRules({ ccJunk: 2 });

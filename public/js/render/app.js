@@ -669,7 +669,7 @@ export async function createFieldView(host, options = {}) {
 
   // ---- prep -----------------------------------------------------------------------------------------------
 
-  /** An equipped item's pip for UnitView.setItems: its icon URL, or { url, cursed } for the Cursed Hammer. */
+  /** An equipped item's pip for UnitView.setItems: its icon URL, or { url, cursed } for the Toxic Waste. */
   function itemPip(id) {
     const r = data.item(id);
     const url = assets.itemIcon ? assets.itemIcon(r ? { trapId: r.trapId, iconId: r.iconId } : id) : null;

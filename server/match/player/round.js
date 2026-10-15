@@ -36,7 +36,7 @@ export class PlayerRound {
     const nonNeg = (v) => (Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0);
     // extraFunds lobby rule: added after the onIncome handlers, so nothing withholds or rewrites it
     const extra = this.m.rules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
-    // SPA-CC Junk: everyone's Cursed Hammer at the start (no shop stock: made, not drawn); Junk 2: income −1 while it is
+    // SPA-CC Junk: everyone's Toxic Waste at the start (no shop stock: made, not drawn); Junk 2: income −1 while it is
     // not equipped (in the hand or the temporary hand)
     const junk = tagLevel(this.m.rules, 'ccJunk');
     if (junk > 0 && r === 1 && this.gd.item(CC.junk.itemId)) this.stow(this.newPiece('item', CC.junk.itemId), { allowTemp: true });

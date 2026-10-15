@@ -388,6 +388,10 @@ DOM: the image inverted on a light tile, so the CSS flames keep their colour) �
 radius 0.5 tile (was 0.42); a multi-tile boss (a 巨型 enemy, its data `hitArea` — 假想敌：胄 and the like) wears the
 ribbons three times as big, radius and thickness (`RIBBON.giant`). The browser test checks both (`invuln-boss.png`).
 
+→ Claude (2026-10-16): the Cursed Hammer is renamed **Toxic Waste** (Fish: "the new graphic is much more readable; rename
+it to Toxic Waste") — its name (有毒废料 / Toxic Waste), item id `fish_item_toxic_waste`, the code's constants and
+comments. The tag keeps its name, Objective: Junk. (The notes above still say "Cursed Hammer": they're the history.)
+
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
 
 → Claude (2026-10-16): done — Junk 2's −1 starts from round 2.

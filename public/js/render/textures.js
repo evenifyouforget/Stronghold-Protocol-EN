@@ -1260,7 +1260,7 @@ export function shadowTexture() {
 const _items = new Map();
 let _cursedFlame = null;
 /**
- * One tongue of the Cursed Hammer's sinking flame (render/units.js CursedFlame): a soft vertical teardrop, dark blue,
+ * One tongue of the Toxic Waste's sinking flame (render/units.js CursedFlame): a soft vertical teardrop, dark blue,
  * widest near its top and tapering to the bottom (the flame "falls"), alpha fading to the edges. 64×128, white-free so
  * normal blending reads as a gloomy shadow-light rather than a glow.
  */
@@ -1291,7 +1291,7 @@ export function cursedFlameTexture() {
 }
 
 /**
- * An item's plate: a dark rounded square in `color` with the icon. `invert` (the SPA-CC Cursed Hammer): the finished
+ * An item's plate: a dark rounded square in `color` with the icon. `invert` (the SPA-CC Toxic Waste): the finished
  * plate's colours inverted — a white plate, the icon's colours turned to their complements (its red vial cyan).
  */
 export function itemTexture(key, img, color, { invert = false } = {}) {

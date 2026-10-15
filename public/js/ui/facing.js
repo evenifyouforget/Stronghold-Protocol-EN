@@ -219,7 +219,7 @@ export function underframeActions(ctx, uid) {
   const onBoard = e.area === 'board';
   // only a loose item (bench / temp) can be destroyed: an equipped one is locked (the server refuses g.destroy —
   // research 04 §2; replacing it is the equip-replace dialog's job, g.equip replaceUid)
-  // the SPA-CC Cursed Hammer (ccJunk) cannot be destroyed: its button shows, greyed out (`destroyLocked`)
+  // the SPA-CC Toxic Waste (ccJunk) cannot be destroyed: its button shows, greyed out (`destroyLocked`)
   if (p.kind === 'item') return itemDestroyable(ctx, uid) ? { retreat: false, sell: null, destroy: true, ...(p.id === CC.junk.itemId ? { destroyLocked: true } : {}) } : null;
   if (p.kind === 'token') return onBoard ? { retreat: true, sell: null, destroy: false } : null;
   if (p.kind !== 'chess') return null;

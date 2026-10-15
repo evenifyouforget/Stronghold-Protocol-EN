@@ -14,7 +14,7 @@ import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
-import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, CURSED_HAMMER_NAME } from '../../../shared/ruleData.js';
+import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -72,8 +72,8 @@ export function riskText(key, level) {
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
     case 'ccJunk': return level >= 2
-      ? { short: t('目标：垃圾 {n}', { n: level }), full: t('未装备【{item}】时每回合收入-{n}', { item: t(CURSED_HAMMER_NAME), n: CC.junk.incomeLoss }) }
-      : { short: t('目标：垃圾 {n}', { n: level }), full: t('开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动', { item: t(CURSED_HAMMER_NAME), n: pct(-CC.junk.atkPct) }) };
+      ? { short: t('目标：垃圾 {n}', { n: level }), full: t('未装备【{item}】时每回合收入-{n}', { item: t(TOXIC_WASTE_NAME), n: CC.junk.incomeLoss }) }
+      : { short: t('目标：垃圾 {n}', { n: level }), full: t('开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动', { item: t(TOXIC_WASTE_NAME), n: pct(-CC.junk.atkPct) }) };
     case 'ccVengeance': return vengeanceText(level, enemyName);
     case 'ccFamiglia': return famigliaText(nodeOf(key, level), enemyName);
     case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);

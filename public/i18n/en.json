@@ -1510,7 +1510,6 @@
   "{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现（每个战场1组）；【{name}】存活时所有敌人移动速度+{m}%，攻击速度+{a}": "{n} 【{escort}】 come with 【{name}】, and all of them come again in the final Leader rounds (one group per field); while 【{name}】 lives, every enemy gets +{m}% Movement Speed and +{a} ASPD",
   "最终领袖回合，每个战场额外出现1名【{degen}】（1级属性）、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%": "In the final Leader rounds, 1 【{degen}】 (Level 1 stats), {n} 【{shield}】 and {m} 【{champ}】 join every field, with {hp}% max HP",
   "每场作战都有血债账款：开始时为{start}%，每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时为{late}%": "Every battle has a Blood Ledger: it starts {start}% full and fills +{n} per second; at {max}, an Asset Liquidation (enemies +{atk}% ATK and +{def}% DEF, 1 【{silencer}】 comes, the Ledger empties over {s} seconds); from round {r} it starts {late}% full",
-  "诅咒重锤": "Cursed Hammer",
   "目标：垃圾 {n}": "Objective: Junk {n}",
   "未装备【{item}】时每回合收入-{n}": "While 【{item}】 is not equipped, −{n} income each round",
   "里德，{name}": "Reid, {name}",
@@ -1522,11 +1521,12 @@
   "【{name}】数量翻倍，攻击速度+{aspd}；生命值低于{low}%时受到的物理与法术伤害改为-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导": "Twice as many 【{name}】, +{aspd} ASPD; below {low}% HP, {dr}% less Physical and Arts damage taken instead, and immune to Slow, Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure",
   "攻击力-50%。无法被销毁": "ATK −50%. Cannot be destroyed",
   "攻击力-50%。无法被销毁；未装备时每回合收入-1": "ATK −50%. Cannot be destroyed; while not equipped, −1 income each round",
-  "开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动": "Every Doctor starts with a 【{item}】: its carrier has −{n}% ATK; it cannot be destroyed and has no interaction with the Damazti Isomorph",
+  "开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动": "Every Doctor starts with 【{item}】: its carrier has −{n}% ATK; it cannot be destroyed and has no interaction with the Damazti Isomorph",
   "【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置": "The final Leader cannot die while a 【{degen}】 lives; those enemies have {hp}% max HP and {atk}% ATK; while unblocked, 【{degen}】 speeds up, reaching +{c}% Movement Speed after {s} seconds, reset when blocked or unable to move",
   "无法销毁": "Cannot be destroyed",
   "初始目标生命翻倍": "Double starting LP",
   "开局获得各阶干员": "Start with one operator of each tier",
   "所有博士的初始目标生命翻倍": "Every Doctor's starting Life Points are doubled",
-  "开局时所有博士各获得每个阶级的随机干员1名（1~6阶）": "Every Doctor starts with one random operator of each tier (I–VI)"
+  "开局时所有博士各获得每个阶级的随机干员1名（1~6阶）": "Every Doctor starts with one random operator of each tier (I–VI)",
+  "有毒废料": "Toxic Waste"
 }

@@ -131,7 +131,7 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
     const it = data.lookup('items', id);
     src = itemIconUrl(m, it);
     name = it?.name || '';
-    cursed = !!it?.cursed; // the SPA-CC Cursed Hammer
+    cursed = !!it?.cursed; // the SPA-CC Toxic Waste
     t = t ?? it?.tier;
     golden = golden ?? !!it?.isGolden;
   } else if (kind === 'token') {

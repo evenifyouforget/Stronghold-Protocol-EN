@@ -253,7 +253,7 @@ test('the battle\'s live leak count weighs a Patriot like the settlement (the HU
 
 const cursedIn = (ps) => [...ps.hand, ...ps.temp].filter((p) => p && p.kind === 'item' && p.id === CC.junk.itemId);
 
-test('ccJunk 1: everyone starts with a Cursed Hammer; it never expires in the temp hand and is never replaced away', () => {
+test('ccJunk 1: everyone starts with Toxic Waste; it never expires in the temp hand and is never replaced away', () => {
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccJunk: 1 } }).start();
   try {
     h.toPrep(1);
@@ -286,12 +286,12 @@ test('ccJunk 1: everyone starts with a Cursed Hammer; it never expires in the te
     // and the player cannot destroy it in the hand (g.destroy): sell its carrier to get it back there
     const h2 = ps.newPiece('item', CC.junk.itemId);
     ps.stow(h2, { allowTemp: true });
-    assert.ok(ps.destroy(h2.uid).error, 'destroying the Cursed Hammer is refused');
+    assert.ok(ps.destroy(h2.uid).error, 'destroying the Toxic Waste is refused');
     assert.ok(ps.find(h2.uid), 'still there');
   } finally { h.m.dispose(); }
 });
 
-test('ccJunk 2: a round\'s income −1 while the Cursed Hammer is not equipped', () => {
+test('ccJunk 2: a round\'s income −1 while the Toxic Waste is not equipped', () => {
   const income = (rules, equip) => {
     const h = makeMatch({ mode: 'solo', seed: 3, rules }).start();
     try {

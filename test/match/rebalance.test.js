@@ -151,7 +151,7 @@ test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod
   } finally { setLang('zh'); }
 });
 
-test('SPA-CC Junk: the client shows the Cursed Hammer of a match with the tag (its name and text in English)', async () => {
+test('SPA-CC Junk: the client shows the Toxic Waste of a match with the tag (its name and text in English)', async () => {
   const { createDataStore } = await import('../../public/js/data.js');
   const { readFileSync, existsSync } = await import('node:fs');
   const path = await import('node:path');
@@ -174,7 +174,7 @@ test('SPA-CC Junk: the client shows the Cursed Hammer of a match with the tag (i
     assert.equal(d.lookup('items', CC.junk.itemId), null);
     d.setRules({ ccJunk: 2 });
     const it = d.lookup('items', CC.junk.itemId);
-    assert.equal(it.name, 'Cursed Hammer');
+    assert.equal(it.name, 'Toxic Waste');
     assert.match(it.desc, /−1 income/);
     assert.equal(it.iconId, CC.junk.iconId);
     d.setRules(null);

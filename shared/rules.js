@@ -62,7 +62,7 @@ export const RULES = Object.freeze([
   { key: 'ccDeepInfiltration', type: 'level', risk: [0, 1], category: 'risk' }, // DP generation −50 %
   { key: 'ccLowEfficiency', type: 'level', risk: [0, 1], category: 'risk' },  // redeployment time +75 %
   { key: 'ccLastLine', type: 'level', risk: [0, 1], category: 'risk' },       // the first leak each round: +2 LP, past the cap
-  { key: 'ccJunk', type: 'level', risk: [0, 1, 2], category: 'risk' },       // a Cursed Hammer for everyone (2: −1 income unequipped)
+  { key: 'ccJunk', type: 'level', risk: [0, 1, 2], category: 'risk' },       // Toxic Waste for everyone (2: −1 income unequipped)
   { key: 'ccOzArts', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +50 RES after 50 % of its pool as Arts
   { key: 'ccOzPhys', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +5000 DEF after 50 % as Physical
   { key: 'ccLockout', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },  // final boss invulnerable 10 s every 68/28/18 %
