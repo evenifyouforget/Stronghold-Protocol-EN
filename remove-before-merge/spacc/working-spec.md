@@ -6,8 +6,8 @@ State as of 2026-10-15, branch `wip/vengeance-junk` (on `wip/famiglia`). Every t
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
 cheat on, the total Risk counts as 0.
 
-**Name** is the tag's player-facing name (blank = not named yet). The **current label** is the placeholder shown on the
-grid tile today.
+The tags' names are Fish's (the Spec below); the grid's tiles show them (see "Tile names"). The **Name** / **Current
+label** lines of the older notes predate that.
 
 ## Spec (Fish's)
 
