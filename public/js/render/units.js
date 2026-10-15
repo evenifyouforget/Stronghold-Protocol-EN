@@ -490,6 +490,9 @@ export class UnitView {
     // enemies: the official prefab's size factor (1 for operators, summons and enemies at the standard size)
     const def = this.isEnemy && ctx.lookupDef ? ctx.lookupDef(info) : null;
     this.modelK = this.isEnemy ? enemyModelScale(def) : 1;
+    // the invulnerability ribbons' size (InvulnRibbons): a multi-tile boss (a 巨型 enemy, its data `hitArea`) wears them
+    // RIBBON.giant times as big, so they go round it
+    this.ribbonK = this.isEnemy && def && def.hitArea ? RIBBON.giant : 1;
     // a fast enemy walks on its model's own Run cycle when it has one (PR #275 by @xcdoge: 猎狗pro, moveSpeed 1.9, Run_Loop
     // 0.53 s next to Move_Loop 0.80 s; also 深池侦察犬 1.7). [ASSUMED] the threshold: faster than the standard 1
     this.moveFast = this.isEnemy && Number(def?.stats?.moveSpeed) > 1;
@@ -1410,7 +1413,7 @@ export class UnitView {
     // invulnerable (无敌, UF.INVULN): two gold ribbons spinning around the model (InvulnRibbons, made on first need)
     if (this.flags & UF.INVULN) {
       if (!this.ribbons) this.ribbons = new InvulnRibbons(this.P, this.root, this.body);
-      this.ribbons.update(t, s, -headTiles * s * RIBBON.centre);
+      this.ribbons.update(t, s * this.ribbonK, -headTiles * s * RIBBON.centre);
     } else if (this.ribbons) this.ribbons.hide();
     this._updateHud(dt, s, bx, by - headTiles * s, alpha, t);
   }
@@ -2057,13 +2060,14 @@ export class ItemView {
 
 /**
  * The invulnerability ribbons (Fish 2026-10-16, after the original game's look): two gold rings around the unit, as if in
- * 3D — each a short cylinder (thickness `thick` tiles, radius `radius` tiles, centred `centre` of the model's height up)
+ * 3D — each a short cylinder (thickness `thick` tiles, radius `radius` tiles — `giant` times both on a multi-tile boss —,
+ * centred `centre` of the model's height up)
  * spinning about its own axis once per second, its near side moving left. Along a ribbon the colour fades from gold
  * to transparent and back, transparent at 180° (its "back side"); the two are half a turn apart. Axes: screen up, tilted
  * `tilt`° to the left (the first) or right (the second) about the screen's Z, then `toward`° toward the camera. Drawn
  * additively: the half turned away from the camera behind the model, the near half in front.
  */
-const RIBBON = Object.freeze({ radius: 0.42, thick: 0.25, centre: 0.45, perSec: 1, tilt: 20, toward: 10, segs: 48, alpha: 0.85, color: 0xffd34d });
+const RIBBON = Object.freeze({ radius: 0.5, thick: 0.25, centre: 0.45, perSec: 1, tilt: 20, toward: 10, segs: 48, alpha: 0.85, color: 0xffd34d, giant: 3 });
 
 /** A ribbon's frame (screen x right, y up, z toward the camera): its axis `a` and the ring's basis u, v. */
 function ribbonFrame(side) {

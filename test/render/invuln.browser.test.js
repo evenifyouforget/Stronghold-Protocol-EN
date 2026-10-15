@@ -89,4 +89,52 @@ describe('invulnerability ribbons in headless Chrome', { skip }, () => {
       await page.close();
     }
   });
+
+  test('a multi-tile boss wears them three times as big', async () => {
+    const BOSS = 'enemy_9013_acstmk'; // 假想敌：胄, a 巨型 enemy (data hitArea)
+    const h = makeBattle({ seed: 5, autoFinish: false, timeLimit: 600, units: [{ chessId: 'chess_char_3_08_a', row: 11, col: 2 }] });
+    h.step();
+    const b = h.b;
+    const boss = h.spawn(BOSS, { pos: [9, 9], routeIndex: 0, mods: { speedMul: 0 } });
+    const mint = h.unit('chess_char_3_08_a');
+    const meta = { ...b.fieldMeta(), stageId: 'act2autochess_m01' };
+    b.drainEvents();
+    const frames = [];
+    for (let i = 0; i < 60; i++) {
+      if (i === 5) for (const u of [boss, mint]) b.addBuff(u, { key: 'test:invuln', duration: Infinity, flags: { invulnerable: true } });
+      b.step();
+      const { t, ...rest } = b.snapshot();
+      frames.push({ snap: { ...rest, t: 'b.snap', gt: t }, ev: b.drainEvents(), gt: t });
+    }
+    const page = await browser.newPage();
+    try {
+      await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 2 });
+      await page.goto(`http://127.0.0.1:${srv.port}/dev/render-demo.html?scene=normal-m01&paused=1&panel=0`);
+      await page.waitForFunction('window.__demo && (window.__demo.ready || window.__demo.error)', { timeout: 30000 });
+      await page.evaluate((meta) => {
+        const v = window.__demo.view;
+        v.enterBattle(meta);
+        v.setCamera('normal', { rect: meta.rect, side: 'L', instant: true });
+        v.setLocalFeed({ on: true, speed: 1 });
+      }, meta);
+      const state = await page.evaluate(async (all, ids) => {
+        const v = window.__demo.view;
+        for (const f of all) {
+          if (f.ev.length) v.pushEvents({ t: 'b.ev', fieldId: f.snap.fieldId, gt: f.gt, ev: f.ev });
+          v.pushSnapshot(f.snap);
+          await new Promise((r) => requestAnimationFrame(() => r()));
+        }
+        await new Promise((r) => setTimeout(r, 800));
+        const bv = v.debug.views.get(ids[0]), mv = v.debug.views.get(ids[1]);
+        const w = (g) => (g ? g.getLocalBounds().width : 0);
+        return { bossK: bv.ribbonK, mintK: mv.ribbonK, bossW: Math.max(w(bv.ribbons?.back), w(bv.ribbons?.front)), mintW: Math.max(w(mv.ribbons?.back), w(mv.ribbons?.front)), x: bv.screen.x, top: bv.screen.top, y: bv.screen.y };
+      }, frames, [boss.id, mint.id]);
+      await page.screenshot({ clip: { x: Math.max(0, state.x - 260), y: Math.max(0, state.top - 40), width: 520, height: Math.max(120, state.y - state.top + 80) }, path: path.join(OUT, 'invuln-boss.png') });
+      assert.equal(state.bossK, 3);
+      assert.equal(state.mintK, 1);
+      assert.ok(state.bossW > state.mintW * 2, `the boss's ribbons are wider: ${JSON.stringify(state)}`);
+    } finally {
+      await page.close();
+    }
+  });
 });

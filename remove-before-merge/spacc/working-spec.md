@@ -384,6 +384,10 @@ colour-inverted — a white plate with a cyan vial (field: the plate canvas inve
 DOM: the image inverted on a light tile, so the CSS flames keep their colour) — and the flame has 21 tongues on the field
 (`CURSED_TONGUES`), three times the blobs in the CSS layers. The purple tint is gone (the inversion replaces it).
 
+→ Claude (2026-10-16, Fish: "the ribbons look good; radius ~20 % wider for normal units; multi-tile bosses 3× as big"):
+radius 0.5 tile (was 0.42); a multi-tile boss (a 巨型 enemy, its data `hitArea` — 假想敌：胄 and the like) wears the
+ribbons three times as big, radius and thickness (`RIBBON.giant`). The browser test checks both (`invuln-boss.png`).
+
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
 
 → Claude (2026-10-16): done — Junk 2's −1 starts from round 2.
