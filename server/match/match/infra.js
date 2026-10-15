@@ -222,6 +222,9 @@ export class MatchInfra {
 
   alivePlayers() { return this.order.filter((p) => p.alive); }
 
+  /** A player's starting LP: its strategy's (GameData.startLp), twice that with the `doubleLp` cheat. */
+  startLp(bandId) { return this.gd.startLp(bandId) * (this.rules?.doubleLp ? 2 : 1); }
+
   /** Whether any chess of a bond is in this match's pool (a 驰援 card of a fully banned bond is never offered). */
   bondInPool(bondId) {
     for (const id of this.pool.entries.keys()) {

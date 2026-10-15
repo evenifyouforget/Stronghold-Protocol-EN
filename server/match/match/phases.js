@@ -199,7 +199,7 @@ export class MatchPhases {
     if (dedupe && this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
     d.picks[ps.playerId] = id;
     ps.bandId = id;
-    ps.lp = this.gd.startLp(id);
+    ps.lp = this.startLp(id);
     this.markPrivate(ps);
     this.markPublic();
     this.startDraftTurn();
@@ -239,7 +239,7 @@ export class MatchPhases {
         const id = this.defaultBand(ps.playerId);
         this.draft.picks[ps.playerId] = id;
         ps.bandId = id;
-        ps.lp = this.gd.startLp(id);
+        ps.lp = this.startLp(id);
       }
       this.markPrivate(ps);
     }

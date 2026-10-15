@@ -134,3 +134,33 @@ test('seeded: a chosen map and chosen bans are used; the rest is drawn as usual,
   assert.deepEqual(odd.m.disabledBonds, base.drawn);
   plain.m.dispose(); h.m.dispose(); odd.m.dispose();
 });
+
+test('cheats keep the Risk (the "WITH CHEATS" watermark tells; Fish 2026-10-16)', async () => {
+  const { ruleLabels } = await import('../../shared/rules.js');
+  assert.deepEqual(ruleLabels({ ccBoss: 2, extraFunds: true }), { cheats: true, seeded: false, risk: 2 });
+});
+
+test('doubleLp: every player starts with twice its strategy\'s LP', () => {
+  const lp = (rules) => {
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, rules }).start();
+    try { h.toPrep(1); return h.m.order.map((p) => [p.lp, h.m.gd.startLp(p.bandId)]); } finally { h.m.dispose(); }
+  };
+  for (const [now, band] of lp({})) assert.equal(now, band);
+  for (const [now, band] of lp({ doubleLp: true })) assert.equal(now, band * 2);
+});
+
+test('tierStart: one random operator of each tier I–VI at the start, the same draw for the same seed, from the pool', () => {
+  const grant = () => {
+    const h = makeMatch({ mode: 'solo', seed: 7, rules: { tierStart: true } }).start();
+    try {
+      h.toPrep(1);
+      const ps = h.ps('p_0');
+      const ops = [...ps.hand, ...ps.temp, ...ps.board.values()].filter((p) => p && p.kind === 'chess');
+      return ops.map((p) => [h.m.gd.tierOf(p.id), p.id]).sort((a, b) => a[0] - b[0]);
+    } finally { h.m.dispose(); }
+  };
+  const a = grant();
+  const tiers = [1, 2, 3, 4, 5, 6].map((t) => a.filter(([x]) => x === t).length);
+  assert.ok(tiers.every((n) => n >= 1), `one per tier at least: ${JSON.stringify(a)}`);
+  assert.deepEqual(grant(), a, 'deterministic for the seed');
+});

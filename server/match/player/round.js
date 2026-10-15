@@ -9,10 +9,22 @@
 import { RULE_EXTRA_FUNDS } from '../../../shared/constants.js';
 import { tagLevel } from '../../../shared/rules.js';
 import { CC } from '../../../shared/ruleData.js';
+import { createRng, deriveSeed } from '../../sim/rng.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
 
 export class PlayerRound {
+  /** The tierStart cheat's operators: per tier, a random base id the shared pool still has a copy of. */
+  grantTierStart() {
+    const rng = createRng(deriveSeed(this.m.seed, `cheat-tiers:${this.playerId}`));
+    const pool = this.m.pool;
+    const bases = [...pool.entries.keys()].sort();
+    for (let tier = 1; tier <= 6; tier++) {
+      const list = bases.filter((b) => this.gd.tierOf(b) === tier && pool.left(b) > 0 && !this.gd.chess(b)?.isDiy);
+      if (list.length) this.acquireChess(list[Math.floor(rng() * list.length)], { source: 'cheat', silent: true });
+    }
+  }
+
   startRound(r) {
     this.round = { refreshes: 0, buys: 0, sells: 0, spent: 0, gainedChess: 0, arts: 0 };
     this.pendingLayerGains = null; // settled (or lapsed) at the last SETTLE
@@ -28,6 +40,9 @@ export class PlayerRound {
     // not equipped (in the hand or the temporary hand)
     const junk = tagLevel(this.m.rules, 'ccJunk');
     if (junk > 0 && r === 1 && this.gd.item(CC.junk.itemId)) this.stow(this.newPiece('item', CC.junk.itemId), { allowTemp: true });
+    // the tierStart cheat: one random operator of each tier (1–6) from the shared pool, on its own seeded stream (the
+    // match's other draws stay as they were)
+    if (r === 1 && this.m.rules?.tierStart) this.grantTierStart();
     // (not on round 1: the hammer has just arrived — Fish 2026-10-16, starting on 3 Funds was too harsh)
     const cursed = junk >= 2 && r > 1 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
     this.addFunds(Math.max(0, nonNeg(ev.income) - cursed) + nonNeg(ev.pending) + extra, { reason: 'income' });

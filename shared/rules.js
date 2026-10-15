@@ -5,8 +5,8 @@
 //   neutral  free to take: Alliance Modules, rebalanced alliances
 //   cheat    the end screen carries a "WITH CHEATS" watermark (+2 Deployment Limit, +2 Funds, untimed)
 //   seeded   less luck: "seeded" after the result title (the chosen map, chosen alliance bans)
-//   risk     SPA-CC difficulty tags worth Risk ("Ultimate+5"; remove-before-merge/ROADMAP.md "SPA-CC"); with a cheat on,
-//            the Risk counts as 0
+//   risk     SPA-CC difficulty tags worth Risk ("Ultimate+5"; remove-before-merge/ROADMAP.md "SPA-CC"); with a cheat on
+//            the Risk still shows — the "WITH CHEATS" watermark tells (Fish 2026-10-16)
 // A rule's value type:
 //   bool     true / false (default false)
 //   choice   one of `options` (default options[0], the original game)
@@ -38,6 +38,8 @@ export const RULES = Object.freeze([
   { key: 'extraDeploy', type: 'bool', category: 'cheat' },      // +RULE_EXTRA_DEPLOY deployment limit for every player
   { key: 'extraFunds', type: 'bool', category: 'cheat' },       // +RULE_EXTRA_FUNDS Funds at every round start
   { key: 'untimed', type: 'bool', category: 'cheat' },          // no countdown on the screens players act on (battles keep theirs)
+  { key: 'doubleLp', type: 'bool', category: 'cheat' },         // every player starts with twice its strategy's LP
+  { key: 'tierStart', type: 'bool', category: 'cheat' },        // every player starts with one random operator of each tier
   // Alliance Modules: A = the original effect
   { key: 'lateranoMod', type: 'choice', options: ['A', 'B'], category: 'neutral' },
   { key: 'victoriaMod', type: 'choice', options: ['A', 'C'], category: 'neutral' },
@@ -145,15 +147,16 @@ export function rulesInForce(rules) {
 export const anyRule = (rules) => rulesInForce(rules).length > 0;
 
 /**
- * How a result with these rules is labelled: `cheats` (the "WITH CHEATS" watermark; Risk counts as 0), `seeded`, and
- * `risk` (the sum of the risk tags; 0 with cheats).
+ * How a result with these rules is labelled: `cheats` (the "WITH CHEATS" watermark), `seeded`, and `risk` (the sum of
+ * the risk tags, cheats or not).
  * @returns {{ cheats: boolean, seeded: boolean, risk: number }}
  */
 export function ruleLabels(rules) {
   const on = rulesInForce(rules).map((k) => BY_KEY.get(k));
   const cheats = on.some((r) => r.category === 'cheat');
   const seeded = on.some((r) => r.category === 'seeded');
-  const risk = cheats ? 0 : on.reduce((n, r) => n + (r.category === 'risk' ? ruleRisk(r.key, rules[r.key]) : 0), 0);
+  // with cheats too: the "WITH CHEATS" watermark says so, the end screen still shows the Risk (Fish 2026-10-16)
+  const risk = on.reduce((n, r) => n + (r.category === 'risk' ? ruleRisk(r.key, rules[r.key]) : 0), 0);
   return { cheats, seeded, risk };
 }
 

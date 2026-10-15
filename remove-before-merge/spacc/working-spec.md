@@ -389,3 +389,10 @@ New cheat mod: Start with one random operator of each tier
 This should make testing significantly faster.
 
 It's also unnecessary to set the score to 0 when cheats are used, since the cheat watermark is already there. I think it's better to not set the score to 0, so it can be shown on the end screen.
+
+→ Claude (2026-10-16): done, all three. Two new cheats in the rules dialog's Cheats section: **Double starting LP**
+(`doubleLp`: twice the strategy's LP) and **Start with one operator of each tier** (`tierStart`: at round 1, one random
+operator of each tier I–VI from the shared pool, on its own seeded stream so the match's other draws don't change; they
+land in the hand, overflow in the temporary hand). Both carry the "WITH CHEATS" watermark like the others. And the Risk
+is no longer zeroed with cheats: the result title shows it next to the watermark (`shared/rules.js ruleLabels`); the
+dialog's "Risk counts as 0" note is gone.
