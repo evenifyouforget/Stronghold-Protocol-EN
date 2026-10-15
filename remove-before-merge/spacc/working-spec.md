@@ -371,6 +371,13 @@ mock: `/dev/game-mock.html?variant=junk`. Numbers to tune: CURSED_TONGUES / CURS
 
 For invulnerability, I want to try developing a visual that is close to the original game. The unit will have two ribbons rotating around them as if in 3D space. Ribbon can be considered a cylinder that is not very tall (thickness around 1/4 the size of a tile), that spins around its own axis. Colour should be gold. Addition, overlay, or a similar colour mixing setting can be used. Ribbon should fade transparent to gold to transparent, with 180 degrees being transparent. (the "back side") Ribbon rotates around 1 rotation per second, with the side closer to the camera moving left. Ribbons should be in opposite phase to each other. First ribbon's axis is screen +Y, then tilted 20 degrees left (counterclockwise around the Z axis that cuts through the screen) then 10 degrees toward the camera. Second ribbon is same but 20 degrees right instead of left.
 
+→ Claude (2026-10-16): built to this description (no such effect in our asset sources — see the answer to question 3). Any
+unit with the invulnerable flag gets two gold rings, drawn additively as 48 quads each: radius 0.42 tile, thickness 0.25
+tile, centred at 45 % of the model's height; the half facing away from the camera is drawn behind the model, the near
+half in front. One turn per second with the near side moving left, gold → transparent at 180° along the ribbon, the two
+half a turn apart, axes tilted ±20° then 10° toward the camera (`render/units.js InvulnRibbons`, numbers in `RIBBON`).
+Check: `RENDER_E2E=1 node --test test/render/invuln.browser.test.js` → `test/e2e/out/invuln-*.png`.
+
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
 
 → Claude (2026-10-16): done — Junk 2's −1 starts from round 2.
