@@ -57,7 +57,7 @@ const NOT_SCALED = [
   // pinned onto board tiles by JS-computed pixels (ui/standInTags.js, ui/underframe.js)
   /\.sitag/, /\.tempnote/, /\.uframe/, /\.ff-/,
   // in-match HUD chrome whose box the design fixed (a later pass: shop cards, top bar, bond strip, corner buttons)
-  /\.gm__/, /\.roundbox/, /\.capsule/, /\.lp\b/, /\.lp--/, /\.misstag/, /\.bossbar/, /\.readywrap/,
+  /\.gm__/, /\.roundbox/, /\.capsule/, /\.lp\b/, /\.lp--/, /\.misstag/, /\.bossbar/, /\.ledger/, /\.readywrap/,
   /\.bstrip/, /\.bslot/, /\.effect/, /\.efftip/, /\.ebubble/, /\.ticker/, /\.dpbox/, /\.vswitch/,
   /\.specpill/, /\.otwarn/, /\.team/, /\.enemybtn/, /\.readybtn/, /\.ewheel/, /\.fwheel/, /\.chud/, /\.toolbtn/,
   /\.shopbar/, /\.scard/, /\.scr\b/,
@@ -231,6 +231,7 @@ describe('文字大小: the CSS text root', () => {
       ['screens/game-shop.css', /\.scard__name \{[^}]*font-size: \.19rem/, 'the shop card'],
       ['screens/game.css', /\.bslot \.bond__name \{[^}]*font-size: \.14rem/, 'the bond strip'],
       ['screens/game.css', /\.bossbar__txt \{[^}]*font-size: \.14rem/, 'the boss bar'],
+      ['screens/game.css', /\.ledger__txt \{[^}]*font-size: \.13rem/, 'the Blood Ledger bar (SPA-CC), the same fixed-height bar'],
       ['screens/game.css', /\.lp--md \{ font-size: \.24rem; \}/, 'the top bar LP'],
       ['screens/game.css', /\.sp-coarse \.set-diag__text \{ font-size: 16px; \}/, 'the 16 px iOS-zoom guard'],
       ['theme.css', /\.rotate-hint \{[\s\S]*?font-size: 16px/, 'the rotate hint'],

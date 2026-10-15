@@ -25,8 +25,8 @@ function* walk(v) {
 test('snapHud reads the Ledger, and none without one', () => {
   assert.deepEqual(snapHud({ killed: 1, total: 5, bl: [250, 500, 0, 0] }).ledger, { value: 250, max: 500, liquidating: false, permanent: false });
   assert.deepEqual(snapHud({ bl: [500, 500, 1, 1] }).ledger, { value: 500, max: 500, liquidating: true, permanent: true });
-  assert.equal(snapHud({ killed: 1, total: 5 }).ledger, null);
-  assert.equal(snapHud({ bl: [1, 0, 0, 0] }).ledger, null, 'no max');
+  assert.ok(!('ledger' in snapHud({ killed: 1, total: 5 })), 'the HUD shape stays as before');
+  assert.equal(snapHud({ bl: [1, 0, 0, 0] }).ledger, undefined, 'no max');
 });
 
 test('LedgerBar: the count while filling, Asset Liquidation while one lasts', () => {
