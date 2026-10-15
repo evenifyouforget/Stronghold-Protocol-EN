@@ -381,3 +381,11 @@ Check: `RENDER_E2E=1 node --test test/render/invuln.browser.test.js` → `test/e
 Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
 
 → Claude (2026-10-16): done — Junk 2's −1 starts from round 2.
+
+New cheat mod: Double initial LP
+
+New cheat mod: Start with one random operator of each tier
+
+This should make testing significantly faster.
+
+It's also unnecessary to set the score to 0 when cheats are used, since the cheat watermark is already there. I think it's better to not set the score to 0, so it can be shown on the end screen.
