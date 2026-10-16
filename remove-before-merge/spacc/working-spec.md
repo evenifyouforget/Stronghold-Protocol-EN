@@ -347,11 +347,16 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
    read better: a lock marker on the boss bar while the pool is invulnerable, and/or a tint on the model (cheap in
    Pixi).
 
+### Answers (Fish, 2026-10-16)
+
+- Toxic Waste's −50 % ATK stacks additively with other ATK% modifiers (as built).
+- A leaked Reid costs 1 LP like most enemies (as built).
+- AI teammates ignoring Toxic Waste is fine; revisit if the AI is to play better.
+- The Rosmontis tags are scrapped.
+
 ## Backlog (ideas not built yet)
 
-| Idea                                           | Risk  | Status                              |
-| ---------------------------------------------- | ----- | ----------------------------------- |
-| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
+(none — every designed tag is built; the Rosmontis tags were scrapped)
 
 ## New suggestions
 
