@@ -315,7 +315,8 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
     check('bands', () => {
       for (const ps of m.order) {
         if (!ps.bandId || !gd.bandAllowed(ps.bandId)) fail(`${ps.playerId}: band ${ps.bandId} not allowed`);
-        if (ps.lp !== gd.startLp(ps.bandId)) fail(`${ps.playerId}: LP ${ps.lp} != totalHp ${gd.startLp(ps.bandId)} of ${ps.bandId}`);
+        const lp0 = typeof m.startLp === 'function' ? m.startLp(ps.bandId) : gd.startLp(ps.bandId); // the doubleLp cheat
+        if (ps.lp !== lp0) fail(`${ps.playerId}: LP ${ps.lp} != start LP ${lp0} of ${ps.bandId}`);
       }
       expectDeadline(gd.timer('battleCheck'), 'BATTLE_CHECK', { silentSolo: true });
     });

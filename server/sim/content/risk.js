@@ -21,7 +21,7 @@
 //                 enemies.json `level1`).
 //   ccDelegation  United 2: the sub-wave's Degenbrecher charges while unblocked (installDegenCharge); United 3's gate is in
 //                 her kit (enemies/leaders.js)
-//   ccJunk        the Cursed Hammer's carrier ATK −50 % (installJunk; the item itself: shared/ruleData.js, the match)
+//   ccJunk        the Toxic Waste's carrier ATK −50 % (installJunk; the item itself: shared/ruleData.js, the match)
 //   ccVengeance   Invincible Blade 2 / 3 on the Reids the tag adds (installVengeance)
 //   ccFamiglia    Unending / Seasonal: the Blood Ledger of every battle (installFamiglia; battle.ledger, the snapshot's
 //                 `bl`); tier 3: Zaaro's leak costs CC.famiglia.zaaro.leakLp
@@ -79,7 +79,7 @@ export function install(battle) {
   installVengeance(battle, rules);
 }
 
-/** ccJunk: the Cursed Hammer's carrier ATK −50 % (its item record has no buffs; this is its effect). */
+/** ccJunk: the Toxic Waste's carrier ATK −50 % (its item record has no buffs; this is its effect). */
 function installJunk(battle, rules) {
   if (!(tagLevel(rules, 'ccJunk') > 0)) return;
   battle.on('deploy', ({ unit }) => {

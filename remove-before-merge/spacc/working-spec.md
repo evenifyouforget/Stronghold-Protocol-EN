@@ -327,8 +327,9 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
 2. For Cursed Hammer, how is it drawn? Is the current convention to serve a png? Do we have postprocessing effects available ex. screenspace distortion or an animated particle overlay? What solution to make it visually distinct would avoid undue code maintenance problems?
 
    → Claude: item icons are PNGs from the asset manifest (`data/assets.json` `items`: icon id → `/assets/…` URL, downloaded
-   by `fetch-assets`), drawn as plain `<img>` in the DOM — the hand, shop, detail panel, choice cards, the 2D fallback
-   board. The 3D battle view (Pixi) never draws item icons. The Cursed Hammer reuses the Victorian Hammer's icon, so it
+   by `fetch-assets`), drawn as plain `<img>` in the DOM — item thumbnails, the detail panel, choice cards, the 2D fallback
+   board. (Correction, 2026-10-16: the 3D field (Pixi) does draw them too — an item lying in the hand on the board is a
+   plate with its icon, `render/units.js ItemView`, and an operator shows small pips of its equipped items.) The Cursed Hammer reuses the Victorian Hammer's icon, so it
    currently looks identical. The DOM side has CSS only: filters (hue-rotate, saturate, brightness, drop-shadow), CSS
    animations, `::after` overlays; screen-space distortion is possible with SVG filters but heavier and browser-
    inconsistent. Pixi has particles / filters, but items aren't there. Suggestion, the way golden items already work
@@ -356,6 +357,56 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
 
 UI tweak for Cursed Hammer: make the "Destroy" button greyed out and unclickable, and change the text to "Cannot be destroyed".
 
+→ Claude (2026-10-16): done — the selection's Destroy button stays, greyed out, reading "Cannot be destroyed".
+
 I want to try developing a visual for the Cursed Hammer that makes it stand out more and not look like a buff item. I'm thinking of a gloomy sinking effect, which could be done with a flame-like overlay (so with varying transparency, and different parts moving at different speeds), but moving down instead of up, dark blue instead of red~yellow, and slow (takes around 5 seconds to cross the height). Flame should be on top of the icon rather than inside it, so it can go outside the square. Not sure if this would be accomplished with particle systems or something else. For the sprite itself, we can give it a purple tint.
 
+→ Claude (2026-10-16): built in both places it shows. The field (Pixi): the hand plate is tinted purple, with 7 soft
+dark-blue flame tongues on top that sink from above the plate to below it, each over its own 4–6 s with its own phase,
+sway and fading alpha (`render/units.js CursedFlame`, texture `textures.js cursedFlameTexture`); an operator wearing it
+shows a purple pip. The DOM thumbnails and the detail panel's icon: a CSS purple filter and two flame layers sinking at
+5 s and 6.5 s (`game-panels.css` `.is-cursed`). Both come from one flag on the item record (`cursed: true`). Try it in the
+mock: `/dev/game-mock.html?variant=junk`. Numbers to tune: CURSED_TONGUES / CURSED_PERIOD / CURSED_SPAN and the tint in
+`render/units.js`, the colours in `cursedFlameTexture`.
+
 For invulnerability, I want to try developing a visual that is close to the original game. The unit will have two ribbons rotating around them as if in 3D space. Ribbon can be considered a cylinder that is not very tall (thickness around 1/4 the size of a tile), that spins around its own axis. Colour should be gold. Addition, overlay, or a similar colour mixing setting can be used. Ribbon should fade transparent to gold to transparent, with 180 degrees being transparent. (the "back side") Ribbon rotates around 1 rotation per second, with the side closer to the camera moving left. Ribbons should be in opposite phase to each other. First ribbon's axis is screen +Y, then tilted 20 degrees left (counterclockwise around the Z axis that cuts through the screen) then 10 degrees toward the camera. Second ribbon is same but 20 degrees right instead of left.
+
+→ Claude (2026-10-16): built to this description (no such effect in our asset sources — see the answer to question 3). Any
+unit with the invulnerable flag gets two gold rings, drawn additively as 48 quads each: radius 0.42 tile, thickness 0.25
+tile, centred at 45 % of the model's height; the half facing away from the camera is drawn behind the model, the near
+half in front. One turn per second with the near side moving left, gold → transparent at 180° along the ribbon, the two
+half a turn apart, axes tilted ±20° then 10° toward the camera (`render/units.js InvulnRibbons`, numbers in `RIBBON`).
+Check: `RENDER_E2E=1 node --test test/render/invuln.browser.test.js` → `test/e2e/out/invuln-*.png`.
+
+→ Claude (2026-10-16, after Fish's look at it — "3× as many particles; blue on black reads badly; maybe the originium
+potion inverted, a cyan potion on white"): the Cursed Hammer's icon is now 源石溶剂 (Originium Solvent)'s vial drawn
+colour-inverted — a white plate with a cyan vial (field: the plate canvas inverted, `textures.js itemTexture { invert }`;
+DOM: the image inverted on a light tile, so the CSS flames keep their colour) — and the flame has 21 tongues on the field
+(`CURSED_TONGUES`), three times the blobs in the CSS layers. The purple tint is gone (the inversion replaces it).
+
+→ Claude (2026-10-16, Fish: "the ribbons look good; radius ~20 % wider for normal units; multi-tile bosses 3× as big"):
+radius 0.5 tile (was 0.42); a multi-tile boss (a 巨型 enemy, its data `hitArea` — 假想敌：胄 and the like) wears the
+ribbons three times as big, radius and thickness (`RIBBON.giant`). The browser test checks both (`invuln-boss.png`).
+
+→ Claude (2026-10-16): the Cursed Hammer is renamed **Toxic Waste** (Fish: "the new graphic is much more readable; rename
+it to Toxic Waste") — its name (有毒废料 / Toxic Waste), item id `fish_item_toxic_waste`, the code's constants and
+comments. The tag keeps its name, Objective: Junk. (The notes above still say "Cursed Hammer": they're the history.)
+
+Nerf Cursed Hammer so the -1 Funds doesn't apply on round 1. Currently it affects round 1, so you start with only 3 Funds, and it is much harder.
+
+→ Claude (2026-10-16): done — Junk 2's −1 starts from round 2.
+
+New cheat mod: Double initial LP
+
+New cheat mod: Start with one random operator of each tier
+
+This should make testing significantly faster.
+
+It's also unnecessary to set the score to 0 when cheats are used, since the cheat watermark is already there. I think it's better to not set the score to 0, so it can be shown on the end screen.
+
+→ Claude (2026-10-16): done, all three. Two new cheats in the rules dialog's Cheats section: **Double starting LP**
+(`doubleLp`: twice the strategy's LP) and **Start with one operator of each tier** (`tierStart`: at round 1, one random
+operator of each tier I–VI from the shared pool, on its own seeded stream so the match's other draws don't change; they
+land in the hand, overflow in the temporary hand). Both carry the "WITH CHEATS" watermark like the others. And the Risk
+is no longer zeroed with cheats: the result title shows it next to the watermark (`shared/rules.js ruleLabels`); the
+dialog's "Risk counts as 0" note is gone.

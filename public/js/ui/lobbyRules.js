@@ -14,7 +14,7 @@ import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
-import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, CURSED_HAMMER_NAME } from '../../../shared/ruleData.js';
+import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -28,6 +28,8 @@ export function ruleLabel(key, rules) {
     case 'extraDeploy': return t('部署上限 +{n}', { n: RULE_EXTRA_DEPLOY });
     case 'extraFunds': return t('每回合资金 +{n}', { n: RULE_EXTRA_FUNDS });
     case 'untimed': return t('行动阶段不限时');
+    case 'doubleLp': return t('初始目标生命翻倍');
+    case 'tierStart': return t('开局获得各阶干员');
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
     case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
@@ -70,8 +72,8 @@ export function riskText(key, level) {
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
     case 'ccJunk': return level >= 2
-      ? { short: t('目标：垃圾 {n}', { n: level }), full: t('未装备【{item}】时每回合收入-{n}', { item: t(CURSED_HAMMER_NAME), n: CC.junk.incomeLoss }) }
-      : { short: t('目标：垃圾 {n}', { n: level }), full: t('开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动', { item: t(CURSED_HAMMER_NAME), n: pct(-CC.junk.atkPct) }) };
+      ? { short: t('目标：垃圾 {n}', { n: level }), full: t('未装备【{item}】时每回合收入-{n}', { item: t(TOXIC_WASTE_NAME), n: CC.junk.incomeLoss }) }
+      : { short: t('目标：垃圾 {n}', { n: level }), full: t('开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动', { item: t(TOXIC_WASTE_NAME), n: pct(-CC.junk.atkPct) }) };
     case 'ccVengeance': return vengeanceText(level, enemyName);
     case 'ccFamiglia': return famigliaText(nodeOf(key, level), enemyName);
     case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);
@@ -174,7 +176,7 @@ function RiskGrid({ rules, editable, onSet }) {
   }
   return html`<div class="risk">
     <div class="risk__total"><b class="num">${t('风险 {n}', { n: labels.risk })}</b>
-      ${labels.cheats ? html`<span class="t-dim">${t('使用作弊时风险计为0')}</span>` : null}</div>
+      </div>
     <div class="risk__grid" style=${`--risk-cols:${col - 1}`}>
       ${cells.map(({ r, level, row, col: c, span, inForce }) => {
         const active = rules[r.key] === level;
@@ -371,6 +373,8 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     <${Section} title=${t('作弊')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
       <${Toggle} k="extraDeploy" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraDeploy', rules)} desc=${t('所有博士的部署上限 +{n}', { n: RULE_EXTRA_DEPLOY })} />
       <${Toggle} k="extraFunds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraFunds', rules)} desc=${t('每回合开始时额外获得 {n} 资金', { n: RULE_EXTRA_FUNDS })} />
+      <${Toggle} k="doubleLp" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('doubleLp', rules)} desc=${t('所有博士的初始目标生命翻倍')} />
+      <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
       ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
     <//>
     <${Section} title=${t('盟约模组')} note=${t('不影响结算标签')}>

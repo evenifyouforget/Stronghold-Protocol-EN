@@ -59,10 +59,11 @@ export const CC = Object.freeze({
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
   // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
-  // Junk 1: every player gets a Cursed Hammer at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
+  // Junk 1: every player gets Toxic Waste at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
   // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
   // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
-  junk: Object.freeze({ itemId: 'fish_item_cursed_hammer', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1041_acarm041' }),
+  // its icon: 源石溶剂 (Originium Solvent)'s vial, drawn colour-inverted — a cyan vial on white (Fish 2026-10-16)
+  junk: Object.freeze({ itemId: 'fish_item_toxic_waste', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1125_acarm125' }),
   // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
   // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
   // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
@@ -130,21 +131,24 @@ export function riskLeakWeight(rules, enemyKey) {
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
 
 
-/** msgids of the Cursed Hammer (Junk; translated by the client's `text`). */
-export const CURSED_HAMMER_NAME = N_('诅咒重锤');
-export const CURSED_HAMMER_DESC = N_('攻击力-50%。无法被销毁');
-export const CURSED_HAMMER_DESC_2 = N_('攻击力-50%。无法被销毁；未装备时每回合收入-1');
+/** msgids of the Toxic Waste (Junk; translated by the client's `text`). */
+export const TOXIC_WASTE_NAME = N_('有毒废料');
+export const TOXIC_WASTE_DESC = N_('攻击力-50%。无法被销毁');
+export const TOXIC_WASTE_DESC_2 = N_('攻击力-50%。无法被销毁；未装备时每回合收入-1');
 
-/** The Cursed Hammer's item record (ccJunk) in data/items.json's shape. */
+/** The Toxic Waste's item record (ccJunk) in data/items.json's shape. */
 function cursedHammerRecord(level, text) {
   const J = CC.junk;
-  const desc = text(level >= 2 ? CURSED_HAMMER_DESC_2 : CURSED_HAMMER_DESC);
+  const desc = text(level >= 2 ? TOXIC_WASTE_DESC_2 : TOXIC_WASTE_DESC);
   return {
     id: J.itemId, baseId: J.itemId, goldenId: null, isGolden: false, trapId: J.iconId, iconId: J.iconId, identifier: null,
-    name: text(CURSED_HAMMER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true, shopExcluded: true,
+    name: text(TOXIC_WASTE_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true, shopExcluded: true,
     shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1, giveBondId: null, givePowerId: null,
     canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc, descRaw: desc, buffs: [], params: {},
     category: 'STAT', kind: 'passive', family: null, implFormula: 'ATK% += −0.5 (server/sim/content/risk.js)', fork: true,
+    // drawn cursed: the icon colour-inverted and a sinking dark-blue flame (ui/gameComponents.js UnitThumb, render/units.js
+    // ItemView)
+    cursed: true,
   };
 }
 
@@ -168,7 +172,7 @@ export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === t
 export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
   const chess = {}, garrisons = {}, bonds = {}, items = {};
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items };
-  // SPA-CC Junk: the Cursed Hammer
+  // SPA-CC Junk: the Toxic Waste
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
   const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;

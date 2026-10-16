@@ -67,7 +67,7 @@
 
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
-import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
+import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, cursedFlameTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed, statusValueLabel } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
 
@@ -490,6 +490,9 @@ export class UnitView {
     // enemies: the official prefab's size factor (1 for operators, summons and enemies at the standard size)
     const def = this.isEnemy && ctx.lookupDef ? ctx.lookupDef(info) : null;
     this.modelK = this.isEnemy ? enemyModelScale(def) : 1;
+    // the invulnerability ribbons' size (InvulnRibbons): a multi-tile boss (a 巨型 enemy, its data `hitArea`) wears them
+    // RIBBON.giant times as big, so they go round it
+    this.ribbonK = this.isEnemy && def && def.hitArea ? RIBBON.giant : 1;
     // a fast enemy walks on its model's own Run cycle when it has one (PR #275 by @xcdoge: 猎狗pro, moveSpeed 1.9, Run_Loop
     // 0.53 s next to Move_Loop 0.80 s; also 深池侦察犬 1.7). [ASSUMED] the threshold: faster than the standard 1
     this.moveFast = this.isEnemy && Number(def?.stats?.moveSpeed) > 1;
@@ -580,6 +583,7 @@ export class UnitView {
     }
     this.body = new P.Container();
     this.root.addChild(this.body);
+    this.ribbons = null;                 // the invulnerability ribbons (InvulnRibbons), made the first time it is invulnerable
     this.fallback = new P.Sprite(P.Texture.EMPTY);
     this.fallback.anchor.set(0.5, 1);
     this.body.addChild(this.fallback);
@@ -843,19 +847,23 @@ export class UnitView {
     this.countText.visible = true;
   }
 
-  /** Equipped item pips (prep): list of item icon URLs. */
+  /** Equipped item pips (prep): list of item icon URLs (or { url, cursed }: the Toxic Waste's, drawn inverted). */
   setItems(urls) {
     const P = this.P;
     const list = Array.isArray(urls) ? urls.slice(0, 2) : [];
     while (this.itemPips.length > list.length) this.itemPips.pop().destroy();
-    list.forEach((u, i) => {
+    list.forEach((entry, i) => {
+      // an entry: the icon URL, or { url, cursed } (the Toxic Waste: its pip takes the purple cast)
+      const u = entry && typeof entry === 'object' ? entry.url : entry;
       let s = this.itemPips[i];
       if (!s) { s = new P.Sprite(P.Texture.EMPTY); s.anchor.set(0.5); this.hud.addChild(s); this.itemPips[i] = s; }
-      if (s._url === u) return;
+      const invert = !!(entry && typeof entry === 'object' && entry.cursed);
+      if (s._url === u && s._invert === invert) return;
       s._url = u;
+      s._invert = invert;
       const a = this.ctx.assets;
-      s.texture = itemTexture(u || 'none', null, 0x4ed8af);
-      if (u && a?.image) a.image(u).then((img) => { if (!s.destroyed && s._url === u) s.texture = itemTexture(u, img, 0x4ed8af); }, () => {});
+      s.texture = itemTexture(u || 'none', null, 0x4ed8af, { invert });
+      if (u && a?.image) a.image(u).then((img) => { if (!s.destroyed && s._url === u) s.texture = itemTexture(u, img, 0x4ed8af, { invert }); }, () => {});
     });
   }
 
@@ -1402,6 +1410,11 @@ export class UnitView {
       modelK: this.modelK, modelKY: this.modelKY,
     });
     this.screen.top = by - headTiles * s;
+    // invulnerable (无敌, UF.INVULN): two gold ribbons spinning around the model (InvulnRibbons, made on first need)
+    if (this.flags & UF.INVULN) {
+      if (!this.ribbons) this.ribbons = new InvulnRibbons(this.P, this.root, this.body);
+      this.ribbons.update(t, s * this.ribbonK, -headTiles * s * RIBBON.centre);
+    } else if (this.ribbons) this.ribbons.hide();
     this._updateHud(dt, s, bx, by - headTiles * s, alpha, t);
   }
 
@@ -1991,9 +2004,17 @@ export class ItemView {
     ctx.layers.shadow.addChild(this.shadow);
     this.root = new P.Container();
     ctx.layers.units.addChild(this.root);
-    this.plate = new P.Sprite(itemTexture(String(info.defId || 'item'), null, info.color || 0x9aa5a0));
+    // the SPA-CC Toxic Waste (item record `cursed`): the plate colour-inverted and the sinking flame on top, spilling
+    // past the plate
+    this.invert = !!info.cursed;
+    this.plate = new P.Sprite(itemTexture(String(info.defId || 'item'), null, info.color || 0x9aa5a0, { invert: this.invert }));
     this.plate.anchor.set(0.5, 1);
     this.root.addChild(this.plate);
+    this.flame = null;
+    if (info.cursed) {
+      this.flame = new CursedFlame(P);
+      this.root.addChild(this.flame.root);
+    }
     this.info.icon = null;
     this.setIcon(info.icon);
     this.hud = null;
@@ -2003,7 +2024,7 @@ export class ItemView {
     if (this.destroyed || !url || url === this.info.icon) return;
     this.info.icon = url;
     const a = this.ctx.assets;
-    if (a?.image) a.image(url).then((img) => { if (!this.destroyed && img && this.info.icon === url) this.plate.texture = itemTexture(String(this.info.defId), img, this.info.color || 0x9aa5a0); }, () => {});
+    if (a?.image) a.image(url).then((img) => { if (!this.destroyed && img && this.info.icon === url) this.plate.texture = itemTexture(String(this.info.defId), img, this.info.color || 0x9aa5a0, { invert: this.invert }); }, () => {});
   }
   setWorld(x, y, z = 0) { this.x = x; this.y = y; this.z = z; }
   /** A battle snapshot sample (syncBattle syncs every unit of the field): a hand item on a scouted prep board rides
@@ -2018,6 +2039,7 @@ export class ItemView {
     this.plate.scale.set(size / 128);
     this.plate.anchor.set(0.5, lifted ? 0.5 : 1);
     this.root.alpha = this.dimmed ? 0.35 : 1;
+    if (this.flame) this.flame.update(t, size, lifted ? 0 : -size / 2);
     placeOnGround(this.ctx, this.shadow, this.ctx.layers.shadow, this.y, this.z);
     const sh = cam.project(this.x, this.y, this.z, SH_P);
     this.shadow.position.set(sh.x, sh.y);
@@ -2035,6 +2057,109 @@ export class ItemView {
 }
 
 // =============================================================================================================
+
+/**
+ * The invulnerability ribbons (Fish 2026-10-16, after the original game's look): two gold rings around the unit, as if in
+ * 3D — each a short cylinder (thickness `thick` tiles, radius `radius` tiles — `giant` times both on a multi-tile boss —,
+ * centred `centre` of the model's height up)
+ * spinning about its own axis once per second, its near side moving left. Along a ribbon the colour fades from gold
+ * to transparent and back, transparent at 180° (its "back side"); the two are half a turn apart. Axes: screen up, tilted
+ * `tilt`° to the left (the first) or right (the second) about the screen's Z, then `toward`° toward the camera. Drawn
+ * additively: the half turned away from the camera behind the model, the near half in front.
+ */
+const RIBBON = Object.freeze({ radius: 0.5, thick: 0.25, centre: 0.45, perSec: 1, tilt: 20, toward: 10, segs: 48, alpha: 0.85, color: 0xffd34d, giant: 3 });
+
+/** A ribbon's frame (screen x right, y up, z toward the camera): its axis `a` and the ring's basis u, v. */
+function ribbonFrame(side) {
+  const d = Math.PI / 180;
+  const a = [-side * Math.sin(RIBBON.tilt * d) * Math.cos(RIBBON.toward * d), Math.cos(RIBBON.tilt * d) * Math.cos(RIBBON.toward * d), Math.sin(RIBBON.toward * d)];
+  const ul = Math.hypot(a[1], a[0]) || 1;
+  const u = [a[1] / ul, -a[0] / ul, 0];                       // a × z: in the screen plane
+  const v = [a[1] * u[2] - a[2] * u[1], a[2] * u[0] - a[0] * u[2], a[0] * u[1] - a[1] * u[0]]; // a × u
+  // spin so that the ring's nearest point (max z) moves toward −x
+  const tn = Math.atan2(v[2], u[2]);
+  const vx = -Math.sin(tn) * u[0] + Math.cos(tn) * v[0];
+  return { a, u, v, dir: vx > 0 ? -1 : 1 };
+}
+
+class InvulnRibbons {
+  constructor(P, root, body) {
+    this.back = new P.Graphics();
+    this.front = new P.Graphics();
+    for (const g of [this.back, this.front]) g.blendMode = P.BLEND_MODES.ADD;
+    const at = Math.max(0, root.getChildIndex(body));
+    root.addChildAt(this.back, at);
+    root.addChildAt(this.front, at + 2);                       // after the body (now one further down)
+    this.frames = [ribbonFrame(1), ribbonFrame(-1)];
+  }
+  hide() { this.back.clear(); this.front.clear(); }
+  /** @param {number} t seconds @param {number} s the tile size (px) @param {number} cy the ring centre's y in the root */
+  update(t, s, cy) {
+    this.back.clear();
+    this.front.clear();
+    const R = RIBBON.radius * s, h = (RIBBON.thick * s) / 2, n = RIBBON.segs;
+    this.frames.forEach((f, k) => {
+      const spin = f.dir * 2 * Math.PI * RIBBON.perSec * t;
+      const phase = k * Math.PI;                               // the two ribbons in opposite phase
+      const pt = (th, off) => {
+        const c = Math.cos(th), sn = Math.sin(th);
+        const x = R * (c * f.u[0] + sn * f.v[0]) + off * f.a[0];
+        const y = R * (c * f.u[1] + sn * f.v[1]) + off * f.a[1];
+        return [x, cy - y];
+      };
+      for (let i = 0; i < n; i++) {
+        const t0 = (i / n) * 2 * Math.PI, t1 = ((i + 1) / n) * 2 * Math.PI, tm = (t0 + t1) / 2;
+        const m = tm - spin + phase;                              // the ribbon's own angle at this place
+        const al = RIBBON.alpha * (1 + Math.cos(m)) / 2;
+        if (al < 0.02) continue;
+        const z = R * (Math.cos(tm) * f.u[2] + Math.sin(tm) * f.v[2]);
+        const g = z < 0 ? this.back : this.front;
+        const p0 = pt(t0, h), p1 = pt(t1, h), p2 = pt(t1, -h), p3 = pt(t0, -h);
+        g.beginFill(RIBBON.color, al);
+        g.drawPolygon([p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], p3[0], p3[1]]);
+        g.endFill();
+      }
+    });
+  }
+}
+
+/** The Toxic Waste's flame: tongues, the seconds one takes to cross (5 ± 1), the height it crosses (× the plate). */
+const CURSED_TONGUES = 21, CURSED_PERIOD = 5, CURSED_SPAN = 1.5;
+
+/**
+ * The Toxic Waste's flame (Fish 2026-10-16: "a gloomy sinking effect … like a flame overlay, but moving down instead of
+ * up, dark blue instead of red-yellow, and slow — around 5 s to cross the height; on top of the icon, so it can go
+ * outside the square"): CURSED_TONGUES soft tongues (textures.js cursedFlameTexture), each sinking from above the plate
+ * to below it over its own period (CURSED_PERIOD ± 1 s) from its own phase, swaying a little, its alpha rising and
+ * falling with the crossing — so different parts move at different speeds and the transparency keeps changing. Pure
+ * functions of the clock: nothing is spawned or freed while it runs.
+ */
+class CursedFlame {
+  constructor(P) {
+    this.root = new P.Container();
+    this.tongues = [];
+    const tex = cursedFlameTexture();
+    for (let i = 0; i < CURSED_TONGUES; i++) {
+      const sp = new P.Sprite(tex);
+      sp.anchor.set(0.5);
+      this.root.addChild(sp);
+      // spread evenly: phase, column, period and size differ per tongue (fixed, so every hammer looks alike; the golden
+      // ratio and coprime steps keep 21 of them from lining up)
+      this.tongues.push({ sp, phase: (i * 0.61803) % 1, col: ((i * 0.37) % 1) - 0.5, period: CURSED_PERIOD - 1 + ((i * 0.53) % 1) * 2, scale: 0.75 + ((i * 0.29) % 1) * 0.5 });
+    }
+  }
+  /** @param {number} t seconds @param {number} size the plate's on-screen size @param {number} cy the plate centre's y in the root */
+  update(t, size, cy) {
+    for (const g of this.tongues) {
+      const u = (t / g.period + g.phase) % 1;                    // 0 → 1 over the crossing
+      const sp = g.sp;
+      sp.position.set((g.col * 0.8 + Math.sin(t * 0.7 + g.phase * 6.28) * 0.06) * size, cy + (u - 0.5) * CURSED_SPAN * size);
+      const s = (size * 0.42 * g.scale) / 128;
+      sp.scale.set(s, s * (0.9 + 0.2 * Math.sin(t * 1.3 + g.phase * 9)));
+      sp.alpha = 0.75 * Math.sin(Math.PI * u);
+    }
+  }
+}
 
 /**
  * Battle device unit (kind 'device': crates, “双眼皮” turrets, unknown stage devices): a textured 3D box (the tile

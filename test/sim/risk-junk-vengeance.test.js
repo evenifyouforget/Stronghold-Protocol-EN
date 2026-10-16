@@ -1,4 +1,4 @@
-// test/sim/risk-junk-vengeance.test.js — the battle side of SPA-CC Junk (the Cursed Hammer's carrier ATK −50 %) and
+// test/sim/risk-junk-vengeance.test.js — the battle side of SPA-CC Junk (the Toxic Waste's carrier ATK −50 %) and
 // Vengeance (Invincible Blade 2 / 3 on the Reids the tag adds: HP / ATK, Status Resistance, damage reduction below half
 // HP, 15 s invulnerable after the revive, +100 ASPD and the immunities at 3), server/sim/content/risk.js and his kit.
 
@@ -10,7 +10,7 @@ import { CC } from '../../shared/ruleData.js';
 const DEFS = { enemies: { enemy_dummy: enemyRec({ key: 'enemy_dummy', hp: 1e9, speed: 0 }) } };
 const V = CC.vengeance;
 
-test('Junk: the Cursed Hammer\'s carrier has −50 % ATK, nobody else', () => {
+test('Junk: the Toxic Waste\'s carrier has −50 % ATK, nobody else', () => {
   const op = (items, rules) => {
     const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 100, seed: 2, flags: { rules },
       units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 3, items }] });
