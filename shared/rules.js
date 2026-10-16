@@ -60,6 +60,7 @@ export const RULES = Object.freeze([
   { key: 'ccDeepInfiltration', type: 'level', risk: [0, 1], category: 'risk' }, // DP generation −50 %
   { key: 'ccLowEfficiency', type: 'level', risk: [0, 1], category: 'risk' },  // redeployment time +75 %
   { key: 'ccLastLine', type: 'level', risk: [0, 1], category: 'risk' },       // the first leak each round: +2 LP, past the cap
+  { key: 'ccJunk', type: 'level', risk: [0, 1, 2], category: 'risk' },       // a Cursed Hammer for everyone (2: −1 income unequipped)
   { key: 'ccOzArts', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +50 RES after 50 % of its pool as Arts
   { key: 'ccOzPhys', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +5000 DEF after 50 % as Physical
   { key: 'ccLockout', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },  // final boss invulnerable 10 s every 68/28/18 %
@@ -67,6 +68,7 @@ export const RULES = Object.freeze([
   { key: 'ccFamiglia', type: 'level', risk: [0, 1, 2, 3, 2, 3], nodes: [null, 'cleaner', 'unending2', 'unending3', 'seasonal2', 'seasonal3'], parent: [0, 0, 1, 2, 1, 4], category: 'risk' },
   { key: 'ccPatriot', type: 'level', risk: [0, 1, 2, 3], nodes: [null, 'undying1', 'undying2', 'undying3'], parent: [0, 0, 1, 2], category: 'risk' },
   { key: 'ccDelegation', type: 'level', risk: [0, 1, 2, 3], nodes: [null, 'united1', 'united2', 'united3'], parent: [0, 0, 1, 2], category: 'risk' },
+  { key: 'ccVengeance', type: 'level', risk: [0, 1, 2, 3], nodes: [null, 'blade1', 'blade2', 'blade3'], parent: [0, 0, 1, 2], category: 'risk' },
 ].map((r) => Object.freeze(r)));
 
 const BY_KEY = new Map(RULES.map((r) => [r.key, r]));

@@ -11,6 +11,9 @@ import { tagHas, tagLevel } from '../../../shared/rules.js';
 /** The effect id of ccPatriot Undying 1's round-9 card (its bounty keeps it). */
 export const RISK_PATRIOT_CARD = 'risk:patriot';
 
+/** A player's total stacks: Σ of its alliance layers. */
+const stackTotal = (p) => Object.values(p.layers || {}).reduce((n, v) => n + (Number.isFinite(v) ? v : 0), 0);
+
 /** A bounty entry of an SPA-CC sub-wave: no Funds, one battle. */
 const riskCard = (id, key, count, extra = {}) => ({ id, roundsLeft: 1, card: { effectId: id, enemyKey: key, count, coin: 0, payout: 'kill', rounds: 1, ...extra } });
 
@@ -106,7 +109,20 @@ export class MatchInfra {
       out.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count));
     }
     out.push(...this.silencerBounties(ps));
+    const v = this.vengeanceCount([ps]);
+    if (v > 0) out.push(riskCard('risk:vengeance', CC.vengeance.key, v));
     return out;
+  }
+
+  /**
+   * ccVengeance: how many Reid, "Hateful Avenger" a battle gets — 1 per CC.vengeance.perStacks total stacks of `players`
+   * (Σ of their alliance layers; Invincible Blade 3: twice as many), at most 20 (a bounty card's cap).
+   */
+  vengeanceCount(players) {
+    const V = CC.vengeance;
+    if (!tagHas(this.rules, 'ccVengeance', 'blade1') || !this.gd.enemy(V.key)) return 0;
+    const stacks = players.reduce((n, p) => n + (p && p.alive ? stackTotal(p) : 0), 0);
+    return Math.min(20, Math.floor(stacks / V.perStacks) * (tagHas(this.rules, 'ccVengeance', 'blade3') ? 2 : 1));
   }
 
   /**
@@ -134,6 +150,9 @@ export class MatchInfra {
       const atkMul = has('united2') ? dg.atkMul.united2 : 1;
       for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
     }
+    // ccVengeance: by the stacks of every alive player, once per field
+    const v = this.vengeanceCount(this.alivePlayers());
+    if (v > 0) cards.push(riskCard('risk:vengeance', CC.vengeance.key, v, { leftFirst: true }));
     if (cards.length) out.set(first.playerId, cards);
     return out;
   }
@@ -143,9 +162,8 @@ export class MatchInfra {
     if (!tagHas(this.rules, 'ccFamiglia', 'cleaner') || !s.rounds.includes(this.round) || !this.gd.enemy(s.key)) return [];
     const alive = this.alivePlayers();
     if (!alive.length) return [];
-    const total = (p) => Object.values(p.layers || {}).reduce((n, v) => n + (Number.isFinite(v) ? v : 0), 0);
     let low = alive[0];
-    for (const p of alive) if (total(p) < total(low)) low = p;
+    for (const p of alive) if (stackTotal(p) < stackTotal(low)) low = p;
     if (low !== ps) return [];
     const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
     // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave

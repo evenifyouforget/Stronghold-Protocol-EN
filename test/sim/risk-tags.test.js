@@ -166,6 +166,10 @@ test('Delegation United 2: the sub-wave Degenbrecher charges while unblocked (+3
   h.run(0.2);
   dg.blockedBy = null;
   assert.ok(mul(dg) < 1 + CC.delegation.chargePct * 0.05, `reset when blocked: ${mul(dg)}`);
+  h.run(10);
+  h.b.applyStatus(dg, 'bind', { duration: 1, source: h.allies()[0], force: true });
+  h.run(0.2);
+  assert.ok(mul(dg) < 1 + CC.delegation.chargePct * 0.05, `reset when unable to move: ${mul(dg)}`);
   const off = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 1 } }, units: [] });
   off.step(1);
   const d1 = off.spawn(CC.delegation.degen, { pos: [10, 9], routeIndex: 0, mods: { speedMul: 0.0001, bountyId: `risk:delegation:${CC.delegation.degen}` } });

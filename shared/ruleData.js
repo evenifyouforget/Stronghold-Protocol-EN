@@ -59,6 +59,19 @@ export const CC = Object.freeze({
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
   // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
+  // Junk 1: every player gets a Cursed Hammer at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
+  // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
+  // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
+  junk: Object.freeze({ itemId: 'fish_item_cursed_hammer', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1041_acarm041' }),
+  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
+  // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
+  // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
+  // after his revive. 3: twice as many, +100 ASPD, below 50 % HP 60 % less damage and immune to the listed statuses.
+  vengeance: Object.freeze({
+    key: 'enemy_1539_reid', perStacks: 300, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
+    reviveInvincible: 15, aspd: 100,
+    immune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
+  }),
   famiglia: Object.freeze({
     max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0.25, lateFrom: 10, lateShare: 0.75,
     atkPct: 0.2, defPct: 0.15,
@@ -86,13 +99,13 @@ export const CC = Object.freeze({
   }),
   // Delegation: the sub-wave of the final boss round(s), once per field; United 2 — the final boss cannot die while a
   // Degenbrecher lives, and she charges: move speed +up to chargePct while unblocked, reached after chargeSeconds, reset
-  // when blocked; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
+  // when blocked or unable to move; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
   // 300 / 500 %, Cloned 3 gone)
   delegation: Object.freeze({
     wave: Object.freeze([
       Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
-      Object.freeze({ key: 'enemy_1387_winshd', count: 10 }),
-      Object.freeze({ key: 'enemy_1389_winbab_2', count: 10 }),
+      Object.freeze({ key: 'enemy_1387_winshd', count: 5 }),
+      Object.freeze({ key: 'enemy_1389_winbab_2', count: 5 }),
     ]),
     degen: 'enemy_1525_blkswb', // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
     hpMul: Object.freeze({ united1: 2, united2: 3, united3: 5 }), atkMul: Object.freeze({ united2: 1.5 }),
@@ -117,6 +130,24 @@ export function riskLeakWeight(rules, enemyKey) {
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
 
 
+/** msgids of the Cursed Hammer (Junk; translated by the client's `text`). */
+export const CURSED_HAMMER_NAME = N_('诅咒重锤');
+export const CURSED_HAMMER_DESC = N_('攻击力-50%。无法被销毁');
+export const CURSED_HAMMER_DESC_2 = N_('攻击力-50%。无法被销毁；未装备时每回合收入-1');
+
+/** The Cursed Hammer's item record (ccJunk) in data/items.json's shape. */
+function cursedHammerRecord(level, text) {
+  const J = CC.junk;
+  const desc = text(level >= 2 ? CURSED_HAMMER_DESC_2 : CURSED_HAMMER_DESC);
+  return {
+    id: J.itemId, baseId: J.itemId, goldenId: null, isGolden: false, trapId: J.iconId, iconId: J.iconId, identifier: null,
+    name: text(CURSED_HAMMER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true, shopExcluded: true,
+    shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1, giveBondId: null, givePowerId: null,
+    canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc, descRaw: desc, buffs: [], params: {},
+    category: 'STAT', kind: 'passive', family: null, implFormula: 'ATK% += −0.5 (server/sim/content/risk.js)', fork: true,
+  };
+}
+
 /** The Alliance Modules' texts (the rules dialog, and the alliance's own text while the module is on): {bond} = the
  *  alliance's name, {list} = the names of LATERANO_B_LIST. */
 export const LATERANO_B_TEXT = N_('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）');
@@ -125,18 +156,20 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0));
 
 /**
- * The records `rules` change: `{ chess: { [id]: record }, garrisons: { [id]: record } }` — new objects, the inputs are not
+ * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
  * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
  * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
 export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
-  const chess = {}, garrisons = {}, bonds = {};
-  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds };
+  const chess = {}, garrisons = {}, bonds = {}, items = {};
+  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items };
+  // SPA-CC Junk: the Cursed Hammer
+  if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
   const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;
   if (investor) {
@@ -192,5 +225,5 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
       };
     }
   }
-  return { chess, garrisons, bonds };
+  return { chess, garrisons, bonds, items };
 }

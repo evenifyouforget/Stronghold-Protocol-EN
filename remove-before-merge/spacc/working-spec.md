@@ -2,14 +2,74 @@
 
 Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
 
-State as of 2026-10-15, branch `wip/famiglia` (on `main`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
+State as of 2026-10-15, branch `wip/vengeance-junk` (on `wip/famiglia`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
 cheat on, the total Risk counts as 0.
 
-**Name** is the tag's player-facing name (blank = not named yet). The **current label** is the placeholder shown on the
-grid tile today.
+The tags' names are Fish's (the Spec below); the grid's tiles show them (see "Tile names"). The **Name** / **Current
+label** lines of the older notes predate that.
 
-## Implemented tags
+## Spec (Fish's)
+
+The tags as Fish designs them — the source of truth; the implementation notes below follow it. (Merged in from
+`remove-before-merge/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
+
+### Clarifications
+
+Sub-waves added to all fields should be only one per field, not one per side. Path should all start going leftward, then alternate left and right per loop (rather than going left every loop) (for fields with 2 players alive).
+
+### General
+
+- Objective: Investor - Operators on the bench no longer count toward activating Investor
+- Objective: Swift - Swift formula nerfed from 20 + 0.35 × stacks to 20 + 0.25 × stacks
+- Objective: Foresight - Foresight operators have -20 ASPD
+- Objective: Strategy - All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
+- Objective: Intern - Starting on round 3, the first tier 1 unit you buy that round costs 1 more
+- Originium Zone: Arts - Final boss gains 50 RES after taking 50% max HP as Arts damage
+- Originium Zone: Physical - Final boss gains 5000 DEF after taking 50% max HP as Physical damage
+- Originium Zone: Activation 1/2/3 - Final boss gains +50/150/400% max HP and +15/25/50% ATK
+- Originium Zone: Lockout 1/2/3 - Final boss becomes invulnerable for 10 seconds (in-game time) every 68/28/18% max HP lost
+- Environment: Suffocation 1/2/3 - Operators' auto recovery skills gain SP slower by 0.2/0.5/0.8 SP/s
+- Objective: Barge 1 - Upgrading barge from tier 4 to tier 5 costs 2 additional Funds
+- - Objective: Barge 2 - Also affects tier 5 to tier 6, and penalty increased to 3 Funds
+- Originium Zone: Elements 1/2 - Leader enemies have 50/90% Physical and Arts DR while not under an elemental burst effect.
+- Objective: Deep Infiltration - DP generation rate reduced by 50%
+- Objective: Low Efficiency - Friendly units have their redeployment time increased by 75%
+- Objective: Last Line of Defense - First leak each round deducts an additional 2 life points. Applies even if Unite Phase has no leaks. Ignores 10 life points loss per round limit.
+- Objective: Junk 1 - At the start of the match, all players receive a Cursed Hammer: Cannot be destroyed, equipped operator has -50% ATK, does not have any interaction with Damazti Isomorph.
+- - Objective: Junk 2 - Cursed Hammer additionally reduces income for the round by 1 if not equipped.
+
+### Famiglia group (pick one)
+
+- Famiglia: Cleaner 1 - On rounds 10~13, the player with the least total stacks will have 5 Famiglia Shadow Silencer added to their wave.
+- - Famiglia: Unending 2 (2 risk) - Blood Debt and Asset Liquidations are permanently active, for everyone (Asset Liquidations does not summon more Famiglia Shadow Silencer)
+- - Famiglia: Unending 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
+- - Famiglia: Seasonal 2 (2 risk) - Blood Debt is permanently active, for everyone. Blood Debt starts 25% full. Starting on round 10, Blood Debt starts 75% full. (Asset Liquidation summons Famiglia Shadow Silencer as normal)
+- - Famiglia: Seasonal 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
+
+This branch is the tradeoff between having all enemies constantly buffed, or a risk of spawning more Famiglia Shadow Silencer for everyone due to Asset Liquidation triggering.
+
+### Patriot group (pick one)
+
+- Patriot: Undying 1 - Round 9 improv always offers Patriot as an option, worth 0 Funds (no bounty). Not taking Patriot causes final boss to have +200% max HP. Patriot costs 5 life points if leaked. Patriot uses Level 1 stats.
+- - Patriot: Undying 2 - In Marching Stance, <Patriot> receives 90% less physical and Arts damage from Operators who are not blocking him. <Patriot> gains +200% HP, is immune to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure while in Marching Stance, and Movement Speed cannot be lower than base speed (both phases). Penalty for not taking Patriot also gives final boss +100% ATK.
+- - Patriot: Undying 3 - Adds 5 Guerrilla Shieldguard to the sub-wave. Adds the sub-wave again to final boss round(s). (all fields, not just the player who selected Patriot) All enemies have +40% MSPD and +40 ASPD while Patriot is alive.
+
+### Delegation group (pick one)
+
+- Delegation: United 1 - Degenbrecher, 5 Delegation Shieldbearer, and 5 Delegation Centurion Champion are added to the final boss round(s). Degenbrecher uses Level 1 stats. Degenbrecher, Delegation Shieldbearer, and Delegation Centurion Champion from this sub-wave have 200% max HP.
+- Delegation: United 2 - Final boss cannot die as long as Degenbrecher is alive. Sub-wave max HP increased to 300%, and ATK increased to 150%. Degenbrecher gains MSPD while unblocked, up to +300% after 10 seconds, resetting when blocked or unable to move.
+- Delegation: United 3 - Sub-wave max HP increased to 500%. Degenbrecher's Momentum Murder triggers every 9% max HP instead of 25%. Degenbrecher has a hard HP gate every 9% max HP, and cannot lose further HP until she finishes casting Momentum Murder.
+
+### Vengeance group (pick one)
+
+Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (as known by players). Not the mid-tier mob. It's probably best for the in-game text to say Reid, "Hateful Avenger" for clarity even though that's not the official name.
+
+- Vengeance: Invincible Blade 1 - At battle start, add 1 Hateful Avenger to the wave for every 300 total stacks the player has. In final boss round(s), Hateful Avenger is added to every field based on total stacks across all players.
+- Vengeance: Invincible Blade 2 - Hateful Avengers have +150% max HP and +50% ATK. Hateful Avengers have Status Resistance, 30% Physical and Arts DR when at <50% HP, and are invulnerable for 15 seconds after revival.
+- Vengeance: Invincible Blade 3 - Spawns twice as many Hateful Avengers. Hateful Avengers have +100 ASPD. When Hateful Avengers are below 50% HP, they have 60% Physical and Arts DR and immunity to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure.
+
+## Implementation notes
 
 ### 1. `ccInvestorBench`
 
@@ -150,14 +210,37 @@ grid tile today.
 
 ### 18. `ccDelegation` (group: United 1 / 2 / 3, a chain since 2026-10-15)
 
-- **United 1** (Risk 1): in the final boss rounds, every field gets 1 Degenbrecher, 10 Delegation Shieldbearers and 10
+- **United 1** (Risk 1): in the final boss rounds, every field gets 1 Degenbrecher, 5 Delegation Shieldbearers and 5
   Delegation Centurion Champions, at 200 % of their HP that round. This Degenbrecher uses her Level 1 stats (45000 HP,
   1000 ATK, 800 DEF); a bounty Degenbrecher in a normal round keeps Level 0.
 - **United 2** (Risk 2): the final boss cannot die while a Degenbrecher lives on any field (its pool stops at 1 HP).
   The sub-wave has 300 % HP and 150 % ATK. Degenbrecher charges: while unblocked her move speed climbs to +300 % over
-  10 s, back to normal when she is blocked.
+  10 s, back to normal when she is blocked or can't move (stunned, frozen, asleep, levitated, bound).
 - **United 3** (Risk 3): the sub-wave has 500 % HP. Her Momentum Murder comes every 9 % of her HP (normally 25 %), and
   each step is a hard gate: she loses no HP until the cast ends. (Cloned 3 is gone.)
+
+### 19. `ccJunk` (Objective: Junk 1 / 2, prototype)
+
+- **Junk 1** (Risk 1): every player starts with a **Cursed Hammer** (a Fish Edition item, made at run time; the Victorian
+  Hammer's icon). Its carrier has −50 % ATK. It cannot be destroyed: not sold (no item can be), not destroyed by the
+  player (refused), never the item a third equip replaces (picking it is refused; the default "oldest" skips it), never
+  expiring in the temporary hand. (One edge left: an item coming back off an operator with the hand and temporary hand
+  both full is lost, the Cursed Hammer too — the same for every item.) It gives no
+  alliance, so it has no interaction with the Damazti Isomorph.
+- **Junk 2** (Risk 2): a round's income is 1 lower while the Cursed Hammer is in the hand or temporary hand (not
+  equipped).
+
+### 20. `ccVengeance` (Vengeance: Invincible Blade 1 / 2 / 3, prototype)
+
+Reid, "Hateful Avenger" (`enemy_1539_reid`, the leader), shown in the tag texts as `Reid, <his name>`.
+
+- **Invincible Blade 1** (Risk 1): every normal battle gets 1 Reid per 300 total stacks of that player (at most 20). In
+  the final boss rounds: by the total stacks of all alive players, once per field, on the left-first route.
+- **Invincible Blade 2** (Risk 2): those Reids have +150 % max HP, +50 % ATK, Status Resistance, 30 % less Physical /
+  Arts damage below 50 % HP, and are invulnerable for 15 s after their revive.
+- **Invincible Blade 3** (Risk 3): twice as many, +100 ASPD; below 50 % HP 60 % less damage instead and immune to Slow,
+  Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure.
+- Only the Reids the tag adds get these; a Reid that comes as an ordinary bounty keeps his data.
 
 ### Sub-waves on the final boss fields (Patriot Undying 3, Delegation)
 
@@ -169,8 +252,8 @@ mobs take (the other half go right first). A one-player field's routes all go le
 
 The Risk grid's tiles show the tags' names (Fish's, "part of the branding"): Objective: Investor / Swift / Foresight /
 Strategy / Intern / Barge 1–2 / Deep Infiltration / Low Efficiency / Last Line of Defense, Environment: Suffocation 1–3,
-Originium Zone: Arts / Physical / Activation 1–3 / Lockout 1–3 / Elements 1–2, Famiglia: Cleaner 1 / Unending 2–3 /
-Seasonal 2–3, Patriot: Undying 1–3, Delegation: United 1–3. English is Fish's wording; the Chinese source strings are
+Originium Zone: Arts / Physical / Activation 1–3 / Lockout 1–3 / Elements 1–2, Objective: Junk 1–2, Famiglia: Cleaner 1
+/ Unending 2–3 / Seasonal 2–3, Patriot: Undying 1–3, Delegation: United 1–3, Vengeance: Invincible Blade 1–3. English is Fish's wording; the Chinese source strings are
 translations of it, and Japanese / Korean / Traditional Chinese fall back to the Chinese until someone translates them.
 
 ## How the groups work
@@ -241,13 +324,38 @@ See https://arknights.wiki.gg/wiki/Blood_Ledger
 → Answered (2026-10-15): built as Famiglia Unending / Seasonal above. Fish: Unending = always in Liquidation, Seasonal =
 the running gauge; the Ledger is fresh every battle and runs in every battle.
 
+2. For Cursed Hammer, how is it drawn? Is the current convention to serve a png? Do we have postprocessing effects available ex. screenspace distortion or an animated particle overlay? What solution to make it visually distinct would avoid undue code maintenance problems?
+
+   → Claude: item icons are PNGs from the asset manifest (`data/assets.json` `items`: icon id → `/assets/…` URL, downloaded
+   by `fetch-assets`), drawn as plain `<img>` in the DOM — the hand, shop, detail panel, choice cards, the 2D fallback
+   board. The 3D battle view (Pixi) never draws item icons. The Cursed Hammer reuses the Victorian Hammer's icon, so it
+   currently looks identical. The DOM side has CSS only: filters (hue-rotate, saturate, brightness, drop-shadow), CSS
+   animations, `::after` overlays; screen-space distortion is possible with SVG filters but heavier and browser-
+   inconsistent. Pixi has particles / filters, but items aren't there. Suggestion, the way golden items already work
+   (just an `is-golden` class: gold border + glow): the hammer's generated record gets `cursed: true`, the ~5 components
+   that draw an item icon add `is-cursed` next to `is-golden`, and one CSS rule gives it a dark-red / purple hue shift,
+   darkening and a slow pulsing red glow (optionally a small corner glyph via `::after`). One flag, one rule, a one-line
+   hook per place, no assets to maintain. Custom art would look best but needs an image source and the asset pipeline.
+
+3. Is there any current visual representation of invulnerability?
+
+   → Claude: only a status icon: a unit with the invulnerable flag (`UF.INVULN` in the snapshot) gets a gold-rimmed disc
+   among the up to 4 status icons above it (`render/units.js _iconKeys`, drawn in `render/textures.js`). That covers
+   Reid's 15 s, Patriot's / Degenbrecher's revive invincibility and the final boss during a Lockout. Nothing on the
+   model itself (no tint, no shield bubble), and the boss bar in the phase capsule doesn't show it. If Lockout needs to
+   read better: a lock marker on the boss bar while the pool is invulnerable, and/or a tint on the model (cheap in
+   Pixi).
+
 ## Backlog (ideas not built yet)
 
-| Idea                                                                           | Risk  | Status                                                   |
-| ------------------------------------------------------------------------------ | ----- | -------------------------------------------------------- |
-| Vengeance group                                                                |       | Fish is rewriting it (the mob Hateful Avenger, not Reid) |
-| Final round: Rosmontis, Simulated Sentry joins                                 | 1 / 2 | needs a new enemy (kit with Matrix)                      |
+| Idea                                           | Risk  | Status                              |
+| ---------------------------------------------- | ----- | ----------------------------------- |
+| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
 
 ## New suggestions
 
-(add here)
+UI tweak for Cursed Hammer: make the "Destroy" button greyed out and unclickable, and change the text to "Cannot be destroyed".
+
+I want to try developing a visual for the Cursed Hammer that makes it stand out more and not look like a buff item. I'm thinking of a gloomy sinking effect, which could be done with a flame-like overlay (so with varying transparency, and different parts moving at different speeds), but moving down instead of up, dark blue instead of red~yellow, and slow (takes around 5 seconds to cross the height). Flame should be on top of the icon rather than inside it, so it can go outside the square. Not sure if this would be accomplished with particle systems or something else. For the sprite itself, we can give it a purple tint.
+
+For invulnerability, I want to try developing a visual that is close to the original game. The unit will have two ribbons rotating around them as if in 3D space. Ribbon can be considered a cylinder that is not very tall (thickness around 1/4 the size of a tile), that spins around its own axis. Colour should be gold. Addition, overlay, or a similar colour mixing setting can be used. Ribbon should fade transparent to gold to transparent, with 180 degrees being transparent. (the "back side") Ribbon rotates around 1 rotation per second, with the side closer to the camera moving left. Ribbons should be in opposite phase to each other. First ribbon's axis is screen +Y, then tilted 20 degrees left (counterclockwise around the Z axis that cuts through the screen) then 10 degrees toward the camera. Second ribbon is same but 20 degrees right instead of left.

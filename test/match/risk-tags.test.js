@@ -148,8 +148,8 @@ test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5,
   const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
   const u1 = byKey(wave(1));
   assert.equal(u1[dg.degen].count, 1);
-  assert.equal(u1[dg.wave[1].key].count, 10);
-  assert.equal(u1[dg.wave[2].key].count, 10);
+  assert.equal(u1[dg.wave[1].key].count, 5);
+  assert.equal(u1[dg.wave[2].key].count, 5);
   assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2, atkMul: 1 });
   assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
   assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
@@ -249,4 +249,85 @@ test('the battle\'s live leak count weighs a Patriot like the settlement (the HU
   const fake = (rules) => ({ flags: { rules }, _perPlayer: { p_0: { leaked: [{ enemyKey: CC.patriot.key, counted: true }, { enemyKey: 'enemy_x', counted: true }] } } });
   assert.equal(battleProgress(fake({ ccPatriot: 1 })).leaks, CC.patriot.leakLp + 1);
   assert.equal(battleProgress(fake({})).leaks, 2);
+});
+
+const cursedIn = (ps) => [...ps.hand, ...ps.temp].filter((p) => p && p.kind === 'item' && p.id === CC.junk.itemId);
+
+test('ccJunk 1: everyone starts with a Cursed Hammer; it never expires in the temp hand and is never replaced away', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccJunk: 1 } }).start();
+  try {
+    h.toPrep(1);
+    for (const id of ['p_0', 'p_1']) assert.equal(cursedIn(h.ps(id)).length, 1, id);
+    const ps = h.ps('p_0');
+    const rec = h.m.gd.item(CC.junk.itemId);
+    assert.equal(rec.giveBondId, null, 'no 变形同构体 pairing');
+    assert.equal(rec.hideInShop, true);
+    // in the temp hand past its deadline: kept
+    const [hammer] = cursedIn(ps);
+    const loc = ps.find(hammer.uid);
+    ps._detach(loc);
+    const slot = ps.temp.indexOf(null) >= 0 ? ps.temp.indexOf(null) : 0;
+    ps.temp[slot] = hammer;
+    ps.prepsEnded = 1e6;
+    ps.resolveTemp();
+    assert.ok(ps.find(hammer.uid), 'still there after the temp deadline');
+    // equipped next to another item, then a third item: the other one goes, the hammer stays
+    const opId = h.m.gd.visibleChess.find((id) => h.m.gd.tierOf(id) === 1 && !h.m.gd.chess(id).isGolden);
+    const op = ps.newPiece('chess', opId);
+    assert.ok(ps.stow(op, { allowTemp: true }));
+    const items = Object.keys(h.m.data.items).filter((id) => h.m.gd.item(id)?.itemType === 'EQUIP' && !h.m.gd.item(id).isGolden && id !== CC.junk.itemId && !String(h.m.gd.item(id).kind).startsWith('consume'));
+    const [a, b] = [items[0], items[5]].map((id) => { const p = ps.newPiece('item', id); ps.stow(p, { allowTemp: true }); return p; });
+    assert.equal(ps.equip(hammer.uid, op.uid).ok, true);
+    assert.equal(ps.equip(a.uid, op.uid).ok, true);
+    assert.ok(ps.equip(b.uid, op.uid, hammer.uid).error, 'picking the hammer to replace is refused');
+    assert.equal(ps.equip(b.uid, op.uid).ok, true, 'the default replaces the other item');
+    assert.ok(!op.items.some((x) => x.uid === a.uid), 'the other item went');
+    assert.ok(op.items.some((x) => x.id === CC.junk.itemId), 'the hammer stays on');
+    // and the player cannot destroy it in the hand (g.destroy): sell its carrier to get it back there
+    const h2 = ps.newPiece('item', CC.junk.itemId);
+    ps.stow(h2, { allowTemp: true });
+    assert.ok(ps.destroy(h2.uid).error, 'destroying the Cursed Hammer is refused');
+    assert.ok(ps.find(h2.uid), 'still there');
+  } finally { h.m.dispose(); }
+});
+
+test('ccJunk 2: a round\'s income −1 while the Cursed Hammer is not equipped', () => {
+  const income = (rules, equip) => {
+    const h = makeMatch({ mode: 'solo', seed: 3, rules }).start();
+    try {
+      h.toPrep(1);
+      const ps = h.ps('p_0');
+      if (equip) {
+        const op = ps.newPiece('chess', h.m.gd.visibleChess.find((id) => h.m.gd.tierOf(id) === 1 && !h.m.gd.chess(id).isGolden));
+        ps.stow(op, { allowTemp: true });
+        const [hammer] = cursedIn(ps);
+        if (hammer) assert.equal(ps.equip(hammer.uid, op.uid).ok, true);
+      }
+      const before = ps.funds;
+      ps.startRound(2);
+      return ps.funds - before;
+    } finally { h.m.dispose(); }
+  };
+  const base = income({}, false);
+  assert.equal(income({ ccJunk: 1 }, false), base, 'Junk 1: no income loss');
+  assert.equal(income({ ccJunk: 2 }, false), base - CC.junk.incomeLoss);
+  assert.equal(income({ ccJunk: 2 }, true), base, 'equipped: no loss');
+});
+
+test('ccVengeance: Reids by the player\'s stacks in a normal battle (×2 at level 3); the final rounds by everyone\'s, once per field', () => {
+  const V = CC.vengeance;
+  for (const [level, mul] of [[1, 1], [3, 2]]) {
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccVengeance: level } });
+    try {
+      h.m.round = 5;
+      const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
+      p0.layers = { yanShip: 250, kjeragShip: 200 }; p1.layers = { yanShip: 150 };
+      const reids = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === V.key).reduce((n, b) => n + b.card.count, 0);
+      assert.equal(reids(p0), 1 * mul, `level ${level}: 450 stacks`);
+      assert.equal(reids(p1), 0, `level ${level}: 150 stacks`);
+      const sub = h.m.bossSubWave(['p_0', 'p_1']).get('p_0').filter((b) => b.card.enemyKey === V.key);
+      assert.equal(sub[0].card.count, 2 * mul, '600 stacks over both');
+      assert.ok(sub[0].card.leftFirst);
+    } finally { h.m.dispose(); }
+  }
 });

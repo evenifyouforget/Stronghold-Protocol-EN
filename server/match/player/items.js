@@ -9,6 +9,10 @@ import { tileKey, inField, parseDir } from '../board.js';
 import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
+import { CC } from '../../../shared/ruleData.js';
+
+/** The item a full carrier loses by default: the oldest that is not the Cursed Hammer (SPA-CC Junk). */
+const replaceableIndex = (items) => Math.max(0, items.findIndex((x) => x.id !== CC.junk.itemId));
 
 export class PlayerItems {
   /**
@@ -29,6 +33,9 @@ export class PlayerItems {
     const item = iloc.piece;
     const target = tloc.piece;
     if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) return fail(ERR.BAD_TARGET, 'replace: not equipped on the target');
+    // SPA-CC Junk: the Cursed Hammer is never the replaced (destroyed) item
+    if (replaceUid != null && (target.items || []).some((x) => x.uid === replaceUid && x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Cursed Hammer cannot be replaced');
+    if ((target.items || []).length >= this.gd.equipPerChess && (target.items || []).every((x) => x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Cursed Hammer cannot be replaced');
     const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
     if (consume) {
       const key = 'item:' + itemKey(item.id);
@@ -80,7 +87,7 @@ export class PlayerItems {
     target.items = target.items || [];
     while (target.items.length >= this.gd.equipPerChess) {
       const i = replaceUid != null ? target.items.findIndex((x) => x.uid === replaceUid) : -1;
-      const [old] = target.items.splice(i >= 0 ? i : 0, 1);
+      const [old] = target.items.splice(i >= 0 ? i : replaceableIndex(target.items), 1);
       replaceUid = null;
       this.m.dispatchItem(this, old, target, 'onDestroy', { item: old, holder: target, reason: 'replace' });
     }
@@ -95,7 +102,7 @@ export class PlayerItems {
     target.items = target.items || [];
     if (target.items.length < this.gd.equipPerChess) return null;
     const i = replaceUid != null ? target.items.findIndex((x) => x.uid === replaceUid) : -1;
-    const idx = i >= 0 ? i : 0;
+    const idx = i >= 0 ? i : replaceableIndex(target.items);
     const [piece] = target.items.splice(idx, 1);
     return { piece, idx };
   }
@@ -141,6 +148,7 @@ export class PlayerItems {
     const loc = this.find(uid);
     if (!loc || loc.piece.kind !== 'item') return fail(ERR.BAD_TARGET, 'only items can be destroyed');
     if (loc.area === 'equipped') return fail(ERR.BAD_TARGET, 'equipped items are locked');
+    if (loc.piece.id === CC.junk.itemId) return fail(ERR.BAD_TARGET, 'the Cursed Hammer cannot be destroyed'); // SPA-CC Junk
     this._detach(loc);
     this.m.dispatchItem(this, loc.piece, loc.holder || null, 'onDestroy', { item: loc.piece, holder: loc.holder || null, reason: 'player' });
     this.recompute();

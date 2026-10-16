@@ -7,6 +7,8 @@
 // the player state).
 
 import { RULE_EXTRA_FUNDS } from '../../../shared/constants.js';
+import { tagLevel } from '../../../shared/rules.js';
+import { CC } from '../../../shared/ruleData.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
 
@@ -22,7 +24,12 @@ export class PlayerRound {
     const nonNeg = (v) => (Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0);
     // extraFunds lobby rule: added after the onIncome handlers, so nothing withholds or rewrites it
     const extra = this.m.rules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
-    this.addFunds(nonNeg(ev.income) + nonNeg(ev.pending) + extra, { reason: 'income' });
+    // SPA-CC Junk: everyone's Cursed Hammer at the start (no shop stock: made, not drawn); Junk 2: income −1 while it is
+    // not equipped (in the hand or the temporary hand)
+    const junk = tagLevel(this.m.rules, 'ccJunk');
+    if (junk > 0 && r === 1 && this.gd.item(CC.junk.itemId)) this.stow(this.newPiece('item', CC.junk.itemId), { allowTemp: true });
+    const cursed = junk >= 2 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
+    this.addFunds(Math.max(0, nonNeg(ev.income) - cursed) + nonNeg(ev.pending) + extra, { reason: 'income' });
     // temp is NOT wiped here: the last prep's deadline resolved what the player could act on (endPrep); what overflowed
     // after it (battle-result grants, SETTLE merges, returned equipment) is shown and usable in this prep (tempDue).
     // Likewise reward offers of the last prep already expired at its end; what is still queued was earned after it —

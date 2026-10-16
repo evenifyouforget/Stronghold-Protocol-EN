@@ -14,7 +14,7 @@ import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
-import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT } from '../../../shared/ruleData.js';
+import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, CURSED_HAMMER_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -69,6 +69,10 @@ export function riskText(key, level) {
     case 'ccOzArts': return { short: t('源石区域：法术'), full: t('最终领袖受到的法术伤害累计达到其最大生命值的{p}%后，法术抗性+{n}', { p: pct(CC.ozArts.share), n: CC.ozArts.res }) };
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
+    case 'ccJunk': return level >= 2
+      ? { short: t('目标：垃圾 {n}', { n: level }), full: t('未装备【{item}】时每回合收入-{n}', { item: t(CURSED_HAMMER_NAME), n: CC.junk.incomeLoss }) }
+      : { short: t('目标：垃圾 {n}', { n: level }), full: t('开局时每名博士获得【{item}】：携带者攻击力-{n}%，无法被销毁，与变形同构体没有互动', { item: t(CURSED_HAMMER_NAME), n: pct(-CC.junk.atkPct) }) };
+    case 'ccVengeance': return vengeanceText(level, enemyName);
     case 'ccFamiglia': return famigliaText(nodeOf(key, level), enemyName);
     case 'ccPatriot': return patriotText(nodeOf(key, level), enemyName);
     case 'ccDelegation': return delegationText(nodeOf(key, level), enemyName);
@@ -77,6 +81,17 @@ export function riskText(key, level) {
 }
 
 const nodeOf = (key, level) => ruleOf(key)?.nodes?.[level] ?? null;
+
+function vengeanceText(level, enemyName) {
+  const V = CC.vengeance;
+  const name = t('里德，{name}', { name: enemyName(V.key) });
+  switch (level) {
+    case 1: return { short: t('复仇：无敌之刃 1'), full: t('每场作战开始时，博士的盟约层数之和每有{n}层，作战中额外出现1名【{name}】；最终领袖回合按所有博士的层数之和计算，每个战场1组', { n: V.perStacks, name }) };
+    case 2: return { short: t('复仇：无敌之刃 2'), full: t('【{name}】最大生命值+{hp}%，攻击力+{atk}%，获得抵抗；生命值低于{low}%时受到的物理与法术伤害-{dr}%；重生后{s}秒内无敌', { name, hp: pct(V.hpPct), atk: pct(V.atkPct), low: pct(V.lowHp), dr: pct(V.lowDr2), s: V.reviveInvincible }) };
+    case 3: return { short: t('复仇：无敌之刃 3'), full: t('【{name}】数量翻倍，攻击速度+{aspd}；生命值低于{low}%时受到的物理与法术伤害改为-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导', { name, aspd: V.aspd, low: pct(V.lowHp), dr: pct(V.lowDr3) }) };
+    default: return { short: '?', full: '?' };
+  }
+}
 
 function famigliaText(node, enemyName) {
   const F = CC.famiglia;
@@ -107,7 +122,7 @@ function delegationText(node, enemyName) {
   const [degen, shield, champ] = dg.wave.map((w) => enemyName(w.key));
   switch (node) {
     case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性）、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
-    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡时重置', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
+    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
     case 'united3': return { short: t('访问团：联合 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】（原为25%），释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.united3), degen, p: pct(dg.gateRatio) }) };
     default: return { short: '?', full: '?' };
   }

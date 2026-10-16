@@ -150,3 +150,34 @@ test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod
     assert.ok(d.lookup('bonds', 'lateranoShip').effectDescRaw, 'Mod A again');
   } finally { setLang('zh'); }
 });
+
+test('SPA-CC Junk: the client shows the Cursed Hammer of a match with the tag (its name and text in English)', async () => {
+  const { createDataStore } = await import('../../public/js/data.js');
+  const { readFileSync, existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { setLang, addMessages } = await import('../../shared/i18n.js');
+  const { CC } = await import('../../shared/ruleData.js');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const fetch = async (url) => {
+    const abs = path.join(ROOT, url.replace(/^\/data\//, 'data/'));
+    if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
+    const text = readFileSync(abs, 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(text) };
+  };
+  addMessages('en', JSON.parse(readFileSync(path.join(ROOT, 'public/i18n/en.json'), 'utf8')));
+  setLang('en');
+  try {
+    const d = createDataStore({ fetch, retryDelays: [] });
+    await d.loadAll('items', 'chess', 'bonds', 'backups');
+    await d.setLocale('en');
+    assert.equal(d.lookup('items', CC.junk.itemId), null);
+    d.setRules({ ccJunk: 2 });
+    const it = d.lookup('items', CC.junk.itemId);
+    assert.equal(it.name, 'Cursed Hammer');
+    assert.match(it.desc, /−1 income/);
+    assert.equal(it.iconId, CC.junk.iconId);
+    d.setRules(null);
+    assert.equal(d.lookup('items', CC.junk.itemId), null);
+  } finally { setLang('zh'); }
+});
