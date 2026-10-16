@@ -30,9 +30,14 @@
 //                                         (no attack cuts the change clip short); `end` = { clip, in, roles? }: a
 //                                         closing clip timed to end `in` s from now (a 重生's last clip ends with the
 //                                         重生), landing in `roles`
-//   update(dt)                            advances the skeleton (autoUpdate is off: one clock for everything)
+//   update(dt)                            advances the skeleton (autoUpdate is off: one clock for everything); a
+//                                         model frozen before it was ever posed (built while stunned without a stun
+//                                         clip, or dead without a death or idle clip) shows its clip's first frame,
+//                                         never its setup pose (GitHub #542: the impostor box covers the clips only)
 //   poseHeld()                            true while the pose cannot change (render/units.js then neither re-poses nor
 //                                         redraws the model, only advances `clock`)
+//   clipBounds(names)                     skeleton-space bounds of those clips (sampled once per skeleton data, see
+//                                         "clip bounds" below; render/units.js sizes the impostor box from them)
 // (fork) An operator's attack clip loops over its rhythm while the next attack's wind-up confirms each coming swing;
 // without one it stops just before that strike frame (no swing without an attack). Enemies and `once` casts play each
 // attack's clip once. Then the end clip (if any) and base — except the attacks of a skill
@@ -53,9 +58,10 @@ const RHYTHM_DROP_MARGIN = 0.08;
  * (fork) The melee clip of a model whose manifest attack is its ranged one (SpineActor.shot 'melee'), first present
  * wins. Ashlock: Attack01 is his cannon, Attack02 the shield bash (it animates F_weapon_dun). 领主 (lord): Attack is
  * the ranged shot (银灰's cane point with the eagle, user playtest 2026-10-12), Combat the melee; [ASSUMED] the same for
- * Qiubai (Attack / Combat_A), whose two clips animate the same bones.
+ * Qiubai (Attack / Combat_A), whose two clips animate the same bones. Agent (伊内丝 Ines): Attack / Skill_2_Attack throw
+ * her shadow, Combat / Skill_2_Combat strike the enemy she blocks.
  */
-const MELEE_TWIN = Object.freeze({ Attack01: ['Attack02'], Attack: ['Combat', 'Combat_A'] });
+const MELEE_TWIN = Object.freeze({ Attack01: ['Attack02'], Attack: ['Combat', 'Combat_A'], Skill_2_Attack: ['Skill_2_Combat'] });
 /** (fork) The other way round (SpineActor.shot 'ranged'): Thorns' manifest Attack_1 is his melee, Attack_2 the thrown
  *  shot (user playtest 2026-10-12). */
 const RANGED_TWIN = Object.freeze({ Attack_1: ['Attack_2'] });
@@ -156,6 +162,258 @@ function slotCentre(slot, att, buf, out) {
 /** Union of two [x0, y0, x1, y1] boxes (a may be null); a new array. */
 const unionBox = (a, b) => (a ? [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])] : b.slice());
 
+// ---- clip bounds (GitHub #542) ------------------------------------------------------------------------------------
+// What a skeleton can draw, in skeleton space (pixi-spine's y-down world; rects are [x0, y0, x1, y1]): each clip, sampled
+// once per skeleton data and shared by every actor built from it (the setup pose is never shown: SpineActor.update poses
+// even a model frozen before its first update at its clip's first frame). render/units.js sizes a unit's
+// impostor slot from the clips the unit plays — a slot sized from the first pose drawn (plus a margin) cut 野鬃's idle
+// flag and 浊心斯卡蒂's head in her S3 flight, and 598 of the roster's 681 skeletons play a clip that leaves a slot sized
+// that way from their idle's first frame. A clip is posed on a scratch skeleton of the same runtime (never an actor's
+// own) CLIP_SAMPLE_HZ times a second, at most CLIP_SAMPLE_MAX + 1 times (a longer clip is sampled more sparsely); every
+// slot that is drawn (alpha > 0) counts — a region with its whole attachment rectangle (the atlas trim only makes the
+// drawn sprite smaller), a mesh with its world vertices. (Skeleton.getBounds() cannot be used: pixi-spine never computes
+// the RegionAttachment offsets it reads, its sprites do not need them.) Requests are queued; `stepClipBounds(ms)`, called
+// by render/app.js once per frame, samples within that time budget: the clips a unit plays take ≈ 9 ms per skeleton on
+// the current roster (53 ms at most), so a model is measured a few frames after it loads, long before a crowd needs its
+// impostor. [ASSUMED] the rate, the cap and the budget (a pose between two samples is covered by the box's padding,
+// units.js IMP_BOX, and anything past it is cut by the atlas slot's scissor, never left behind). A record is queued only
+// while an actor uses its skeleton data: when the last one is destroyed (a model swap, a battlefield torn down) its pending
+// clips and its scratch skeleton are dropped — nothing holds a skeleton the Spine store let go, and nothing stale is
+// measured ahead of the next scene's models —, and a later actor queues what was never measured again. A clip whose
+// sampling throws is recorded as not measurable (false): units.js draws it directly while it plays, never as empty.
+export const CLIP_SAMPLE_HZ = 60;
+export const CLIP_SAMPLE_MAX = 48;
+export const CLIP_BOUNDS_BUDGET_MS = 2.5;
+const ATT_REGION = 0, ATT_MESH = 2;      // pixi-spine AttachmentType
+const boundsOf = new WeakMap();          // skeleton data → { data, Skeleton, skel, rects: Map<clip, rect|null|false>, todo, job, users, failed }
+const boundsQueue = [];                  // records with clips still to sample, oldest request first
+const nowMs = () => (globalThis.performance ? globalThis.performance.now() : Date.now());
+const emptyRect = () => [Infinity, Infinity, -Infinity, -Infinity];
+const rectOk = (r) => !!r && Number.isFinite(r[0]) && Number.isFinite(r[1]) && Number.isFinite(r[2]) && Number.isFinite(r[3]) && r[0] <= r[2] && r[1] <= r[3];
+
+/** Grow `r` by everything `skel` draws in its current pose (see "clip bounds"); `buf.v` is a scratch vertex buffer. */
+function poseRect(skel, r, buf) {
+  for (const slot of skel.drawOrder) slotRect(slot, r, buf);
+  return r;
+}
+
+/**
+ * (fork) Grow `r` by what one slot draws in the current pose (poseRect; SpineActor._mixGuard): false when it draws
+ * nothing (no attachment, an inactive bone, alpha ≈ 0, another attachment type).
+ */
+function slotRect(slot, r, buf) {
+  const grow = (x, y) => { if (x < r[0]) r[0] = x; if (x > r[2]) r[2] = x; if (y < r[1]) r[1] = y; if (y > r[3]) r[3] = y; };
+  const bone = slot.bone;
+  if (!bone || bone.active === false) return false;
+  const att = typeof slot.getAttachment === 'function' ? slot.getAttachment() : slot.attachment;
+  if (!att || (slot.color ? slot.color.a : 1) * (att.color ? att.color.a : 1) <= 0.004) return false;
+  if (att.type === ATT_MESH && typeof att.computeWorldVertices === 'function') {
+    const n = att.worldVerticesLength | 0;
+    if (n < 2) return false;
+    if (buf.v.length < n) buf.v = new Float32Array(n);
+    const v = buf.v;
+    att.computeWorldVertices(slot, 0, n, v, 0, 2);
+    for (let k = 0; k < n; k += 2) grow(v[k], v[k + 1]);
+    return true;
+  }
+  if (att.type === ATT_REGION && bone.matrix) {
+    // the attachment rectangle (width × height × scale, rotated, at x / y) through the bone (a PIXI matrix)
+    const m = bone.matrix;
+    const hw = (att.width * att.scaleX) / 2, hh = (att.height * att.scaleY) / 2;
+    const rad = (att.rotation * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad);
+    for (let q = 0; q < 4; q++) {
+      const px = q === 0 || q === 3 ? -hw : hw, py = q < 2 ? -hh : hh;
+      const lx = px * c - py * s + att.x, ly = px * s + py * c + att.y;
+      grow(m.a * lx + m.c * ly + m.tx, m.b * lx + m.d * ly + m.ty);
+    }
+    return true;
+  }
+  return false;
+}
+
+/** (fork) A clip's timelines that decide what its slots draw (attachment and colour keys; SpineActor._hiddenByOutgoing),
+ *  listed once per clip. */
+const slotTimelinesOf = new WeakMap();
+function slotTimelines(anim) {
+  let list = slotTimelinesOf.get(anim);
+  if (!list) {
+    list = (anim.timelines || []).filter((tl) => tl && Number.isInteger(tl.slotIndex) && typeof tl.apply === 'function'
+      && !(tl.attachment && 'vertices' in tl.attachment));   // not the deform timelines (vertex offsets only)
+    slotTimelinesOf.set(anim, list);
+  }
+  return list;
+}
+
+/** (fork) SpineActor._mixGuard: how far past the mixed clips' bounds a slot may reach while they crossfade — `min`
+ *  skeleton units + `share` × the bounds' longer side (a blend of two poses sits between them; poses between two
+ *  samples). A crossfade whose visible slots include more than `swapMin` and `swapShare` × of them that no outgoing
+ *  clip draws now swaps one body for another (伊内丝's 'boc' outfit) and is cut. [ASSUMED] the values. */
+export const MIX_GUARD_PAD = Object.freeze({ min: 40, share: 0.08, swapMin: 12, swapShare: 0.4 });
+
+/** The scratch skeleton of a bounds record (made on demand, dropped once its queued clips are sampled). */
+function scratchSkeleton(rec) {
+  if (rec.skel) return rec.skel;
+  const Skeleton = rec.Skeleton;
+  if (typeof Skeleton !== 'function' || Skeleton === Object) throw new Error('no Spine runtime');
+  const skel = new Skeleton(rec.data);
+  if (!Array.isArray(skel.drawOrder) || typeof skel.setToSetupPose !== 'function' || typeof skel.updateWorldTransform !== 'function') throw new Error('no Spine runtime');
+  rec.skel = skel;
+  return skel;
+}
+
+/** The bounds record of skeleton data `data`; `failed` when this runtime cannot be posed here (tried at once). */
+function boundsRecord(data, Skeleton) {
+  let rec = boundsOf.get(data);
+  if (rec) return rec;
+  rec = { data, Skeleton, skel: null, rects: new Map(), todo: [], job: null, users: 0, failed: false, buf: { v: new Float32Array(256) } };
+  try {
+    const skel = scratchSkeleton(rec);
+    skel.setToSetupPose();
+    skel.updateWorldTransform();
+  } catch {
+    rec.failed = true;
+    rec.skel = null;
+  }
+  boundsOf.set(data, rec);
+  return rec;
+}
+
+/**
+ * Start sampling clip `name`: { name, anim, d, n, i, r } (posed at t = d·i/n for i = 0…n; `r` grows), or null when the
+ * skeleton has no such clip.
+ */
+function startClip(rec, name) {
+  const anim = typeof rec.data.findAnimation === 'function' ? rec.data.findAnimation(name) : null;
+  if (!anim || typeof anim.apply !== 'function') return null;
+  const d = Number.isFinite(anim.duration) && anim.duration > 0 ? anim.duration : 0;
+  const n = d > 0 ? Math.min(CLIP_SAMPLE_MAX, Math.max(1, Math.ceil(d * CLIP_SAMPLE_HZ))) : 0;
+  scratchSkeleton(rec).setToSetupPose();
+  const times = clipTimes(anim, d, n);
+  return { name, anim, d, n: times.length - 1, i: 0, times, r: emptyRect() };
+}
+
+/** (fork) At most this many key-time poses (a key and the instant before it) on top of a clip's even samples (thinned evenly past it). */
+export const CLIP_SAMPLE_KEYS = 480;
+/** (fork) Seconds before a key also posed (the pose a timeline reaches just before it jumps at the key). */
+export const CLIP_KEY_LEAD_S = 0.0002;
+
+/**
+ * (fork) The times a clip is posed at: the even samples t = d·i/n, plus every key of its timelines (at most
+ * CLIP_SAMPLE_KEYS of them) — a pose held for a frame between two even samples (赫拉格 Hellagur's katana reaching 160
+ * units further at 0.70 s of his 1.33 s skill, 维伊 Veen's shadow) left the box otherwise. Sorted, the ones within 1 ms
+ * of another dropped. Key times are read from each timeline's `frames` (pixi-spine 3.x: one time per getFrameCount()
+ * entries, its first; 4.x: getFrameEntries()); a timeline that does not expose them adds nothing.
+ */
+function clipTimes(anim, d, n) {
+  const even = [];
+  for (let i = 0; i <= n; i++) even.push(n ? (d * i) / n : 0);
+  if (!(d > 0) || !Array.isArray(anim.timelines)) return even;
+  const keys = [];
+  for (const tl of anim.timelines) {
+    const f = tl && tl.frames;
+    if (!f || typeof f.length !== 'number') continue;
+    let count = 0, stride = 0;
+    try {
+      if (typeof tl.getFrameEntries === 'function') { stride = tl.getFrameEntries(); count = f.length / stride; }
+      else if (typeof tl.getFrameCount === 'function') { count = tl.getFrameCount(); stride = count > 0 ? f.length / count : 0; }
+    } catch { continue; }
+    if (!(count > 0) || !Number.isInteger(stride) || stride < 1) continue;
+    for (let k = 0; k < count; k++) { const t = f[k * stride]; if (Number.isFinite(t) && t > 0 && t <= d) keys.push(t); }
+  }
+  if (!keys.length) return even;
+  // one entry per key time (timelines share most of them: a clip authored at 30 fps has at most 30 a second)
+  keys.sort((x, y) => x - y);
+  const uniq = [];
+  for (const t of keys) if (!uniq.length || t - uniq[uniq.length - 1] > CLIP_KEY_LEAD_S / 2) uniq.push(t);
+  // a key and the instant before it: a pose can jump there (维伊's shadow 160 units further 1 ms before a deform key)
+  keys.length = 0;
+  for (const t of uniq) { if (t - CLIP_KEY_LEAD_S > 0) keys.push(t - CLIP_KEY_LEAD_S); if (t < d) keys.push(t); }
+  const picked = keys.length > CLIP_SAMPLE_KEYS
+    ? Array.from({ length: CLIP_SAMPLE_KEYS }, (_, i) => keys[Math.floor((i * keys.length) / CLIP_SAMPLE_KEYS)])
+    : keys;
+  const all = [...even, ...picked].sort((x, y) => x - y);
+  const out = [];
+  for (const t of all) if (!out.length || t - out[out.length - 1] > CLIP_KEY_LEAD_S / 2) out.push(t);
+  return out;
+}
+
+/**
+ * Queue clips `names` of skeleton data `data` (pixi-spine runtime class `Skeleton`) for sampling — those neither sampled
+ * nor queued yet — and return its record (`rects`, `failed`).
+ */
+export function requestClipBounds(data, Skeleton, names) {
+  const rec = boundsRecord(data, Skeleton);
+  if (rec.failed) return rec;
+  let added = false;
+  for (const n of names) {
+    if (typeof n === 'string' && !rec.rects.has(n) && !rec.todo.includes(n) && !(rec.job && rec.job.name === n)) { rec.todo.push(n); added = true; }
+  }
+  if (added && !boundsQueue.includes(rec)) boundsQueue.push(rec);
+  else if (!boundsQueue.includes(rec)) rec.skel = null;   // nothing to sample: no scratch skeleton kept
+  return rec;
+}
+
+/**
+ * One actor more (+1, SpineActor.clipBounds) or less (−1, SpineActor.destroy) measures record `rec`; with none left, the
+ * record leaves the queue with its pending clips (todo and the clip in progress) and its scratch skeleton — a later actor
+ * queues what was never measured again (a todo left behind would read as queued and never be measured).
+ */
+function useBounds(rec, delta) {
+  rec.users = Math.max(0, rec.users + delta);
+  if (rec.users > 0) return;
+  const i = boundsQueue.indexOf(rec);
+  if (i >= 0) boundsQueue.splice(i, 1);
+  rec.todo.length = 0;
+  rec.job = null;
+  rec.skel = null;
+}
+
+/**
+ * Sample queued clips for up to `budgetMs` (render/app.js calls it once per frame): pose after pose, a clip resumed on the
+ * next call when the budget runs out inside it; at least one pose per call.
+ * @returns {number} clips finished
+ */
+export function stepClipBounds(budgetMs = CLIP_BOUNDS_BUDGET_MS) {
+  if (!boundsQueue.length) return 0;
+  const end = nowMs() + budgetMs;
+  let finished = 0, posed = 0;
+  while (boundsQueue.length) {
+    const rec = boundsQueue[0];
+    if (!rec.job) {
+      const name = rec.todo.shift();
+      if (name === undefined) { boundsQueue.shift(); rec.skel = null; continue; }
+      let broken = false;
+      try { rec.job = startClip(rec, name); } catch { rec.job = null; broken = true; }
+      // no such clip: it never plays (null); a clip that could not be set up: not measurable (false)
+      if (!rec.job) { rec.rects.set(name, broken ? false : null); finished++; continue; }
+    }
+    const j = rec.job;
+    try {
+      const skel = scratchSkeleton(rec);
+      while (j.i <= j.n) {
+        const t = j.times ? j.times[j.i] : j.n ? (j.d * j.i) / j.n : 0;
+        j.anim.apply(skel, t, t, false, null, 1, 0, 0);   // MixBlend.setup, MixDirection.mixIn: the clip's own pose at t
+        skel.updateWorldTransform();
+        poseRect(skel, j.r, rec.buf);
+        j.i++;
+        posed++;
+        if (nowMs() >= end) break;
+      }
+    } catch { j.i = j.n + 1; j.broken = true; }
+    if (j.i > j.n) {
+      // a pose that threw: the clip is not measurable (false) — drawn directly while it plays, not taken as empty
+      rec.rects.set(j.name, j.broken ? false : rectOk(j.r) ? j.r : null);
+      rec.job = null;
+      finished++;
+    }
+    if (posed && nowMs() >= end) break;
+  }
+  return finished;
+}
+
+/** Clips still waiting to be sampled, the one in progress included (dev / tests). */
+export function pendingClipBounds() { return boundsQueue.reduce((s, r) => s + r.todo.length + (r.job ? 1 : 0), 0); }
+
 export class SpineActor {
   /**
    * @param {any} spineData PIXI.spine skeleton data
@@ -178,6 +436,7 @@ export class SpineActor {
     this.clipNeeded = this.clipped && needsClipping(spineData); // non-eyelid clips: the masks stay on (setClipping)
     this.clipOn = true;
     this._clipHidden = new Set(); // slot indexes the eyelid fallback hid in its last pass (_eyeMaskFallback)
+    this.mixRect = null;          // (fork) what a crossfade drew in the last update, [x0, y0, x1, y1] (_mixGuard)
     if (this.clipped) {
       const sp = this.spine;
       const orig = typeof sp.createGraphics === 'function' ? sp.createGraphics.bind(sp) : null;
@@ -195,6 +454,7 @@ export class SpineActor {
     this.skillOn = false;
     this.skillClipOnce = false;    // skillBegin: the skill's own clip plays once (a clip with no Begin / own Idle)
     this.skillEndPending = false;  // … and the skill turned off inside it: play its End clip / base when it ends
+    this.skillEndAfterAttack = false;   // (fork) the skill turned off during its own attack clip: its End clip after it
     this.attackUntil = 0;
     this.clock = 0;
     this.current = '';
@@ -216,6 +476,7 @@ export class SpineActor {
      */
     this.shot = null;
     this._applied = false;        // an update has posed the skeleton since its clip last changed (poseHeld)
+    this._posed = false;          // the skeleton was ever posed (a model frozen before that shows its clip's first frame)
     this._appliedTint = undefined; // the tint that update put on the slots (pixi-spine applies `tint` in update)
     this._play(this._idleName(), true);
   }
@@ -326,6 +587,7 @@ export class SpineActor {
     }
     // Apply the new attachments even when normal updates are frozen.
     this.spine.update(0);
+    this._posed = true;
   }
 
   /** Play a form's transition clip once; attacks and the resting state wait for it (mode 'change'). */
@@ -535,6 +797,18 @@ export class SpineActor {
     return name;
   }
 
+  /** (fork) The clips `name` may play as under either shot (_shot) other than itself — the twins no role names, which
+   *  render/units.js adds to the impostor box's clips (a 重炮手 / 领主 only). */
+  shotTwins(name) {
+    if (typeof name !== 'string') return [];
+    const out = new Set();
+    for (const t of [...(RANGED_TWIN[name] || []), ...(MELEE_TWIN[name] || [])]) if (this.has(t)) { out.add(t); break; }
+    const b = name.replace(/_A(?=_|$)/, '_B');
+    if (b !== name && this.has(b)) out.add(b);
+    out.delete(name);
+    return [...out];
+  }
+
   _attackClip() {
     const sk = this.roles.skill;
     if (this.skillOn && sk && this.has(sk.loop) && sk.via !== 'attack' && !this._skillIsBuffOnly()) return sk;
@@ -577,6 +851,7 @@ export class SpineActor {
     // a skill that ends as the unit (re)deploys — 乌尔比安's 【返回】 is a 【移动】 (sim Battle.moveRedeploy) right before
     // his S3's 'skill' off event — lets the deploy clip play out (then the plain idle) instead of cutting it with the End
     if (!on && this.mode === 'deploy') return;
+    this.skillEndAfterAttack = false;
     if (on && sk) {
       this.skillEndPending = false;
       this.skillClipOnce = false;
@@ -607,6 +882,13 @@ export class SpineActor {
         return;
       }
       this.skillClipOnce = false;
+      // (fork) a charge / instant skill whose attack is its loop clip switches off right after that attack (sim
+      // skills.js: 'skill' 1, the attack, 'skill' 0 in one tick — 风笛 Bagpipe's S2 double shot): the attack plays out,
+      // then its End clip (update, mode 'attack')
+      if (this.has(sk.end) && this.mode === 'attack' && this.current === this._shot(sk.loop) && this.clock < this.attackUntil) {
+        this.skillEndAfterAttack = true;
+        return;
+      }
       if (this.has(sk.end)) {
         this.mode = 'skillEnd';
         this._play(sk.end, false, { mix: 0.08 });
@@ -741,7 +1023,15 @@ export class SpineActor {
           const clip = this._attackClip() || this.roles.attack;
           // a skill with its own idle: back to that idle (its end clip is for the end of the skill, setSkill(false))
           const toSkillIdle = clip === this.roles.skill && !!this._skillIdle();
-          if (clip && this.has(clip.end) && !toSkillIdle) { this._play(clip.end, false); this._queue(this._baseName(), true); }
+          const sk = this.roles.skill;
+          const endSkill = this.skillEndAfterAttack;
+          this.skillEndAfterAttack = false;
+          if (endSkill && sk && this.has(sk.end) && this.current === this._shot(sk.loop)) {
+            // (fork) the skill switched off during its own attack: its End clip closes it now
+            this.mode = 'skillEnd';
+            this._play(sk.end, false, { mix: 0.08 });
+            this.skillEndUntil = this.clock + this.dur(sk.end);
+          } else if (clip && this.has(clip.end) && !toSkillIdle) { this._play(clip.end, false); this._queue(this._baseName(), true); }
           else this._play(this._baseName(), true, { mix: 0.15 });
         }
         break;
@@ -779,10 +1069,19 @@ export class SpineActor {
         break;
       default: break;
     }
-    if (!this.frozen) {
-      try { this.spine.update(dt); } catch { /* a broken skeleton must not stop the frame */ }
+    // frozen (a stun without a stun clip, a death without a death or idle clip): the pose holds — but a model frozen before
+    // it was ever posed (built while its unit is stunned or dead) is posed once at the current clip's first frame, never
+    // left in its setup pose, which no clip shows and the impostor box does not cover (GitHub #542: 隐现's Back model
+    // stands 900 units to the right of its feet in the setup pose)
+    if (!this.frozen || !this._posed) {
+      try {
+        this.spine.update(this.frozen ? 0 : dt);
+        this._posed = true;               // (a first update that threw is tried again: no setup pose left on screen)
+      } catch { /* a broken skeleton must not stop the frame */ }
     }
     if (this.clipped && !this.clipOn) this._eyeMaskFallback();
+    this.mixRect = null;
+    if (!this.frozen) this._mixGuard();
     this._applied = true;
     this._appliedTint = this.spine.tint;
   }
@@ -836,6 +1135,122 @@ export class SpineActor {
     this._clipHidden.clear();
   }
 
+  /**
+   * (fork) A crossfade draws nothing far from where both of its clips draw. Bones a clip moves far away while it hides
+   * their slots (effects and props waiting out of sight) are blended in from there while the other clip shows those
+   * slots: 伊内丝 Ines's slashes (A1–A4) wait about 1600 units to her right at alpha 0 and slid in half-faded as her
+   * attack began (the "extra sprite" by her attack); her 'boc' outfit moves its waist bone 900 units below her for the
+   * last frames of its attack, so its crossfade back to idle slid her whole body up from there. While a clip mixes in
+   * (track 0), a visible slot reaching MIX_GUARD_PAD past the union of the mixed clips' measured bounds (clipBounds —
+   * what each clip draws on its own):
+   *   - is hidden for the frame when a clip mixing out does not draw it now (pixi-spine shows it again on its next
+   *     update);
+   *   - otherwise ends the crossfade (the incoming clip alone from the next frame, posed now): a slot both clips draw
+   *     blended that far out is the body itself, and hiding it would tear the model apart.
+   * A crossfade that mostly draws slots no outgoing clip draws (MIX_GUARD_PAD.swap*) is cut too: the 'boc' outfit's
+   * attack swaps to a second body rig whose bones wait 900 units up and to her left while hidden, so the attack's
+   * crossfade drew that body dashing in from there.
+   * `mixRect` is then what the crossfade draws ([x0, y0, x1, y1], null without one): render/units.js draws the model
+   * directly while it leaves the impostor box (a blend of two poses can pass outside both). No guard while a mixed clip
+   * is not measured.
+   */
+  _mixGuard() {
+    const sp = this.spine, tr = sp && sp.state && sp.state.tracks ? sp.state.tracks[0] : null, rec = this._bounds;
+    if (!tr || !tr.mixingFrom || !rec || !rec.rects || !sp.skeleton || !sp.slotContainers) return;
+    let u = null;
+    for (let e = tr, d = 0; e && d < 4; e = e.mixingFrom, d++) {
+      const r = rec.rects.get(e.animation && e.animation.name);
+      if (!r) return;   // not sampled, unmeasurable (false) or drawing nothing (null): no guard
+      u = unionBox(u, r);
+    }
+    const pad = MIX_GUARD_PAD.min + MIX_GUARD_PAD.share * Math.max(u[2] - u[0], u[3] - u[1]);
+    const lim = [u[0] - pad, u[1] - pad, u[2] + pad, u[3] + pad];
+    const buf = this._mixBuf || (this._mixBuf = { v: new Float32Array(256) });
+    const r = [0, 0, 0, 0];
+    let cut = false;
+    const drawn = [Infinity, Infinity, -Infinity, -Infinity];
+    try {
+      const hidden = this._hiddenByOutgoing(tr);   // slot indexes an outgoing clip does not draw now
+      let shown = 0, fresh = 0;   // visible slots; those of them an outgoing clip does not draw
+      for (const slot of sp.skeleton.drawOrder) {
+        const box = sp.slotContainers[slot.data.index];
+        if (!box || !box.visible) continue;
+        r[0] = r[1] = Infinity; r[2] = r[3] = -Infinity;
+        if (!slotRect(slot, r, buf)) continue;
+        shown++;
+        if (hidden.has(slot.data.index)) fresh++;
+        if (r[0] < lim[0] || r[1] < lim[1] || r[2] > lim[2] || r[3] > lim[3]) {
+          if (hidden.has(slot.data.index)) { box.visible = false; continue; }
+          cut = true;
+          break;
+        }
+        if (r[0] < drawn[0]) drawn[0] = r[0]; if (r[1] < drawn[1]) drawn[1] = r[1];
+        if (r[2] > drawn[2]) drawn[2] = r[2]; if (r[3] > drawn[3]) drawn[3] = r[3];
+      }
+      // a body swap: the incoming clip draws a set of slots the outgoing one does not (its bones parked anywhere),
+      // nothing to blend from
+      if (!cut && fresh > Math.max(MIX_GUARD_PAD.swapMin, MIX_GUARD_PAD.swapShare * shown)) cut = true;
+      if (cut) {
+        tr.mixingFrom = null;   // the outgoing clips leave the mix (AnimationState drops them with no further pose)
+        tr.mixDuration = 0;
+        // this frame: the incoming clip alone, from the setup pose as it is measured (no bone left where the outgoing
+        // clip had moved it)
+        sp.skeleton.setToSetupPose();
+        sp.update(0);
+        if (this.clipped && !this.clipOn) this._eyeMaskFallback();
+      } else if (drawn[0] <= drawn[2]) this.mixRect = drawn;
+    } catch { /* an unknown runtime shape must never stop the frame */ }
+  }
+
+  /**
+   * (fork, _mixGuard) The slot indexes some clip mixing out of `tr` does not draw at its current time (no attachment, or
+   * alpha ≈ 0), from that clip's attachment and colour timelines on a probe skeleton (slots only, no bones posed).
+   */
+  _hiddenByOutgoing(tr) {
+    const out = new Set();
+    const data = this.spine.spineData, Skeleton = this.spine.skeleton.constructor;
+    const probe = this._probe || (this._probe = new Skeleton(data));
+    for (let e = tr.mixingFrom, d = 0; e && d < 3; e = e.mixingFrom, d++) {
+      const anim = e.animation;
+      if (!anim) continue;
+      const t = typeof e.getAnimationTime === 'function' ? e.getAnimationTime() : e.trackTime;
+      probe.setSlotsToSetupPose();
+      for (const tl of slotTimelines(anim)) tl.apply(probe, t, t, null, 1, 0, 0);   // MixBlend.setup, MixDirection.mixIn
+      for (const slot of probe.slots) {
+        const att = slot.getAttachment();
+        if (!att || (slot.color ? slot.color.a : 1) * (att.color ? att.color.a : 1) <= 0.004) out.add(slot.data.index);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Skeleton-space bounds of clips `names` ("clip bounds" above; render/units.js _impBox): a Map name → rect (null: draws
+   * nothing / no such clip; false: its sampling threw, not measurable) once every clip is sampled; null while some still
+   * wait — they are queued here and render/app.js samples them (stepClipBounds); false when this runtime cannot be posed
+   * off-screen (a test double). The actor counts as a user of its skeleton's record until it is destroyed.
+   * @param {string[]} names
+   */
+  clipBounds(names) {
+    const sp = this.spine;
+    const data = sp && sp.spineData;
+    if (!data) return false;
+    let rec = boundsOf.get(data);
+    if (!rec || names.some((n) => !rec.rects.has(n))) rec = requestClipBounds(data, sp.skeleton && sp.skeleton.constructor, names);
+    if (rec.failed) return false;
+    if (this._bounds !== rec) {
+      if (this._bounds) useBounds(this._bounds, -1);
+      this._bounds = rec;
+      useBounds(rec, 1);
+    }
+    const clips = new Map();
+    for (const n of names) {
+      if (!rec.rects.has(n)) return null;
+      clips.set(n, rec.rects.get(n));
+    }
+    return clips;
+  }
+
   /** Model height in skeleton units (setup-pose bounds, else a chibi default). */
   get height() {
     const b = this.entry.bounds;
@@ -844,6 +1259,7 @@ export class SpineActor {
   }
 
   destroy() {
+    if (this._bounds) { useBounds(this._bounds, -1); this._bounds = null; }   // the last user gone: its queue entry goes
     try { this.spine.destroy({ children: true, texture: false, baseTexture: false }); } catch { /* ignore */ }
     this.spine = null;
   }

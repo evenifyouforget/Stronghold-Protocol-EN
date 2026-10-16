@@ -36,8 +36,8 @@ import { useErrorBoundary } from '../vendor/hooks.module.js';
 import { html, UiHosts, Button, MicroLabel, closeAllDialogs } from './ui/components.js';
 import { ConnectionBanner } from './ui/connBanner.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
-import { MaintenanceBar, applyMaintenance, clearMaintenance } from './ui/maintenance.js';
 import { TermTipHost } from './ui/termTip.js';
+import { MaintenanceBar, applyMaintenance, clearMaintenance } from './ui/maintenance.js';
 import { net, identity, NetError } from './net.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
 import { data } from './data.js';
@@ -62,7 +62,7 @@ import { PreloadHost } from './ui/preload.js';
 import { installPreload } from './resources/index.js';
 import { initLang, useLang, tickerText } from './ui/lang.js';
 import { t, N_, translateWire } from '../../shared/i18n.js';
-import { recordError } from './diag.js';
+import { recordError, installTrafficMeter } from './diag.js';
 import { GEN, genUrl, goHome, RETIRED_FLAG } from './gen.js';
 
 const RESTORE_GRACE_MS = 1500;
@@ -390,6 +390,8 @@ function installGlobalErrorHandlers() {
 
 async function boot() {
   installGlobalErrorHandlers();
+  // what this page downloads, by category, for the 问题反馈 report's traffic line (diag.js; nothing is sent anywhere)
+  installTrafficMeter();
   // touch / hover / fullscreen classes, zoom-gesture blocking, rotation re-layout (ui/device.js, css/devices.css)
   installDeviceSupport();
   // A page restored from the back/forward cache has a dead socket and a stale token choice: start over.

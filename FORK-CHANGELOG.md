@@ -5,7 +5,99 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-10-15
+
+### Contributions
+
+- Planned server maintenance: `npm run maintenance` closes the server to new matches, shows players a countdown bar,
+  and stops it once the running matches end ([#6](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/6), thanks to @evenifyouforget).
+- Battle view: operators in liftoff are drawn at a flyer's height, Barrier HP is drawn over the HP bar, and status icons
+  show their time left as a ring with their value ([#10](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/10), thanks to @evenifyouforget).
+- dev-0.2 CI fixed: the BOM regex in `texture-fixes.mjs`, docs-paths exempting `public/fonts/`, and the lobby
+  rate-limit and flood tests on slow Windows runners ([#11](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/11), thanks to @evenifyouforget).
+
+### Changes
+
+- ESLint skips the local `ArknightsGamedata/` and `stronghold-protocol-alliance-database-main/` clones (their own
+  configs broke `npm run lint`); the asset-index test links its folder with a junction, so it runs on Windows without
+  symlink rights.
+
+## 2026-10-14
+
+### Changes
+
+- `GET /healthz?traffic=1` (loopback / private-network clients only, as before) also reports what blocks the main
+  thread: `loop`, the event loop's lateness per minute (mean / p50 / p99 / max from `monitorEventLoopDelay`, and how
+  often a 10 ms tick fired 50 / 100 / 250 / 1000 ms late, with the longest), and `sim`, the time the server's own
+  battle simulation took per minute, by kind (`headless` bot seats and takeovers, `rehearsal`, `prep` bot decisions,
+  `boss`, `runner`) with the longest single slice and the longest burst of back-to-back slices (`server/http/loopStats.js`, `server/match/simMeter.js`). The wait a player's action sees
+  is the `loop` delay; when `sim` rises with it, the simulation is what holds the thread. A measurement on the public
+  server (2026-10-14, about 150 matches and 30 AI seats) had found stalls of 100 ms to 1 s several times a minute.
+- One log line per combat start: `[match CODE] R<n> combat: <fields> field(s), <k> server-run`, so the server journal
+  can be read against those stalls (`server/match/match/combat.js`).
+- `SP_BOT_REHEARSAL` (0–8, default 3) sets how many layouts an AI teammate rehearses with the real simulation per Rest
+  Phase; `0` skips the rehearsal. A knob for a public host, README env table.
+- Afterimages on mobile fixed: after switching apps and back on Android Chrome / Brave (a GPU process restart;
+  `chrome://gpucrash` reproduces it), units drawn through the impostor atlas (crowds, and clipped skeletons in prep)
+  piled every new pose onto the old ones and showed pieces of other units until a reload. The slot erase is now a
+  scissored `gl.clear` instead of an ERASE-blend quad, and returning to the page or a restored WebGL context resets
+  PIXI's GL state, clears every atlas page and redraws every impostor. A failed atlas pass and context loss / restore
+  are written to the diagnostics log (`public/js/render/impostor.js`, `public/js/render/app.js`).
+- HP bars, projectiles, redeploy rings and other drawn HUD pieces no longer vanish after that GPU restart: Chrome
+  blanks every GPU-backed 2D canvas when its GPU process restarts, and PIXI re-uploaded those empty canvases. Every
+  canvas the game draws a texture on (and every canvas PIXI makes for itself, `Texture.WHITE` and text) is now kept in
+  CPU memory (`willReadFrequently`), which a GPU restart doesn't touch (`cpuCanvas` in `public/js/render/app/pixi.js`).
+- Lobby announcement bumped to Update 0.2.6 and shown again to everyone (new dismiss key `news.0.2.6`): Outfits stay on
+  top, then Suzuran without glasses, the official scenes' lighting, raised / water platforms and sealed ground on the
+  scenes, the round-start deploy replay, the Ammo Count setting, uncut models on crowded boards and Wiš'adel's summons
+  on deploy tiles.
+
+### Fixes
+
+- The last 15 cut-off models are fixed: the clip measurement also poses every animation key (and the instant before
+  it), so a pose shown for a single frame between two samples is in the box (Hellagur's katana, Veen's shadow, Dusk,
+  Ulpianus, the strawberry of Eyjafjalla the Hvít Aska's Epoque outfit, Fartooth's whirlwind outfit…). All 483
+  Operator and outfit models now keep every pose they play inside their box. A model's box takes about twice as many
+  frames to measure (median 22 frames instead of 10, 2.5 ms each).
+- Ines's attack no longer shows a stray slash beside her: her slash effects wait about 1600 units to her right while
+  hidden, and the short crossfade into her attack slid them in from there. While two clips crossfade, a slot drawn far
+  outside both clips is hidden if the outgoing clip doesn't show it, and the crossfade is cut if it does (her 'boc'
+  outfit's body rose from 900 units below her on its way back to idle). A crossfade that leaves the impostor box is
+  drawn directly for those frames.
+- Ines's 'boc' (Bloodline of Combat) outfit no longer dashes in from the left on each normal attack. Her attack
+  switches to a second copy of her body whose bones wait about 900 units away while hidden, and the 0.06 s crossfade
+  blended that copy in from there. A crossfade that mostly draws slots the outgoing clip doesn't show (over 40% of the
+  visible slots) now swaps straight to the new clip. Skadi and Bagpipe (and their outfits) swap bodies the same way
+  and are cut too.
+- Bagpipe's S2 (next attack ×2) plays its double shot again. The sim turns a charge skill on, attacks and turns it off
+  in the same tick, so the skill-off cut the Skill_2_Loop shot straight into Skill_2_End and idle. A skill that switches
+  off during its own attack clip now lets that attack play out, then plays its End clip.
+- Ines strikes the enemy she blocks with her melee clip (Combat, and Skill_2_Combat during S2) instead of her ranged
+  shadow throw (Attack / Skill_2_Attack), as in the official game. The sim's attack event doesn't say which, so the view
+  checks whether the target is blocked and standing on her tile.
+- Suzuran's default model no longer looks like she's wearing glasses: the dark outer rims of her eyelid patches are
+  painted skin-coloured in her atlas image (the line around each eye stays), so she still blinks. Her outfits are unchanged.
+  `fetch-assets` paints the fix itself after every download (tools/assets/texture-fixes.mjs), so an asset refresh keeps it.
+
 ## 2026-10-13
+
+### Upstream merge
+
+- Merged upstream 0.2.6 at [`488db49f`](https://github.com/sganggs/Stronghold-Protocol/commit/488db49f11daf862b67ce26fa4cf89aa6cba2466).
+  The fork's generations router keeps working with upstream's content-hashed asset URLs, brotli, WebSocket deflate and
+  `/healthz?traffic=1` (the generation prefix is stripped first, `/assets` stays unprefixed). Upstream's new
+  「弹药数量」 (ammo count) setting sits next to the fork's voice settings. Upstream's per-Operator `voiceOverrides` stays
+  out, as before.
+- The asset preload works with the content-hashed URLs: the service worker reads `/assets/~<hash>/…`,
+  `/fonts/~<hash>/…` and `/media/~<hash>/…` as the plain file's path (`shared/resources.js`, `public/resource-sw.js`),
+  so the files the game now requests are answered from the saved copies again instead of always going to the network.
+- Impostor boxes (the cached image a unit is drawn through on crowded fields) now come from upstream's runtime
+  measurement of every clip a unit can play (#542), grown to the fork's build-time per-clip extents where those reach
+  further; the extents alone are the fallback when a model cannot be measured. The melee / ranged twin clips of
+  fortress and lord Operators (Horn, Ashlock, Thorns, SilverAsh…) are measured too. Across all 483 Operator and outfit
+  models, 15 still have a pose past their box (upstream's box alone: 28, the extents box alone: 28).
+  `test/render/impostor-fork-models.test.js` keeps Ashlock's cannon, Sankta Miksaparato's skill, Gummy's Summer easel and
+  the twins inside the box.
 
 ### Changes
 

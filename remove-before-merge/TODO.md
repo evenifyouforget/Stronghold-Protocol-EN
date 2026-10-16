@@ -85,20 +85,40 @@ Next batch (2026-10-14), two PRs into main, both built on `wip/sync-yuri-0.2.5`
 PR C `wip/spacc` (on `wip/custom-lobby`), SPA-CC first batch — built 2026-10-15; Fish to playtest
 
 - [x] Risk tags as lobby rules (`level` type, Risk per level), the Risk grid in the rules dialog, "+Risk" on the
-  strip and the result title; cheats make the Risk 0.
+  strip and the result title; cheats made the Risk 0 (since 2026-10-16 the Risk shows with cheats too).
 - [x] Tags: Investor bench, Swift nerf, Foresight −20 ASPD (active or not), Strategies one round later (periodic ones
   and Damazti keep theirs), tier-1 price, shop upgrades (2 levels), SP recovery (3), final boss HP/ATK (3), leader DR
   (2; final bosses and leader-class bounty enemies, none under a burst), Silencers (fewest stacks, ties: earliest seat).
 - [x] Patriot pilot: data (tools/build-data.mjs FORK_ENEMY_KEYS, flagged `fork`), art in the manifest, kit, and a
   provisional tag "round 9: Patriot in every wave" until Fish's enemy tags are designed.
-- [ ] Open: Degenbrecher's second-form ATK +50 % is not applied (enemy-palette/leaders.md); Blood Debt / Asset Liquidation design; the pool-wide boss tags (Arts/Physical thresholds,
-  invulnerability).
+- [x] Degenbrecher's ATK buff: not a gap — the game's text ties it to <Snowfall> ("Gains increased ATK during
+  Snowfall"), an event mechanic this mode doesn't have, so it rightly stays off (checked 2026-10-16).
+- [x] Blood Debt / Asset Liquidation (Famiglia Unending / Seasonal, #20) and the pool-wide boss tags (Originium Zone
+  Arts / Physical / Lockout, #19): built.
+
+SPA-CC after the first batch (2026-10-15/16) — merged: #19 (`wip/spacc-tags`), #20 (`wip/famiglia`); open: #21
+(`wip/vengeance-junk`: Junk / Toxic Waste, Vengeance), #22 (`wip/spacc-visuals`, stacked on #21: Toxic Waste's look,
+invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW for every SPA-CC text)
+
+- [x] Fish's answers (2026-10-16): Toxic Waste's −50 % ATK stacks additively like other ATK modifiers; a leaked Reid
+  costs 1 LP like most enemies; AI teammates ignoring Toxic Waste is fine (revisit if the AI is to play better).
+- [x] Scrapped (Fish, 2026-10-16): the Rosmontis tags. Parked unless someone complains: the giant-boss ribbon seams,
+  the stale-browser-cache issue (2026-10-10).
+- [x] Sync main with Yuri's dev-0.2 (0.2.6 + our merged #6 #10 #11): `wip/sync-yuri-0.2.6` (2026-10-16) — Yuri's
+  dev-0.2 with our fork's changes since the 0.2.5 sync applied on top, recorded as a merge of main and dev-0.2.
+- [ ] Visual overhaul (Fish, 2026-10-16): design doc first — a particle engine and a custom generic effect set, then a
+  time-boxed extraction pilot (`tools/local-extract`) to weigh extracting the game's own effects.
 
 # to be ported to yuri
 
 - [x] English docs (README, CHANGELOG, NOTICE, DEPLOY, PLAYING, WINDOWS `.en.md`): Yuri #3, merged, then updated by Yuri for the current repo state.
 - [x] Difficulty details: Yuri #4, merged; Yuri moved its font sizes onto Text Size (`--t`).
-- [ ] Keyword popup: `yuri/keyword-popup` pushed, PR not opened yet (description drafted; its CI is red only because of the stale reroll test below, so open it after Yuri #5).
-- [ ] Reroll test expects the old 25 s co-op briefing (Yuri raised it to 45 s in d7f4e8d7): `yuri/fix-briefing-timer-test`, Yuri #5 (open), CI green on GitHub. Makes dev-0.2's CI green again.
-- [ ] Server maintenance: port `wip/server-maintenance` once it passes the ROADMAP usability check (Yuri runs a public server).
-- [ ] Custom Lobby Modifications (lobby rules): main only for now. Ask Yuri whether gameplay mods are welcome as dormant code behind a server option (off by default) before porting.
+- [x] Keyword popup: Yuri #7, merged 2026-10-14.
+- [x] Reroll test (co-op briefing 45 s): Yuri #5, merged 2026-10-11.
+- [x] Server maintenance: Yuri #6, merged 2026-10-15.
+- [x] Status timers and values + liftoff altitude + Barrier HP: Yuri #10, merged 2026-10-15.
+- [x] dev-0.2's CI (lint, docs paths, two Windows lobby tests): Yuri #11, merged 2026-10-15.
+- [ ] Invulnerability ribbons: `yuri/invuln-ribbons` pushed (2026-10-16), PR to open (description in
+  pr-descriptions/yuri-invuln-ribbons.md).
+- [ ] Custom Lobby Modifications (lobby rules) and the SPA-CC tags: main only for now. Fish is asking Yuri (2026-10-16)
+  whether gameplay mods are welcome as dormant code behind a server option (off by default) before porting.

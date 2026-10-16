@@ -14,6 +14,7 @@
 // geometry when the camera moves.
 
 import { ORIGINIUM } from '../style.js';
+import { cpuCanvas } from '../app/pixi.js';
 
 /** Shared focus uniforms (one object for every lit material). */
 export function focusUniforms(THREE) {
@@ -349,9 +350,11 @@ export function smogMaterial(THREE, tex, focus) {
  * not reproduced: the albedo is lit by the baked indirect light of the scene's lightmap plus the scene's key light
  * masked by its baked shadow, in linear light (Unity's Shadowmask lighting mode). `range` — the linear light a lightmap
  * texel of 1.0 stands for when scene.json has no lightRange; [ASSUMED] `ambient` — the light of a mesh without a
- * lightmap page; `direct` / `indirect` — gains of the two terms (1 = the scene's own values).
+ * lightmap page; `direct` / `indirect` — gains of the two terms, both 1: the scene's own values (the key light's
+ * `light.intensity`, and the lightmap's baked linear light, whose texel is (L / lightRange)^(1/2.2)). Anything below 1
+ * darkens the board against the official render — 0.2.5 had 0.8 / 0.4 tuned by eye (GitHub #549, PR #554 by @xcdoge).
  */
-export const SCENE_LIGHT = Object.freeze({ range: 8.0, ambient: 0.2, direct: 0.8, indirect: 0.4 });
+export const SCENE_LIGHT = Object.freeze({ range: 8.0, ambient: 0.2, direct: 1, indirect: 1 });
 
 const colorOf = (info, key, fallback = [1, 1, 1, 1]) => {
   const c = info && info.colors && Array.isArray(info.colors[key]) ? info.colors[key] : fallback;
@@ -478,7 +481,7 @@ export function sceneWaterMaterial(THREE, tex, focus, info) {
 export function environmentMap(THREE, renderer) {
   if (typeof document === 'undefined' || !renderer) return null;
   const W = 256, H = 128;
-  const c = document.createElement('canvas');
+  const c = cpuCanvas(document.createElement('canvas'));
   c.width = W; c.height = H;
   const g = c.getContext('2d');
   const grad = g.createLinearGradient(0, 0, 0, H);
@@ -502,7 +505,7 @@ export function environmentMap(THREE, renderer) {
 /** Canvas texture of a dash pattern (cyan field edge). */
 export function dashTexture(THREE) {
   if (typeof document === 'undefined') return null;
-  const c = document.createElement('canvas');
+  const c = cpuCanvas(document.createElement('canvas'));
   c.width = 128; c.height = 8;
   const g = c.getContext('2d');
   g.clearRect(0, 0, 128, 8);
@@ -519,7 +522,7 @@ export function dashTexture(THREE) {
 /** Soft radial falloff texture (contact shadow of the island on the background, glow cards). */
 export function softTexture(THREE, size = 64) {
   if (typeof document === 'undefined') return null;
-  const c = document.createElement('canvas');
+  const c = cpuCanvas(document.createElement('canvas'));
   c.width = c.height = size;
   const g = c.getContext('2d');
   const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
