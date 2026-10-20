@@ -18,7 +18,10 @@ import { chessAvatarUrl, chessPortraitUrl, profIconUrl, skillRecordIconUrl, modu
 import { data } from '../data.js';
 import { PROF_NAME, skillLabel, moduleBadge, fullTraitText, skillTags } from '../ui/loadoutModel.js';
 import { diySlotList, pickChoices, pickOptions, slotRecord, defaultPick } from '../ui/diyModel.js';
+// 皮肤 (docs/SKINS.md): the same self-contained section the 干员调配 detail draws, keyed by the operator being picked
+import { SkinSection } from '../ui/skinPicker.js';
 import { LoadoutStats } from '../ui/loadoutStats.js';
+import { useSkillRangePreview } from '../ui/rangePreview.js';
 import { CultivationSelects } from './cultivation.js';
 import { t } from '../../../shared/i18n.js';
 import { VoiceLangPicker } from '../ui/voiceLang.js';
@@ -73,6 +76,8 @@ function SlotCard({ m, slot, pick, illegal, onOpen, onClear, ops = {}, onOps = n
       <div class="diy-slot__head"><${TierChip} tier=${slot.tier} size="sm" /><span class="diy-slot__label">${label}</span><${KindTag} proto=${proto} /></div>
       <b class="diy-slot__name">${rec.name}</b>
       <small class="diy-slot__class">${classLine(rec)}</small>
+      ${/* (fork) the operator's dub from the overview: a click sets it and plays a line (no 更换 page needed) */ ''}
+      <${VoiceLangPicker} charId=${rec.charId} class="diy-slot__voice" compact />
       <${Bonds} bonds=${rec.bonds} />
       <span class="diy-slot__kit" data-skill=${sk?.index ?? ''}>
         <${Img} src=${skillRecordIconUrl(m, sk, { empty: false })} class="diy-slot__sicon" fallback=${html`<b class="num">${skillLabel(sk?.index)}</b>`} />
@@ -153,6 +158,7 @@ function ModuleRow({ id, rec, on, locked, onPick }) {
  */
 export function DiyPicker(props) {
   const [previewLevel, setPreviewLevel] = useState('elite');
+  useSkillRangePreview(); // (fork) 局内数值's 攻击范围 技能 toggle (ui/rangePreview.js)
   const cur = props.picks[props.slot.slotId] || null;
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
@@ -228,6 +234,12 @@ export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter,
             <${KindTag} proto=${ch.proto} />
             <${VoiceLangPicker} charId=${draft.charId} class="diy-pick__voice" />
           </div>
+          ${/* 外观 (docs/SKINS.md) sits under this operator's name, on the operator being picked rather than on the
+               slot card: the appearance belongs to the operator and the choice is made while picking one. The key is
+               draft.charId, which is what the manifest groups skins under and what the server stores
+               (ps.skins[charId]), so a slot fielded as its golden form keeps it. The 0.3.1 picker keeps 潜能与练度
+               next, then 局内数值 / 技能 / 模组 — the same place the 干员调配 detail puts the section. */ null}
+          <${SkinSection} charId=${draft.charId} />
           ${!ch.proto && onOps ? html`<section class="lo-sec"><header class="lo-sec__head"><h3>${t('潜能与练度')}</h3></header><${CultivationSelects} charId=${draft.charId} ops=${ops} onSet=${onOps} /></section>` : null}
           <${OutfitPickSection} key=${draft.charId} m=${m} charId=${draft.charId} name=${unit.name} />
           <${LoadoutStats} base=${base} golden=${golden} entries=${previewEntries} level=${previewLevel}

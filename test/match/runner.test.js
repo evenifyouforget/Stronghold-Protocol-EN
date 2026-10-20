@@ -5,7 +5,9 @@
 // leak count of normal fields (state().leaks, user playtest #3 item 2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createBattleRunner, ticksPerFrameCap } from '../../public/js/battle/runner.js';
+import { buildDiagnostics } from '../../public/js/diag.js';
 import { createStore, initialState } from '../../public/js/store.js';
 import * as specMod from '../../server/sim/spec.js';
 import { DataSource } from '../../server/sim/simdata.js';
@@ -28,14 +30,15 @@ function fakeNet() {
   return n;
 }
 
-function rig({ hidden = false } = {}) {
+function rig({ hidden = false, createHost = null } = {}) {
   let t = 1000;
   const frames = [];
   const intervals = [];
   const doc = { hidden, addEventListener() {} };
   const net = fakeNet();
   const store = createStore(initialState);
-  const runner = createBattleRunner({
+  // (fork) the meter is always on (no setting, no pin). createHost stands in for a Worker sim.
+  const deps = {
     net, store, doc,
     now: () => t,
     raf: (fn) => { frames.push(fn); return frames.length; },
@@ -44,7 +47,9 @@ function rig({ hidden = false } = {}) {
     clearInterval: () => {},
     loadSim: async () => ({ spec: specMod, ds: DS }),
     logger: { error() {}, warn() {}, info() {}, debug() {} },
-  });
+  };
+  if (createHost) deps.createHost = createHost;
+  const runner = createBattleRunner(deps);
   const feed = { snaps: [], evs: [], fields: [] };
   runner.on('snap', (s) => feed.snaps.push(s));
   runner.on('ev', (e) => feed.evs.push(e));
@@ -124,6 +129,17 @@ test('authoritative battle: 2× pacing, ≤ max(8, 4·speed) ticks per frame, b.
   const b = validateClientResult(start.spec, specMod.compactResult(server), {});
   assert.ok(a.ok && b.ok);
   assert.equal(specMod.resultDigest(a.result).hash, specMod.resultDigest(b.result).hash, 'the browser result equals the server simulation');
+  const metrics = r.runner.combatMetrics();
+  const hpDamage = e.battle.allyUnits.reduce((n, u) => n + u.stats.dmg, 0);
+  assert.ok(Math.abs(metrics.damage - hpDamage) < 1e-6, 'local accounting matches unrounded simulation totals');
+  const finalMetrics = structuredClone(metrics);
+  await r.runner.onStart(start);
+  assert.deepEqual(r.runner.combatMetrics(), finalMetrics, 'resending a finished battle does not count it twice');
+  r.store.patch('match', { public: { phase: PHASE.PREP, round: 3 } });
+  assert.deepEqual(r.runner.combatMetrics(), finalMetrics, 'match totals survive next-round prep');
+  assert.equal(r.runner.combatMetrics({ scope: 'battle' }).rows.length, 0, 'current battle clears at prep');
+  r.store.patch('match', { public: null });
+  assert.equal(r.runner.combatMetrics().rows.length, 0, 'leaving the match clears totals');
   r.runner.dispose();
 });
 
@@ -135,6 +151,8 @@ test('fast-forward to `elapsed` before showing; display replicas never report; b
   await r.settle();
   const e = r.runner._entries.get(start.battleId);
   assert.ok(e.battle.time >= 19.8, `caught up to the field clock (${e.battle.time})`);
+  assert.ok(Math.abs(r.runner.combatMetrics().damage - e.battle.allyUnits.reduce((n, u) => n + u.stats.dmg, 0)) < 1e-6,
+    'initial silent catch-up records all damage');
   assert.equal(r.feed.fields.length, 1, 'shown once, after the catch-up');
   r.advance(3000);
   assert.equal(r.net.sent.length, 0, 'a display replica never reports');
@@ -163,6 +181,8 @@ test('fast-forward to `elapsed` before showing; display replicas never report; b
   const snaps = r3.feed.snaps.length;
   r3.advance(2000, 1000);
   assert.ok(e3.battle.tickCount >= 110, `pumped while hidden (${e3.battle.tickCount})`);
+  assert.ok(Math.abs(r3.runner.combatMetrics().damage - e3.battle.allyUnits.reduce((n, u) => n + u.stats.dmg, 0)) < 1e-6,
+    'hidden-tab damage is recorded before visual events are discarded');
   assert.equal(r3.feed.snaps.length, snaps, 'nothing rendered while hidden');
   r3.runner.dispose();
 });
@@ -183,6 +203,52 @@ test('b.end forced ends the local battle and reports at once; a new prep clears 
   r.store.patch('match', { public: { phase: 'PREP' } });
   assert.equal(r.runner._entries.size, 0);
   assert.equal(r.store.get().match.battle, null);
+  r.runner.dispose();
+});
+
+test('own battle statistics stay available when viewing a teammate; owner filtering excludes teammate damage', async () => {
+  const start = realStart(7311);
+  const r = rig();
+  await r.runner.onStart(start);
+  r.advance(5000, 50);
+  const ownerId = start.spec.players[0].playerId;
+  const own = r.runner.combatMetrics({ scope: 'battle', ownerId });
+  assert.ok(own.rows.length > 0);
+  const teammate = structuredClone(start);
+  teammate.battleId = 'metrics-teammate';
+  teammate.fieldId = 'n:metrics-teammate';
+  teammate.authoritative = false;
+  teammate.watch = true;
+  for (const player of teammate.spec.players) player.playerId = 'metrics-teammate';
+  await r.runner.onStart(teammate);
+  assert.deepEqual(r.runner.combatMetrics({ scope: 'battle', ownerId }), own, 'own field is selected instead of the watched field');
+  assert.ok(r.runner.combatMetrics({ scope: 'battle', ownerId }).rows.every((row) => row.ownerId === ownerId));
+  assert.deepEqual(r.runner.combatMetrics({ scope: 'match', ownerId }), own, 'match view remains restricted to self');
+  assert.equal(r.runner.combatMetrics({ scope: 'battle', ownerId: 'unavailable-player' }).rows.length, 0);
+  r.runner.dispose();
+});
+
+test('evicted observed battles keep match totals; replaying one replaces its snapshot without double counting', async () => {
+  const start = realStart(7310);
+  const r = rig();
+  const recorded = new Map();
+  for (let i = 0; i < 5; i++) {
+    const battleId = `metrics-replica-${i}`;
+    await r.runner.onStart({ ...start, battleId, authoritative: false, watch: true });
+    r.advance(10000, 50);
+    const b = r.runner._entries.get(battleId).battle;
+    recorded.set(battleId, b.allyUnits.reduce((n, u) => n + u.stats.dmg, 0));
+  }
+  assert.ok(!r.runner._entries.has('metrics-replica-0'), 'first replica was evicted');
+  const expected = [...recorded.values()].reduce((n, v) => n + v, 0);
+  assert.ok(expected > 0);
+  assert.ok(Math.abs(r.runner.combatMetrics().damage - expected) < 1e-6);
+  await r.runner.onStart({ ...start, battleId: 'metrics-replica-0', authoritative: false, watch: true });
+  assert.ok(Math.abs(r.runner.combatMetrics().damage - expected) < 1e-6, 'replay at time zero retains prior totals');
+  r.advance(12000, 50);
+  const replay = r.runner._entries.get('metrics-replica-0').battle;
+  const updated = expected - recorded.get('metrics-replica-0') + replay.allyUnits.reduce((n, u) => n + u.stats.dmg, 0);
+  assert.ok(Math.abs(r.runner.combatMetrics().damage - updated) < 1e-6, 'same battle contributes only its newer snapshot');
   r.runner.dispose();
 });
 
@@ -325,9 +391,11 @@ test('solo pause: m.public.paused freezes every local battle clock (no ticks, no
   assert.equal(r.runner.state().paused, true);
   assert.equal(r.store.get().match.battle.paused, true, 'published for the HUD');
   const reports = r.net.sent.length;
+  const beforePause = r.runner.combatMetrics();
   r.advance(5000);
   assert.equal(e.battle.tickCount, t1, 'no tick while paused');
   assert.equal(r.net.sent.length, reports, 'no report while paused');
+  assert.deepEqual(r.runner.combatMetrics(), beforePause, 'damage, healing and rates all freeze while paused');
   // a resend while paused (reconnect) keeps the clock frozen
   r.net.emit('b.start', { ...start, elapsed: t1 / 30 });
   await r.settle();
@@ -414,28 +482,25 @@ test('live leaks: a boss field is not counted (the merged team LP moves through 
   r2.runner.dispose();
 });
 
-test('damage chart: damageUnits(ownerId) reads every own unit\'s stats.dmg of the battles this client runs; tokens name their summoner', async () => {
+test('(fork) results chart: combatRounds tags each battle with its spec round and splits each row\'s damage by round', async () => {
   const start = realStart(7305);
   const r = rig();
   r.net.emit('b.start', start);
   await r.settle();
   const e = r.runner._entries.get(start.battleId);
   for (let i = 0; i < 80 && !e.battle.allyUnits.some((u) => u.stats.dmg > 0); i++) r.advance(500, 50);
-  const ally = e.battle.allyUnits.find((u) => u.kind === 'op' && u.stats.dmg > 0);
-  assert.ok(ally, 'an operator that dealt damage');
-  const mine = e.battle.allyUnits.filter((u) => u.ownerId === ally.ownerId && (u.kind === 'op' || u.kind === 'token'));
-  const got = r.runner.damageUnits(ally.ownerId);
-  assert.equal(got.length, mine.length);
-  assert.equal(got.reduce((s, u) => s + u.dmg, 0), mine.reduce((s, u) => s + u.stats.dmg, 0));
-  assert.ok(got.some((u) => u.kind === 'op' && u.defId === ally.defId && u.dmg === ally.stats.dmg));
-  for (const u of got) if (u.kind === 'token' && u.by) assert.equal(u.by.kind, 'op');
-  assert.equal(r.runner.damageUnits('someone_else'), null);
-  // a watched teammate's replica is not the player's own battle
-  e.own = false;
-  assert.equal(r.runner.damageUnits(ally.ownerId), null);
-  e.own = true;
-  r.runner.clear();
-  assert.equal(r.runner.damageUnits(ally.ownerId), null, 'dropped with the battle');
+  const round = start.spec.round;
+  assert.ok(Number.isInteger(round) && round > 0, 'the fixture battle has a round');
+  const got = r.runner.combatRounds();
+  const total = r.runner.combatMetrics();
+  assert.ok(got.damage > 0 && Math.abs(got.damage - total.damage) < 1e-6, 'the same totals as the match scope');
+  for (const row of got.rows) {
+    const sum = row.parts.reduce((n, p) => n + p.damage, 0);
+    assert.ok(Math.abs(sum - row.damage) < 1e-6, `${row.key}: its rounds add up`);
+    for (const p of row.parts) assert.equal(p.round, round);
+  }
+  assert.equal(r.runner.combatRounds({ ownerId: 'someone_else' }).rows.length, 0);
+  r.runner.dispose();
 });
 
 test('live unit stats (user playtest #4 item 7): unitStats(id) reads the battle on screen — the sim\'s last computed stats, never unit.s (no recompute from the UI)', async () => {
@@ -498,4 +563,83 @@ test('live unit stats (user playtest #4 item 7): unitStats(id) reads the battle 
   assert.equal(r.runner.unitStats(ally.id), null, 'nothing on screen after the battles were dropped');
   assert.equal(r.runner.unitIdOf(ally.uid, ally.ownerId), null);
   r.runner.dispose();
+});
+
+test('(fork) the combat meter attaches to every in-page battle (no setting) and never reaches the network', async () => {
+  const start = realStart(7312);
+  const r = rig();
+  r.net.emit('b.start', start);
+  await r.settle();
+  const e = r.runner._entries.get(start.battleId);
+  assert.equal(typeof e.combatMetrics, 'function', 'attached without any setting');
+  assert.equal(r.runner.setCombatMetrics, undefined, 'the opt-in switch is gone');
+  let live = 0;
+  for (let i = 0; i < 40 && live <= 0 && !e.battle.finished; i++) {
+    r.advance(500, 50);
+    live = (e.battle.allyUnits || []).reduce((n, u) => n + (u.stats?.dmg || 0), 0);
+  }
+  const seen = r.runner.combatMetrics().damage;
+  assert.ok(live > 0, `operators dealt no damage by t=${e.battle.time}`);
+  assert.ok(Math.abs(seen - live) < 1e-6, `meter ${seen} vs sim ${live}`);
+  for (const msg of r.net.sent) {
+    assert.equal(msg.rows, undefined);
+    assert.equal(msg.combatMetrics, undefined);
+  }
+  r.runner.dispose();
+});
+
+test('a Worker host never attaches the combat meter', async () => {
+  let hooked = 0;
+  const battle = {
+    finished: true, time: 0, tickCount: 0, leakedCount: 0, flags: {}, allyUnits: [],
+    snapshot: () => ({ t: 0 }),
+    drainEvents: () => [],
+    fieldMeta: () => ({ units: [] }),
+    getPlayer: () => null,
+    on() { hooked += 1; throw new Error('trackCombat must not attach to a Worker battle'); },
+    heal() { return 0; },
+  };
+  const host = {
+    remote: true,
+    battle,
+    meter: { lp: 0 },
+    async load() {},
+    async start() {},
+    async syncPool() {},
+    stop() {},
+    progress: () => ({ gt: 0, killed: 0, total: 0, done: true, leaks: 0 }),
+    compactResult: () => null,
+    step: () => Promise.resolve({ ticks: 0, slices: [] }),
+    forceEnd: () => Promise.resolve(),
+  };
+  const r = rig({ createHost: () => host });
+  const spec = { fieldId: 'n:worker', kind: 'normal', players: [{ playerId: 'p_0' }] };
+  r.net.emit('b.start', { battleId: 'worker-1', fieldId: 'n:worker', kind: 'normal', spec, authoritative: true, speed: 2 });
+  await r.settle();
+  const e = r.runner._entries.get('worker-1');
+  assert.ok(e && !e.failed, 'the Worker battle was prepared');
+  assert.equal(e.combatMetrics, null);
+  assert.equal(hooked, 0);
+  const prog = r.net.sent.filter((m) => m.t === 'b.progress');
+  assert.ok(prog.length >= 1, 'progress is still the battle report');
+  for (const msg of r.net.sent) {
+    assert.equal(msg.rows, undefined);
+    assert.equal(msg.combatMetrics, undefined);
+    assert.notEqual(msg.t, 'b.result', 'a null compact result is not sent');
+  }
+  r.runner.dispose();
+});
+
+test('(fork) 作战统计 has no setting (always on): no settings row or key, the panel shown; the hud.right plugin slot remains', () => {
+  const settings = readFileSync(new URL('../../public/js/ui/settings.js', import.meta.url), 'utf8');
+  const game = readFileSync(new URL('../../public/js/screens/game.js', import.meta.url), 'utf8');
+  const logic = readFileSync(new URL('../../public/js/ui/gameLogic/settings.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(logic, /combatMetrics: (false|typeof)/);
+  assert.doesNotMatch(settings, /t\('作战统计'\)/);
+  assert.match(game, /CombatMetricsPanel/);
+  assert.doesNotMatch(game, /DamageButton|metricsSetting/);
+  assert.match(game, /data-ui-slot="hud\.right"/);
+  const state = { me: {}, room: null, match: { public: null, battle: null }, connection: { status: 'online' } };
+  const line = (s) => buildDiagnostics({ state, env: {}, settings: s }).split('\n').find((l) => l.startsWith('settings:'));
+  assert.equal(line({ quality: 'high', damageNumbers: true, combatMetrics: true }), 'settings: quality high | damage numbers', 'an old stored key is not reported');
 });

@@ -4,7 +4,7 @@
 // Installed on Battle.prototype by server/sim/Battle.js (a method container: never instantiated; `this` is the battle).
 
 import { FORCED_EXIT, MAX_BATTLE_TIME } from '../constants.js';
-import { updateAlly, updateEnemy } from '../ai.js';
+import { noteAttackCommit, updateAlly, updateEnemy } from '../ai.js';
 
 export class BattleLifecycle {
   start() {
@@ -81,6 +81,8 @@ export class BattleLifecycle {
         for (const ps of this.players) ps.dp = Math.min(this.flags.dpMax, ps.dp + this.flags.dpPerSec * dt);
       });
       this._phase('buffs', () => this._tickBuffs(dt));
+      // Allies whose attack comes off cooldown this tick keep the target they have now, before enemies move.
+      this._phase('attackCommit', () => noteAttackCommit(this, dt));
       this._phase('enemies', () => {
         // enemies spawned by hooks during this loop start moving next tick (a leak hook that spawns an enemy which
         // leaks at once would otherwise loop forever inside a single tick)
@@ -106,6 +108,7 @@ export class BattleLifecycle {
         }
       });
       this._phase('projectiles', () => this.projectiles.update(dt));
+      if (this.notes.list.length) this._phase('notes', () => this.notes.update(dt));
       this._phase('redeploy', () => this._checkRedeploys());
       this._phase('boss', () => this._bossSync());
       if (this._hooks.tick) this._phase('tickHook', () => this.emit('tick', { dt }));
@@ -132,12 +135,13 @@ export class BattleLifecycle {
     this._endReq = null;
     try { this._result = this._buildResult(); } catch { this._result = { time: this.time, reason: this.reason, perPlayer: {}, killed: this.killed, total: this.total, resolved: this.resolved, errors: this.errorCount }; }
     this.projectiles.clear();
+    this.notes.clear();
   }
 
   /** Run until finished or `maxSeconds` of game time elapsed. Returns the result when finished. */
   runToEnd(maxSeconds = MAX_BATTLE_TIME) {
     const limit = this.time + maxSeconds;
-    while (!this.finished && this.time < limit) this.step();
+    while (!this.finished && this.time < limit) this.step(); // loop-cap: battle time limit
     return this.finished ? this.result() : null;
   }
 
@@ -211,6 +215,7 @@ export class BattleLifecycle {
       pp.perfect = !pp.leaked.some((l) => l.counted !== false);
     }
     this.projectiles.clear();
+    this.notes.clear();
   }
 
   _buildResult() {
@@ -219,8 +224,12 @@ export class BattleLifecycle {
       const pp = this._perPlayer[ps.playerId];
       pp.perfect = !pp.leaked.some((l) => l.counted !== false);
       // the HUD capsule's numerator of this field (DESIGN §14): this player's own scheduled enemies resolved — knocked
-      // down or leaked (`counted` keeps the LP / 完美作战 reading, runtime splits and summons included)
+      // down or leaked (`counted` keeps the LP / 完美作战 reading, runtime splits and summons included — a 联防 field
+      // tags its runtime spawns `uniteRuntime`, spawns.js, which only its billing reads)
       pp.resolved = Math.min(pp.total, pp.killedInTotal + pp.leakedInTotal);
+      // Actual enemy deaths credited to this player's operators / summons, independent of the enemy's wave owner.
+      // Sum the full unit list before compactBattleResult caps unitStats (long fights may spawn many summons).
+      pp.creditedKills = ps.units.reduce((n, u) => n + u.stats.kills, 0);
       // the operators and the board's summon pieces (a board uid): 联防 carries an operator's HP ratio and SP, a summon's
       // SP only (match/unite.js). `sp` is the official 技力 — stored charges included (PRTS 技能 "可充能X次…当前技力上限等于该
       // 技能技力需求的X倍"); a running skill spent its SP at activation, so it reports what was left (0 for one charge).
@@ -236,6 +245,8 @@ export class BattleLifecycle {
         id: u.id, uid: u.uid, defId: u.defId, name: u.name, kind: u.kind,
         dmg: Math.round(u.stats.dmg), kills: u.stats.kills, heal: Math.round(u.stats.heal), taken: Math.round(u.stats.taken), attacks: u.stats.attacks,
       }));
+      // the Fever gauge at the end (sim/fever.js), for 联防 (match/unite.js): only on a field that has one
+      if (this.fever) pp.fever = Math.round(this.fever.value * 100) / 100;
       perPlayer[ps.playerId] = pp;
     }
     const res = { time: Math.round(this.time * 1000) / 1000, reason: this.reason, perPlayer, killed: this.killed, total: this.total, resolved: this.resolved, errors: this.errorCount };

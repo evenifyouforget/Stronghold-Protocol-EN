@@ -56,7 +56,7 @@ describe('Modal keyboard focus', { skip: !ENABLED && 'set SP_E2E=1 and have Chro
   }
 
   test('initial focus, both Tab boundaries, nested priority, recovery and cleanup', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     try {
       await fixture(page);
       await page.click('#open');
@@ -91,7 +91,7 @@ describe('Modal keyboard focus', { skip: !ENABLED && 'set SP_E2E=1 and have Chro
   });
 
   test('clipboard fallback stays in the active dialog, copies its payload, restores focus and cleans up on failure', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     try {
       await fixture(page);
       await page.click('#open');
@@ -129,7 +129,7 @@ describe('Modal keyboard focus', { skip: !ENABLED && 'set SP_E2E=1 and have Chro
   });
 
   test('no controls: focus the dialog itself; imperative confirm retains autofocus and native Enter', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     try {
       await fixture(page);
       await page.click('#empty-open');
@@ -150,12 +150,12 @@ describe('Modal keyboard focus', { skip: !ENABLED && 'set SP_E2E=1 and have Chro
   });
 
   test('title settings: Tab cycles and leaves hotkey capture; Esc cancels capture before closing', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     try {
       await page.setViewport({ width: 1280, height: 720 });
       page.setDefaultTimeout(5000);
-      await page.goto(srv.url, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.title-settings');
+      await page.goto(srv.url, { waitUntil: 'domcontentloaded', timeout: 30000 }); // (fork) the module graph alone can take > 5 s here
+      await page.waitForSelector('.title-settings', { timeout: 30000 });
       await page.click('.title-settings');
       await page.waitForFunction(() => document.querySelector('.modal__box')?.contains(document.activeElement));
       const assertInside = async () => assert.equal(await page.evaluate(() => document.querySelector('.modal__box').contains(document.activeElement)), true);
@@ -181,11 +181,11 @@ describe('Modal keyboard focus', { skip: !ENABLED && 'set SP_E2E=1 and have Chro
   });
 
   test('settings lets the higher guide keep keyboard focus and resumes after it closes', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     try {
       page.setDefaultTimeout(5000);
-      await page.goto(srv.url, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.title-settings');
+      await page.goto(srv.url, { waitUntil: 'domcontentloaded', timeout: 30000 }); // (fork) the module graph alone can take > 5 s here
+      await page.waitForSelector('.title-settings', { timeout: 30000 });
       await page.click('.title-settings');
       await page.waitForSelector('.set-guide');
       await page.waitForFunction(() => !document.querySelector('.modal__box').getAnimations().some((a) => a.playState === 'running'));

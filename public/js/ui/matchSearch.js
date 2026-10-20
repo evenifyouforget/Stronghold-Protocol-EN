@@ -9,33 +9,30 @@ import { net } from '../net.js';
 import { serverNow, loadPref, savePref } from '../store.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 
-// A new key per announcement, so everyone who closed the earlier one ('news.0.2.4.1') sees it again.
-export const UPDATE_NEWS_PREF = 'news.0.2.5';
+// A new key per announcement, so everyone who closed the earlier one ('news.0.2.6') sees it again.
+export const UPDATE_NEWS_PREF = 'news.0.3.0';
 
-/** The 0.2.5 announcement's emphasized line, shown above the points (msgid). */
-const UPDATE_HIGHLIGHT = N_('干员调配新增时装系统'); // en: "Added the Outfits system to Operator Loadout"
+/** The 0.3.0 announcement's emphasized line, shown above the points (msgid). */
+const UPDATE_HIGHLIGHT = N_('丰川祥子加入自选编队，技能与特效尽可能忠实还原原作'); // en: "Sakiko Togawa joins the Custom Squad, with her kit and effects recreated as faithfully to the original game as we could"
 
-/** The 0.2.5 announcement's points (msgids). */
+/** The 0.3.0 announcement's points (msgids). */
 const UPDATE_POINTS = [
-  N_('战场现使用官方3D场景（如沙地战场），取代金属棋盘'), // en: "Battlefields now use the official 3D scenes, such as the sand stages, in place of the metal board"
-  N_('新增「官方伤害数字」设置（默认关闭）：只显示官方游戏会显示的伤害数字'), // en: "New \"Official Damage Numbers\" setting (off by default): shows only the damage numbers the official game shows"
-  N_('盟约层数音效现会在回合开始、机变、休整期与战斗中播放'), // en: "Alliance stack sounds now play at round start, in Improv, in the Rest Phase and in combat"
-  N_('结算前生命值保持当前数值，并在旁边显示待扣除的 −N'), // en: "HP keeps its current value until settlement, with the pending −N shown beside it"
-  N_('干员模型在攻击或释放技能时不再被直线边缘截断'), // en: "Operator models no longer get cut off at a straight edge when they attack or use a skill"
-  N_('号角与灰毫现使用正确的攻击动画'), // en: "Horn and Ashlock use the correct attack animations"
-  N_('重炮手的炮弹以抛物线飞行并在落地时爆炸；领主近卫在近距离时使用近战动画'), // en: "Fortress Defenders shots fly in an artillery arc and burst on landing; Lord Guards use their melee animation up close"
-  N_('大量问题修复'), // en: "Many fixes"
+  N_('官方战斗特效（早期预览）：命中、弹道与技能可使用游戏原版特效，可在「设置 → 官方特效」中开启'), // en: "Official battle effects (early preview): hits, projectiles and skills can use the game's own effects. Turn them on in Settings → Official Effects"
+  N_('高台、召唤物与装置改用官方模型'), // en: "High Ground, summons and devices use the official models"
+  N_('统计页向官方靠拢：奖杯、独立 / 联合模拟两行、六称号图'), // en: "Stats page redesigned closer to the game's: trophies, Solo / Co-op rows, the six-title chart"
+  N_('手动刷新商店会取消冻结（按官方）'), // en: "Refreshing the shop by hand now cancels the freeze, as in the game"
+  N_('攻击出手后，目标走出射程也会打完这一下（按官方）'), // en: "Operators keep attacking a target that leaves range during the attack, as in the game"
 ];
 
-// '0.2.5 更新 - PRTS' — en: "Update 0.2.5 - PRTS"
+// '0.3.0 更新' — en: "Update 0.3.0"
 export function UpdateNews() {
   const [hidden, setHidden] = useState(() => loadPref(UPDATE_NEWS_PREF, false) === true);
   if (hidden) return null;
   const dismiss = () => { savePref(UPDATE_NEWS_PREF, true); setHidden(true); };
-  return html`<aside class="search-news brackets" role="note" aria-label=${t('0.2.5 更新 - PRTS')}>
+  return html`<aside class="search-news brackets" role="note" aria-label=${t('0.3.0 更新')}>
     <span class="search-news__icon" aria-hidden="true"><${Icon} name="info" /></span>
     <div class="search-news__text">
-      <span class="search-news__head"><span class="search-news__tag">NEW</span>${t('0.2.5 更新 - PRTS')}</span>
+      <span class="search-news__head"><span class="search-news__tag">NEW</span>${t('0.3.0 更新')}</span>
       <ul class="search-news__list">
         <li class="search-news__highlight"><strong>${t(UPDATE_HIGHLIGHT)}</strong></li>
         ${UPDATE_POINTS.map((p) => html`<li key=${p}>${t(p)}</li>`)}
@@ -60,9 +57,12 @@ export function useFindMates() {
   return [on, (v) => { savePref(FIND_MATES_PREF, !!v); setOn(!!v); }];
 }
 
-/** The switch applies: a co-op room with a free seat, seen from a player seat. */
+/**
+ * The switch applies: a co-op room with a free seat, seen from a player seat — and (fork) no gameplay plugins: such a
+ * room is joined by its code only (room.state.content.vanilla false; the server refuses room.search for it too).
+ */
 export function canFindMates(room, facts) {
-  return room.mode !== 'solo' && !facts.spectating && facts.occupied.length < MAX_SEATS;
+  return room.mode !== 'solo' && !facts.spectating && facts.occupied.length < MAX_SEATS && room.content?.vanilla !== false;
 }
 
 /**

@@ -9,6 +9,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { gotoMock } from '../e2e/mockPage.mjs';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
@@ -41,14 +42,16 @@ describe('文字大小 on a phone (headless Chrome)', { skip: !ENABLED && 'set S
 
   /** A page watching for console / page errors, with `sp.pref.settings` seeded before the first script runs. */
   async function open(url, textSize, { seed = true } = {}) {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     await page.setViewport(PHONE);
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
     if (seed && textSize) await seedSettings(page, textSize);
     // this fork starts in English (ui/lang.js START_LANG); these checks read the Chinese msgids
-    await page.goto(`${url}${url.includes('?') ? '&' : '?'}lang=zh`, { waitUntil: 'networkidle0', timeout: 60000 });
+    const target = `${url}${url.includes('?') ? '&' : '?'}lang=zh`;
+    if (url.includes('game-mock')) await gotoMock(page, target); // (fork) the mock never reliably goes network-idle (e2e/mockPage.mjs)
+    else await page.goto(target, { waitUntil: 'networkidle0', timeout: 60000 });
     return { page, problems };
   }
 
@@ -137,6 +140,7 @@ describe('文字大小 on a phone (headless Chrome)', { skip: !ENABLED && 'set S
     const measure = async (textSize) => {
       const { page, problems } = await open(`${base}/dev/game-mock.html?shot=1&phase=PREP&variant=settings`, textSize);
       await page.waitForFunction(() => !!document.querySelector('.screen:not(.gload)'), { timeout: 15000 });
+      await page.waitForSelector('.gm__field canvas', { timeout: 60000 }); // (fork) the engine mounts after the screen
       await sleep(900);
       const m = await page.evaluate(() => {
         const box = (sel) => {

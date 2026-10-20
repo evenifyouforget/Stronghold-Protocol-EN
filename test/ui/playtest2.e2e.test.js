@@ -4,8 +4,9 @@
 //   SP_E2E=1 node --test test/ui/playtest2.e2e.test.js
 //   SP_E2E=1 SP_P2_ONLY=pen|sell|reach|bonds|loadout node --test test/ui/playtest2.e2e.test.js
 //
-//  6  the enemy preview pen is shown only by the pen camera: never with the prep board (after 🔍◀◀ "返回战场" too) nor in
-//     any battle camera (normal / 联防 / 最终攻势 / 隐秘核心): no pen figures, no pen rows drawn (2D), no pen area built (3D)
+//  6  (superseded by the maintainer's decision of 2026-10-15) the enemy preview pen shows with the prep board — its
+//     figures at the top right, its rows drawn (2D), its block built (3D) — in the pen view and back on the board after
+//     🔍◀◀ "返回战场"; never in a battle camera (normal / 联防 / 最终攻势 / 隐秘核心) nor with the Final Assault prep
 //  7  the underframe's 出售 / 销毁 buttons are coloured plates (amber / red), not a white block — 3D engine and DOM fallback
 //  8  at 16:9, 16:10, 21:9 (2560×1080 and 3440×1440), 4:3, 1280×720, 1366×768 and iPad landscape every bench / temp /
 //     board unit's underframe buttons are the topmost element under their centre (clickable) and the detail card
@@ -17,11 +18,12 @@
 //     icon for the chosen skill), detail card skill + 已调配, an elite with its module unequipped shows 未装备模组
 // Screenshots: test/e2e/out/fix-*.png.
 
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gotoMock } from '../e2e/mockPage.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -55,16 +57,18 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     await browser?.close();
     await srv?.close();
   });
+  // (fork) a failed test skips its own page.close(): close what it left open, or its render loop slows every next test
+  afterEach(async () => { for (const p of (await browser?.pages()) || []) await p.close().catch(() => {}); });
 
   async function open(query, { w = 1920, h = 1080, render = 'engine' } = {}) {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     await page.setViewport({ width: w, height: h });
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
     page.on('requestfailed', (r) => problems.push(`requestfailed: ${r.url()} ${r.failure()?.errorText}`));
     page.on('response', (r) => { if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`); });
-    await page.goto(`${base}/dev/game-mock.html?shot=1&render=${render}&${query}`, { waitUntil: 'networkidle0' });
+    await gotoMock(page, `${base}/dev/game-mock.html?shot=1&render=${render}&${query}`);
     await page.waitForFunction(() => !!document.querySelector('.screen:not(.gload)') && !!globalThis.__SP_VIEW__, { timeout: 20000 });
     await sleep(render === 'engine' ? 1600 : 700);
     return { page, problems };
@@ -140,6 +144,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
       });
       await tapPiece(page, uids.chess);
       await page.waitForSelector('.uframe__btn--sell .uframe__plate', { timeout: 3000 });
+      await sleep(300); // (fork) the frame's uframe-in fade (200 ms): sampled mid-fade it reads as the board behind
       const plate = await page.$eval('.uframe__btn--sell .uframe__plate', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.2, w: r.width * 0.6, h: r.height * 0.6 }; });
       const c = await meanColor(page, plate);
       assert.ok(!(c.r > 225 && c.g > 225 && c.b > 225), `sell plate is not white (${JSON.stringify(c)})`);
@@ -148,6 +153,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
       await page.keyboard.press('Escape');
       await tapPiece(page, uids.item);
       await page.waitForSelector('.uframe__btn--destroy .uframe__plate', { timeout: 3000 });
+      await sleep(300); // (fork) the frame's uframe-in fade (200 ms): sampled mid-fade it reads as the board behind
       const dp = await page.$eval('.uframe__btn--destroy .uframe__plate', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.2, w: r.width * 0.6, h: r.height * 0.6 }; });
       const d = await meanColor(page, dp);
       assert.ok(!(d.r > 225 && d.g > 225 && d.b > 225), `destroy plate is not white (${JSON.stringify(d)})`);
@@ -388,7 +394,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
       camera: document.querySelector('.gm')?.dataset.camera, kind: d.camKind,
       pen: pens.length, penVisible: pens.filter((v) => v.root && v.root.visible !== false).length,
       band: d.tiles.band, penRowsDrawn: d.tiles.grid.some((row) => row.some((t) => t.r >= 14 && t.drawn)),
-      area3d: area ? Math.max(...area.map((a) => a.r1)) : null, board3d: !!d.board3d,
+      area3d: area ? Math.max(...area.map((a) => a.r1)) : null, board3d: !!d.board3d, penHidden: raw.stats().penHidden,
     };
   });
 
@@ -396,14 +402,18 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
   // playtest #5 item 6: render/app.js boardArea) — and the enemy preview pen starts at row 14.
   const NO_PEN_R1 = 13;
 
-  test('6: the enemy pen shows only in the pen view — never with the prep board (after 返回战场) or any battle', { skip: skipUnless('pen'), timeout: 5 * 60 * 1000 }, async () => {
+  test('6: the enemy pen shows with the prep board, in the pen view and after 返回战场 — never in a battle or the Final Assault prep', { skip: skipUnless('pen'), timeout: 5 * 60 * 1000 }, async () => {
     const { page, problems } = await open('phase=PREP', { w: 1920, h: 1080 });
+    await sleep(900);
     let s = await penState(page);
     assert.equal(s.camera, 'prep');
     assert.ok(s.pen > 0, 'the pen holds the next round\'s enemies');
-    assert.equal(s.penVisible, 0, 'prep board: no pen figure shown');
-    assert.equal(s.penRowsDrawn, false, 'prep board: pen rows not drawn');
-    if (s.board3d) assert.ok(s.area3d <= NO_PEN_R1, `prep board: 3D area without the pen (${s.area3d})`);
+    // the maintainer's decision of 2026-10-15 (the official 休整期: the next round's enemies at the top right of the
+    // prep view); user playtest #2 item 6 had kept the pen to the pen camera
+    assert.equal(s.penHidden, false, 'prep board: the camera shows the pen');
+    assert.ok(s.penVisible > 0, 'prep board: the pen\'s figures shown');
+    assert.ok(s.penRowsDrawn, 'prep board: pen rows drawn');
+    if (s.board3d) assert.ok(s.area3d >= 18, `prep board: 3D pen area built (${s.area3d})`);
     await page.screenshot({ path: path.join(OUT, 'fix-pen-prep.png') });
     await page.click('.enemybtn');
     await page.waitForFunction(() => document.querySelector('.gm')?.dataset.camera === 'pen', { timeout: 3000 });
@@ -413,17 +423,32 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     assert.ok(s.penRowsDrawn, 'pen view: pen rows drawn');
     if (s.board3d) assert.ok(s.area3d >= 18, 'pen view: 3D pen area built');
     await page.screenshot({ path: path.join(OUT, 'fix-pen-view.png') });
-    // 🔍◀◀ (tooltip 返回战场) back to the board: the pen is gone again
+    // 🔍◀◀ (tooltip 返回战场) back to the board: the pen stays where it stands
     await page.click('.gtop__iconbtn');
     await page.waitForFunction(() => document.querySelector('.gm')?.dataset.camera === 'prep', { timeout: 3000 });
     await sleep(900);
     s = await penState(page);
-    assert.equal(s.penVisible, 0, 'back on the board (返回战场): no pen figure');
-    assert.equal(s.penRowsDrawn, false, 'back on the board: pen rows not drawn');
-    if (s.board3d) assert.ok(s.area3d <= NO_PEN_R1, `back on the board: no pen area (${s.area3d})`);
+    assert.equal(s.penHidden, false, 'back on the board (返回战场): the camera shows the pen');
+    assert.ok(s.penVisible > 0, 'back on the board (返回战场): the pen\'s figures still shown');
+    assert.ok(s.penRowsDrawn, 'back on the board: pen rows drawn');
+    if (s.board3d) assert.ok(s.area3d >= 18, `back on the board: the pen area (${s.area3d})`);
     await page.screenshot({ path: path.join(OUT, 'fix-pen-back.png') });
     assert.deepEqual(problems, []);
     await page.close();
+
+    // the Final Assault prep frames the boss field: no pen there
+    {
+      const o = await open('phase=PREP&variant=boss', { w: 1920, h: 1080 });
+      await sleep(1200);
+      const b = await penState(o.page);
+      assert.equal(b.camera, 'bossPrep');
+      assert.equal(b.penVisible, 0, 'Final Assault prep: no pen figure');
+      assert.equal(b.penHidden, true, 'Final Assault prep: the camera hides the pen');
+      assert.equal(b.penRowsDrawn, false, 'Final Assault prep: pen rows not drawn');
+      if (b.board3d) assert.ok(b.area3d <= 6, `Final Assault prep: the boss field only (${b.area3d})`);
+      assert.deepEqual(o.problems, [], 'boss prep');
+      await o.page.close();
+    }
 
     // every battle camera
     for (const phase of ['COMBAT', 'UNITE', 'FINAL_ASSAULT', 'HIDDEN_CORE']) {

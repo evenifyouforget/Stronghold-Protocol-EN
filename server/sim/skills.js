@@ -47,13 +47,17 @@
 //   the unit's 攻击距离), showOwnRange (rangeGrid only selects targets: the detail card keeps the unit's own range)},
 //   attack {dmgType, atkScale, splashRadius, splashScale, hits, projectile, maxTargets, dmgMul, onHit, heal…},
 //   heal (bool: heal-type skill for the trigger rule), allyTargets (bool: the skill acts on a registered ally target — see
-//   `allyTargetsOk`), onStart(ctx), onEnd(ctx), onHit(ctx), onAttack(ctx), onTick(ctx).
+//   `allyTargetsOk`), onStart(ctx), onEnd(ctx), onHit(ctx), onAttack(ctx), onTick(ctx), cue(ctx) (a cast's display
+//   payload: an object returned here rides on the cast's client event as `['skill', id, 1, cue]` — read before onStart,
+//   so it sees the state the cast was made in; display only, never read by the sim).
 // ctx passed to spec callbacks: { battle, unit, skill, bb, target?, dealt?, targets?, dt?, reason? }; onAttack's ctx
 //   also carries `noAmmo` (set it to true: this attack spends no ammo). onEnd runs while the skill's mods / range are
 //   still applied (`active` is already false); they are removed right after it (unless onEnd re-activated the skill).
 
 import { absoluteRangeKeys, canTargetEnemy } from './targeting.js';
 import { AUTO_OP_COOLDOWN, COLS, ROWS } from './constants.js';
+import { boundedCount } from '../../shared/plugins/limits.js';
+import { fieldCap } from '../../shared/plugins/officialBounds.js';
 
 const TICK_RULES = new Set(['SP_FULL', 'SEARCH', 'CUSTOM_RANGE', 'SKILL_RANGE', 'ACTIVE_RANGE', 'GDGLOW_SKILL_2']);
 /** True when a SkillSpec `targeting` changes the unit's range while the skill runs (Battle._refreshRange). */
@@ -92,7 +96,7 @@ export class SkillRuntime {
     this.ammo = Math.max(0, Math.floor(+s.ammo || 0));
     this.baseSpCost = Math.max(0, Number.isFinite(+s.spCost) ? +s.spCost : (d.spCost ?? 0));
     this.initSp = Math.max(0, Number.isFinite(+s.initSp) ? +s.initSp : (d.initSp ?? 0));
-    this.maxCharges = Math.max(1, Math.floor(s.charges ?? d.maxCharges ?? 1));
+    this.maxCharges = Math.max(1, Math.floor(boundedCount(s.charges ?? d.maxCharges ?? 1, fieldCap('skill.maxCharges'), 1)));
     this.spType = s.spType ?? d.spType ?? 'time';
     const trig = typeof s.trigger === 'string' ? { rule: s.trigger } : (s.trigger || d.trigger || {});
     this.rule = String(trig.rule ?? 'DEFAULT').toUpperCase();
@@ -346,7 +350,7 @@ export class SkillRuntime {
     this.sp += amt;
     // within 1e-9 of the cost is the cost (the timer tolerance of `timeLeft` below; PR #402): 300 time gains of 1/30 SP
     // add up to 9.999999999999975 in floating point, which held a 10-SP charge one tick
-    while (this.sp > cost - 1e-9 && this.charges < this.maxCharges) {
+    while (this.sp > cost - 1e-9 && this.charges < this.maxCharges) { // loop-cap: fieldCap skill.maxCharges
       this.charges++;
       if (this.charges < this.maxCharges) this.sp = Math.max(0, this.sp - cost);
       else this.sp = cost;
@@ -360,7 +364,7 @@ export class SkillRuntime {
     if (this.noSkill || this.kind === 'passive') return;
     const cost = this.spCost;
     if (cost <= 0) { if (this.sp > 0) { this.sp = 0; this.charges = this.maxCharges; } return; } // became free
-    while (this.sp > cost - 1e-9 && this.charges < this.maxCharges) {   // (the 1e-9 of gainSp)
+    while (this.sp > cost - 1e-9 && this.charges < this.maxCharges) {   // loop-cap: fieldCap skill.maxCharges (the 1e-9 of gainSp)
       this.charges++;
       this.sp = this.charges < this.maxCharges ? Math.max(0, this.sp - cost) : cost;
     }
@@ -466,7 +470,7 @@ export class SkillRuntime {
     if (this.rule === 'SKILL_RANGE') {
       if (this.triggerAllies) return this._allyTriggerSatisfied();
       if (!this.triggerGrid) return this._defaultCondition();
-      return b.anyEnemyInKeys(this._triggerKeys()) || this._allyTargetIn(this._trigSet);
+      return b.anyEnemyInKeys(this._triggerKeys(), u) || this._allyTargetIn(this._trigSet);
     }
     if (this.rule === 'ACTIVE_RANGE') return this._defaultCondition(this.triggerGrid ? this._triggerKeys() : null);
     // GDGLOW_SKILL_2 "全场存在可选目标时释放技能": a targetable enemy anywhere (heal skill: an ally that needs healing)
@@ -554,7 +558,8 @@ export class SkillRuntime {
       // (a targeting-only instant skill must still switch to its skill range for the pending attack)
       if (this.spec.mods || this.spec.flags || this.spec.targeting) this._applyMods();
     }
-    b._ev(['skill', u.id, 1]);
+    const cue = this.spec.cue ? this._call('cue', { reason }) : null;
+    b._ev(cue && typeof cue === 'object' ? ['skill', u.id, 1, cue] : ['skill', u.id, 1]);
     u.skillAnimUntil = b.time + SKILL_ANIM_WINDOW;
     this._call('onStart', { reason });
     if (b._hooks.skillStart) b.emit('skillStart', { unit: u, skill: this, reason });

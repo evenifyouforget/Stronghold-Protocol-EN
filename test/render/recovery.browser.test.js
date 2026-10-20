@@ -1,6 +1,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url'; // (fork) Windows-safe paths
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = process.env.RENDER_E2E === '1' && existsSync(CHROME);
@@ -127,6 +128,9 @@ describe('renderer recovery after transient resource failures', { skip: !enabled
   for (const resource of ['atlas', 'three']) test(`${resource} download can recover the 3D board on visibility`, { skip: !art }, async () => {
     const page = await browser.newPage(); let failing = true, requests = 0;
     try {
+      // the imported-art service worker (public/sw.js, PR #628 — registered by an earlier page of this origin) would
+      // fetch the hashed atlas itself, past this page's request interception
+      await page.setBypassServiceWorker(true);
       await page.setRequestInterception(true);
       page.on('request', req => {
         const p = new URL(req.url()).pathname;
@@ -143,7 +147,7 @@ describe('renderer recovery after transient resource failures', { skip: !enabled
       await page.waitForFunction(() => window.__demo.stats().board3d.on, { timeout: 15000 });
       assert.ok(requests > before, 'the failed resource is actually requested again');
       assert.equal(await page.evaluate(() => window.__demo.view.debug.app.view.parentNode.querySelectorAll('canvas').length), 2);
-      await page.screenshot({ path: new URL(`../e2e/out/recovery-${resource}.png`, import.meta.url).pathname });
+      await page.screenshot({ path: fileURLToPath(new URL(`../e2e/out/recovery-${resource}.png`, import.meta.url)) });
     } finally { await page.close(); }
   });
 });
