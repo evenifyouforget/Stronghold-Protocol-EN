@@ -1,0 +1,3 @@
+# Kept out of git on purpose (Fish, 2026-10-21): everything else in remove-before-merge/ is tracked.
+# untracked/: superseded drafts (spacc-live-spec.md was merged into spacc/working-spec.md).
+untracked/
