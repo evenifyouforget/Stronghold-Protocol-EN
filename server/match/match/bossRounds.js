@@ -54,8 +54,8 @@ export class MatchBoss {
     const hitSteps = new Map();
     // SPA-CC: ccPatriot Undying 1 — nobody took the round-9 Patriot (riskPatriotSkipped); the boss-pool tags (bossRisk.js)
     const patriotSkipped = this.riskPatriotSkipped();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.rules, { patriotSkipped }), {
-      risk: bossRiskConfig(this.rules),
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.lobbyRules, { patriotSkipped }), {
+      risk: bossRiskConfig(this.lobbyRules),
       onRisk: (changes) => this._bossRisk(changes),
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
@@ -108,7 +108,7 @@ export class MatchBoss {
         routes: wave.routes,
         sharedBoss: this.bossPool,
         // the round's enemy effects for the leaders' mid-fight summons (server/sim/content/bosses.js summonMods)
-        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round), rules: this.rules,
+        flags: { layerGainsEnabled: false, ...this.gd.dp, enemyScale: this.gd.enemyScale(this.round), rules: this.lobbyRules,
           ...(patriotSkipped ? { ccPatriotSkipped: true } : {}) },
         fieldId,
         enemyOverrides: wave.overrides,

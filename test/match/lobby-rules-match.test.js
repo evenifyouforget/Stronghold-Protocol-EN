@@ -1,4 +1,4 @@
-// Lobby rules (Fish Edition, shared/constants.js RULE_KEYS): the host-set modifiers a match reads at start —
+// test/match/lobby-rules-match.test.js — Lobby rules (Fish Edition, shared/constants.js RULE_KEYS): the host-set modifiers a match reads at start —
 // extraDeploy (+2 deployment limit), extraFunds (+2 Funds every round start), untimed (no countdown outside battles).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,7 +40,7 @@ test('room.setRules: a non-empty partial map of known rule keys to values of the
 test('no rules: the match runs with every rule off and shows them in m.public', () => {
   const h = makeMatch({ mode: 'solo', seed: 2 }).start();
   h.toPrep(1);
-  assert.deepEqual(h.m.rules, DEFAULT_RULES);
+  assert.deepEqual(h.m.lobbyRules, DEFAULT_RULES);
   assert.deepEqual(h.m.publicView().rules, DEFAULT_RULES);
   const ps = h.ps('p_0');
   assert.equal(ps.deployCap, 8);
@@ -49,7 +49,7 @@ test('no rules: the match runs with every rule off and shows them in m.public', 
 });
 
 test('extraFunds: +2 Funds at every round start, on top of the income', () => {
-  const h = makeMatch({ mode: 'solo', seed: 2, rules: { extraFunds: true } }).start();
+  const h = makeMatch({ mode: 'solo', seed: 2, lobbyRules: { extraFunds: true } }).start();
   h.toPrep(1);
   const ps = h.ps('p_0');
   assert.equal(ps.funds, 4 + RULE_EXTRA_FUNDS, 'R1: income 4 + 2');
@@ -61,7 +61,7 @@ test('extraFunds: +2 Funds at every round start, on top of the income', () => {
 });
 
 test('extraDeploy: +2 deployment limit for every player, stacking with in-game bonuses', () => {
-  const h = makeMatch({ mode: 'coop', humans: 1, bots: 1, seed: 3, rules: { extraDeploy: true } }).start();
+  const h = makeMatch({ mode: 'coop', humans: 1, bots: 1, seed: 3, lobbyRules: { extraDeploy: true } }).start();
   h.toPrep(1);
   for (const ps of h.m.players.values()) {
     assert.equal(ps.deployCap, 8 + RULE_EXTRA_DEPLOY, ps.playerId);
@@ -79,7 +79,7 @@ test('untimed: a co-op match with two humans publishes no countdown outside batt
   assert.ok(timed.m.deadline > 0, 'without the rule, co-op prep has a countdown');
   timed.m.dispose();
 
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 5, rules: { untimed: true } }).start();
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 5, lobbyRules: { untimed: true } }).start();
   const m = h.m;
   m.handle('p_0', { t: 'g.infoReady' });
   m.handle('p_1', { t: 'g.infoReady' });
@@ -113,7 +113,7 @@ test('seeded: a chosen map and chosen bans are used; the rest is drawn as usual,
   const otherStage = plain.m.gd.mode.stages.find((id) => id !== base.stageId);
   const coreIds = plain.m.gd.bondIds.filter((b) => plain.m.gd.bond(b).isCore && Number(plain.m.gd.bond(b).weight) > 0);
   const notDrawn = coreIds.filter((b) => !base.drawn.includes(b)).slice(0, 2);
-  const h = makeMatch({ mode: 'solo', seed: 7, rules: { stage: otherStage, bans: notDrawn } });
+  const h = makeMatch({ mode: 'solo', seed: 7, lobbyRules: { stage: otherStage, bans: notDrawn } });
   const m = h.m;
   assert.equal(m.stageId, otherStage);
   assert.equal(m.bossId, base.bossId, 'the same seed keeps its bosses');
@@ -129,7 +129,7 @@ test('seeded: a chosen map and chosen bans are used; the rest is drawn as usual,
   for (const b of notDrawn) assert.ok(m.disabledBonds.includes(b), `${b} still banned after the reroll`);
   assert.equal(m.disabledBonds.length, core + addon);
   // a map the mode does not have, and bonds that cannot be banned, are ignored
-  const odd = makeMatch({ mode: 'solo', seed: 7, rules: { stage: 'nope_stage', bans: ['nopeShip'] } });
+  const odd = makeMatch({ mode: 'solo', seed: 7, lobbyRules: { stage: 'nope_stage', bans: ['nopeShip'] } });
   assert.equal(odd.m.stageId, base.stageId);
   assert.deepEqual(odd.m.disabledBonds, base.drawn);
   plain.m.dispose(); h.m.dispose(); odd.m.dispose();
@@ -142,7 +142,7 @@ test('cheats keep the Risk (the "WITH CHEATS" watermark tells; Fish 2026-10-16)'
 
 test('doubleLp: every player starts with twice its strategy\'s LP', () => {
   const lp = (rules) => {
-    const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, rules }).start();
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 7, lobbyRules: rules }).start();
     try { h.toPrep(1); return h.m.order.map((p) => [p.lp, h.m.gd.startLp(p.bandId)]); } finally { h.m.dispose(); }
   };
   for (const [now, band] of lp({})) assert.equal(now, band);
@@ -151,7 +151,7 @@ test('doubleLp: every player starts with twice its strategy\'s LP', () => {
 
 test('tierStart: one random operator of each tier I–VI at the start, the same draw for the same seed, from the pool', () => {
   const grant = () => {
-    const h = makeMatch({ mode: 'solo', seed: 7, rules: { tierStart: true } }).start();
+    const h = makeMatch({ mode: 'solo', seed: 7, lobbyRules: { tierStart: true } }).start();
     try {
       h.toPrep(1);
       const ps = h.ps('p_0');

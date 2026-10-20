@@ -71,7 +71,7 @@ export class MatchViews {
       serverNow: this.sched.now(),
       modeId: this.modeId,
       difficulty: this.difficulty,
-      rules: { ...this.rules },
+      rules: { ...this.lobbyRules },
       stageId: this.stageId,
       setupRevision: this.setupRevision,
       rerollVote: this.setupVote ? {

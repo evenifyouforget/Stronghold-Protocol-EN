@@ -13,7 +13,7 @@ import { CC } from '../../shared/ruleData.js';
 const tier1 = (gd) => gd.visibleChess.find((id) => gd.tierOf(id) === 1 && !gd.chess(id).isGolden);
 
 test('ccTier1Price: +1 on the first tier-1 operator of a round from round 3, not after one is bought, not before round 3', () => {
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccTier1Price: 1 } }).start();
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccTier1Price: 1 } }).start();
   try {
     const ps = h.ps('p_0');
     const id = tier1(ps.gd);
@@ -32,7 +32,7 @@ test('ccTier1Price: +1 on the first tier-1 operator of a round from round 3, not
 
 test('ccUpgrade: leaving shop level 4 costs +2 (level 2: +3, and level 5 too)', () => {
   for (const [lv, want] of [[0, { 4: 0, 5: 0 }], [1, { 4: 2, 5: 0 }], [2, { 4: 3, 5: 3 }]]) {
-    const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccUpgrade: lv } });
+    const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccUpgrade: lv } });
     try {
       const ps = h.ps('p_0');
       for (const level of [3, 4, 5]) assert.equal(ps.upgradeBaseOf(level), (ps.gd.upgradeBase(level) ?? 0) + (want[level] ?? 0), `tag ${lv}, level ${level}`);
@@ -49,7 +49,7 @@ test('ccBoss: the final boss pool +50 / 150 / 400 %', () => {
 });
 
 test('ccFamiglia Cleaner: rounds 10–13, the fewest stacks; a tie goes to the earliest seat; none on round 9 or without the tag', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccFamiglia: 1 } });
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccFamiglia: 1 } });
   try {
     const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
     h.m.round = 10;
@@ -71,7 +71,7 @@ test('ccFamiglia Cleaner: rounds 10–13, the fewest stacks; a tie goes to the e
 });
 
 test('ccInvestorBench: 投资人 counts the board only', () => {
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccInvestorBench: 1 } });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccInvestorBench: 1 } });
   const plain = makeMatch({ mode: 'solo', seed: 3 });
   try {
     assert.equal(h.m.gd.bond('investShip').countMode, 'BOARD');
@@ -80,7 +80,7 @@ test('ccInvestorBench: 投资人 counts the board only', () => {
 });
 
 test('ccPatriot Undying 1: a round-9 card worth 0 Funds; nobody taking it → the final boss +200 % HP (Undying 2: +100 % ATK)', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 1 } });
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 1 } });
   try {
     h.m.round = 9;
     const c = h.m.riskPatriotCard();
@@ -96,15 +96,15 @@ test('ccPatriot Undying 1: a round-9 card worth 0 Funds; nobody taking it → th
     assert.equal(h.m.riskPatriotSkipped(), true, 'nobody took him');
     h.m.ccPatriotTaken = true;
     assert.equal(h.m.riskPatriotSkipped(), false);
-    const base = bossPoolHp(h.m.gd, h.m.bossId, 2, h.m.rules);
-    assert.equal(bossPoolHp(h.m.gd, h.m.bossId, 2, h.m.rules, { patriotSkipped: true }), Math.round(base * (1 + CC.patriot.skipHp)));
+    const base = bossPoolHp(h.m.gd, h.m.bossId, 2, h.m.lobbyRules);
+    assert.equal(bossPoolHp(h.m.gd, h.m.bossId, 2, h.m.lobbyRules, { patriotSkipped: true }), Math.round(base * (1 + CC.patriot.skipHp)));
   } finally { h.m.dispose(); }
-  const two = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 2 } });
+  const two = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 2 } });
   try { two.m.round = 9; assert.equal(two.m.riskPatriotCard().skipAtk, true); } finally { two.m.dispose(); }
 });
 
 test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6th in co-op), and taking it brings him', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 1 } });
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 1 } });
   try {
     h.m.round = 9;
     h.m.enterSpDraft();
@@ -123,7 +123,7 @@ test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6t
 });
 
 test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccPatriot: 3 } });
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 3 } });
   try {
     h.m.round = 9;
     const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
@@ -141,7 +141,7 @@ test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the
 
 test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5, ATK × 1.5 from United 2', () => {
   const wave = (level) => {
-    const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, rules: { ccDelegation: level } });
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, lobbyRules: { ccDelegation: level } });
     try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
   };
   const dg = CC.delegation;
@@ -154,13 +154,13 @@ test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5,
   assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
   assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
   assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccDelegation: 1 } });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 1 } });
   try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
 });
 
 test('the sub-wave takes the left-first route of a pair field (left portal, then right), the left one of a one-player field', async () => {
   const { buildBossWave, bountySpawns, leftFirstRoute } = await import('../../server/match/waves.js');
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccDelegation: 1, ccPatriot: 3 } }).start();
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccDelegation: 1, ccPatriot: 3 } }).start();
   try {
     h.toPrep(2);
     const m = h.m;
@@ -181,7 +181,7 @@ test('the sub-wave takes the left-first route of a pair field (left portal, then
 
 test('a sub-wave riskMods multiply the round spawn mods', async () => {
   const { bountySpawns } = await import('../../server/match/waves.js');
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccDelegation: 2 } });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 2 } });
   try {
     const ps = h.ps('p_0');
     const list = h.m.bossSubWave(['p_0']).get('p_0');
@@ -197,7 +197,7 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
 });
 
 test('round LP: ccLastLine +2 past the cap when the own battle leaked; a leaked Patriot costs 5 (within the cap)', () => {
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccLastLine: 1, ccPatriot: 1 } });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccLastLine: 1, ccPatriot: 1 } });
   try {
     const cap = h.m.gd.lpCapPerRound;
     assert.equal(h.m.riskLoss([], 0), 0);
@@ -214,7 +214,7 @@ test('round LP: ccLastLine +2 past the cap when the own battle leaked; a leaked 
 test('ccFamiglia tier 3: Zaaro joins Cleaner\'s sub-wave and costs 5 LP when he leaks; tier 2 adds no one', () => {
   const z = CC.famiglia.zaaro.key;
   for (const [level, want] of [[2, false], [3, true], [4, false], [5, true]]) {
-    const h = makeMatch({ mode: 'solo', seed: 3, rules: { ccFamiglia: level } });
+    const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccFamiglia: level } });
     try {
       h.m.round = 10;
       const keys = h.m.riskBounties(h.ps('p_0')).map((b) => b.card.enemyKey);
@@ -228,7 +228,7 @@ test('ccFamiglia tier 3: Zaaro joins Cleaner\'s sub-wave and costs 5 LP when he 
 
 test('a Patriot who leaks and survives the Unite Phase still costs his leaker 5 LP (and 1 without the tag)', () => {
   for (const [rules, want] of [[{ ccPatriot: 1 }, CC.patriot.leakLp], [{}, 1]]) {
-    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules }).start();
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: rules }).start();
     try {
       h.toPrep(2);
       h.m.round = 9;
@@ -254,7 +254,7 @@ test('the battle\'s live leak count weighs a Patriot like the settlement (the HU
 const cursedIn = (ps) => [...ps.hand, ...ps.temp].filter((p) => p && p.kind === 'item' && p.id === CC.junk.itemId);
 
 test('ccJunk 1: everyone starts with Toxic Waste; it never expires in the temp hand and is never replaced away', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccJunk: 1 } }).start();
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccJunk: 1 } }).start();
   try {
     h.toPrep(1);
     for (const id of ['p_0', 'p_1']) assert.equal(cursedIn(h.ps(id)).length, 1, id);
@@ -293,7 +293,7 @@ test('ccJunk 1: everyone starts with Toxic Waste; it never expires in the temp h
 
 test('ccJunk 2: a round\'s income −1 while the Toxic Waste is not equipped', () => {
   const income = (rules, equip) => {
-    const h = makeMatch({ mode: 'solo', seed: 3, rules }).start();
+    const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: rules }).start();
     try {
       h.toPrep(1);
       const ps = h.ps('p_0');
@@ -313,14 +313,14 @@ test('ccJunk 2: a round\'s income −1 while the Toxic Waste is not equipped', (
   assert.equal(income({ ccJunk: 2 }, false), base - CC.junk.incomeLoss);
   assert.equal(income({ ccJunk: 2 }, true), base, 'equipped: no loss');
   // round 1: no loss (the hammer has just arrived)
-  const first = (rules) => { const h = makeMatch({ mode: 'solo', seed: 3, rules }).start(); try { h.toPrep(1); return h.ps('p_0').funds; } finally { h.m.dispose(); } };
+  const first = (rules) => { const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: rules }).start(); try { h.toPrep(1); return h.ps('p_0').funds; } finally { h.m.dispose(); } };
   assert.equal(first({ ccJunk: 2 }), first({}), 'round 1 starts with the usual Funds');
 });
 
 test('ccVengeance: Reids by the player\'s stacks in a normal battle (×2 at level 3); the final rounds by everyone\'s, once per field', () => {
   const V = CC.vengeance;
   for (const [level, mul] of [[1, 1], [3, 2]]) {
-    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, rules: { ccVengeance: level } });
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccVengeance: level } });
     try {
       h.m.round = 5;
       const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];

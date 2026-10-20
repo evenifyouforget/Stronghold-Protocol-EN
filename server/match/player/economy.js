@@ -68,14 +68,14 @@ export class PlayerEconomy {
 
   /** SPA-CC ccTier1Price (shared/rules.js): from round 3, the first tier-1 operator bought each round costs 1 more. */
   riskPriceExtra(slot) {
-    if (!(this.m.rules?.ccTier1Price > 0) || slot.kind !== 'chess' || this.m.round < CC.tier1FromRound || this.round.tier1Bought) return 0;
+    if (!(this.m.lobbyRules?.ccTier1Price > 0) || slot.kind !== 'chess' || this.m.round < CC.tier1FromRound || this.round.tier1Bought) return 0;
     return this.gd.tierOf(slot.id) === 1 ? CC.tier1Extra : 0;
   }
 
   /** The upgrade price of shop level `level` (the price to leave it): the data's, plus SPA-CC ccUpgrade's extra. */
   upgradeBaseOf(level) {
     const base = this.gd.upgradeBase(level) ?? 0;
-    const extra = CC.upgradeExtra[this.m.rules?.ccUpgrade || 0]?.[level] ?? 0;
+    const extra = CC.upgradeExtra[this.m.lobbyRules?.ccUpgrade || 0]?.[level] ?? 0;
     return base + extra;
   }
 
@@ -90,7 +90,7 @@ export class PlayerEconomy {
     // 维多利亚 Mod C (shared/rules.js victoriaMod; sim/content/bonds/core.js victoriaCPrice): while 维多利亚 is active a
     // 维式重锤 in the shop is the upgraded one (when the shared stock still has two copies) — and free
     const rec = id ? this.gd.item(id) : null;
-    if (rec && this.m.rules?.victoriaMod === 'C' && this.bonds.victoriaShip?.active && rec.giveBondId === 'victoriaShip'
+    if (rec && this.m.lobbyRules?.victoriaMod === 'C' && this.bonds.victoriaShip?.active && rec.giveBondId === 'victoriaShip'
       && !rec.isGolden && rec.goldenId && this.m.itemPool.canGain(rec.goldenId)) id = rec.goldenId;
     return id ? { kind: 'item', id, basePrice: this.gd.itemPrice(id), frozen: false, sold: false } : null;
   }

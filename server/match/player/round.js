@@ -35,14 +35,14 @@ export class PlayerRound {
     this.m.dispatch(this, 'onIncome', ev);
     const nonNeg = (v) => (Number.isFinite(v) && v > 0 ? Math.trunc(v) : 0);
     // extraFunds lobby rule: added after the onIncome handlers, so nothing withholds or rewrites it
-    const extra = this.m.rules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
+    const extra = this.m.lobbyRules?.extraFunds ? RULE_EXTRA_FUNDS : 0;
     // SPA-CC Junk: everyone's Toxic Waste at the start (no shop stock: made, not drawn); Junk 2: income −1 while it is
     // not equipped (in the hand or the temporary hand)
-    const junk = tagLevel(this.m.rules, 'ccJunk');
+    const junk = tagLevel(this.m.lobbyRules, 'ccJunk');
     if (junk > 0 && r === 1 && this.gd.item(CC.junk.itemId)) this.stow(this.newPiece('item', CC.junk.itemId), { allowTemp: true });
     // the tierStart cheat: one random operator of each tier (1–6) from the shared pool, on its own seeded stream (the
     // match's other draws stay as they were)
-    if (r === 1 && this.m.rules?.tierStart) this.grantTierStart();
+    if (r === 1 && this.m.lobbyRules?.tierStart) this.grantTierStart();
     // (not on round 1: the hammer has just arrived — Fish 2026-10-16, starting on 3 Funds was too harsh)
     const cursed = junk >= 2 && r > 1 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
     this.addFunds(Math.max(0, nonNeg(ev.income) - cursed) + nonNeg(ev.pending) + extra, { reason: 'income' });

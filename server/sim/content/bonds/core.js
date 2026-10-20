@@ -779,12 +779,12 @@ const HAMMER_HOOKS = Object.freeze(['onLayers', 'onRoundStart', 'onPrepStart', '
  *              <6 members> also 2 × its tier to each of its other active alliances
  */
 export function victoriaCPrice(ctx, ev) {
-  if (ctx.rules?.victoriaMod !== 'C' || !ctx.bondActive('victoriaShip') || !ev || ev.kind !== 'item') return;
+  if (ctx.lobbyRules?.victoriaMod !== 'C' || !ctx.bondActive('victoriaShip') || !ev || ev.kind !== 'item') return;
   if (isVictorianHammer(ctx.gd?.item?.(ev.id) ?? ev.id)) ctx.setPrice(0);
 }
 
 export function victoriaCPrepEnd(ctx) {
-  if (ctx.rules?.victoriaMod !== 'C' || !ctx.bondActive('victoriaShip')) return;
+  if (ctx.lobbyRules?.victoriaMod !== 'C' || !ctx.bondActive('victoriaShip')) return;
   const six = ctx.bondCount('victoriaShip') >= VICTORIA_C.members;
   for (const p of ctx.board()) {
     if (!p || p.kind !== 'chess') continue;
@@ -808,7 +808,7 @@ export function registerMeta(registry) {
       if (before) before.call(this, ctx, ev);
       if (hook === 'onPrepEnd') victoriaCPrepEnd(ctx);
       // Mod C replaces Mod A: no hammer every 25 stacks (its shop hammers are free instead)
-      if (ctx.rules?.victoriaMod === 'C') return;
+      if (ctx.lobbyRules?.victoriaMod === 'C') return;
       if (hook === 'onLayers' && !(ev && ev.bondId === 'victoriaShip')) return;
       payHammers(ctx);
     };

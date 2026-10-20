@@ -23,7 +23,7 @@ const A = (k) => `chess_item_${k}_e_a`;
 // prep helpers
 
 function setup({ band, mode = 'solo', humans = 1, seed = 41, bands: perPlayer = null, rules = undefined } = {}) {
-  const h = makeMatch({ mode, humans, seed, registry: REG, fake: true, rules }).start();
+  const h = makeMatch({ mode, humans, seed, registry: REG, fake: true, lobbyRules: rules }).start();
   h.toPrep(1);
   const m = h.m;
   for (const ps of m.players.values()) {

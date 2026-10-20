@@ -79,7 +79,7 @@ export function makeMatch(o = {}) {
     verify: o.verify ?? 'off',
     headlessSliceMs: o.headlessSliceMs,
     aiPicksLast: o.aiPicksLast,
-    rules: o.rules,
+    lobbyRules: o.lobbyRules,
   });
   const m = h.m;
   if (m.clientCombat && o.clients !== false) {

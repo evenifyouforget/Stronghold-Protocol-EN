@@ -15,7 +15,7 @@
 //   opts.aiPicksLast boolean (optional)         the co-op room option 「AI 队友最后选择」 (room.setAiPicksLast, GitHub #338):
 //                                              the strategy and 机变 drafts put every human seat before every AI seat
 //                                              (MatchPhases.humansFirst); only `true` turns it on; ignored in solo
-//   opts.rules       { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
+//   opts.lobbyRules  { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
 //                                              Read once: extraDeploy → PlayerState.deployCap, extraFunds → the round
 //                                              start income, untimed → soloUntimed. Shown as m.public.rules.
 //   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
@@ -245,7 +245,7 @@ export class Match {
     this.difficulty = opts.difficulty;
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
     /** lobby rules (shared/constants.js RULE_KEYS), fixed for the whole match */
-    this.rules = normalizeRules(opts.rules);
+    this.lobbyRules = normalizeRules(opts.lobbyRules);
     this.seed = (Number(opts.seed) >>> 0) || 1;
     // (fork) the server-wide match number (lobby: every match this server process created); 0 = not counted
     this.serverMatchNo = Number.isInteger(opts.serverMatchNo) && opts.serverMatchNo > 0 ? opts.serverMatchNo : 0;
@@ -256,8 +256,8 @@ export class Match {
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
     // the rebalanced alliances of the lobby rules (shared/ruleData.js): this match's records, the shared data untouched
-    if (rulesChangeData(this.rules)) {
-      const patch = ruleDataPatch(this.data, this.rules);
+    if (rulesChangeData(this.lobbyRules)) {
+      const patch = ruleDataPatch(this.data, this.lobbyRules);
       this.data = { ...this.data, chess: { ...(this.data.chess || {}), ...patch.chess }, garrisons: { ...(this.data.garrisons || {}), ...patch.garrisons }, bonds: { ...(this.data.bonds || {}), ...patch.bonds }, items: { ...(this.data.items || {}), ...patch.items } };
     }
     this.gd = new GameData(this.data, this.modeId);
@@ -339,13 +339,13 @@ export class Match {
     this.loneHuman = this.order.filter((p) => !p.isBot).length === 1;
 
     // per-match setup (DESIGN §6.5)
-    const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.rules.stage });
+    const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.lobbyRules.stage });
     this.stageId = setup.stageId;
     this.stage = this.stageId ? this.gd.stage(this.stageId) : null;
     this.factions = setup.factions;
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
-    const bans = drawDisabledBonds(this.gd, this.rngSetup, { picks: this.rules.bans });
+    const bans = drawDisabledBonds(this.gd, this.rngSetup, { picks: this.lobbyRules.bans });
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;

@@ -76,7 +76,7 @@ export class MatchInfra {
    * any match: a phase then ends when every alive player is ready (a disconnected human is waited for until the
    * reconnect window turns the drop into onLeave).
    */
-  get soloUntimed() { return this.isSolo || this.loneHuman || !!this.rules?.untimed; }
+  get soloUntimed() { return this.isSolo || this.loneHuman || !!this.lobbyRules?.untimed; }
 
   nextUid() { return ++this.uidSeq; }
 
@@ -101,10 +101,10 @@ export class MatchInfra {
 
   /** A player's SPA-CC extras in a normal round: Patriot's escort with the Patriot this player took, Cleaner's sub-wave. */
   riskBounties(ps) {
-    if (!this.rules || !ps.alive) return [];
+    if (!this.lobbyRules || !ps.alive) return [];
     const out = [];
     const pt = CC.patriot;
-    if (tagHas(this.rules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.escort.key)
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.escort.key)
       && ps.bounties.some((b) => b.card && b.card.effectId === RISK_PATRIOT_CARD && b.roundsLeft > 0)) {
       out.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count));
     }
@@ -120,9 +120,9 @@ export class MatchInfra {
    */
   vengeanceCount(players) {
     const V = CC.vengeance;
-    if (!tagHas(this.rules, 'ccVengeance', 'blade1') || !this.gd.enemy(V.key)) return 0;
+    if (!tagHas(this.lobbyRules, 'ccVengeance', 'blade1') || !this.gd.enemy(V.key)) return 0;
     const stacks = players.reduce((n, p) => n + (p && p.alive ? stackTotal(p) : 0), 0);
-    return Math.min(20, Math.floor(stacks / V.perStacks) * (tagHas(this.rules, 'ccVengeance', 'blade3') ? 2 : 1));
+    return Math.min(20, Math.floor(stacks / V.perStacks) * (tagHas(this.lobbyRules, 'ccVengeance', 'blade3') ? 2 : 1));
   }
 
   /**
@@ -134,18 +134,18 @@ export class MatchInfra {
    */
   bossSubWave(field) {
     const out = new Map();
-    if (!this.rules) return out;
+    if (!this.lobbyRules) return out;
     const first = (field || []).map((id) => this.players.get(id)).find((p) => p && p.alive);
     if (!first) return out;
     const cards = [];
     const pt = CC.patriot;
-    if (tagHas(this.rules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.key)) {
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.key)) {
       cards.push(riskCard('risk:patriot', pt.key, 1, { leftFirst: true }));
       if (this.gd.enemy(pt.escort.key)) cards.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count, { leftFirst: true }));
     }
     const dg = CC.delegation;
-    if (tagHas(this.rules, 'ccDelegation', 'united1')) {
-      const has = (n) => tagHas(this.rules, 'ccDelegation', n);
+    if (tagHas(this.lobbyRules, 'ccDelegation', 'united1')) {
+      const has = (n) => tagHas(this.lobbyRules, 'ccDelegation', n);
       const hpMul = has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
       const atkMul = has('united2') ? dg.atkMul.united2 : 1;
       for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
@@ -159,7 +159,7 @@ export class MatchInfra {
 
   silencerBounties(ps) {
     const s = CC.silencers;
-    if (!tagHas(this.rules, 'ccFamiglia', 'cleaner') || !s.rounds.includes(this.round) || !this.gd.enemy(s.key)) return [];
+    if (!tagHas(this.lobbyRules, 'ccFamiglia', 'cleaner') || !s.rounds.includes(this.round) || !this.gd.enemy(s.key)) return [];
     const alive = this.alivePlayers();
     if (!alive.length) return [];
     let low = alive[0];
@@ -168,7 +168,7 @@ export class MatchInfra {
     const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
     // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave
     const z = CC.famiglia.zaaro;
-    if ((tagHas(this.rules, 'ccFamiglia', 'unending3') || tagHas(this.rules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {
+    if ((tagHas(this.lobbyRules, 'ccFamiglia', 'unending3') || tagHas(this.lobbyRules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {
       out.push({ id: 'risk:zaaro', roundsLeft: 1, card: { effectId: 'risk:zaaro', enemyKey: z.key, count: 1, coin: 0, payout: 'kill', rounds: 1 } });
     }
     return out;
@@ -180,11 +180,11 @@ export class MatchInfra {
    */
   riskPatriotCard() {
     const pt = CC.patriot;
-    if (!tagHas(this.rules, 'ccPatriot', 'undying1') || this.round !== pt.round) return null;
+    if (!tagHas(this.lobbyRules, 'ccPatriot', 'undying1') || this.round !== pt.round) return null;
     const e = this.gd.enemy(pt.key);
     if (!e) return null;
     return { kind: 'bounty', id: RISK_PATRIOT_CARD, name: e.name, desc: '', descRaw: null, tier: null, coin: 0, payout: 'kill', rounds: 1, enemyKey: pt.key, count: 1, risk: true,
-      ...(tagHas(this.rules, 'ccPatriot', 'undying2') ? { skipAtk: true } : {}) };
+      ...(tagHas(this.lobbyRules, 'ccPatriot', 'undying2') ? { skipAtk: true } : {}) };
   }
 
   /**
@@ -192,11 +192,11 @@ export class MatchInfra {
    * (a mode without a round-9 Improv offers nothing, so no penalty).
    */
   riskPatriotSkipped() {
-    return tagHas(this.rules, 'ccPatriot', 'undying1') && !!this.ccPatriotOffered && !this.ccPatriotTaken;
+    return tagHas(this.lobbyRules, 'ccPatriot', 'undying1') && !!this.ccPatriotOffered && !this.ccPatriotTaken;
   }
 
   /** The LP one leak of `enemyKey` costs in a normal round or a 联防 (1; a Patriot / tier-3 Zaaro under their tags more). */
-  riskLeakWeight(enemyKey) { return riskLeakWeight(this.rules, enemyKey); }
+  riskLeakWeight(enemyKey) { return riskLeakWeight(this.lobbyRules, enemyKey); }
 
   /**
    * The LP a player's round costs (settle(), the live pendingLp): `base` (min(cap, …) as before) with the SPA-CC tags —
@@ -207,7 +207,7 @@ export class MatchInfra {
    * @param {boolean} [weigh] whether `base` came from `leaked` (false: 联防 survivors)
    */
   riskLoss(leaked, base, weigh = true) {
-    if (!this.rules) return base;
+    if (!this.lobbyRules) return base;
     const counted = (leaked || []).filter((l) => l && l.counted !== false);
     let loss = base;
     if (weigh) {
@@ -216,14 +216,14 @@ export class MatchInfra {
       for (const l of counted) extra += this.riskLeakWeight(l.enemyKey) - 1;
       if (extra > 0) loss = Math.min(this.gd.lpCapPerRound, base + extra);
     }
-    if (tagLevel(this.rules, 'ccLastLine') > 0 && counted.length > 0) loss += CC.lastLineLp;
+    if (tagLevel(this.lobbyRules, 'ccLastLine') > 0 && counted.length > 0) loss += CC.lastLineLp;
     return loss;
   }
 
   alivePlayers() { return this.order.filter((p) => p.alive); }
 
   /** A player's starting LP: its strategy's (GameData.startLp), twice that with the `doubleLp` cheat. */
-  startLp(bandId) { return this.gd.startLp(bandId) * (this.rules?.doubleLp ? 2 : 1); }
+  startLp(bandId) { return this.gd.startLp(bandId) * (this.lobbyRules?.doubleLp ? 2 : 1); }
 
   /** Whether any chess of a bond is in this match's pool (a 驰援 card of a fully banned bond is never offered). */
   bondInPool(bondId) {

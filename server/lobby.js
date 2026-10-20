@@ -853,7 +853,7 @@ export class Lobby {
         // 「AI 队友最后选择」 (GitHub #338): fixed for the match
         aiPicksLast: room.mode !== 'solo' && room.aiPicksLast === true,
         // lobby rules (Fish Edition): fixed for the match
-        rules: room.rules,
+        lobbyRules: room.rules,
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),

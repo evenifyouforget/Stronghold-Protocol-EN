@@ -28,7 +28,7 @@ export class PlayerBasics {
   get botControlled() { return this.isBot || this.left || this.autoplay; }
 
   get deployCap() {
-    const rule = this.m.rules?.extraDeploy ? RULE_EXTRA_DEPLOY : 0; // lobby rule (shared/constants.js)
+    const rule = this.m.lobbyRules?.extraDeploy ? RULE_EXTRA_DEPLOY : 0; // lobby rule (shared/constants.js)
     return Math.max(1, this.gd.deployCap + rule + this.deployCapBonus, this.deployCapMin);
   }
   get deployCount() { let n = 0; for (const p of this.board.values()) if (p.kind === 'chess') n++; return n; }

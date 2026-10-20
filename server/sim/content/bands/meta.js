@@ -47,7 +47,7 @@ const int = (v, d = 0) => Math.trunc(num(v, d));
  * rounds 5 / 10 / 15 in the data (Fish, 2026-10-15).
  */
 const PERIODIC_BANDS = new Set(['band_damaztic']);
-const roundLate = (ctx, bandId) => (ctx.rules?.ccStrategyLate > 0 && !PERIODIC_BANDS.has(bandId) ? 1 : 0);
+const roundLate = (ctx, bandId) => (ctx.lobbyRules?.ccStrategyLate > 0 && !PERIODIC_BANDS.has(bandId) ? 1 : 0);
 /** The round a Strategy's `round` names, after ccStrategyLate. */
 const namedRound = (ctx, p, bandId, d = -1) => int(p.round, d) + roundLate(ctx, bandId);
 const list = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
