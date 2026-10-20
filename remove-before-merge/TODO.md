@@ -185,6 +185,11 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
   pr-descriptions/yuri-sync-sganggs-0.3.2.md (three fixes since it was opened).
 - Yuri #12 `yuri/invuln-ribbons`: the invulnerability ribbons.
 - Yuri #17 `yuri/en-templates`: English issue and PR templates (+ #14's two CI fixes, cherry-picked).
+  Its Windows jobs failed (2026-10-21) on an intermittent upstream test, not on the templates: "the zip reader …"
+  (test/update-package.test.js) → tools/package.mjs zipFolder → "zipping failed: install `zip` (or a bsdtar `tar`)".
+  The same test failed once on #14 (Windows node 22) and passed on its next run. We can't re-run jobs on Yuri's repo:
+  ask Yuri to re-run, or push to retrigger. If it keeps happening: make zipFolder print why tar failed, and on
+  Windows call %SystemRoot%\System32\tar.exe (bsdtar) explicitly, in case a GNU tar (no --format zip) comes first on PATH.
 
 # need human action - branches that have not been made PRs yet
 
