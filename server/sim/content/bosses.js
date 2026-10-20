@@ -687,8 +687,10 @@ function kitSpring(ab, e) {
           } else if (ty === 'phys') {
             c.dmg.mul *= scale;
             // the counter "对来源造成…无来源物理附加伤害" picks its attacker directly — no selection, so an airborne 起飞
-            // attacker takes it too (PRTS 异常效果 无法选择: "'直接选中'的能力…不受这些仅在选择时生效的异常效果制约")
-            const s = c.source, o = { ignoreSelect: true, tags: ['springCounter'] };
+            // attacker takes it too (PRTS 异常效果 无法选择: "'直接选中'的能力…不受这些仅在选择时生效的异常效果制约").
+            // Tagged 'counter' like the operators' counters, so none of them answers it (tier1 byEnemyAttack: no ping-pong —
+            // 泡泡's 挨打 and this counter set each other off to the hook depth limit, issue #27)
+            const s = c.source, o = { ignoreSelect: true, tags: ['counter', 'springCounter'] };
             if (s && s.side === 'ally' && s.alive) { hurt(b, e2, s, e2.s.atk * (T(ab, '1.atk_scale') ?? 0), 'phys', o); elem(b, e2, s, 'erosion', e2.s.atk * (T(ab, '1.ep_damage_ratio') ?? 0), o); }
           }
         } else if (kind === 'element') {                 // 元素护盾: phys/arts heavily reduced
