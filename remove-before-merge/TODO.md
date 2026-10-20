@@ -2,19 +2,50 @@
 
 ## AI players
 
+Findings (2026-10-21): remove-before-merge/ai-players.md — strategy, speed, win rates per difficulty, a
+per-tag SPA-CC cost table (botbench `--rules`), a record format and what not to collect.
+
 - What strategy do the current AI players use? Is it optimized in any way?
+- - What would making the AI better look like? Modular/evolutionary strategies? Machine learning?
+- - If some kind of machine learning, and humans play significantly better: what data do we need to learn from humans?
+- - Is there an explicit reason for the AI to be bad? ex. needs to be deterministic for testing
 - How fast is the decision making of AI players?
 - Are the AI players competent? (does this question need further defining)
 - Around what is the winrate for a solo/4-man AI lobby, on each difficulty?
-- Can we efficiently run many AI matches in the background, to gather data?
+- Can we efficiently run many AI matches in the background, to gather data? (we should not force this on live server operators, but it is something some people could choose to run)
 - What diagnostics could be collected from matches, that could measure human players vs each other and vs AI? (win rate > stack counts > others?)
+- - How do we limit the data size while still getting useful key information? No full replays?
 - What definitely should we not collect, for privacy reasons?
 - Is there any infrastructure to collect such data? Can we build it?
 - - Suggestion is to produce a small number of record files, such that any subset of them is a valid set for analysis.
+- - Put it in a gitignored directory by default?
 - Is there any infrastructure to process such data? ex. display stats?
 - - Could scan for all record files in a directory, and use that as the data set. This makes it easy for admins to zip up and send their records.
+- - Use the same directory as collection for analysis by default?
 - How much better do human players play?
 - If AI players are good enough, can we map out the difficulty curve for SPA-CC and determine what tags are easiest to take?
+
+## Gameplay replication accuracy
+
+The Arknights wiki has data on pretty much every operator, enemy, and stage gimmick. It includes explanations of some non-obvious mechanics, such as how Logos skill 1's instakill actually works. ex. https://arknights.wiki.gg/wiki/Logos https://arknights.wiki.gg/wiki/Fear
+
+DragonGJY https://www.youtube.com/@DragonGJY also has analysis videos that further detail many interactions, but this is probably hard to scrape.
+
+At least within the available data sources, can we check the accuracy of implemented gameplay so far? Have any shortcuts been taken, or features left out?
+
+## Effects
+
+Now that we have a script to download the full assets bundle, can we locate effects that should be associated with operators, and replace the placeholders with the correct animations? Ex. Lemuen's elite enemy lock on visual overlay, or the sprite for a pending orbital strike from skill 3
+
+## New contributors
+
+What are we missing that would help new contributors get started? (for humans or for other Claude Code instances)
+
+## QA/usability/process
+
+Can a new server owner figure out how to download the local assets bundle and deploy from source?
+
+More generally, is there a process step we're missing before the PRs go up, to ensure usability?
 
 # main/wip
 
@@ -145,20 +176,20 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 - [ ] kaltsit esperanta liftoff altitude bug fix (if it is determined to be a bug and not working as intended): a bug
       from our #18. Fixed on `wip/liftoff-hover` (a talent's liftoff hovers low, a skill's flies; Fish's official
       measurements). Port to Yuri after it merges here.
-- [ ] EN versions of issue template and PR template: `yuri/en-templates` (built on dev-0.2: main's templates are older).
+- [ ] EN versions of issue template and PR template: Yuri #17 (built on dev-0.2: main's templates are older; carries #14's
+      CI fixes until #14 merges).
 
 # live PRs to watch
 
 - Yuri #14 `yuri/sync-sganggs-0.3.2`: the sgangss sync + dev-0.2 CI fixes. CI green. Update its PR text from
   pr-descriptions/yuri-sync-sganggs-0.3.2.md (three fixes since it was opened).
 - Yuri #12 `yuri/invuln-ribbons`: the invulnerability ribbons.
+- Yuri #17 `yuri/en-templates`: English issue and PR templates (+ #14's two CI fixes, cherry-picked).
 
 # need human action - branches that have not been made PRs yet
 
 - `wip/liftoff-hover` → main: talent liftoff hovers low (Kal'tsit - Esperanta, Leizi the Thunderbringer). Description:
   pr-descriptions/liftoff-hover.md.
-- `yuri/en-templates` → Yuri's dev-0.2: English issue and PR templates. Description: pr-descriptions/yuri-en-templates.md.
-  Its fork CI is red only because dev-0.2 is (fixed by Yuri #14); open it after #14 merges, or I merge #14's fixes in.
 - `wip/sync-yuri-0.2.6`: stale (Yuri is at 0.3.1 now). Don't open; I'll rebuild the main ← Yuri sync after Yuri #14
   merges.
 - `wip/3` (2026-10-21): Fish's scratch branch (like `wip/1`, `wip/2`), not tied to a PR yet. It also carries

@@ -20,3 +20,6 @@ Checked:
 - All four forms parse as YAML.
 - The English and Chinese forms have the same blocks (13 / 7) and the same required fields (7 / 5).
 - `test/issue-templates.test.js`: 4 / 4 pass. Lint is clean.
+
+**CI:** `dev-0.2`'s own CI is red (see #14), so this branch also carries #14's two CI-fix commits (cherry-picked, the
+same changes). Once #14 merges they reconcile with no conflict, and this PR's diff is just the templates again.
