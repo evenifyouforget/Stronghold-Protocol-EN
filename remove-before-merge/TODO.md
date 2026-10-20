@@ -1,3 +1,14 @@
+# GitHub issues (for contributors to claim, 2026-10-21)
+
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue)
+- #28 Windows CI: intermittent zip-reader test (bug, good first issue)
+- #29 AI: recalibrate the bounty kill-chance estimate
+- #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
+- #31 SPA-CC Risk balance: extend the botbench tag sweep
+- #32 Opt-in anonymous match records + tools/records.mjs
+- #33 Gameplay accuracy audit (tracking)
+- #34 Effects: official effects instead of placeholders (Lemuen first)
+
 # Investigation/questions
 
 ## AI players
@@ -33,9 +44,13 @@ DragonGJY https://www.youtube.com/@DragonGJY also has analysis videos that furth
 
 At least within the available data sources, can we check the accuracy of implemented gameplay so far? Have any shortcuts been taken, or features left out?
 
+→ #33 (tracking issue; ~510 `[ASSUMED]` tags in server/sim/content are the starting list).
+
 ## Effects
 
 Now that we have a script to download the full assets bundle, can we locate effects that should be associated with operators, and replace the placeholders with the correct animations? Ex. Lemuen's elite enemy lock on visual overlay, or the sprite for a pending orbital strike from skill 3
+
+→ #34.
 
 ## New contributors
 
