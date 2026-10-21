@@ -131,6 +131,31 @@ export function riskLeakWeight(rules, enemyKey) {
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
 
 
+/**
+ * The boosterPack cheat (Fish, GitHub #35): every player starts with a Booster Pack, a Fish Edition item made by
+ * ruleDataPatch. Equipped on an operator it is not attached: it offers a free pick of `choices` operators of that
+ * operator's tier, in a fixed order (the tier's base chess ids sorted), and stays where it was. Each player's place in
+ * every tier's order is kept, so using it again shows the next `choices`, and the whole tier comes round in turn.
+ * AI players neither use nor drop it. Its icon: 商业包装方案 (Commercial Packaging Plan)'s.
+ */
+export const BOOSTER = Object.freeze({ itemId: 'fish_item_booster_pack', iconId: 'trap_1074_acarm074', choices: 6 });
+/** msgids of the Booster Pack (translated by the client's `text`; the name is also the offer's header). */
+export const BOOSTER_NAME = N_('补充包');
+export const BOOSTER_DESC = N_('装备到干员上：免费选择一名同阶干员（按固定顺序轮换，每次6名），补充包留在手牌');
+
+/** The Booster Pack's item record (boosterPack) in data/items.json's shape. */
+function boosterRecord(text) {
+  const desc = text(BOOSTER_DESC);
+  return {
+    id: BOOSTER.itemId, baseId: BOOSTER.itemId, goldenId: null, isGolden: false, trapId: BOOSTER.iconId, iconId: BOOSTER.iconId,
+    identifier: null, name: text(BOOSTER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true,
+    shopExcluded: true, shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1,
+    giveBondId: null, givePowerId: null, canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc,
+    descRaw: desc, buffs: [], params: {}, category: 'STAT', kind: 'passive', family: null,
+    implFormula: 'a pick-one offer of its target\'s tier (server/match/player/items.js openBooster)', fork: true, booster: true,
+  };
+}
+
 /** msgids of the Toxic Waste (Junk; translated by the client's `text`). */
 export const TOXIC_WASTE_NAME = N_('有毒废料');
 export const TOXIC_WASTE_DESC = N_('攻击力-50%。无法被销毁');
@@ -160,7 +185,7 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true));
 
 /**
  * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
@@ -174,6 +199,8 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items };
   // SPA-CC Junk: the Toxic Waste
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
+  // the boosterPack cheat: the Booster Pack
+  if (rules.boosterPack === true) items[BOOSTER.itemId] = boosterRecord(text);
   // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
   const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;
   if (investor) {
