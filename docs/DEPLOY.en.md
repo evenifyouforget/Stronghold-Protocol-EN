@@ -570,4 +570,6 @@ links a player's matches to each other.
 Reading them: `node tools/records.mjs [folder…]` (default `logs/records`) prints tables (matches per mode and
 difficulty, human vs. AI seats, by lobby rule, by Risk, by strategy, human prep activity per round); Matches that ended before their first battle (everyone left during the briefing or the drafts) are counted apart and left out of the tables. `--json` gives the
 same numbers as JSON; `--verify` replays each recorded normal battle from its spec with this checkout and checks it
-gives the recorded result (records of another app version are skipped).
+gives the recorded result. A record of this version that differs is an error; records of other versions are replayed
+too, but a gameplay change between versions may explain a difference, so theirs are listed apart as "maybe" and do not
+fail.

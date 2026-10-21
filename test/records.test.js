@@ -153,4 +153,13 @@ test('tools/records.mjs: reads a folder (bad files reported), prints the tables,
   const v = await verify(records);
   assert.ok(v.same >= 5, `replayed (${v.same})`);
   assert.deepEqual(v.differ, []);
+  // a changed digest: a real mismatch for a record of this version, a maybe for one of another version
+  const bent = records.map((r) => ({ ...r, battles: r.battles.map((b, i) => (i === 0 ? { ...b, digest: 'x' } : b)) }));
+  const here = await verify(bent, { app: records[0].app });
+  assert.equal(here.differ.length, 1);
+  assert.deepEqual(here.maybe, []);
+  const older = await verify(bent, { app: '999.0.0' });
+  assert.deepEqual(older.differ, []);
+  assert.equal(older.maybe.length, 1, 'another version: replayed, its difference a maybe');
+  assert.equal(older.same, here.same, 'and its other battles still checked');
 });

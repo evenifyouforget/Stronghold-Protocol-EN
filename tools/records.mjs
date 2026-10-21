@@ -6,8 +6,10 @@
 //   node tools/records.mjs [folder…]          tables over every record under the folders (default logs/records)
 //   node tools/records.mjs --json [folder…]   the same numbers as JSON
 //   node tools/records.mjs --verify [folder…] re-run each recorded normal battle from its BattleSpec and compare the
-//                                             result digest with the recorded one (needs this checkout's data to be the
-//                                             records' version: records of another `app` version are skipped)
+//                                             result digest with the recorded one. A record of this checkout's `app`
+//                                             version must match (a difference fails); one of another version may or may
+//                                             not (versions move fast, most carry no gameplay change): its differences
+//                                             are reported apart, as maybes, and do not fail
 // Records are `*.json.gz` (or `*.json`), any depth below the folders; a file that does not parse is reported and skipped.
 //
 // Tables: matches per mode and difficulty (wins, reached the final boss, rounds passed); seats, human vs AI (rounds
@@ -142,7 +144,10 @@ export function tables(s) {
 
 /**
  * Re-run every recorded normal battle of `records` (not a synthetic result) from its spec and compare the digests.
- * @returns {Promise<{ same: number, differ: { file?: string, round: number, field: string }[], skipped: number }>}
+ * `differ`: battles of version `app` (or every battle, with no `app`) whose digest changed — a real mismatch; `maybe`:
+ * those of records of another version (or none) — a gameplay change since may explain them.
+ * @returns {Promise<{ same: number, differ: Diff[], maybe: Diff[], skipped: number }>}
+ * @typedef {{ app: string | null, round: number, field: string }} Diff
  */
 export async function verify(records, { app = null } = {}) {
   const { createBattleFromSpec, resultDigest } = await import('../server/sim/spec.js');
@@ -150,13 +155,15 @@ export async function verify(records, { app = null } = {}) {
   const { DataSource } = await import('../server/sim/simdata.js');
   const ds = new DataSource(getData({ log: { warn() {}, error() {}, info() {} } }), null);
   let same = 0, skipped = 0;
-  const differ = [];
+  const differ = [], maybe = [];
   for (const r of records) for (const b of r.battles || []) {
-    if (b.kind !== 'normal' || b.synthetic || !b.digest || (app && r.app && r.app !== app)) { skipped++; continue; }
+    if (b.kind !== 'normal' || b.synthetic || !b.digest) { skipped++; continue; }
     const res = createBattleFromSpec(b.spec, ds, { recordEvents: false, quiet: true }).runToEnd(4000);
-    if (resultDigest(res).hash === b.digest) same++; else differ.push({ round: b.r, field: b.field });
+    if (resultDigest(res).hash === b.digest) { same++; continue; }
+    const d = { app: r.app ?? null, round: b.r, field: b.field };
+    (!app || r.app === app ? differ : maybe).push(d);
   }
-  return { same, differ, skipped };
+  return { same, differ, maybe, skipped };
 }
 
 function main() {
@@ -169,8 +176,9 @@ function main() {
     let app = null;
     try { app = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version; } catch { /* none */ }
     return verify(records, { app }).then((v) => {
-      console.log(`battles replayed: ${v.same} same, ${v.differ.length} differ, ${v.skipped} skipped (not normal, synthetic or another version)`);
+      console.log(`battles replayed: ${v.same} same, ${v.differ.length} differ, ${v.maybe.length} differ from another version (maybe a gameplay change since), ${v.skipped} skipped (not normal, or synthetic)`);
       for (const d of v.differ.slice(0, 20)) console.log(`  differs: round ${d.round} ${d.field}`);
+      for (const d of v.maybe.slice(0, 20)) console.log(`  maybe: ${d.app ?? 'no version'} round ${d.round} ${d.field}`);
       process.exitCode = v.differ.length ? 1 : 0;
     });
   }
