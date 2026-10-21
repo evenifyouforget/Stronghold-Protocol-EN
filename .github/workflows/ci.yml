@@ -1,7 +1,14 @@
 name: CI
 
+# Two tiers (GitHub #43). The full tier (job `test`, 3 shards × Ubuntu/Windows × Node 22/24, the `full CI` check) runs
+# on pushes to main, pull requests into main and by hand. The quick tier (job `quick`, one Ubuntu runner without the
+# slow test files, the `quick CI` check) runs on pull requests into any other branch — a mini/* branch, or the branch
+# below in a stack: what they collect reaches main in a pull request of its own, which runs the full tier. Pushes to
+# other branches run nothing: a branch with a pull request already gets its run from `pull_request` (a push run on top
+# was the same checks twice); run one by hand from the Actions tab (workflow_dispatch) if needed.
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -14,17 +21,19 @@ permissions:
 
 jobs:
   test:
-    name: test (${{ matrix.os }}, node ${{ matrix.node }})
+    name: test (${{ matrix.os }}, node ${{ matrix.node }}, shard ${{ matrix.shard }}/3)
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ${{ matrix.os }}
-    # The unit & integration step alone took 19.7 min (ubuntu) and 22.4 min (windows) on Node 22 in run 38777566530,
-    # and more tests ran to the end once the Windows failures were fixed: 25 minutes left no margin.
-    timeout-minutes: 40
+    # Unsharded, the unit & integration step took 16–36 min (2026-10-21) and a 40 min limit was sometimes hit; a third
+    # of the files (tools/test-tier.mjs --shard) is about a third of that.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         # 22 and 24 = the maintained LTS lines (24 is what `winget install OpenJS.NodeJS.LTS` installs today)
         node: [22, 24]
+        shard: [1, 2, 3]
     env:
       # Browser/E2E suites gate themselves on these (and on a local Chrome + downloaded game assets, which CI never
       # has): keep them off explicitly. Suites that need .cache/gamedata, public/assets or data/local-assets.json skip.
@@ -46,10 +55,10 @@ jobs:
       - name: Setup check (no downloads)
         run: node tools/setup.mjs --check --no-local
 
-      # package.json "test": node --test over the test files. A bare `node --test` would also run every helper and
-      # fixture under test/ (Node's default patterns take any .js there for a test file).
+      # The files of package.json "test" (a bare `node --test` would also run every helper and fixture under test/),
+      # this runner's third of them.
       - name: Unit & integration tests
-        run: npm run test
+        run: node tools/test-tier.mjs --shard ${{ matrix.shard }}/3
 
       - name: Server smoke test (boot, /healthz, index.html, doctor)
         shell: bash
@@ -71,7 +80,57 @@ jobs:
           node tools/doctor.mjs || true
           kill $pid || true
 
-  # Separate from the test matrix so lint / types / import boundaries run once, not four times.
+
+  # The quick tier: pull requests into a branch other than main (mini/*, a stack). One runner, the test files without tools/test-tier.mjs
+  # SLOW_TEST_FILES (about a quarter of the suite's time), the setup check and the smoke test.
+  quick:
+    name: quick (ubuntu-latest, node 22)
+    if: github.event_name == 'pull_request' && github.base_ref != 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SP_E2E: '0'
+      SP_REAL_E2E: '0'
+      RENDER_E2E: '0'
+      NO_COLOR: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (npm ci → postinstall copies public/vendor)
+        run: npm ci --no-audit --no-fund
+
+      - name: Setup check (no downloads)
+        run: node tools/setup.mjs --check --no-local
+
+      - name: Quick tests (the slow files left out)
+        run: npm run test:quick
+
+      - name: Server smoke test (boot, /healthz, index.html, doctor)
+        shell: bash
+        run: |
+          node server/index.js > server.log 2>&1 &
+          pid=$!
+          ok=
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/healthz; then ok=1; break; fi
+            sleep 1
+          done
+          echo
+          [ -n "$ok" ] || { cat server.log; exit 1; }
+          # Save the page first: piping curl into `grep -q` let grep exit on the first match, curl then failed with a
+          # write error (23) and pipefail turned that into a flaky red step.
+          curl -fsS -o index.out http://127.0.0.1:3000/
+          grep -qi '<html' index.out
+          curl -fsS -o /dev/null http://127.0.0.1:3000/vendor/pixi.min.js
+          node tools/doctor.mjs || true
+          kill $pid || true
+
+  # Separate from the test matrix so lint / types / import boundaries run once per run, in both tiers.
   # Lint warnings do not fail the job (npm run lint does not pass --max-warnings=0).
   tooling:
     name: tooling (lint, imports, typecheck)
@@ -96,3 +155,25 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+  # The two checks a ruleset requires (one per tier): green when every job of the tier passed, red otherwise (a run
+  # cancelled by a newer push reports neither); on the other tier's events the tier's jobs are skipped and its check with them.
+  full:
+    name: full CI
+    needs: [test, tooling]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.base_ref == 'main') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job of the full tier passed
+        run: test "${{ needs.test.result }}" = success && test "${{ needs.tooling.result }}" = success
+
+  quick-ci:
+    name: quick CI
+    needs: [quick, tooling]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && github.base_ref != 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job of the quick tier passed
+        run: test "${{ needs.quick.result }}" = success && test "${{ needs.tooling.result }}" = success

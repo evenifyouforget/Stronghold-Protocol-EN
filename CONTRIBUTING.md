@@ -36,6 +36,11 @@ npm run lint && npm run check:imports && npm run typecheck       # 代码检查�
 类型；第一步失败就停下并打印每步结果和耗时。`--keep-going` 失败后继续，`--only lint,test` 只跑指定步骤，`--list` 列出步骤。
 不包含 `npm ci`（依赖请自己装），也不跑 Node 版本 × 系统的矩阵。
 
+CI 分两档（GitHub #43）。完整档：推送到 main、合入 main 的 PR，跑全部测试，每种系统 × Node 组合分 3 个运行器
+（`node tools/test-tier.mjs --shard k/3`），汇总成 `full CI` 检查。快速档：合入其他分支（`mini/*` 分支、叠放 PR 的下层分支）的 PR，一个 Ubuntu 运行器，
+跳过 `tools/test-tier.mjs` 里 `SLOW_TEST_FILES` 列出的耗时文件（`npm run test:quick`），汇总成 `quick CI` 检查；
+这些分支之后以自己的 PR 合入 main，那时跑完整档。本地 `npm run ci -- --quick` 跑快速档。
+
 浏览器测试默认不跑，需要本机 Chrome（路径不标准时设置 `CHROME_PATH`），用环境变量打开：
 
 ```bash
@@ -114,7 +119,11 @@ SIM_E2E=1 node --test 'test/sim/*.browser.test.js'               # 浏览器里�
   `npm run golden` before a pull request (a bare `node --test` also runs the helpers and fixtures under test/);
   `npm run lint`, `npm run check:imports`, `npm run typecheck`.
   `npm run ci` (or `node tools/ci.mjs`) runs the checks of `.github/workflows/ci.yml` in one go and stops at the first
-  failure (`--keep-going`, `--only <steps>`, `--list`); it does not run `npm ci`. Browser suites
+  failure (`--keep-going`, `--only <steps>`, `--list`); it does not run `npm ci`. CI has two tiers (GitHub #43): the
+  full tier (pushes to main, pull requests into main: every test file, 3 shards per OS × Node pair, the `full CI`
+  check) and the quick tier (pull requests into any other branch — `mini/*`, a stack: one Ubuntu runner without
+  `SLOW_TEST_FILES` of `tools/test-tier.mjs`, the `quick CI` check); `npm run ci -- --quick` runs the quick tier
+  locally. Browser suites
   are opt-in: `SP_E2E=1`, `SP_REAL_E2E=1` (needs downloaded art), `RENDER_E2E=1`, `SIM_E2E=1` (a local Chrome,
   `CHROME_PATH`). A refactor never changes `test/golden/*.json`; an intended gameplay change runs
   `npm run golden:update` and commits the digests with the change, naming the scenarios that moved.
