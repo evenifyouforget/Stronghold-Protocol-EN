@@ -101,7 +101,6 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
         <div class="bossbar__fill" style=${`width:${frac == null ? 100 : frac * 100}%`}></div>
         <span class="bossbar__txt num">${frac == null ? t('敌方领袖') : bossPctText(frac)}</span>
       </div>
-      <${LedgerBar} ledger=${hud?.ledger} />
     </div>`;
   }
   if (isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null)) {
@@ -111,7 +110,6 @@ export function PhaseCapsule({ pub, hud, miss = null }) {
       <span class="capsule__kills num"><b>${hud?.resolved ?? hud?.killed ?? 0}</b>/${hud?.total ?? '--'}</span>
       ${phase === PHASE.UNITE ? html`<span class="capsule__tag">${t('联防')}</span>` : null}
       ${phase === PHASE.UNITE && Number.isFinite(miss) ? html`<${MissTag} n=${miss} />` : null}
-      <${LedgerBar} ledger=${hud?.ledger} />
     </div>`;
   }
   return html`<div class="capsule capsule--prep" role="status">
@@ -214,22 +212,25 @@ function CapsuleScene({ kind }) {
 }
 
 /**
- * The SPA-CC Blood Ledger of the battle on screen (ccFamiglia Unending / Seasonal; snapHud `ledger`): the gauge filling
- * toward an Asset Liquidation, then draining while it lasts (pulsing); a permanent Liquidation (Unending) reads so. Its
- * icon is the client's blood drop (ui/battle blood_icon, as the overtime drain's — #48: the bar had none).
+ * The SPA-CC Blood Ledger of the battle on screen (ccFamiglia Unending / Seasonal; snapHud `ledger`), drawn as the
+ * Siracusa event's gauge (#48, from Fish's screenshots): a wide thin bar centred under the top bar, with no numbers.
+ * It fills left to right in cream toward an Asset Liquidation, then turns red and drains back while one lasts. The
+ * Liquidation's claw mark sits on its centre all the time, greyed out until one starts, so the bar reads as Blood Debt.
+ * The mark pulses once when a Liquidation starts (CSS, on the class change). A permanent Liquidation (Unending) stays red.
+ * [ASSUMED] the claw is an inline look-alike: the official sprite is not in our asset list or the mirror's act42side art.
  * @param {{ ledger?: { value: number, max: number, liquidating: boolean, permanent: boolean } | null }} p
  */
 export function LedgerBar({ ledger }) {
   if (!ledger) return null;
   const frac = Math.max(0, Math.min(1, ledger.value / ledger.max));
-  const label = ledger.liquidating ? t('清算时刻') : `${Math.floor(ledger.value)}/${ledger.max}`; // Unending: always liquidating
-  return html`<div class=${cx('ledger', ledger.liquidating && 'is-liquidating')} data-testid="ledger"
-    title=${t('血债账款：达到{max}时触发清算时刻（敌人攻击力+20%、防御力+15%）', { max: ledger.max })}>
-    <${LocalSprite} name="blood_icon" class="ledger__icon" fallback=${html`<${Icon} name="rook" class="ledger__icon" />`} />
-    <div class="ledger__bar">
-      <div class="ledger__fill" style=${`width:${frac * 100}%`}></div>
-      <span class="ledger__txt num">${label}</span>
-    </div>
+  const tip = t('血债账款：达到{max}时触发清算时刻（敌人攻击力+20%、防御力+15%）', { max: ledger.max });
+  return html`<div class=${cx('ledger', ledger.liquidating && 'is-liquidating')} data-testid="ledger" title=${tip}
+    role="meter" aria-label=${tip} aria-valuemin="0" aria-valuemax=${ledger.max} aria-valuenow=${Math.floor(ledger.value)}
+    aria-valuetext=${ledger.liquidating ? t('清算时刻') : `${Math.floor(ledger.value)}/${ledger.max}`}>
+    <div class="ledger__bar"><div class="ledger__fill" style=${`width:${frac * 100}%`}></div></div>
+    <svg class="ledger__mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 16 Q6 9 11 2" /><path d="M7 20 Q10 13 15.5 5" /><path d="M12 22.5 Q15 16 20.5 9" />
+    </svg>
   </div>`;
 }
 
@@ -485,6 +486,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
+  // the Blood Ledger shows while a battle is on screen (the phases whose capsule counts kills)
+  const fighting = boss || isCombatPhase(phase) || (phase === PHASE.SETTLE && hud?.total != null);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
   // normal rounds: the leaks of the own battle so far (boss rounds: the team LP above already moves live)
   const pending = !boss && Number.isFinite(lp) && live && live.pending > 0 ? Math.min(lp, live.pending) : 0;
@@ -552,6 +555,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <${OvertimeWarning} ot=${ot} />
       ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
     </div>
+    ${fighting ? html`<${LedgerBar} ledger=${hud?.ledger} />` : null}
   </header>`;
 }
 
