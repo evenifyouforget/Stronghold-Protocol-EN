@@ -392,7 +392,7 @@ volumes:
 
 表情（6 套 × 6 个）和「玩法说明」的 19 页教程图公开镜像也有：`node tools/setup.mjs` 会和其他素材一起下载（约 21 MB），不需要客户端；有本地素材时优先显示本地的。
 
-**没有客户端的服务器**想要上表中的官方素材：从**同一版本**的完整包（[Releases](https://github.com/sganggs/Stronghold-Protocol/releases)）里，把 `public/assets/local/` 文件夹和 `data/local-assets.json`（还有官方战斗特效的清单 `data/local-fx.json`）复制到服务器项目目录下的相同位置。服务器每次请求都会重新读取这两处，不必重启，玩家刷新页面即可。一定要用与服务器代码相同版本的完整包：各版本提取的内容和清单可能不同（例如灼热 / 炽焰源石虫的模型是 0.1.0 之后才加入的，召唤物模型是 0.2.0 加入的），混用其他版本的文件会缺图或用错图。复制后 `node tools/doctor.mjs` 会显示本地素材的条目数和「3D 棋盘可用」。分组或官方特效清单和这一版对不上时，它会提示已有多少、这一版期望多少。
+**没有客户端的服务器**想要上表中的官方素材，最简单的是运行 `npm run assets:release-local`（见下面「也可以用脚本代替手动复制」）。手动的话：从**同一版本**的完整包（[Releases](https://github.com/sganggs/Stronghold-Protocol/releases)）里，把 `public/assets/local/` 文件夹和 `data/local-assets.json`（还有官方战斗特效的清单 `data/local-fx.json`）复制到服务器项目目录下的相同位置。服务器每次请求都会重新读取这两处，不必重启，玩家刷新页面即可。一定要用与服务器代码相同版本的完整包：各版本提取的内容和清单可能不同（例如灼热 / 炽焰源石虫的模型是 0.1.0 之后才加入的，召唤物模型是 0.2.0 加入的），混用其他版本的文件会缺图或用错图。复制后 `node tools/doctor.mjs` 会显示本地素材的条目数和「3D 棋盘可用」。分组或官方特效清单和这一版对不上时，它会提示已有多少、这一版期望多少。
 
 **也可以用脚本代替手动复制**（Linux、macOS、Windows 都行，只需要 Node）：`npm run assets:release-local`（`node tools/fetch-release-local.mjs`）用 HTTP 范围请求只读取完整包的文件目录和这两部分（约 800 MB 的包里大约 200 MB），不用手动解压。默认取与本目录 `package.json` 版本相同的发布（`--tag v0.3.1` 指定其他版本，`--latest` 取最新），逐个文件校验 CRC，中断后再运行会接着下载；原有的 `public/assets/local/` 和 `data/local-*.json` 会移到 `.cache/release-local/previous-<时间>/`，不会删除（0.3.0 起也包括 `data/local-fx.json`：服务器提供的官方战斗特效清单）。本目录的其他内容（代码、数据、其他素材、本地改动）都不动。`--dry-run` 只列出将要下载的内容。
 
