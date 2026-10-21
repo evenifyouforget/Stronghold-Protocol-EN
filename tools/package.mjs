@@ -649,10 +649,22 @@ export function packageOutIsUnsafe(out, root = REPO) {
  */
 export function zipFolder(cwd, zipPath, folder = FOLDER) {
   // deflate everything: storing PNG / MP3 as they are made the full zip 8.5 MB larger and saved no real time
-  const z = spawnSync('zip', ['-q', '-r', '-X', zipPath, folder], { cwd, stdio: 'inherit' });
+  // the output is kept for the error below (GitHub #28: an intermittent Windows CI failure whose cause never reached the
+  // log); Info-ZIP writes its errors to stdout, tar to stderr
+  const io = { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: /** @type {const} */ ('utf8') };
+  const z = spawnSync('zip', ['-q', '-r', '-X', zipPath, folder], io);
   if (!z.error && z.status === 0) return;
-  const t = spawnSync('tar', ['-c', '--format', 'zip', '--options', 'zip:hdrcharset=UTF-8', '-f', zipPath, folder], { cwd, stdio: 'inherit' });
-  if (t.error || t.status !== 0 || !isFile(zipPath)) throw new Error('zipping failed: install `zip` (or a bsdtar `tar`)');
+  // zip adds to an archive that exists: nothing a failed run left may remain in the one tar writes
+  fs.rmSync(zipPath, { force: true });
+  // Windows: its own bsdtar, not a GNU tar (no --format zip) that may come first on PATH (Git for Windows)
+  const sys = process.platform === 'win32' && process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : null;
+  const tar = sys && isFile(sys) ? sys : 'tar';
+  const t = spawnSync(tar, ['-c', '--format', 'zip', '--options', 'zip:hdrcharset=UTF-8', '-f', zipPath, folder], io);
+  if (t.error || t.status !== 0 || !isFile(zipPath)) {
+    const said = (r) => `${r.stdout || ''}\n${r.stderr || ''}`.trim().replace(/\s*\n\s*/g, ' | ').slice(-600);
+    const why = (r, name) => `${name}: ${r.error ? r.error.message : `exit ${r.status}${r.signal ? ` (${r.signal})` : ''}`}${said(r) ? ` — ${said(r)}` : ''}`;
+    throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${why(z, 'zip')}; ${why(t, tar)}${!t.error && t.status === 0 ? '; no zip was written' : ''}`);
+  }
 }
 
 const isLib = (f) => f.startsWith('node_modules/') || f.startsWith('public/vendor/');
