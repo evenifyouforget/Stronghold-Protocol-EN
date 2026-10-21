@@ -72,6 +72,7 @@ import { answerClientError } from './http/common.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 import { NoticeBoard } from './announce.js';
 import { AltArtLedger } from './altArt.js';
+import { RecordStore, recordsDirFrom } from './records.js';
 import { MaintenanceBoard } from './maintenance.js';
 import { Presence } from './presence.js';
 import { GenerationWatch } from './generation.js';
@@ -182,6 +183,8 @@ export async function startServer(opts = {}) {
   const generation = gen && genFile ? new GenerationWatch({ gen, file: genFile, registry, lobby, pollMs: opts.genPollMs, log }) : null;
   // (fork) picked rooms + journal of the alternate result background (server/altArt.js); only the real server writes it
   if (opts.altArtDir) lobby.altArt = new AltArtLedger({ dir: opts.altArtDir, log, gen });
+  // (fork) opt-in anonymous match records (server/records.js, SP_RECORDS); only the real server passes the folder
+  if (opts.recordsDir) { lobby.records = new RecordStore({ dir: opts.recordsDir, log }); log.info(`[records] match records on: ${opts.recordsDir}`); }
   if (generation) {
     const helloBefore = lobby.onHello.bind(lobby);
     lobby.onHello = (session, info) => {
@@ -286,4 +289,4 @@ export async function startServer(opts = {}) {
 }
 
 // `node server/index.js` / npm start: listen, print the banner, stop on SIGINT / SIGTERM (http/boot.js).
-if (isProcessEntry(import.meta.url)) runMain(() => startServer({ warmResources: true, altArtDir: path.join(ROOT, 'logs') }));
+if (isProcessEntry(import.meta.url)) runMain(() => startServer({ warmResources: true, altArtDir: path.join(ROOT, 'logs'), recordsDir: recordsDirFrom(process.env.SP_RECORDS, ROOT) }));

@@ -10,6 +10,7 @@ import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
 import { msg } from '../../../shared/i18n.js';
 import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
+import { finishRecord } from '../records.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
@@ -167,6 +168,8 @@ export class MatchSettle {
     const { t, ...summary } = result;
     void t;
     summary.errors = this.errorCount;
+    // the anonymous match record (fork, ./records.js): the lobby writes it and keeps it out of room.lastSummary
+    if (this._record) { try { summary.record = finishRecord(this, summary); } catch (e) { this.reportError('record', e); } }
     try { this.onEndFn(summary); } catch (e) { this.reportError('onEnd', e); }
   }
 }
