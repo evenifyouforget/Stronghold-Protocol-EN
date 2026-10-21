@@ -57,8 +57,12 @@ const pct = (n, d) => (d ? Math.round((100 * n) / d) : null);
 const reachedBoss = (r) => (r.result?.roundsPassed ?? 0) >= (r.bossRound ?? Infinity) - 1;
 const humans = (r) => r.seats.filter((s) => s.human).length;
 
-/** The numbers behind the tables. */
-export function summarize(records) {
+/** A match that ended before its first battle (everyone left during the briefing or the drafts): not a result. */
+export const unplayed = (r) => !(r.battles || []).length;
+
+/** The numbers behind the tables. Matches that never reached a battle are counted apart (`unplayed`) and left out. */
+export function summarize(all) {
+  const records = all.filter((r) => !unplayed(r));
   const group = (keyOf) => {
     const m = new Map();
     for (const r of records) for (const k of [].concat(keyOf(r))) { if (k == null) continue; if (!m.has(k)) m.set(k, []); m.get(k).push(r); }
@@ -108,7 +112,7 @@ export function summarize(records) {
   const byRound = [...activity.entries()].sort(([a], [b]) => a - b).map(([r, cs]) => ({
     round: r, seats: cs.length, buys: avg(cs.map((c) => c.buy)), sells: avg(cs.map((c) => c.sell)), refreshes: avg(cs.map((c) => c.refresh)), levelUps: avg(cs.map((c) => c.levelUp)),
   }));
-  return { matches: records.length, byMode, bySeat, byRule, byRisk, byBand, byRound };
+  return { matches: records.length, unplayed: all.length - records.length, byMode, bySeat, byRule, byRisk, byBand, byRound };
 }
 
 const f1 = (x) => (x == null ? '–' : x.toFixed(1));
@@ -116,7 +120,7 @@ const p = (x) => (x == null ? '–' : `${x} %`);
 
 /** The markdown tables of summarize(). */
 export function tables(s) {
-  const out = [`${s.matches} match records`];
+  const out = [`${s.matches} match records${s.unplayed ? ` (${s.unplayed} more left out: ended before the first battle)` : ''}`];
   out.push('', '| mode | matches | wins | reached the final boss | rounds passed | human seats |', '|---|---|---|---|---|---|');
   for (const g of s.byMode) out.push(`| ${g.key} | ${g.matches} | ${g.wins} (${p(g.winPct)}) | ${g.reachedBoss} | ${f1(g.roundsPassed)} | ${g.humanSeats} |`);
   out.push('', '| seats | seats | win | rounds passed | LP at the last round |', '|---|---|---|---|---|');

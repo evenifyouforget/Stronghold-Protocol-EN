@@ -1,6 +1,6 @@
 // server/records.js — (fork, GitHub #32) opt-in anonymous match records: the server owner sets SP_RECORDS, and every
 // finished match writes one gzipped JSON file `<dir>/<YYYY-MM-DD>/<random id>.json.gz` (the record server/match/records.js
-// builds, plus the app version and the date). Off by default: nothing is recorded or written. `tools/records.mjs` reads
+// builds, plus the app version and the date; the file and folder times are set to that day's midnight UTC). Off by default: nothing is recorded or written. `tools/records.mjs` reads
 // a folder of them. Any subset of the files is a valid data set: an admin can zip a day's folder and send it.
 //   SP_RECORDS unset, '', 0, off, false, no → off
 //   SP_RECORDS 1, on, true, yes             → logs/records/ of the install directory (gitignored, like all of logs/)
@@ -57,6 +57,11 @@ export class RecordStore {
       const body = await gzip(JSON.stringify({ app: this.app, date: day, ...record }));
       await fs.promises.mkdir(path.dirname(file), { recursive: true });
       await fs.promises.writeFile(file, body, { flag: 'wx' });
+      // the file times say the day only: a modification time would date the match to the second (and an archive of the
+      // folder keeps it)
+      const midnight = new Date(`${day}T00:00:00Z`);
+      await fs.promises.utimes(file, midnight, midnight);
+      await fs.promises.utimes(path.dirname(file), midnight, midnight).catch(() => {}); // a folder's times: best effort
       return file;
     } catch (e) {
       this.log?.error?.('[records] write failed', e);

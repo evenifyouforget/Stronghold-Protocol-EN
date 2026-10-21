@@ -10,7 +10,8 @@
 //   * observations in the same list — `shop` (every roll of a seat's shop: round start, refresh, effects) and `gain` (a
 //     piece a seat got outside its own action: round rewards, cards, bands, items; inside an action it is the action's `got`).
 //   * rounds — at each SETTLE, per seat: LP, shop level, funds, board value, units, elites, bonds and tiers, layers, items,
-//     leaks (botbench's row, tools/botbench.mjs).
+//     leaks (botbench's row, tools/botbench.mjs); the round the match ended in gets one too (`final: true`: a final boss
+//     or hidden round ends without a SETTLE).
 //   * battles — every field's BattleSpec (server/sim/spec.js: deterministic, so the spec replays the battle) with the
 //     digest of the result the match used (resultDigest) and each seat's killed / total / leaks / perfect.
 // finishRecord(m, summary) returns the record with every playerId replaced by its seat id (`s0`…`s3`).
@@ -188,6 +189,10 @@ function roundRow(m) {
 export function finishRecord(m, summary) {
   const rec = m._record;
   if (!rec) return null;
+  // the round the match ended in: a final boss / hidden round finishes without a SETTLE, and a match can end mid-round
+  if (m.round >= 1 && (!rec.rounds.length || rec.rounds[rec.rounds.length - 1].r !== m.round)) {
+    try { rec.rounds.push({ ...roundRow(m), final: true }); } catch (e) { m.reportError?.('record round', e); }
+  }
   const seatOf = new Map([...m.players.values()].map((ps) => [ps.playerId, `s${ps.seat}`]));
   const players = (summary && Array.isArray(summary.players) ? summary.players : []);
   const raw = {

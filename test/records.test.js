@@ -45,6 +45,9 @@ test('RecordStore: one gzipped JSON per match in a folder per day, with the app 
   const rec = JSON.parse(zlib.gunzipSync(fs.readFileSync(a)).toString('utf8'));
   assert.deepEqual(rec, { app: '9.9.9', date: '2026-10-21', v: 1, seats: [] });
   assert.equal(JSON.stringify(rec).includes('13:45'), false, 'no time of day');
+  // nor in the file times (an archive of the folder keeps them): the day's midnight UTC
+  assert.equal(fs.statSync(a).mtimeMs, Date.parse('2026-10-21T00:00:00Z'));
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.dirname(a)).mtimeMs, Date.parse('2026-10-21T00:00:00Z'), 'the day folder too');
   // a folder it cannot create: logged, resolved null, never thrown
   const errors = [];
   const blocked = path.join(dir, 'file');
@@ -132,11 +135,13 @@ test('tools/records.mjs: reads a folder (bad files reported), prints the tables,
   await new RecordStore({ dir, app: '1.0.0' }).write(h.ended.record);
   fs.mkdirSync(path.join(dir, 'other'));
   fs.writeFileSync(path.join(dir, 'other', 'broken.json'), '{');
+  // a match everyone left before the first battle: read, but not a result
+  await new RecordStore({ dir, app: '1.0.0' }).write({ v: 1, mode: 'solo', difficulty: 'FUNNY', seats: [{ seat: 's0', human: true }], result: { victory: false, reason: 'abandoned', roundsPassed: 0 }, rounds: [], actions: [], battles: [] });
   const { records, bad } = readRecords([dir]);
-  assert.equal(records.length, 1);
+  assert.equal(records.length, 2);
   assert.equal(bad.length, 1);
   const s = summarize(records);
-  assert.equal(s.matches, 1);
+  assert.deepEqual([s.matches, s.unplayed], [1, 1]);
   assert.equal(s.byMode[0].key, 'coop:FUNNY (2 seats, 1 human)');
   assert.deepEqual(s.bySeat.map((g) => g.key), ['coop:FUNNY · AI', 'coop:FUNNY · human']);
   assert.deepEqual(s.byRule.map((g) => g.key), ['extraFunds']);
@@ -144,6 +149,7 @@ test('tools/records.mjs: reads a folder (bad files reported), prints the tables,
   assert.equal(s.byRound.length, 0, 'a human under AI 托管 makes no human actions');
   const md = tables(s);
   assert.match(md, /\| coop:FUNNY \(2 seats, 1 human\) \| 1 \|/);
+  assert.match(md, /^1 match records \(1 more left out: ended before the first battle\)/);
   const v = await verify(records);
   assert.ok(v.same >= 5, `replayed (${v.same})`);
   assert.deepEqual(v.differ, []);

@@ -553,7 +553,7 @@ Turning it on: the environment variable `SP_RECORDS`, e.g. `SP_RECORDS=on npm st
 
 The server log says `[records] match records on: <folder>` at start. Every finished match writes one file,
 `<folder>/<YYYY-MM-DD>/<random id>.json.gz` (gzipped JSON, about 10 KB for a solo match and 30–35 KB for a 4-seat
-co-op match). Test rooms are never recorded. Any set of these files is a valid data set: to share your data, zip a
+co-op match). The file and folder times are set to that day's midnight (UTC), so an archive of the folder doesn't date the matches either. Test rooms are never recorded. Any set of these files is a valid data set: to share your data, zip a
 day's folder (or several) and send it.
 
 **What a record holds**: the app version and the date; the mode, difficulty, lobby rules, the content hash of plugin
@@ -561,13 +561,13 @@ rooms, and the seed; per seat (`s0`–`s3`): human or AI, strategy, rounds passe
 the outcome; every action that changed the game, in order, without times (buys, sells, refreshes, level-ups, moves,
 equips, Arts, rewards, draft picks, AI takeover on or off; an action made by the AI for a seat is marked), every shop
 roll and every operator or item gained; a row per round (LP, shop level, funds, board, bonds, layers); and every
-battle's spec with the digest of its result. The battles are deterministic, so a battle replays from its spec.
+battle's spec with the digest of its result; the round the match ended in has its row too. The battles are deterministic, so a battle replays from its spec.
 
 **What a record never holds**: player names or ids, room codes, IP addresses, tokens, browser or device details, times
 of day (only the date), emotes or chat, the "Report a problem" text. Seats are only `s0`–`s3`, human or AI: nothing
 links a player's matches to each other.
 
 Reading them: `node tools/records.mjs [folder…]` (default `logs/records`) prints tables (matches per mode and
-difficulty, human vs. AI seats, by lobby rule, by Risk, by strategy, human prep activity per round); `--json` gives the
+difficulty, human vs. AI seats, by lobby rule, by Risk, by strategy, human prep activity per round); Matches that ended before their first battle (everyone left during the briefing or the drafts) are counted apart and left out of the tables. `--json` gives the
 same numbers as JSON; `--verify` replays each recorded normal battle from its spec with this checkout and checks it
 gives the recorded result (records of another app version are skipped).

@@ -65,6 +65,10 @@ test('the record: seats, outcome, actions, shop rolls, round rows and battle spe
   assert.ok(buy.got.length >= 1 && Number.isInteger(buy.got[0].uid), 'a buy names the piece it gave');
   assert.ok(r.rounds.length >= Math.min(r.result.roundsPassed, r.bossRound - 1), 'a row per settled round');
   assert.ok(r.rounds.every((row, i) => i === 0 || row.r > r.rounds[i - 1].r), 'rows in round order');
+  // the round the match ended in has its row: a final boss round finishes without a SETTLE (first human records)
+  const last = r.rounds[r.rounds.length - 1];
+  assert.equal(last.r, recorded().m.round, 'a row for the last round');
+  if (r.result.victory) assert.equal(last.final, true, 'the final boss round, marked');
   for (const row of r.rounds) for (const s of Object.values(row.seats)) {
     for (const k of ['lp', 'level', 'funds', 'deployed', 'value', 'elites', 'items', 'layers']) assert.equal(typeof s[k], 'number', k);
     assert.ok(Array.isArray(s.units) && Array.isArray(s.bonds));
