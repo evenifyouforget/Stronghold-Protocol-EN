@@ -2501,5 +2501,9 @@
   "开局获得各阶干员": "Start with one operator of each tier",
   "所有博士的初始目标生命翻倍": "Every Doctor's starting Life Points are doubled",
   "开局时所有博士各获得每个阶级的随机干员1名（1~6阶）": "Every Doctor starts with one random operator of each tier (I–VI)",
-  "有毒废料": "Toxic Waste"
+  "有毒废料": "Toxic Waste",
+  "补充包": "Booster Pack",
+  "装备到干员上：免费选择一名同阶干员（按固定顺序轮换，每次6名），补充包留在手牌": "Equip it on an Operator: pick one Operator of the same tier for free (6 at a time, in a fixed rotating order). The Booster Pack stays in your hand",
+  "开局获得补充包": "Start with a Booster Pack",
+  "开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）": "Every Doctor starts with a Booster Pack: equip it on an Operator to pick an Operator of the same tier for free, 6 at a time in a fixed rotating order. The pack stays in your hand (AI players don't use it)"
 }

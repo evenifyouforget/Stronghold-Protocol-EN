@@ -1291,6 +1291,7 @@ function tryDo(fn) {
 function canUseItem(m, ps, item) {
   const rec = m.gd.item(item.id);
   if (!rec) return false;
+  if (rec.booster === true) return false; // the boosterPack cheat's pack is for humans (GitHub #35): never used
   if (rec.itemType === 'MAGIC') return m.registry.has('item:' + itemKey(item.id));
   const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
   if (consume) return m.registry.has('item:' + itemKey(item.id));
@@ -2004,12 +2005,15 @@ function equipItems(m, ps) {
  * (PlayerState._fillHandFromTemp — resolveTemp asks for the rightmost temp piece, the next one a slot pulls in). false:
  * the hand stays full (summon cards only).
  */
+/** The boosterPack cheat's Booster Pack (shared/ruleData.js BOOSTER): the bot neither uses nor drops it. */
+const isBoosterPack = (gd, id) => gd.item(id)?.booster === true;
+
 function makeHandRoom(m, ps, piece = null) {
   const room = () => freeSlot(ps.hand) >= 0 || (piece != null && !ps.temp.includes(piece));
   if (room()) return true;
   if (sellWeakestHand(m, ps, { handOnly: true }) && room()) return true;
   const gd = ps?.gd || m.gd;
-  const junk = ps.isBot && !ps.autoplay ? ps.hand.filter((p) => p && p.kind === 'item' && !isMutationCell(gd, p.id))
+  const junk = ps.isBot && !ps.autoplay ? ps.hand.filter((p) => p && p.kind === 'item' && !isMutationCell(gd, p.id) && !isBoosterPack(gd, p.id))
     .sort((a, b) => ((gd.item(a.id) || {}).price || 0) - ((gd.item(b.id) || {}).price || 0) || a.uid - b.uid)[0] : null;
   if (junk && tryDo(() => ps.destroy(junk.uid)) && room()) return true;
   return sellWeakestHand(m, ps, { handOnly: true, keepPairs: false }) && room();
@@ -2032,7 +2036,8 @@ function resolveTemp(m, ps) {
     } else if (p.kind === 'item') {
       // 突变细胞 comes back after every transformation (昆图斯's strategy item), and a human's item under AI 托管 is theirs:
       // make room in the hand (sell a bench operator) rather than lose it — only a hand of nothing but items still drops it
-      if ((isMutationCell(m.gd, p.id) || ps.autoplay) && makeHandRoom(m, ps, p)) {
+      // the boosterPack cheat's pack is never dropped either (GitHub #35)
+      if ((isMutationCell(m.gd, p.id) || isBoosterPack(m.gd, p.id) || ps.autoplay) && makeHandRoom(m, ps, p)) {
         if (!ps.temp.includes(p)) continue;
         const j = freeSlot(ps.hand);
         if (j >= 0 && tryDo(() => ps.move(p.uid, { area: 'hand', idx: j }))) continue;
