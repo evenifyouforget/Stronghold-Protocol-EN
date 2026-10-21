@@ -25,10 +25,13 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'sp-records-'));
 const files = (dir) => { const out = []; const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else out.push(path.relative(dir, p)); } }; if (fs.existsSync(dir)) walk(dir); return out; };
 
 test('SP_RECORDS: off unless set; 1/on = logs/records; anything else names the folder', () => {
-  for (const v of [undefined, '', '  ', '0', 'off', 'OFF', 'false', 'no']) assert.equal(recordsDirFrom(v, '/srv/sp'), null, String(v));
-  for (const v of ['1', 'on', 'true', 'yes']) assert.equal(recordsDirFrom(v, '/srv/sp'), path.join('/srv/sp', RECORDS_DEFAULT_DIR), v);
-  assert.equal(recordsDirFrom('data-out', '/srv/sp'), path.resolve('/srv/sp', 'data-out'));
-  assert.equal(recordsDirFrom('/var/sp-records', '/srv/sp'), '/var/sp-records');
+  // platform paths (Windows: a drive letter and backslashes)
+  const root = path.resolve(os.tmpdir(), 'sp-install');
+  for (const v of [undefined, '', '  ', '0', 'off', 'OFF', 'false', 'no']) assert.equal(recordsDirFrom(v, root), null, String(v));
+  for (const v of ['1', 'on', 'true', 'yes']) assert.equal(recordsDirFrom(v, root), path.join(root, RECORDS_DEFAULT_DIR), v);
+  assert.equal(recordsDirFrom('data-out', root), path.join(root, 'data-out'));
+  const elsewhere = path.resolve(os.tmpdir(), 'sp-records-elsewhere');
+  assert.equal(recordsDirFrom(elsewhere, root), elsewhere, 'an absolute path is kept');
 });
 
 test('RecordStore: one gzipped JSON per match in a folder per day, with the app version and the date only', async (t) => {
