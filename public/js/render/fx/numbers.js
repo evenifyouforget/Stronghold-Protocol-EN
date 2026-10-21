@@ -2,7 +2,7 @@
 // Installed on FxSystem.prototype by ./system.js (a method container: never instantiated; `this` is the effect system).
 
 import { DMG_STYLE, HIT_TINT, dmgStyleKey } from '../style.js';
-import { camKey } from './camera.js';
+import { camKey, SHOT_HEIGHT } from './camera.js';
 import { clamp, easeOut } from './limits.js';
 
 const MAX_NUMBERS = 90;
@@ -52,18 +52,28 @@ const SPLASH_SUBS = new Set(['aoesniper', 'splashcaster', 'bombarder', 'fortress
 export class FxNumbers {
   // ---- hits / numbers -----------------------------------------------------------------------------------------
 
-  /** b.ev 'dmg' visual: glow + sparks in the hit colour; a melee blow (atk 'none' just before) adds its slash. */
-  damage(view, amount, type, srcView, mark) {
+  /**
+   * b.ev 'dmg' visual: glow + sparks in the hit colour; a melee blow (atk 'none' just before) adds its slash.
+   * `o.noSpark`: the official effects drew this hit (render/vfx/wiring.js) — only the number (and the splash ring) stay.
+   */
+  damage(view, amount, type, srcView, mark, o) {
     if (!view) return;
     const style = dmgStyleKey(type);
-    const p = this._chest(view);
+    // 丰川祥子's note hit (app.js notePending): where the note struck (render/fx/notes.js) — a boss's HitPoint, else the body
+    const atBody = this._noteHitAt === view.id;
+    if (atBody) this._noteHitAt = null;
+    const hp = atBody && view.isBoss && typeof this.ctx.hitPoint === 'function' ? this.ctx.hitPoint(view) : null;
+    const p = hp ? this._proj(hp.x, hp.y, hp.z) : atBody ? this._bodyPt(view, SHOT_HEIGHT.aim) : this._chest(view);
     const px = p.x, py = p.y, s = p.s;
     const tint = HIT_TINT[style] || 0xffffff;
     const big = view.maxHp > 0 && amount >= view.maxHp * 0.18;
     const melee = !!srcView && this._slashAt === srcView.id;
-    this.particle('glow', px, py, { tint, life: 0.18, s0: (s / 128) * (big ? 1.0 : 0.6), s1: (s / 128) * (big ? 1.5 : 0.9), a0: 0.9, a1: 0 });
-    if (melee) { this._slashAt = null; this._slash(view, srcView, px, py, s, style, big); }
-    this.burst(px, py, s, big ? 8 : melee ? 6 : 4, tint, { speed: melee ? 2.8 : 2.4, size: big ? 0.6 : 0.46 });
+    if (melee) this._slashAt = null;
+    if (!o?.noSpark) {
+      this.particle('glow', px, py, { tint, life: 0.18, s0: (s / 128) * (big ? 1.0 : 0.6), s1: (s / 128) * (big ? 1.5 : 0.9), a0: 0.9, a1: 0 });
+      if (melee) this._slash(view, srcView, px, py, s, style, big);
+      this.burst(px, py, s, big ? 8 : melee ? 6 : 4, tint, { speed: melee ? 2.8 : 2.4, size: big ? 0.6 : 0.46 });
+    }
     if (srcView && this.ctx.subProfOf && SPLASH_SUBS.has(this.ctx.subProfOf(srcView.info?.defId, srcView.info))) {
       if (!this._lastRing || this.time - this._lastRing > 0.08) {
         this._lastRing = this.time;
@@ -97,12 +107,13 @@ export class FxNumbers {
     b.sx = flip;
   }
 
-  heal(view, amount) {
+  /** b.ev 'heal' visual: a green glow and rising crosses (`o.noSpark`: the official heal hit drew it; the number stays). */
+  heal(view, amount, o) {
     if (!view) return;
     const p = this._chest(view);
     const s = p.s;
-    this.particle('glow', p.x, p.y, { tint: 0x62f08a, life: 0.3, s0: (s / 128) * 0.5, s1: (s / 128) * 0.9, a0: 0.55, a1: 0 });
-    for (let i = 0; i < (this.quality === 'low' ? 1 : 3); i++) {
+    if (!o?.noSpark) this.particle('glow', p.x, p.y, { tint: 0x62f08a, life: 0.3, s0: (s / 128) * 0.5, s1: (s / 128) * 0.9, a0: 0.55, a1: 0 });
+    for (let i = 0; i < (o?.noSpark ? 0 : this.quality === 'low' ? 1 : 3); i++) {
       this.particle('plus', p.x + (Math.random() - 0.5) * s * 0.5, p.y + (Math.random() - 0.2) * s * 0.3, {
         tint: 0x7dffa8, vy: -s * 0.9, life: 0.7, s0: s / 64 * 0.32, s1: s / 64 * 0.2, a0: 0.95, a1: 0, fadeIn: 0.08,
       });

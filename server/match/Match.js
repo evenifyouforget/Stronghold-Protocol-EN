@@ -15,7 +15,7 @@
 //   opts.aiPicksLast boolean (optional)         the co-op room option 「AI 队友最后选择」 (room.setAiPicksLast, GitHub #338):
 //                                              the strategy and 机变 drafts put every human seat before every AI seat
 //                                              (MatchPhases.humansFirst); only `true` turns it on; ignored in solo
-//   opts.rules       { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
+//   opts.lobbyRules  { [RULE_KEYS]: boolean } (optional)  the room's lobby rules (shared/constants.js); missing = all off.
 //                                              Read once: extraDeploy → PlayerState.deployCap, extraFunds → the round
 //                                              start income, untimed → soloUntimed. Shown as m.public.rules.
 //   opts.seats       Array<{ seat: 0..3, playerId: string, name: string, isBot: boolean, connected: boolean,
@@ -34,8 +34,15 @@
 //                    for the match; those chess fight as their stand-ins (PlayerState setNotOwned; bots own everything).
 //                    `diy` (0.2.0 自选编队, optional): the human's 自选 picks (shared/protocol.js checkDiyPicks) — fixed for
 //                    the match; the slotted operators join the human's own shop (PlayerState setDiy / initDiyStock).
+//   opts.kitted      string[] (optional)        the operators a 自选 slot may field in this room (the content set's
+//                                              list, lobby.kittedFor). Absent on a vanilla match, so setDiy keeps
+//                                              KITTED_CHARS and a normal match stays byte-identical. A modded room
+//                                              always passes it (local match, match host, test journal / replay).
 //   opts.spectators  string[] (optional)        the room's spectator seats (remake feature, community report #26;
 //                                              server/lobby.js): never players — see addSpectator below
+//   opts.hostId      string (optional)          the room's current host (server/lobby.js room.hostId): the executor a
+//                                              bot layout rehearsal is delegated to (DESIGN §14, botRehearsalDelegate);
+//                                              setHost follows a migration while the match runs
 //   opts.seed        uint32                     master seed for all match randomness
 //   opts.matchNo     integer ≥ 1 (optional)     the room's match number (lobby: room.matchCount + 1); with the seed it
 //                                              makes this match's battleIds unique within the room (DESIGN §14)
@@ -43,6 +50,15 @@
 //                                              ALT_ART_EVERY-th match may get the alternate result background (results.js)
 //   opts.altArtChance 'every' | 'picked' | null (optional, fork) the lobby's results.js altArtChance(); absent =
 //                                              derived from serverMatchNo
+//   opts.cs          string (optional)          the content hash of the room's content set (DESIGN §32,
+//                                              server/plugins/identity.js; 64 hex digits): copied into every BattleSpec
+//                                              as `cs` — the sim never reads it; absent (or malformed) ⇒ specs carry none
+//   opts.vs          string (optional)          the room's visual set of cosmetic plugins (DESIGN §32.6; 64 hex digits):
+//                                              copied into every BattleSpec as `vs` (replays name the art) — never read
+//   opts.requireCs   boolean (optional)         a room with gameplay plugins (DESIGN §32.6; the lobby sets it, the match
+//                                              then runs in a match host, server/match/host/): a b.result whose
+//                                              `cs` is missing or not opts.cs is refused like an implausible one — the
+//                                              server simulates that battle itself
 //   opts.data        frozen game data (server/data.js getData()); may lack keys while data is generated
 //   opts.log         { info, warn, error, debug }
 //   opts.now         () => ms epoch             injectable clock (Date.now in production)
@@ -70,7 +86,8 @@
 // setLoadout(playerId, loadout, ops?) → { ok } | { error, detail? }   (DESIGN §16; optional for the platform) a new
 //                           checked operator loadout (and its 潜能 / 练度 `ops`, 0.2.2) from room.loadout. Accepted only
 //                           during INFO_CHECK (the briefing's 干员调配 entry); afterwards the match's loadout is locked
-//                           (WRONG_PHASE).
+//                           (WRONG_PHASE). A room whose prepLoadout rule is prep also accepts one merge during PREP
+//                           while that seat has not pressed 准备 (DESIGN §34.15).
 // onLeave(playerId)         The human quit permanently (g.leave, room.leave, or the 10-minute reconnect
 //                           window expired). They will never return under this playerId in this match;
 //                           treat as quit (AI takes over / eliminated per DESIGN). No onDisconnect follows.
@@ -87,6 +104,9 @@
 //                           handle(id, msg) answers only its 'g.watch' (anything else → SPECTATOR; the platform routes
 //                           nothing else of it).
 // removeSpectator(id)       The spectator left (room.leave / g.leave, removed by the host, reconnect window expired).
+// setHost(playerId)         The room's host changed (server/lobby.js migrateHost; optional for the platform): the
+//                           current executor of a delegated bot rehearsal (opts.hostId / opts.botRehearsalDelegate) —
+//                           a running task of the previous host falls back to the server, later ones ask the new host.
 //
 // Bot seats never produce intents or hooks: the match drives bots itself (server/match/bot.js).
 // Messages the match emits are the S2C 'm.*' / 'b.*' frames of DESIGN §8.2 (room.* frames are platform-owned).
@@ -106,6 +126,11 @@
 // this mode; g.watch hands out specs. battleIds are `<seed36>[-<matchNo36>].<round>.<seq>[.<fieldId>]` (≤ 64 chars):
 // unique across the matches of a room, so a report that crossed into the next match is ignored like any stale one; a
 // duplicate b.result (a browser re-sending one it believes lost) is answered ok and changes nothing.
+// Bot layout rehearsals (opts.botRehearsalDelegate, (fork) on by default): a bot prep's candidate layouts go to the current
+// host's browser as one b.rehearsal frame — its module Worker simulates them off the page's main thread with the same
+// sim, seeds and scoring and answers b.rehearsalResult with the index of its pick (server/sim/rehearsal.js). A timeout,
+// a host that changed / disconnected / left or a task this client cannot run makes the server simulate the very same
+// candidates itself; the task is dropped either way, so a late answer is ignored (server/match/match/rehearsal.js).
 // Solo pause (g.pause { on }, setPause): freezes the field clocks, result deadlines, server release timers, the boss
 // clock and the server pacers; m.public.paused; resume shifts every clock / deadline by the pause.
 // Live LP (user playtest #3 item 2): during COMBAT / 联防 m.public players[].pendingLp = min(lpCapPerRound, the counted
@@ -131,10 +156,17 @@
 //   opts.battleContent 'full' | 'generic' | 'none' (sim content mode, default 'full')
 //   opts.timerScale    multiplier on every real-time phase timer (default 1)
 //   opts.combatSpeed   game seconds per real second while battles run in real time (default 2, the forced 2×)
-//   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 3, 0 = heuristic only;
+//   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 3, 0 = heuristic only; (fork) env SP_BOT_REHEARSAL when unset;
 //                      a whole battle per candidate: ~20–300 ms of CPU each, see server/match/bot.js createRehearsal)
 //   opts.botSliceMs    wall-clock ms of rehearsal per scheduler callback (default 8 with a real scheduler, unbounded
 //                      with a virtual one); the rest runs in later callbacks (scheduleBotPrep)
+//   opts.botRehearsalDelegate  offer each bot prep's layout rehearsal to the current host's browser instead (DESIGN §14;
+//                      (fork) default ON, env SP_BOT_REHEARSAL_HOST=0 turns it off; MatchRehearsal — a rehearsal the
+//                      host did not answer is simulated by the server with at most opts.botRehearsal of the same
+//                      candidates, seeds and scoring: with 0 the bot keeps its heuristic layout, no server CPU)
+//   opts.botRehearsalHost  (fork) candidate layouts a delegated rehearsal offers the host's browser (default 3, 2…8)
+//   opts.botRehearsalDelegateMs  wall-clock ms the host has to answer a delegated rehearsal (default 3000) — never an
+//                      extension of the phase: the prep deadline stays the phase's own (MatchPrep.endPrep)
 //   opts.headlessSliceMs  wall-clock ms per callback of a server-run normal / 联防 field (client-side combat: bots,
 //                      takeovers, result verification; default 8 with a real scheduler, at once with a virtual one)
 // Seats may be all bots (tools/matchrun.mjs); the lobby always has ≥ 1 human.
@@ -171,6 +203,8 @@
 //   combat.js        battle construction, COMBAT (both modes), the per-field results, then 联防 or SETTLE
 //   clientCombat.js  client-side combat bookkeeping: field records, the field clock, authority, b.start, result
 //                    deadlines and releases, server runs, field completion
+//   rehearsal.js     the bot layout rehearsal delegated to the current host's browser: the b.rehearsal task, its answer,
+//                    its timeout and the server takeover (DESIGN §14)
 //   reports.js       b.progress / b.result (validation, held boss results), SP_VERIFY
 //   unitePhase.js    联防 (UNITE) in both modes and the leakers' live counts
 //   bossRounds.js    FINAL_ASSAULT / HIDDEN_CORE: boss fields, the shared pool, plausibility budgets, the boss clock,
@@ -179,6 +213,7 @@
 //   common.js        what the modules share (FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS — re-exported here, OK,
 //                    fail, BOSS_CLOCK_MS)
 
+import { isContentHash } from '../../shared/plugins/identity.js';
 import { ruleDataPatch, rulesChangeData } from '../../shared/ruleData.js';
 import { PHASE, modeIdFor, normalizeRules } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
@@ -204,10 +239,14 @@ import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
 import { MatchClientCombat } from './match/clientCombat.js';
+import { MatchRehearsal, REHEARSAL_ANSWER_MS } from './match/rehearsal.js';
 import { MatchReports } from './match/reports.js';
 import { MatchUnite } from './match/unitePhase.js';
 import { MatchBoss } from './match/bossRounds.js';
 import { MatchSettle } from './match/settle.js';
+import { installTestTrace } from './testTrace.js';
+import { MatchTestCommands } from './match/testCommands.js';
+import { MatchOffers } from './match/offers.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
 
@@ -217,11 +256,26 @@ const BOT_SLICE_MS = 8;
 const env = (k) => (typeof process !== 'undefined' && process.env ? process.env[k] : undefined);
 /** Default combat mode: client-side unless SP_COMBAT=server. */
 const envClientCombat = () => String(env('SP_COMBAT') || '').toLowerCase() !== 'server';
+/** (fork) SP_BOT_REHEARSAL → layouts a bot rehearses per prep: an integer 0…8, anything else = unset. @param {unknown} v */
+export function parseBotRehearsal(v) {
+  const s = String(v ?? '').trim();
+  if (!/^\d{1,2}$/.test(s)) return undefined;
+  const n = Number(s);
+  return n >= 0 && n <= 8 ? n : undefined;
+}
 /** SP_VERIFY → 'off' | 'sample' | 'all'. */
 export function parseVerify(v) {
   const s = String(v ?? '').trim().toLowerCase();
   return s === 'all' || s === 'sample' ? s : 'off';
 }
+/**
+ * (fork) Default of the bot rehearsal delegation: ON — SP_BOT_REHEARSAL_HOST=0 / off / false turns it off (DESIGN §14).
+ * SP_BOT_REHEARSAL=host (upstream's spelling) still turns it on. The server's own count stays SP_BOT_REHEARSAL.
+ */
+const envBotRehearsal = () => {
+  if (String(env('SP_BOT_REHEARSAL') || '').trim().toLowerCase() === 'host') return true;
+  return !/^(0|off|false|no)$/i.test(String(env('SP_BOT_REHEARSAL_HOST') ?? '').trim());
+};
 const noopLog = { info() {}, warn() {}, error() {}, debug() {} };
 
 const dsCache = new WeakMap();
@@ -245,7 +299,7 @@ export class Match {
     this.difficulty = opts.difficulty;
     this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
     /** lobby rules (shared/constants.js RULE_KEYS), fixed for the whole match */
-    this.rules = normalizeRules(opts.rules);
+    this.lobbyRules = normalizeRules(opts.lobbyRules);
     this.seed = (Number(opts.seed) >>> 0) || 1;
     // (fork) the server-wide match number (lobby: every match this server process created); 0 = not counted
     this.serverMatchNo = Number.isInteger(opts.serverMatchNo) && opts.serverMatchNo > 0 ? opts.serverMatchNo : 0;
@@ -255,9 +309,36 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
+    /** the room's content hash (opts.cs, DESIGN §32): every BattleSpec carries it */
+    this.cs = isContentHash(opts.cs) ? opts.cs : null;
+    /** the room's visual set (opts.vs, DESIGN §32.6): every BattleSpec names it */
+    this.vs = isContentHash(opts.vs) ? opts.vs : null;
+    /** a room with gameplay plugins (opts.requireCs): a client result must name this match's cs (reports.js) */
+    this.requireCs = opts.requireCs === true && !!this.cs;
+    // [ASSUMED] Only an array is a content list. Omitting the key (every vanilla match) leaves setDiy on KITTED_CHARS.
+    // A copy so a caller's freeze or later mutation cannot change the check, and so the key stays off public views.
+    if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
+    // The room's rule switches (DESIGN §34.15). Omitted on a vanilla match, so its own keys stay the same.
+    if (opts.rules && typeof opts.rules === 'object' && !Array.isArray(opts.rules)) this.rules = Object.freeze({ ...opts.rules });
+    /**
+     * The interaction windows this match's content set declares (PLUGIN API v2, docs/PLUGINS.md §10b): the normalized
+     * `offers` of the plugins the host installed, handed in as `opts.offers` before construction so test journals
+     * and both host transports capture the same declaration snapshot. `[]` for every match whose set declares none, and then
+     * no window code ever runs (MatchOffers.openOfferWindow returns before it touches the phase).
+     * @type {object[]}
+     */
+    this.offers = Array.isArray(opts.offers) ? opts.offers : [];
+    /** @type {any[]} the windows open right now (MatchOffers) */
+    this.offerWin = [];
+    /** @type {Map<object, any>} window → its deadline timer (tracked so dispose cancels it) */
+    this._offerTimers = new Map();
+    /** what runs once the last open window closes (a held-back round start / prep) */
+    this._offerResume = null;
+    /** window sequence (diagnostics and messages) */
+    this.offerSeq = 0;
     // the rebalanced alliances of the lobby rules (shared/ruleData.js): this match's records, the shared data untouched
-    if (rulesChangeData(this.rules)) {
-      const patch = ruleDataPatch(this.data, this.rules);
+    if (rulesChangeData(this.lobbyRules)) {
+      const patch = ruleDataPatch(this.data, this.lobbyRules);
       this.data = { ...this.data, chess: { ...(this.data.chess || {}), ...patch.chess }, garrisons: { ...(this.data.garrisons || {}), ...patch.garrisons }, bonds: { ...(this.data.bonds || {}), ...patch.bonds }, items: { ...(this.data.items || {}), ...patch.items } };
     }
     this.gd = new GameData(this.data, this.modeId);
@@ -274,9 +355,53 @@ export class Match {
     this.timerScale = Number.isFinite(opts.timerScale) && opts.timerScale >= 0 ? opts.timerScale : 1;
     this.gameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, 200) : GAME_SPEED;
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
-    this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
+    const wantRehearsal = opts.botRehearsal ?? parseBotRehearsal(env('SP_BOT_REHEARSAL')); // (fork) the env when no option
+    this.botRehearsal = Number.isInteger(wantRehearsal) && wantRehearsal >= 0 ? Math.min(wantRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
     /** wall-clock budget of one rehearsal slice (scheduleBotPrep) */
     this.botSliceMs = Number.isFinite(opts.botSliceMs) && opts.botSliceMs > 0 ? opts.botSliceMs : this.sched.virtual ? Infinity : BOT_SLICE_MS;
+    /**
+     * Offer a bot's layout rehearsal to the current host's browser (DESIGN §14): `opts.botRehearsalDelegate`, default
+     * off, env SP_BOT_REHEARSAL=host. The server simulates a rehearsal the host did not answer (see MatchRehearsal).
+     */
+    this.botRehearsalDelegate = opts.botRehearsalDelegate != null ? !!opts.botRehearsalDelegate : envBotRehearsal();
+    /** (fork) layouts a delegated rehearsal offers the host's browser (its CPU, not the server's) */
+    this.botRehearsalHost = Number.isInteger(opts.botRehearsalHost) && opts.botRehearsalHost >= 2 ? Math.min(opts.botRehearsalHost, 8) : BOT_REHEARSAL_DEFAULT;
+    /** wall-clock ms the host has to answer a delegated rehearsal (engine option: tests shorten it) */
+    this.botRehearsalDelegateMs = Number.isFinite(opts.botRehearsalDelegateMs) && opts.botRehearsalDelegateMs > 0 ? opts.botRehearsalDelegateMs : REHEARSAL_ANSWER_MS;
+    /** the room's current host (opts.hostId; server/lobby.js room.hostId — setHost follows a migration) */
+    this.hostId = typeof opts.hostId === 'string' ? opts.hostId : null;
+    /**
+     * Match test mode (DESIGN §34.8 phase 2). opts.test is only forwarded for a room created with the flag.
+     * The extra state exists only then, and public / result views omit the keys while this is false, so a
+     * normal match stays byte-identical.
+     */
+    this.test = opts.test === true;
+    if (this.test) {
+      /** phase deadlines are armed. false holds the callback (g.test timers) instead of scaling time to 0. */
+      this.testTimers = true;
+      /** successful g.test commands this match (m.result.testActions) */
+      this.testActions = 0;
+      /** @type {{ seq: number, playerId: string, cmd: string, args: object, at: number, ok: boolean, code?: string }[]} */
+      this.testLog = [];
+      /** @type {Map<string, number[]>} command → scheduler timestamps inside the rate window */
+      this._testRate = new Map();
+      this._testSeq = 0;
+      /** the phase callback held while testTimers is false */
+      this._testHeld = null;
+      /** the last callback setDeadline armed, so timers can be turned off mid-phase */
+      this._testArmed = null;
+      /** false once the input journal stops logging (the replay decoder's line cap) */
+      this.testReplayable = true;
+      /** replay: stop a sliced callback after this many steps; null while recording */
+      this._testSliceBudget = null;
+      /** steps taken by the timer callback now running (the journal's `steps`) */
+      this._testSliceCount = 0;
+    }
+    /** @type {Map<string, { id: string, job: any, executor: string, timer: any }>} delegated rehearsals in flight */
+    this._rehearsalTasks = new Map();
+    this._rehearsalSeq = 0;
+    /** how this match's delegated rehearsals ended (the log lines above; the tests read it) */
+    this.rehearsalStats = { delegated: 0, answered: 0, takeovers: 0 };
     this.ds = dataSourceFor(this.data);
     /** client-side combat (DESIGN §14) — see the header */
     this.clientCombat = opts.clientCombat != null ? !!opts.clientCombat : envClientCombat();
@@ -339,13 +464,13 @@ export class Match {
     this.loneHuman = this.order.filter((p) => !p.isBot).length === 1;
 
     // per-match setup (DESIGN §6.5)
-    const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.rules.stage });
+    const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.lobbyRules.stage });
     this.stageId = setup.stageId;
     this.stage = this.stageId ? this.gd.stage(this.stageId) : null;
     this.factions = setup.factions;
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
-    const bans = drawDisabledBonds(this.gd, this.rngSetup, { picks: this.rules.bans });
+    const bans = drawDisabledBonds(this.gd, this.rngSetup, { picks: this.lobbyRules.bans });
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;
@@ -416,11 +541,15 @@ export class Match {
     this.hiddenReached = false;
     this.outcome = null;
     this._turnToken = 0;
+    // [ASSUMED] A real scheduler keeps the 8 ms bot and headless slices, including a test match,
+    // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
+    // above). The input journal records the steps that callback took; replay stops there.
+    if (this.test && opts.journal !== false) installTestTrace(this, opts);
   }
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchReports, MatchUnite, MatchBoss, MatchSettle]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

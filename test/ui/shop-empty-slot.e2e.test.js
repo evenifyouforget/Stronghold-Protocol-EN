@@ -11,6 +11,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { gotoMock } from '../e2e/mockPage.mjs';
 
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
@@ -38,12 +39,12 @@ describe('the empty slot of the shop bar', { skip: !ENABLED && 'set SP_E2E=1 (an
   })));
 
   test('a null slot is a bare frame, a bought one still says 已招募, and a refresh fills the empty one', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     await page.setViewport({ width: 1600, height: 900 });
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-    await page.goto(`${base}/dev/game-mock.html?phase=PREP&render=fallback`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await gotoMock(page, `${base}/dev/game-mock.html?phase=PREP&render=fallback`);
     await page.waitForSelector('.shopbar__cards .scard', { timeout: 15000 });
     await sleep(400);
     const before = await cards(page);
@@ -85,12 +86,12 @@ describe('the empty slot of the shop bar', { skip: !ENABLED && 'set SP_E2E=1 (an
   });
 
   test('the upgrade itself: tapping the level card twice opens the fifth slot empty, the cards shown stay', async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     await page.setViewport({ width: 1600, height: 900 });
     const problems = [];
     page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
     page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
-    await page.goto(`${base}/dev/game-mock.html?phase=PREP&render=fallback`, { waitUntil: 'networkidle0', timeout: 60000 });
+    await gotoMock(page, `${base}/dev/game-mock.html?phase=PREP&render=fallback`);
     await page.waitForSelector('.shopbar__cards .scard', { timeout: 15000 });
     // level 3 with its four operator slots, funds for the upgrade (the mock answers like the server: level 4 has five)
     await page.evaluate(() => globalThis.__MOCK__.mutate((S) => {

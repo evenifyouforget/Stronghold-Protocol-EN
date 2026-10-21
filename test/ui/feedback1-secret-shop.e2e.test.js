@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gotoMock } from '../e2e/mockPage.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -45,12 +46,12 @@ describe('机密商店: the same item twice (mock harness, headless Chrome)', { 
 
   for (const [name, w, h, touch] of [['756x366', 756, 366, true], ['1920x1080', 1920, 1080, false]]) {
     test(`${name}: two 变形同构体 are two cards; the second stays pickable after the first is taken, and picking it sends its own index`, { timeout: 120000 }, async () => {
-      const page = await browser.newPage();
+      const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
       await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: touch, hasTouch: touch });
       const problems = [];
       page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
       page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
-      await page.goto(`${base}/dev/game-mock.html?shot=1&phase=SP_DRAFT&variant=shop`, { waitUntil: 'networkidle0' });
+      await gotoMock(page, `${base}/dev/game-mock.html?shot=1&phase=SP_DRAFT&variant=shop`);
       await page.waitForSelector('.spov__grid .spcard', { timeout: 20000 });
       await sleep(600);
       // the teammate p4 has taken the first 变形同构体 (slot 0)

@@ -5,7 +5,270 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-10-18
+
+### Upstream merge
+
+- Merged upstream 0.3.1 at [`d905c146`](https://github.com/sganggs/Stronghold-Protocol/commit/d905c1464f762a03d236c7ad6bc3ba31a74f4494) (`TBD`).
+  Upstream's plugin skins (`room.skins`, 显示其他玩家的皮肤) are merged but dormant next to the fork's outfits
+  (`room.outfits`), which stay the skin system players use; no skin plugin is installed.
+- Damage meter: the fork's damage meter (`ui/damageChart.js`, `damageLog.js`) is replaced by upstream's Combat
+  statistics, which is now always on (upstream's opt-in setting is removed; an old stored value is dropped). Each
+  record is tagged with its round, and the result screen's Full Report shows a whole-match chart split By Round or
+  By Type, with Total Damage, Total Healing and DPS / HPS.
+- Settings: Fold Shop While Deploying defaults to off. The fork's English voice default and match alert stay;
+  upstream's Ammo and Energy Counts setting is taken.
+- English UI: upstream's new strings use the fork's Alliance / Stacks wording.
+
+### Changes
+
+- Host bandwidth: the four big file lists (`data/assets.json`, `data/local-assets.json`, `data/local-fx.json` and the
+  preload's `resource-manifest.json`, about 1.75 MB gzipped together) are also served at content-hashed URLs,
+  `/data/h/<hash>/<name>`, marked `immutable` while the hash is current, so a CDN can keep them; another hash gets the
+  current file with `no-cache`. A generation's page names the hashes in a `<meta name="sp-data-hashes">` tag
+  (`shared/dataHash.js`, `public/js/dataUrls.js`); without it the plain URLs are used as before. A CDN needs a cache
+  rule for paths containing `/data/h/`.
+- Site policy: `SP_CF_ANALYTICS=1` lets the Cloudflare Web Analytics beacon through the page's Content-Security-Policy
+  (`https://static.cloudflareinsights.com` in `script-src`, `https://cloudflareinsights.com` in `connect-src`). Off by
+  default; the policy is otherwise unchanged.
+- Site policy: `SP_CSP_NONCE=1` adds a fresh random nonce to `script-src` in every response's policy header, so
+  Cloudflare's JavaScript Detections (Bot Fight Mode) can run: Cloudflare copies the header's nonce onto the script it
+  injects. The game's pages still have no inline script of their own. Off by default.
+- The service worker no longer fetches the preload manifest for a player who never preloaded (no preload cache).
+- Sakiko S2: a cast that starts Fever no longer uses up her one switch. She stays on piano, the skill goes off again
+  and charges, and her next cast switches to organ. Before, an S2 Sakiko next to an S3 one could get stuck on piano
+  with no SP for the rest of her deployment, since the gauge refilled during the S3's Fever and her first cast
+  started a new one.
+- Sakiko's skill stings, the official short piano / organ clips: S1 plays one of three on every cast, Fever recasts
+  included (at most two at once); S2 plays its organ sting when she switches to organ (not when the cast starts
+  Fever); S3 plays its sting and holds its ambient loop for the skill, except when Fever is running or the gauge is
+  full, as in the game's client. The stings play on their own voices (the busy battle mix no longer drops them) and
+  load as soon as she is on the field, so none plays late. A server running locally needs
+  `node tools/fetch-assets.mjs --add-only` for the seven new sound files.
+- Sakiko's note sounds follow the game's own rules: each note sound plays at most twice at once (a new one cuts the
+  oldest) with a slight random pitch, instead of up to 48 stacked copies. A Fever volley no longer buries the Fever
+  song.
+- The sound mix follows the game client's own mixer: music, voice lines and every battle and interface sound play at
+  the levels of the official mixer groups their sounds belong to (attacks, impacts, skills, enemies, alerts …), with
+  the client's compressors on the normal battle sounds and on skill sounds, and the normal battle sounds dipping under
+  an operator's voice line. Music sits about 6 dB higher against the battle sounds than before, so the Fever song
+  carries over Sakiko's volley. The round's track now fades out over 2 seconds when the Fever song starts, as in the
+  game, instead of cutting out.
+- Music, Operator Voices and Sound Effects all start at 80. Music used to start at 60, which put the battle sounds
+  about 5 dB over the music compared with the game client, where the three default alike. Saved settings keep their
+  values.
+- Battle sounds the game plays from a spot on the field (attacks, impacts, most skill sounds) are 3 dB quieter when
+  the clip is mono, matching how the client spreads them between the speakers. Interface sounds, alerts, skill stings
+  and voice lines keep their level.
+- Songs carry over the battle (a fork choice, not in the game client): while the Fever song or a singing skill plays
+  (Skadi the Corrupting Heart's skills, Civilight Eterna's skills), the song plays 3 dB louder and the attack, impact,
+  skill-attack and boss sounds 3 dB quieter. Alerts, skill stings, interface sounds and voice lines don't change.
+- Dev sandbox: a Settings button in the panel header opens the game's own settings dialog, so volumes and the voice
+  language can be changed while testing.
+- Detail card: an operator whose selected skill changes the attack range gets Normal / Skill buttons under its Attack
+  Range title. On Skill, the range preview and the highlighted tiles on the field show the range while the skill is
+  active; the choice is remembered. The box keeps the size of the larger range, so the buttons never move. In battle
+  it uses the battle's own range, so kit-only ranges such as Fartooth S3's line show too. The dev sandbox has it as
+  well: its card and field highlight follow the unit's picked skill, and a Custom Squad pick such as Sakiko now
+  highlights her range on the field when selected.
+- Sakiko's S2 animations follow her official modes: piano attacks play its own attack clip and stance, organ the organ
+  pair. Before, she stood in the organ stance from deployment and never played an attack clip in S2.
+- Outfit effects follow each outfit's own replacement list from the game client instead of matching names. Sakiko's
+  Master of Melodia now plays the outfit's piano and organ attack effects the right way round, with their extra light
+  rays, and a few other outfits gain effects the name rule missed. Run `extract.py --only fx` again to pick this up.
+
+### Fixes
+
+- Combat statistics: operator names in the in-battle panel are translated (they showed the Chinese name).
+
+## 2026-10-17
+
+### Changes
+
+- Match Found Sound: the official match-found chime plays as the match briefing opens, however the match started
+  (Solo Matchmaking, a room's start, Find Teammates), and also while the game's tab is in the background. On by
+  default; Settings → Match Found Sound turns it off. Mute and the SFX volume apply.
+- Dev sandbox, round 3 — bonds, stacks and items: bonds are counted from the board and the bench by the match's own
+  rules (the server's `bondsMeta.js`, served to the page as `/match/bondsMeta.js`) and go into the battle, so kits that
+  stack bonds in battle do it in the sandbox too. A "Bonds & stacks" panel lists each bond's members and tier, with
+  "+Count" (extra members) and "Stacks" per bond, both kept in the URL. After a battle, "Bank stacks" adds the stacks
+  gained the way the settlement does (capped at 999) and "Bank + next round" also loads the next round's waves; the
+  board and the bench stay, and a history lists what each battle stacked. Changing the waves no longer reloads the page.
+  Each unit can carry up to two items (kept in the URL), including the pairs that grant a bond.
+- Dev sandbox, round 4: Pause / Resume and frame stepping in battle ("+1 frame" / "+10 frames", or Space, "." and
+  ">"); a step is exactly that many 1/30 s ticks of the battle, and a paused, stepped battle ends exactly like one run
+  straight through. A unit already on the board or the bench can change its skill and outfit from its entry in the list.
+  Boss picker: every map's Final Assault (round 14) and Hidden Core (round 15) are in the waves list, fought on the boss
+  field with your units on its left half and the captured partner board on the right (boss fields gain no stacks in
+  battle, the official rule). `tools/capture-specs.mjs --stages --kind boss,hidden` captures them and keeps the rounds
+  already in the index. Core bond presets: "Add the whole bond" puts every Operator of a core bond (normal or elite) on
+  the board's free tiles at once, melee ones on melee tiles, and the rest on the bench.
+- Dev sandbox, round 5 — the match's own widgets: the bond strip over the field (stacks, active state, live stacks in
+  battle, dimmed on boss fields) with its bond popup; clicking a piece, a battle unit, an enemy or the boss opens the
+  usual detail card, with live HP and stats in battle; on a boss field in battle, "My side" / "Whole field" / "Partner's
+  side" move the camera like the match's ‹ › pill. Icon pickers: "Browse…" shows every Operator as an icon grouped by
+  bond (core bonds first, then the others, then the Custom Squad picks, with a filter), and "+ Item…" on a unit shows
+  every item as an icon grouped by name (normal and elite side by side).
+- Dev sandbox battle meter: Damage, Healing, Stacks and Taken tabs with a bar per Operator (a summon counts for its
+  Operator), live during the battle and kept afterwards until the next one starts. Stacks shows which Operator's kit
+  stacked which bond and by how much, gains without an Operator (bond effects, items …) on their own rows, and a total
+  per bond that matches the stacks "Bank stacks" adds.
+
+### Fixes
+
+- Small phone screens (narrower than 768 px, e.g. 640 × 360): the Damage Stats button sat under the shop bar. It now
+  wraps onto its own row above the ⚙ / 📖 / ⛶ buttons, and the card that opens on the left ends above it.
+- Sakiko's notes fly to the centre of a multi-tile boss before they strike, like other projectiles, instead of
+  striking as soon as they touch the edge of its body.
+- The preload manager no longer fails with "Couldn't load the asset list: … Operation too large" once a whole pack is
+  saved: Chrome refuses to list a cache of more than about 15,000 files, so the manager then checks each file of the
+  asset list on its own.
+- Gladiia (normal and elite) can be deployed on Ranged Tiles in every language, not only Simplified Chinese: the
+  client's placement check read the translated trait text, so it never found the Chinese one and blocked the drop.
+  It now reads the untranslated records; cards and details stay translated. Ported from upstream
+  [PR #694](https://github.com/sganggs/Stronghold-Protocol/pull/694) by @hesperine.
+
+## 2026-10-16
+
+### Upstream merge
+
+- Merged upstream 0.3.0 at [`c24e17ee`](https://github.com/sganggs/Stronghold-Protocol/commit/c24e17eec3af1e6dedfa9935a6d15245cf2f4586) (`33221173`).
+  Upstream's plugin system, Studio and official battle effects work with the fork's generations router: plugin, sim
+  worker, rehearsal, effects and manifest URLs stay in the page's own generation, the CSP also hashes each
+  generation's rewritten import map, and `/healthz` carries both sides' fields (plugin content and trusted runtime
+  next to generation, loop, sim and maintenance).
+- Voice: upstream's voice store replaces the fork's. Its dubs and per-Operator `voiceOverrides` are kept, with the
+  fork's rules on top: English by default, a pick → native → voice language → Japanese → Chinese fallback, and
+  changing the voice language or the native switch clears every per-Operator pick. The fork's square picker drives
+  it, in the Operator detail and on each row of the Custom Squad overview (pick and hear a dub without opening
+  Change); picks saved before the merge carry over on first load.
+- Bot rehearsals now run in the host's browser by default (`SP_BOT_REHEARSAL_HOST`, 3 layouts; `0` turns it off).
+  `SP_BOT_REHEARSAL` is only the server's own count: with `0`, a host that doesn't answer leaves the bot the simple
+  placement, at no server CPU.
+- Matchmaking: a room with gameplay plugins can only be joined by room code (no Find Teammates, no solo queue; turning
+  them on mid-search stops the search). Players merged in by matchmaking don't get the host's cosmetic plugin art.
+- One damage meter: the fork's corner button and result chart; upstream's combat-metrics panel and its setting are
+  left out. The meter now also counts in plugin rooms, where the battle runs in the browser.
+- Left out: the title screen's asset download button (the preloader covers it; the asset import stays, sharing one
+  service worker with the preloader).
+- Fixes found while merging: Sakiko's Fever is no longer lost when a round's battle ran in the player's browser; her
+  note range uses the 0.1 colliders; upstream's cast effects follow the fork's repeating attacks; her note textures
+  moved from `fx/oblvns` to `notes/oblvns` (re-extract or move the folder), clear of the official effects' `fx/`.
+- Official battle effects are opt-in in 0.3.0: extract them from a local client with
+  `tools/local-extract/extract.py --only fx --fx-set used`; without the files the 官方特效 (Official Effects) setting
+  stays hidden.
+
+### Changes
+
+- The lobby news banner announces Update 0.3.0 (Sakiko Togawa, official battle effects, official models for High
+  Ground, summons and devices, and three gameplay points); everyone who closed the 0.2.6 banner sees it again.
+- The preload manager (Settings → Preload Assets) imports a preload zip: `npm run package:preload`
+  (`tools/preload-pack.mjs`) writes every file the preload lists, the official battle effects included, into one
+  zip a host can offer anywhere; files whose size and SHA-1 match the server's are saved as if downloaded, the rest
+  still download. Upstream's title-screen asset import and download buttons are gone (one place for the art).
+
+## 2026-10-15
+
+### Contributions
+
+- Planned server maintenance: `npm run maintenance` closes the server to new matches, shows players a countdown bar,
+  and stops it once the running matches end ([#6](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/6), thanks to @evenifyouforget).
+- Battle view: operators in liftoff are drawn at a flyer's height, Barrier HP is drawn over the HP bar, and status icons
+  show their time left as a ring with their value ([#10](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/10), thanks to @evenifyouforget).
+- dev-0.2 CI fixed: the BOM regex in `texture-fixes.mjs`, docs-paths exempting `public/fonts/`, and the lobby
+  rate-limit and flood tests on slow Windows runners ([#11](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/11), thanks to @evenifyouforget).
+
+### Changes
+
+- ESLint skips the local `ArknightsGamedata/` and `stronghold-protocol-alliance-database-main/` clones (their own
+  configs broke `npm run lint`); the asset-index test links its folder with a junction, so it runs on Windows without
+  symlink rights.
+- Sakiko Togawa can be picked in the Custom Squad, with her full kit: notes that wander, home in and (piano) pass
+  through, using the official note flight data; her continuous attack; S1's eight-note volley, S2's piano → organ
+  switch, S3's double-timbre volley; and the Ave Mujica Fever gauge (450 points, 20 s), shared by every Sakiko on a
+  field and carried into the unite phase. High Swift layers lock S1 out of Fever, as in the game.
+- Sakiko Togawa (丰川祥子) is no longer left out of the Custom Squad data with the other collab operators: her units,
+  her Master of Melodia outfit and the Fever / Ave Mujica keywords are built (she becomes pickable with her kit). Her
+  only dub is the Japanese collab one, so the Chinese voice setting plays those lines, as the game does.
+- Status keyword names follow the current official EN data: Sluggish (was Dull), DP Lower Limit (was Minimum DP), and
+  Necrosis / Corrosion / Nervous Impairment - Ally (was - Player).
+
+## 2026-10-14
+
+### Changes
+
+- `GET /healthz?traffic=1` (loopback / private-network clients only, as before) also reports what blocks the main
+  thread: `loop`, the event loop's lateness per minute (mean / p50 / p99 / max from `monitorEventLoopDelay`, and how
+  often a 10 ms tick fired 50 / 100 / 250 / 1000 ms late, with the longest), and `sim`, the time the server's own
+  battle simulation took per minute, by kind (`headless` bot seats and takeovers, `rehearsal`, `prep` bot decisions,
+  `boss`, `runner`) with the longest single slice and the longest burst of back-to-back slices (`server/http/loopStats.js`, `server/match/simMeter.js`). The wait a player's action sees
+  is the `loop` delay; when `sim` rises with it, the simulation is what holds the thread. A measurement on the public
+  server (2026-10-14, about 150 matches and 30 AI seats) had found stalls of 100 ms to 1 s several times a minute.
+- One log line per combat start: `[match CODE] R<n> combat: <fields> field(s), <k> server-run`, so the server journal
+  can be read against those stalls (`server/match/match/combat.js`).
+- `SP_BOT_REHEARSAL` (0–8, default 3) sets how many layouts an AI teammate rehearses with the real simulation per Rest
+  Phase; `0` skips the rehearsal. A knob for a public host, README env table.
+- Afterimages on mobile fixed: after switching apps and back on Android Chrome / Brave (a GPU process restart;
+  `chrome://gpucrash` reproduces it), units drawn through the impostor atlas (crowds, and clipped skeletons in prep)
+  piled every new pose onto the old ones and showed pieces of other units until a reload. The slot erase is now a
+  scissored `gl.clear` instead of an ERASE-blend quad, and returning to the page or a restored WebGL context resets
+  PIXI's GL state, clears every atlas page and redraws every impostor. A failed atlas pass and context loss / restore
+  are written to the diagnostics log (`public/js/render/impostor.js`, `public/js/render/app.js`).
+- HP bars, projectiles, redeploy rings and other drawn HUD pieces no longer vanish after that GPU restart: Chrome
+  blanks every GPU-backed 2D canvas when its GPU process restarts, and PIXI re-uploaded those empty canvases. Every
+  canvas the game draws a texture on (and every canvas PIXI makes for itself, `Texture.WHITE` and text) is now kept in
+  CPU memory (`willReadFrequently`), which a GPU restart doesn't touch (`cpuCanvas` in `public/js/render/app/pixi.js`).
+- Lobby announcement bumped to Update 0.2.6 and shown again to everyone (new dismiss key `news.0.2.6`): Outfits stay on
+  top, then Suzuran without glasses, the official scenes' lighting, raised / water platforms and sealed ground on the
+  scenes, the round-start deploy replay, the Ammo Count setting, uncut models on crowded boards and Wiš'adel's summons
+  on deploy tiles.
+
+### Fixes
+
+- The last 15 cut-off models are fixed: the clip measurement also poses every animation key (and the instant before
+  it), so a pose shown for a single frame between two samples is in the box (Hellagur's katana, Veen's shadow, Dusk,
+  Ulpianus, the strawberry of Eyjafjalla the Hvít Aska's Epoque outfit, Fartooth's whirlwind outfit…). All 483
+  Operator and outfit models now keep every pose they play inside their box. A model's box takes about twice as many
+  frames to measure (median 22 frames instead of 10, 2.5 ms each).
+- Ines's attack no longer shows a stray slash beside her: her slash effects wait about 1600 units to her right while
+  hidden, and the short crossfade into her attack slid them in from there. While two clips crossfade, a slot drawn far
+  outside both clips is hidden if the outgoing clip doesn't show it, and the crossfade is cut if it does (her 'boc'
+  outfit's body rose from 900 units below her on its way back to idle). A crossfade that leaves the impostor box is
+  drawn directly for those frames.
+- Ines's 'boc' (Bloodline of Combat) outfit no longer dashes in from the left on each normal attack. Her attack
+  switches to a second copy of her body whose bones wait about 900 units away while hidden, and the 0.06 s crossfade
+  blended that copy in from there. A crossfade that mostly draws slots the outgoing clip doesn't show (over 40% of the
+  visible slots) now swaps straight to the new clip. Skadi and Bagpipe (and their outfits) swap bodies the same way
+  and are cut too.
+- Bagpipe's S2 (next attack ×2) plays its double shot again. The sim turns a charge skill on, attacks and turns it off
+  in the same tick, so the skill-off cut the Skill_2_Loop shot straight into Skill_2_End and idle. A skill that switches
+  off during its own attack clip now lets that attack play out, then plays its End clip.
+- Ines strikes the enemy she blocks with her melee clip (Combat, and Skill_2_Combat during S2) instead of her ranged
+  shadow throw (Attack / Skill_2_Attack), as in the official game. The sim's attack event doesn't say which, so the view
+  checks whether the target is blocked and standing on her tile.
+- Suzuran's default model no longer looks like she's wearing glasses: the dark outer rims of her eyelid patches are
+  painted skin-coloured in her atlas image (the line around each eye stays), so she still blinks. Her outfits are unchanged.
+  `fetch-assets` paints the fix itself after every download (tools/assets/texture-fixes.mjs), so an asset refresh keeps it.
+
 ## 2026-10-13
+
+### Upstream merge
+
+- Merged upstream 0.2.6 at [`488db49f`](https://github.com/sganggs/Stronghold-Protocol/commit/488db49f11daf862b67ce26fa4cf89aa6cba2466).
+  The fork's generations router keeps working with upstream's content-hashed asset URLs, brotli, WebSocket deflate and
+  `/healthz?traffic=1` (the generation prefix is stripped first, `/assets` stays unprefixed). Upstream's new
+  「弹药数量」 (ammo count) setting sits next to the fork's voice settings. Upstream's per-Operator `voiceOverrides` stays
+  out, as before.
+- The asset preload works with the content-hashed URLs: the service worker reads `/assets/~<hash>/…`,
+  `/fonts/~<hash>/…` and `/media/~<hash>/…` as the plain file's path (`shared/resources.js`, `public/resource-sw.js`),
+  so the files the game now requests are answered from the saved copies again instead of always going to the network.
+- Impostor boxes (the cached image a unit is drawn through on crowded fields) now come from upstream's runtime
+  measurement of every clip a unit can play (#542), grown to the fork's build-time per-clip extents where those reach
+  further; the extents alone are the fallback when a model cannot be measured. The melee / ranged twin clips of
+  fortress and lord Operators (Horn, Ashlock, Thorns, SilverAsh…) are measured too. Across all 483 Operator and outfit
+  models, 15 still have a pose past their box (upstream's box alone: 28, the extents box alone: 28).
+  `test/render/impostor-fork-models.test.js` keeps Ashlock's cannon, Sankta Miksaparato's skill, Gummy's Summer easel and
+  the twins inside the box.
 
 ### Changes
 

@@ -34,6 +34,9 @@
 //       `ammo`   [[id, rounds left, rounds in the magazine]]  → sample().ammo   [left, magazine] | null (whole numbers only)
 //       `wolves` [[id, 狼影 left, the talent's maximum]]      → sample().wolves [left, maximum]  | null
 //       `neg`    [[id, fill]] (0.01–1: the negative-HP pool's share of its cap) → sample().neg  number (0: none)
+//     and two the official effects read (render/vfx/talentfx.js, skillfx.js), the same way:
+//       `layers`  [[id, n]] (the hit-negating 护盾 layers, n ≥ 1)                → sample().layers  number (0: none)
+//       `charges` [[id, stored, maximum]] (a charge skill's stored charges)   → sample().charges [stored, maximum] | null
 //     An entry that is malformed, or names a unit the snapshot does not list, is dropped; a snapshot without the list
 //     clears the readout (render/units.js: the segmented ammo bar, the wolf pips, the red bar of 斩业星熊's 我执).
 //   * `stand` [[id, until]] — the game time an enemy's attack recovery ends (sim atkStandUntil, PR #381): the position
@@ -56,6 +59,11 @@ const ELEMENT_KEYS = new Set(['neural', 'erosion', 'burn', 'apoptosis', 'necrosi
 const MAX_EVENTS = 6000;
 const finite = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+/** Uniform Catmull-Rom between p1 and p2 at t ∈ [0, 1] (p0 / p3 the neighbours): passes through every point. */
+const catmull = (p0, p1, p2, p3, t) => {
+  const t2 = t * t, t3 = t2 * t;
+  return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - p0 - 3 * p2 + p3) * t3);
+};
 
 /**
  * Game time unit `id` starts moving between snapshot `a` and the newer `b` (interpolation and extrapolation share it):
@@ -67,7 +75,7 @@ function movementStart(a, b, id) {
 }
 
 /** Cosmetic event kinds that may be dropped when far behind (never state-changing). */
-export const COSMETIC_EVENTS = new Set(['atk', 'dmg', 'heal', 'fx', 'layer', 'bounty']);
+export const COSMETIC_EVENTS = new Set(['atk', 'dmg', 'heal', 'fx', 'layer', 'bounty', 'cast']);
 /**
  * Whether an event may be dropped when stale or shed from a full queue. An 'fx' that carries an enemy's model `form`
  * (shared/protocol.js fxForm) is state: dropping it left the view on the old model after a long main-thread stall, on a
@@ -117,6 +125,14 @@ export function normalizeSnapshot(snap) {
     }
   }
   const ammo = countList(snap.ammo, units), wolves = countList(snap.wolves, units), coins = countList(snap.coins, units);
+  const energy = countList(snap.energy, units), charges = countList(snap.charges, units);
+  let layers = null;
+  if (Array.isArray(snap.layers)) {
+    for (const e of snap.layers) {
+      if (!Array.isArray(e) || !units.has(e[0]) || !Number.isSafeInteger(e[1]) || e[1] < 1) continue;
+      (layers || (layers = new Map())).set(e[0], e[1]);
+    }
+  }
   let neg = null;
   if (Array.isArray(snap.neg)) {
     for (const e of snap.neg) {
@@ -169,12 +185,28 @@ export function normalizeSnapshot(snap) {
       (standCut || (standCut = new Map())).set(e[0], e[1]);
     }
   }
-  return { t, units, down, ammo, wolves, coins, neg, st, sh, stand, standCut, raw: snap };
+  // 丰川祥子's free-flight notes (server/sim/notes.js; b.snap `notes`): [id, owner, x, y, hx, hy, look, state]
+  let notes = null;
+  if (Array.isArray(snap.notes)) {
+    for (const e of snap.notes) {
+      if (!Array.isArray(e) || !Number.isFinite(e[0]) || !Number.isFinite(e[2]) || !Number.isFinite(e[3])) continue;
+      (notes || (notes = new Map())).set(e[0], [e[0], e[1], e[2], e[3], finite(e[4]), finite(e[5]), typeof e[6] === 'string' ? e[6] : '', finite(e[7]) | 0, Number.isFinite(e[8]) ? e[8] : null]);
+    }
+  }
+  // the Fever gauge each Ave Mujica member shows (server/sim/fever.js; b.snap `fever`): id → [fill 0..1, active]
+  let fever = null;
+  if (Array.isArray(snap.fever)) {
+    for (const e of snap.fever) {
+      if (!Array.isArray(e) || !units.has(e[0]) || !Number.isFinite(e[1])) continue;
+      (fever || (fever = new Map())).set(e[0], [clamp(e[1], 0, 1), e[2] ? 1 : 0]);
+    }
+  }
+  return { t, units, down, ammo, wolves, coins, energy, charges, layers, neg, st, sh, stand, standCut, notes, fever, raw: snap };
 }
 
 /**
  * `[[id, left, max]]` → Map id → [left, max] for the ids in `units`: whole numbers with 0 ≤ left ≤ max and max ≥ 1 (the
- * `ammo` and `wolves` lists); null without a valid entry.
+ * `ammo`, `wolves`, `coins` and `energy` lists); null without a valid entry.
  */
 function countList(list, units) {
   if (!Array.isArray(list)) return null;
@@ -351,6 +383,38 @@ export class SnapshotBuffer {
    * The `down` list (knocked-out operators waiting to redeploy, see header) of the snapshot shown at `time` (default
    * renderT) — the same snapshot sample() reads flags from — or null.
    */
+  /**
+   * The notes in the air at `time` (b.snap `notes`): each note of the older snapshot, its position on a Catmull-Rom
+   * spline through the snapshots around `time` (the one before, the two framing it, the one after — a wandering note
+   * curves smoothly between the snapshots, 0.1 s apart, instead of turning corners at each), the newer snapshot's end
+   * point when it is the last one; a new note appears where it is, a gone one is not drawn. Fills and returns `out`
+   * (an array of { id, owner, x, y, hx, hy, look, state, tgt }).
+   */
+  notesAt(time = this.renderT, out = []) {
+    out.length = 0;
+    const s = this.snaps;
+    if (!s.length || !Number.isFinite(time)) return out;
+    let ia = this._indexAt(time);
+    if (ia < 0) ia = 0;
+    const A = s[ia], B = ia + 1 < s.length ? s[ia + 1] : null;
+    if (!A.notes) return out;
+    const P0 = ia > 0 ? s[ia - 1] : null, P3 = ia + 2 < s.length ? s[ia + 2] : null;
+    const span = B ? B.t - A.t : 0;
+    const k = B && span > 0 ? clamp((time - A.t) / span, 0, 1) : 0;
+    for (const [id, a] of A.notes) {
+      const b = B && B.notes ? B.notes.get(id) : null;
+      let x = a[2], y = a[3];
+      if (b) {
+        // the neighbours (a note born or gone there repeats the end it has)
+        const p0 = (P0 && P0.notes && P0.notes.get(id)) || a, p3 = (P3 && P3.notes && P3.notes.get(id)) || b;
+        x = catmull(p0[2], a[2], b[2], p3[2], k);
+        y = catmull(p0[3], a[3], b[3], p3[3], k);
+      }
+      out.push({ id, owner: a[1], x, y, hx: b ? b[4] : a[4], hy: b ? b[5] : a[5], look: a[6], state: b ? b[7] : a[7], tgt: b ? b[8] : a[8] });
+    }
+    return out;
+  }
+
   downAt(time = this.renderT) {
     const s = this.snaps;
     if (!s.length || !Number.isFinite(time)) return null;
@@ -425,9 +489,13 @@ export class SnapshotBuffer {
       o.ammo = A.ammo ? A.ammo.get(id) || null : null;
       o.wolves = A.wolves ? A.wolves.get(id) || null : null;
       o.coins = A.coins?.get(id) ?? null;
+      o.energy = A.energy?.get(id) ?? null;
+      o.charges = A.charges?.get(id) ?? null;
+      o.layers = A.layers?.get(id) ?? 0;
       o.neg = A.neg ? A.neg.get(id) || 0 : 0;
       o.st = A.st?.get(id) ?? null;
       o.sh = A.sh?.get(id) ?? 0;
+      o.fever = A.fever?.get(id) ?? null;
       o.seen = stamp;
     }
     for (const id of out.keys()) if (!A.units.has(id)) out.delete(id);

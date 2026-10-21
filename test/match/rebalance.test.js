@@ -15,7 +15,7 @@ import { KITS } from '../../server/sim/content/kits/index.js';
 const BOTH = { blaze: true, virtuosaBonds: true };
 
 test('the match\'s records change; a match without the rules (and the shared data) keep the original ones', () => {
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: BOTH });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: BOTH });
   const plain = makeMatch({ mode: 'solo', seed: 3 });
   try {
     const blaze = h.m.gd.chess(BLAZE.slot.a), cath = plain.m.gd.chess(BLAZE.slot.a);
@@ -38,7 +38,7 @@ test('the match\'s records change; a match without the rules (and the shared dat
 
 test('selling 煌 gives one 烛煌; an elite 煌 an elite one', () => {
   for (const form of ['a', 'b']) {
-    const h = makeMatch({ mode: 'solo', seed: 5, rules: { blaze: true } }).start();
+    const h = makeMatch({ mode: 'solo', seed: 5, lobbyRules: { blaze: true } }).start();
     try {
       h.toPrep(1);
       const ps = h.ps('p_0');
@@ -115,7 +115,7 @@ test('煌 takes the skill (and module) the player chose for 凯瑟琳: her loado
 });
 
 test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod A "current effect") in the match and the client', async () => {
-  const h = makeMatch({ mode: 'solo', seed: 3, rules: { lateranoMod: 'B', victoriaMod: 'C' } });
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { lateranoMod: 'B', victoriaMod: 'C' } });
   try {
     const lat = h.m.gd.bond('lateranoShip'), vic = h.m.gd.bond('victoriaShip');
     assert.match(lat.desc, /min\(5 \+ 1×层数/);
