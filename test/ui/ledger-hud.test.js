@@ -35,6 +35,8 @@ test('LedgerBar: the count while filling, Asset Liquidation while one lasts', ()
   assert.ok(!filling.props.class.includes('is-liquidating'));
   const fill = [...walk(filling)].find((v) => v.props?.class === 'ledger__fill');
   assert.ok(fill.props.style.includes('62.5'), fill.props.style);
+  const icon = [...walk(filling)].find((v) => v.props?.class === 'ledger__icon');
+  assert.equal(icon?.props.name, 'blood_icon', '#48: the Blood Debt icon by the bar');
   const on = LedgerBar({ ledger: { value: 200, max: 500, liquidating: true, permanent: false } });
   assert.ok(on.props.class.includes('is-liquidating'));
   assert.ok(!textOf(on).includes('/500'));

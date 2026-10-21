@@ -215,7 +215,8 @@ function CapsuleScene({ kind }) {
 
 /**
  * The SPA-CC Blood Ledger of the battle on screen (ccFamiglia Unending / Seasonal; snapHud `ledger`): the gauge filling
- * toward an Asset Liquidation, then draining while it lasts (pulsing); a permanent Liquidation (Unending) reads so.
+ * toward an Asset Liquidation, then draining while it lasts (pulsing); a permanent Liquidation (Unending) reads so. Its
+ * icon is the client's blood drop (ui/battle blood_icon, as the overtime drain's — #48: the bar had none).
  * @param {{ ledger?: { value: number, max: number, liquidating: boolean, permanent: boolean } | null }} p
  */
 export function LedgerBar({ ledger }) {
@@ -224,8 +225,11 @@ export function LedgerBar({ ledger }) {
   const label = ledger.liquidating ? t('清算时刻') : `${Math.floor(ledger.value)}/${ledger.max}`; // Unending: always liquidating
   return html`<div class=${cx('ledger', ledger.liquidating && 'is-liquidating')} data-testid="ledger"
     title=${t('血债账款：达到{max}时触发清算时刻（敌人攻击力+20%、防御力+15%）', { max: ledger.max })}>
-    <div class="ledger__fill" style=${`width:${frac * 100}%`}></div>
-    <span class="ledger__txt num">${label}</span>
+    <${LocalSprite} name="blood_icon" class="ledger__icon" fallback=${html`<${Icon} name="rook" class="ledger__icon" />`} />
+    <div class="ledger__bar">
+      <div class="ledger__fill" style=${`width:${frac * 100}%`}></div>
+      <span class="ledger__txt num">${label}</span>
+    </div>
   </div>`;
 }
 
