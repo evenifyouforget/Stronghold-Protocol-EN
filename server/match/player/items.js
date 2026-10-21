@@ -10,7 +10,7 @@ import { tileKey, inField, parseDir, freeSlot } from '../board.js';
 import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
-import { CC } from '../../../shared/ruleData.js';
+import { CC, BOOSTER, BOOSTER_NAME } from '../../../shared/ruleData.js';
 
 /** The item a full carrier loses by default: the oldest that is not the Toxic Waste (SPA-CC Junk). */
 const replaceableIndex = (items) => Math.max(0, items.findIndex((x) => x.id !== CC.junk.itemId));
@@ -49,6 +49,8 @@ export class PlayerItems {
     if (!tloc || tloc.piece.kind !== 'chess' || tloc.area === 'equipped') return fail(ERR.BAD_TARGET);
     const item = iloc.piece;
     const target = tloc.piece;
+    // the boosterPack cheat: the Booster Pack is not attached, it opens its offer
+    if (rec.booster === true) return this.openBooster(target);
     if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) return fail(ERR.BAD_TARGET, 'replace: not equipped on the target');
     const policy = this._slotPolicy();
     // [ASSUMED] a second 变形同构体 is refused before anything moves. Official accepts() is always true.
@@ -143,6 +145,26 @@ export class PlayerItems {
     const idx = replacedIndex(policy, target.items, replaceUid);
     const [piece] = target.items.splice(idx, 1);
     return { piece, idx };
+  }
+
+  /**
+   * The Booster Pack on `target` (the boosterPack cheat, shared/ruleData.js BOOSTER): a free pick-one offer of
+   * BOOSTER.choices operators of the target's tier, the next ones of that tier's fixed order (its base chess ids sorted,
+   * 自选 slots left out) after this player's place in it, which then moves on, round the end of the order. The operators
+   * are listed whatever copies the shared pool has left (a displayed reward survives stock exhaustion, prep.js
+   * pickReward). The pack itself stays where it was.
+   */
+  openBooster(target) {
+    const tier = this.gd.tierOf(target.id);
+    const order = [...this.m.pool.entries.keys()].filter((b) => this.gd.tierOf(b) === tier && !this.gd.chess(b)?.isDiy).sort();
+    if (!order.length) return fail(ERR.BAD_TARGET, 'no operator of that tier');
+    this.boosterAt = this.boosterAt || {};
+    const at = (this.boosterAt[tier] || 0) % order.length;
+    const n = Math.min(BOOSTER.choices, order.length);
+    const ids = Array.from({ length: n }, (_, i) => order[(at + i) % order.length]);
+    this.boosterAt[tier] = (at + n) % order.length;
+    if (!this.pushRewardOffer('booster', { tier, ids, label: BOOSTER_NAME })) return fail(ERR.BAD_TARGET, 'no operator of that tier');
+    return OK;
   }
 
   /** g.art {itemUid, row, col, dir?}: the Art's range grid is rotated by `dir` (absent ⇒ RIGHT). */
