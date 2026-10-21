@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLangsOf, effectiveVoiceLang, voiceLine, VOICE_TREES } from '../../public/js/audio.js';
 import { mediaUrl } from '../../public/js/media.js';
+import { songGain } from '../../public/js/audioMixer.js';
 import { PHASE } from '../../shared/constants.js';
 import { makeBattle, chessRec } from '../helpers/battleHarness.js';
 
@@ -364,13 +365,62 @@ describe('operator battle voice', () => {
       assert.match(a.voiceNode?.url ?? '', /^\/a\/voice\/cn\/char_a\/cn_02[12]\.mp3$/, '中文 again');
       a._stopVoice();
       a.setVoiceLang('kr');
-      assert.equal(a.voiceLang, 'kr', "the picker's dubs are settings too (this fork: EN / KR)");
+      assert.equal(a.voiceLang, 'kr', '한국어 is a dub');
       a.setVoiceLang('xx');
-      assert.equal(a.voiceLang, 'cn', 'an unknown dub is 中文');
+      assert.equal(a.voiceLang, 'cn', 'an unknown value stays 中文');
       // the settings store hands the choice over (installAudio and ui/settings.js)
       const settings = readFileSync(path.join(ROOT, 'public/js/ui/settings.js'), 'utf8');
-      assert.match(settings, /audio\.setVoiceLang\(s\.voiceLang\)/);
+      assert.match(settings, /audio\.setVoiceLang\(s\.voiceLang, s\.voiceOverrides\)/);
       assert.match(settings, /t\('语音语言'\)/);
+      assert.match(settings, /audio\.setVoiceNative\(s\.voiceNative\)/);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test('English, Korean and the own-language dub use the same fallback as 日本語; 试听 skips the gate', async () => {
+    assert.deepEqual(VOICE_TREES, { jp: 'voiceJp', en: 'voiceEn', kr: 'voiceKr', native: 'voiceNative' });
+    const id = 'char_102_texas';
+    const audioM = {
+      voice: { [id]: { select: '/a/voice/cn/char_a/cn_021.mp3', place: '/a/voice/cn/char_a/cn_023.mp3' } },
+      voiceEn: { [id]: { select: '/a/voice/en/char_a/cn_021.mp3' } },
+      voiceKr: { [id]: { place: '/a/voice/kr/char_a/cn_023.mp3' } },
+      voiceNative: { [id]: { select: '/a/voice/native/char_a_ita/cn_021.mp3' } },
+    };
+    assert.deepEqual(voiceLine(audioM, id, 'select', 'en'), { url: '/a/voice/en/char_a/cn_021.mp3', fallback: '/a/voice/cn/char_a/cn_021.mp3' });
+    assert.deepEqual(voiceLine(audioM, id, 'place', 'kr'), { url: '/a/voice/kr/char_a/cn_023.mp3', fallback: '/a/voice/cn/char_a/cn_023.mp3' });
+    assert.deepEqual(voiceLine(audioM, id, 'select', 'native'), { url: '/a/voice/native/char_a_ita/cn_021.mp3', fallback: '/a/voice/cn/char_a/cn_021.mp3' });
+    assert.deepEqual(voiceLine(audioM, id, 'place', 'en'), { url: '/a/voice/cn/char_a/cn_023.mp3', fallback: null }, 'a slot the EN tree lacks: the Chinese line');
+    assert.deepEqual(voiceLine(audioM, id, 'place', 'native'), { url: '/a/voice/cn/char_a/cn_023.mp3', fallback: null });
+
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => ({ audio: { sfx: { ui: {}, battle: {}, units: {} }, ...audioM } }) });
+      a.voiceGate = new VoiceGate({ gapMs: 60_000 });
+      a.install();
+      fw.fire('pointerdown');
+      await tick();
+      assert.equal(a.voice(id, 'place', { unitKey: 1 }), true);
+      await tick();
+      assert.equal(a.voice(id, 'place', { unitKey: 1 }), false, 'the battle line is on cooldown');
+      assert.equal(a.previewVoice(id, 'en'), true, '试听 takes the channel and skips the cooldown');
+      await tick();
+      assert.equal(a.voiceNode?.url, '/a/voice/en/char_a/cn_021.mp3');
+      a.setVoiceLang('cn', { [id]: 'native' });
+      a.setVoiceNative(false);
+      assert.equal(a.previewVoice(id), true, 'no lang: the operator\'s own choice');
+      await tick();
+      assert.equal(a.voiceNode?.url, '/a/voice/native/char_a_ita/cn_021.mp3');
+      a.setVoiceLang('kr', {});
+      a.setVoiceNative(true);
+      assert.equal(a.voice(id, 'select'), true, '本土语言 wins over the global KR dub');
+      await tick();
+      assert.equal(a.voiceNode?.url, '/a/voice/native/char_a_ita/cn_021.mp3');
+      a.volumes.muted = true;
+      assert.equal(a.previewVoice(id, 'en'), false, 'muted stays silent');
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -406,7 +456,7 @@ describe('operator battle voice', () => {
       assert.equal(a.voice('char_zz', 'place', { unitKey: 1 }), false, 'unknown operator');
       a._stopVoice(); a.voiceGate.reset();
       // the battle events drive the lines: 行动出发 (the first deploy), 部署 (the rest), 行动开始, 作战中N
-      a.setFieldUnits([{ id: 11, side: 'ally', spine: 'char_a', kind: 'op', skillIndex: 2 }, { id: 12, side: 'ally', spine: 'char_b', kind: 'op' }]);
+      a.setFieldUnits([{ id: 11, side: 'ally', spine: 'model_other', voice: 'char_a', kind: 'op', skillIndex: 2 }, { id: 12, side: 'ally', spine: 'char_b', kind: 'op' }]);
       a.handleBattleEvents([['deploy', 11]]);
       await new Promise((r) => setTimeout(r, 10));
       assert.equal(a.voiceNode?.url, '/v/a_start.mp3', 'the first operator deployed says 行动出发');
@@ -503,7 +553,14 @@ describe('operator battle voice', () => {
 function fakeWindow() {
   const listeners = new Map();
   const made = { sources: 0, started: 0 };
-  class Param { constructor() { this.value = 1; } setValueAtTime(v) { this.value = v; } linearRampToValueAtTime(v) { this.value = v; } setTargetAtTime(v) { this.value = v; } cancelScheduledValues() {} }
+  // the value is the last one scheduled; `log` keeps every automation call ([kind, value]) for the tests that need the shape
+  class Param {
+    constructor() { this.value = 1; this.log = []; }
+    setValueAtTime(v) { this.value = v; this.log.push(['set', v]); }
+    linearRampToValueAtTime(v) { this.value = v; this.log.push(['ramp', v]); }
+    setTargetAtTime(v) { this.value = v; this.log.push(['target', v]); }
+    cancelScheduledValues() {}
+  }
   class Node { connect() {} disconnect() {} }
   class Gain extends Node { constructor() { super(); this.gain = new Param(); } }
   class Src extends Node { constructor() { super(); this.playbackRate = new Param(); made.sources++; } start() { made.started++; } stop() {} }
@@ -528,6 +585,171 @@ function fakeWindow() {
 }
 
 describe('AudioManager', () => {
+  test('丰川祥子 (committed manifest): each note type its official bank; the notes own every impact (no generic hit), her swing is attack.0.1, S3 its own', () => {
+    const u = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx.units.char_4182_oblvns;
+    const f = (url) => url?.split('/').pop();
+    const want = {
+      attack: [undefined, 'p_imp_mjckyrdnt.mp3'], talent: ['p_atk_mjckyrdnt.mp3', 'p_imp_mjckyrdnt.mp3'],
+      s1: [undefined, 'p_imp_mjckyrdglsnt.mp3'], s2: ['p_atk_mjckyrdnt_r.mp3', 'p_imp_mjckyrdnt_r.mp3'],
+      s2_slow: ['p_atk_mjckyrdnt_p.mp3', 'p_imp_mjckyrdnt_p.mp3'], s3_phy: ['p_atk_mjckyrdnt_r.mp3', 'p_imp_mjckyrdslnt.mp3'],
+      s3_mag: ['p_atk_mjckyrdnt_p.mp3', 'p_imp_mjckyrdslnt.mp3'],
+    };
+    for (const [look, [born, hit]] of Object.entries(want)) assert.deepEqual([f(u.notes[look]?.born), f(u.notes[look]?.hit)], [born, hit], look);
+    assert.equal(u.hit, undefined); assert.equal(u.hits, undefined);
+    assert.equal(f(u.attack), 'p_atk_mjckyrdnt_h.mp3');
+    assert.equal(f(u.attacks?.[2]), 'p_atk_mjckyrdslnt.mp3');
+  });
+
+  test('丰川祥子: per-note born / hit sounds on their official bank pools (max 2, the oldest gives way, pitch 0.8–1.2); the Fever song starts at full volume over the round track, a second Fever changes nothing (no queue), resets with the field', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    try {
+      let roll = 0;
+      const bank = (file) => ({ maxSoundAllowed: 2, popOldest: true, sounds: { [file]: { minPitch: 0.8, maxPitch: 1.2, delay: 0 } } });
+      const vm = { audio: {
+        bgm: { combat: { loop: '/b/combat.mp3' }, fever: { intro: '/b/fever.mp3', loop: '/b/fever.mp3' } },
+        sfx: { ui: {}, battle: {}, pools: { s1h: bank('s1_hit.mp3'), tb: bank('t_born.mp3') },
+          units: { char_4182_oblvns: { notes: { s1: { hit: '/assets/audio/sfx/s1_hit.mp3', hitPool: 's1h' },
+            talent: { born: '/assets/audio/sfx/t_born.mp3', bornPool: 'tb' } } } } },
+      } };
+      const a = new AudioManager({ win: fw.win, getManifest: () => vm, random: () => roll });
+      a.install();
+      fw.fire('pointerdown');
+      await new Promise((r) => setTimeout(r, 10));
+      a.setFieldUnits([{ id: 3, kind: 'op', side: 'ally', defId: 'chess_char_6_diy1_a', spine: 'char_4182_oblvns' }]);
+      const plays = [];
+      const play = a._playBank.bind(a);
+      a._playBank = (url, pool, vol) => { plays.push([url, pool, vol]); return play(url, pool, vol); };
+      const ev = [];
+      for (let i = 0; i < 30; i++) ev.push(['fx', 'note', 5, 10, { id: i, owner: 3, look: 's1_' + ((i % 8) + 1), on: 'hit', tgt: 9 }]);
+      ev.push(['fx', 'note', 5, 10, { id: 99, owner: 3, look: 'unknown', on: 'born' }]);
+      const before = fw.made.started;
+      a.handleBattleEvents(ev);
+      assert.equal(plays.length, 30, 'every note hit reaches its bank');
+      assert.ok(plays.every(([u, p]) => u.endsWith('/s1_hit.mp3') && p === 's1h'), 'S1 notes share the s1 hit bank');
+      await new Promise((r) => setTimeout(r, 10));
+      assert.equal(fw.made.started - before, 30, 'each starts (the battle limiter drops none)');
+      assert.equal(a.stingVoices.get('s1h').length, 2, 'official cap: 2 at once, the oldest giving way');
+      // the official pitch range of the played file
+      const srcs = [];
+      const mk = a.ctx.createBufferSource.bind(a.ctx);
+      a.ctx.createBufferSource = () => { const s = mk(); srcs.push(s); return s; };
+      roll = 1;
+      a.handleBattleEvents([['fx', 'note', 5, 10, { id: 100, owner: 3, look: 'talent', on: 'born' }]]);
+      await new Promise((r) => setTimeout(r, 10));
+      assert.equal(a.stingVoices.get('tb').length, 1, 'the talent born bank is its own pool');
+      assert.ok(Math.abs(srcs[0].playbackRate.value - 1.2) < 1e-9, 'pitch drawn in the file\'s 0.8–1.2');
+      roll = 0;
+      // Fever: the song starts at once at full volume (no fade in), the round track drops out
+      a.playBgm('combat');
+      await new Promise((r) => setTimeout(r, 10));
+      a.handleBattleEvents([['fx', 'fever', 0, 0, { on: 1 }]]);
+      await new Promise((r) => setTimeout(r, 10));
+      assert.ok(a.fever && a.fever.node, 'the Fever song plays');
+      const shape = a.fever.node.gain.gain.log;
+      // (fork) at the song's boost over the battle (audioMixer.js SONG_DUCK) when the mixer is up, else 1
+      assert.deepEqual(shape[0], ['set', a.mixer ? songGain() : 1], 'full volume from the start (no fade in)');
+      assert.ok(!shape.some(([k, v]) => k === 'ramp' && v > 0), 'nothing ramps it up');
+      assert.deepEqual(shape[shape.length - 1], ['ramp', 0], 'only a click guard at its very end');
+      const first = a.fever;
+      a.handleBattleEvents([['fx', 'fever', 0, 0, { on: 0 }], ['fx', 'fever', 0, 0, { on: 1 }]]);
+      assert.equal(a.fever, first, 'Fever ending does nothing; a new Fever neither restarts nor queues it');
+      assert.equal(a.fever.queued, undefined);
+      // her targetless 持续攻击 (target id 0) plays no attack sound — only an attack on an enemy does (owner 2026-10-16)
+      const calls = [];
+      const unit = a.unit.bind(a);
+      a.unit = (...args) => { calls.push(args[1]); return unit(...args); };
+      a.handleBattleEvents([['atk', 3, 0, 'note']]);
+      assert.equal(calls.length, 0, 'no attack sound without a target');
+      a.handleBattleEvents([['atk', 3, 9, 'note']]);
+      assert.deepEqual(calls, ['attack'], 'an attack on an enemy has one');
+      a.unit = unit;
+      a.setFieldUnits([]);
+      assert.equal(a.fever, null, 'a new field stops it');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test('丰川祥子 (committed manifest): the skill stings — S1 d1/d2/d3 40/30/30, S2 h1 only (into organ), S3 s1/s2 50/50 + its loop, each on its official pool', () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const st = m.units.char_4182_oblvns.stings;
+    const f = (c) => [c.url.split('/').pop(), c.w];
+    assert.deepEqual(st[0].clips.map(f), [['p_skill_mjckyrdglsnt_d1.mp3', 40], ['p_skill_mjckyrdglsnt_d2.mp3', 30], ['p_skill_mjckyrdglsnt_d3.mp3', 30]]);
+    assert.deepEqual(st[1].clips.map(f), [['p_skill_mjckyrdslnt_h1.mp3', 1]], 'h2 (back into piano) is never shipped: S2 switches once');
+    assert.deepEqual(st[2].clips.map(f), [['p_skill_mjckyrdslnt_s1.mp3', 50], ['p_skill_mjckyrdslnt_s2.mp3', 50]]);
+    assert.equal(st[2].loop.split('/').pop(), 'p_atk_mjckyrdslnt_lp.mp3');
+    assert.deepEqual([m.pools[st[0].pool].maxSoundAllowed, m.pools[st[0].pool].popOldest], [2, true], 'S1: max 2, the oldest gives way');
+    assert.equal(m.pools[st[2].pool].maxSoundAllowed, 0);
+  });
+
+  test('丰川祥子: a cast cue plays one weighted sting on its pool; no cue, no sting; S3 holds its loop until the skill ends / she dies / the field changes', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    try {
+      let roll = 0;
+      const pools = { p1: { maxSoundAllowed: 2, popOldest: true, sounds: {} }, p3: { maxSoundAllowed: 0, popOldest: false, sounds: {} } };
+      const stings = {
+        0: { clips: [{ url: '/s/d1.mp3', w: 40 }, { url: '/s/d2.mp3', w: 30 }, { url: '/s/d3.mp3', w: 30 }], pool: 'p1' },
+        2: { clips: [{ url: '/s/s1.mp3', w: 50 }, { url: '/s/s2.mp3', w: 50 }], pool: 'p3', loop: '/s/lp.mp3' },
+      };
+      const vm = { audio: { bgm: {}, sfx: { ui: {}, battle: {}, pools, units: { char_4182_oblvns: { stings } } } } };
+      const a = new AudioManager({ win: fw.win, getManifest: () => vm, random: () => roll });
+      a.install();
+      fw.fire('pointerdown');
+      await new Promise((r) => setTimeout(r, 10));
+      const sak = (id, skillIndex) => ({ id, kind: 'op', side: 'ally', defId: 'chess_char_6_diy1_a', spine: 'char_4182_oblvns', skillIndex });
+      a.setFieldUnits([sak(3, 0), sak(4, 2)]);
+      const plays = [];
+      const play = a._playBank.bind(a);
+      a._playBank = (url, pool, vol) => { plays.push([url, pool]); return play(url, pool, vol); };
+      const tick = () => new Promise((r) => setTimeout(r, 10));
+      // the draw follows the weights: 0.39 → d1 (0–40), 0.4 → d2 (40–70), 0.95 → d3
+      for (const r of [0.39, 0.4, 0.95]) { roll = r; a.handleBattleEvents([['skill', 3, 1, { sting: 1 }]]); }
+      assert.deepEqual(plays, [['/s/d1.mp3', 'p1'], ['/s/d2.mp3', 'p1'], ['/s/d3.mp3', 'p1']]);
+      await tick();
+      // S1's bank holds 2 and the oldest gives way: never more than 2 at once, and the battle limiter never drops one
+      assert.equal(a.stingVoices.get('p1').length, 2, 'S1: max 2 at once');
+      // a burst of casts right after one another (迅捷) each still start: the unit / URL gaps do not apply
+      const before = fw.made.started;
+      for (let i = 0; i < 4; i++) { roll = 0.1; a.handleBattleEvents([['skill', 3, 1, { sting: 1 }]]); }
+      await tick();
+      assert.equal(fw.made.started - before, 4, 'every cast of a burst starts its sting');
+      assert.equal(a.stingVoices.get('p1').length, 2);
+      plays.length = 0;
+      a.handleBattleEvents([['skill', 3, 1]]);
+      assert.deepEqual(plays, [], 'a cast without a cue plays no sting');
+      // S3: the sting and the held loop together; its end stops the loop
+      roll = 0.6;
+      a.handleBattleEvents([['skill', 4, 1, { sting: 1, loop: 1 }]]);
+      await tick();
+      assert.deepEqual(plays, [['/s/s2.mp3', 'p3']]);
+      assert.equal(a.stingVoices.get('p3').length, 1, 'the S3 sting plays');
+      const held = a.stingLoops.get(4);
+      assert.ok(held?.node?.src.loop, 'the loop plays, looped');
+      a.handleBattleEvents([['skill', 4, 0]]);
+      assert.equal(a.stingLoops.has(4), false, 'the skill ended: the loop stops');
+      assert.deepEqual(held.node.gain.gain.log.at(-1), ['ramp', 0], 'with a fade (0.2 s)');
+      // a Fever-gated cast (no `loop`) starts no loop; death and a new field stop a running one
+      a.handleBattleEvents([['skill', 4, 1, { sting: 1 }]]);
+      await new Promise((r) => setTimeout(r, 10));
+      assert.equal(a.stingLoops.has(4), false, 'no loop without the cue');
+      a.handleBattleEvents([['skill', 4, 1, { sting: 1, loop: 1 }]]);
+      await new Promise((r) => setTimeout(r, 10));
+      a.handleBattleEvents([['die', 4]]);
+      assert.equal(a.stingLoops.has(4), false, 'her death stops it');
+      a.handleBattleEvents([['skill', 4, 1, { sting: 1, loop: 1 }]]);
+      await new Promise((r) => setTimeout(r, 10));
+      a.setFieldUnits([]);
+      assert.equal(a.stingLoops.size, 0, 'a new field stops it');
+      assert.equal(a.stingVoices.size, 0, 'and its stings');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   test('no AudioContext / no manifest: every call is a silent no-op', () => {
     const a = new AudioManager({ win: null, getManifest: () => null });
     a.install();
@@ -579,6 +801,63 @@ describe('AudioManager', () => {
       globalThis.fetch = origFetch;
     }
   });
+  test('BGM is not downloaded while the music is muted or at volume 0; the wanted track starts once it is audible', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+    const lobby = manifest.audio.bgm.lobby.loop;
+    const prep = manifest.audio.bgm.prep.loop;
+    assert.notEqual(lobby, prep, 'premise: two different loops');
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+      a.setVolumes({ muted: true });
+      a.install();
+      a.playBgm('lobby');
+      fw.fire('pointerdown');
+      await tick();
+      assert.equal(a.unlocked, true);
+      assert.equal(a.bgmSilent, true);
+      assert.ok(!asked(urls, lobby) && !asked(urls, manifest.audio.bgm.lobby.intro), 'muted: nothing fetched at unlock');
+      a.playBgm('prep');
+      await tick();
+      assert.ok(!asked(urls, prep), 'muted: a phase change fetches nothing');
+      assert.equal(a.wantBgm, 'prep', 'the wanted track is remembered');
+      a.setVolumes({ muted: false });
+      await tick();
+      assert.ok(asked(urls, prep), 'unmuted: the track the screen wants now is fetched');
+      assert.ok(!asked(urls, lobby), 'never the track wanted before');
+      assert.equal(a.bgm?.loopUrl, prep);
+
+      // BGM volume 0 is silent too: another track stops and is not fetched; SFX keep playing
+      a.setVolumes({ bgm: 0 });
+      a.playBgm('lobby');
+      await tick();
+      assert.ok(!asked(urls, lobby), 'BGM volume 0: no download');
+      assert.equal(a.bgm, null, 'the other track stopped');
+      a.sfx('buy');
+      await tick();
+      assert.ok(asked(urls, manifest.audio.sfx.ui.buy), 'SFX are not gated by the BGM volume');
+      a.setVolumes({ bgm: 0.5 });
+      await tick();
+      assert.ok(asked(urls, lobby), 'audible again: fetched');
+      assert.equal(a.bgm?.loopUrl, lobby);
+
+      // the loop that already plays keeps playing through a silent phase change, and is not fetched again
+      a.setVolumes({ muted: true });
+      const n = urls.length;
+      const started = fw.made.started;
+      a.playBgm('lobby');
+      a.setVolumes({ muted: false });
+      await tick();
+      assert.equal(a.bgm?.loopUrl, lobby);
+      assert.equal(urls.length, n, 'no new request');
+      assert.equal(fw.made.started, started, 'no restart');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
   test('fetch failures are swallowed', async () => {
     const fw = fakeWindow();
     const origFetch = globalThis.fetch;
@@ -598,6 +877,27 @@ describe('AudioManager', () => {
     } finally {
       globalThis.fetch = origFetch;
       console.warn = origWarn;
+    }
+  });
+  test('a served manifest\'s content-hashed audio URL is fetched as /media/~<hash>/…, falling back to the hashed .mp3 URL', async () => {
+    const H = '0123456789abcdef';
+    const raw = manifest.audio.bgm.prep.loop.replace(/^\/assets\//, `/assets/~${H}/`);
+    const served = { ...manifest, audio: { ...manifest.audio, bgm: { ...manifest.audio.bgm, prep: { loop: raw } } } };
+    const fw = fakeWindow();
+    const urls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (u) => { urls.push(u); return u.startsWith('/media/') ? { ok: false, status: 404 } : { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => served });
+      a.install();
+      fw.fire('pointerdown');
+      a.playBgm('prep');
+      await new Promise((r) => setTimeout(r, 20));
+      assert.deepEqual(urls, [raw.replace(/^\/assets\/(~[0-9a-f]{16})\/audio\/(.+)\.mp3$/, '/media/$1/$2'), raw]);
+      assert.match(urls[0], new RegExp(`^/media/~${H}/bgm/`));
+      assert.equal(a.bgm?.loopUrl, raw);
+    } finally {
+      globalThis.fetch = origFetch;
     }
   });
   test('音频先走无扩展名的 /media/ 路由；只有它 404 才回退到带扩展名的原地址', async () => {
@@ -1097,7 +1397,7 @@ describe('voice language', () => {
     assert.equal(effectiveVoiceLang(am, 'char_102_texas', pref), 'native', 'its own pick');
     assert.equal(effectiveVoiceLang(am, 'char_x', pref), 'jp', 'an EN default it lacks ⇒ JP (not on global yet)');
     assert.equal(effectiveVoiceLang(am, 'char_x', { default: 'cn' }), 'cn');
-    assert.equal(effectiveVoiceLang(am, 'char_x', { default: 'kr' }), 'jp', 'a KR default it lacks ⇒ EN, else JP');
+    assert.equal(effectiveVoiceLang(am, 'char_x', { default: 'kr' }), 'jp', 'a KR default it lacks ⇒ JP (voiceLangFor)');
     assert.equal(effectiveVoiceLang(am, 'char_102_texas', null), 'en', 'no settings ⇒ EN');
     assert.equal(effectiveVoiceLang(am, 'char_x', null), 'jp');
     assert.equal(effectiveVoiceLang({ voice: am.voice }, 'char_x', pref), 'cn', 'only the base dub ⇒ CN');
@@ -1119,17 +1419,16 @@ describe('voice language', () => {
     assert.deepEqual(voiceLine(am, 'char_102_texas', 'select', 'xx'), { url: V, fallback: null }, 'an unknown dub: the Chinese line');
   });
 
-  test('the audio manager: an operator\'s pick wins over the settings dub, which falls back EN → JP → CN', () => {
+  test('the audio manager: an operator\'s override wins over the settings dub, which falls back to JP, then CN', () => {
     const a = new AudioManager({ win: fakeWindow().win, getManifest: () => ({ audio: am }) });
     a.setVoiceLang('en');
-    assert.equal(a.voiceLangOf('char_102_texas'), 'en');
-    assert.equal(a.voiceLangOf('char_x'), 'jp', 'no EN dub ⇒ JP');
-    a.setVoicePicks({ char_102_texas: 'native' });
-    assert.equal(a.voiceLangOf('char_102_texas'), 'native');
-    a.setVoiceLang('cn');
-    a.setVoicePicks(null);
-    assert.equal(a.voiceLangOf('char_102_texas'), 'cn');
-    assert.equal(a.voiceLangOf('char_none'), null);
+    assert.equal(a._voiceLangOf('char_102_texas'), 'en');
+    assert.equal(a._voiceLangOf('char_x'), 'jp', 'no EN dub ⇒ JP');
+    a.setVoiceLang('en', { char_102_texas: 'native' });
+    assert.equal(a._voiceLangOf('char_102_texas'), 'native');
+    a.setVoiceLang('cn', {});
+    assert.equal(a._voiceLangOf('char_102_texas'), 'cn');
+    assert.equal(a._voiceLangOf('char_x'), 'cn', 'a 中文 global stays 中文');
   });
 
   test('battle lines play in the picked language, a missing line falls back to the base one; 试听 skips the gate', async () => {

@@ -1,6 +1,6 @@
-// Result screen (research 06 §10.6): victory / defeat hero with rounds passed, boss medallions, and a
-// card per player — band, final lineup avatars with elite marks, stats, title (评语) with its icon —
-// plus 返回同盟.
+// The full settlement report (research 06 §10.6): victory / defeat hero with rounds passed, boss medallions, and a
+// card per player — band, final lineup avatars with elite marks, stats, title (评语) with its icon. The live RESULT
+// screen opens it as 数据详情 over the settlement flow (screens/settle.js); the stats page re-views a stored match with it.
 //
 // Expected m.result (free-form in DESIGN §8.2; fields read tolerantly, see gameLogic.normalizeResult):
 //   { victory, roundsPassed, lastRound?, hiddenCleared?, bossId?, hiddenBossId?, difficulty?, modeId?, durationMs?,
@@ -21,10 +21,11 @@ import { useGameData, Img, UnitThumb, BandIcon, PlayerAvatar, BondGlyph, LpTower
 import { normalizeResult, fmtNum, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';
 import { data } from '../data.js';
 import { enemyIconUrl, titleIconUrl, uiUrl } from '../ui/assetUrls.js';
-import { store, useStore, emptyMatch } from '../store.js';
 import { audio } from '../audio.js';
-import { useDamageLog, DamageSummary } from '../ui/damageChart.js';
+import { CombatSummary } from '../ui/combatSummary.js';
 import { sentText } from '../ui/lang.js';
+import { UnofficialMark } from '../ui/pluginTag.js';
+import { TestMark } from '../ui/testConsole.js';
 import { ruleLabel, ruleBadges } from '../ui/lobbyRules.js';
 import { rulesInForce, ruleOf } from '../../../shared/rules.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
@@ -33,13 +34,6 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 // The first seven present are shown (+ remaining LP = a 4×2 grid); the title (评语) stats come first.
 // `gold` is the funds a player SPENT (server/match/player/economy.js spend(); the 挥金如土 title stat).
-/** (fork) the alternate result background: artwork used with the artist's permission (NOTICE) */
-const ALT_ART_BG = '/icons/result-alt.jpg';
-/** the artist credited on the screen ('鸣谢：{name}，匿名委托' — en: "Credits: {name}, commissioned by anonymous"),
-    linking to the artist's post of the piece */
-const ALT_ART_ARTIST = '3e46';
-const ALT_ART_SOURCE = 'https://x.com/Gan3E_CSL/status/2030836795823231164';
-
 const STAT_ROWS = [
   ['dmgDealt', N_('造成伤害')], ['kills', N_('击倒敌人')], ['bossDamage', N_('领袖伤害')], ['activatedLayers', N_('盟约层数')],
   ['merges', N_('晋升次数')], ['itemsEquipped', N_('配发装备')], ['gold', N_('消耗资金')], ['perfectRounds', N_('完美作战')],
@@ -114,25 +108,16 @@ function PlayerCard({ p, myId, titles, best, solo = false }) {
   </article>`;
 }
 
-/** RESULT screen of the match on screen: reads the store; 返回同盟 / 返回大厅 drops the match. */
-export function ResultScreen() {
-  const res = useStore((s) => s.match.result);
-  const pub = useStore((s) => s.match.public);
-  const myId = useStore((s) => s.me.playerId);
-  const hasRoom = useStore((s) => !!s.room);
-  // the local player's damage per operator over the match (ui/damageLog.js: this client only, not in a stored match)
-  const dmg = useDamageLog();
-  const back = () => store.set({ match: emptyMatch() });
-  return html`<${ResultView} res=${res} pub=${pub} myId=${myId} backLabel=${hasRoom ? t('返回同盟') : t('返回大厅')} onBack=${back} damage=${dmg.history} />`;
-}
-
 /**
- * The settlement view of one m.result payload — the live screen above, and the stats page's re-view of a stored match
- * (screens/stats.js, which hands it the payload recordToResult rebuilt; `quiet`: no settlement jingle). `damage`: the
- * live match's damage history (ui/damageLog.js), drawn under the player cards.
- * @param {{ res: any, pub?: any, myId?: string|null, backLabel: string, onBack: () => void, quiet?: boolean, damage?: any }} props
+ * The settlement view of one m.result payload — the live flow's 数据详情 (screens/settle.js), and the stats page's
+ * re-view of a stored match (screens/stats.js, which hands it the payload recordToResult rebuilt; `quiet`: no settlement
+ * jingle). `content`: the room's content (room.state.content, or a stats record's) — gameplay plugins mark the result
+ * unofficial (DESIGN §32.6). `slot`: the 结算 tab plugin slot (result.tab) — false where the page under it has one.
+ * (fork) `damage`: draw the live match's damage chart (ui/combatSummary.js, this client's 作战统计 records) under the
+ * player cards — the live 数据详情 only; a stored match has no such records.
+ * @param {{ res: any, pub?: any, myId?: string|null, backLabel: string, onBack: () => void, quiet?: boolean, content?: any, slot?: boolean, damage?: boolean }} props
  */
-export function ResultView({ res, pub = null, myId = null, backLabel, onBack, quiet = false, damage = null }) {
+export function ResultView({ res, pub = null, myId = null, backLabel, onBack, quiet = false, content = null, slot = true, damage = false }) {
   const gd = useGameData();
   const r = normalizeResult(res, pub);
   const titles = Array.isArray(gd.config?.titles) ? gd.config.titles : [];
@@ -143,19 +128,9 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
     if (top && r.players.length > 1) best[k] = top.id;
   }
   useEffect(() => { if (!quiet) audio.sfx(r.victory ? 'settlementSucceed' : 'settlementFail'); }, []);
-  // (fork) alternate background: the signal-loss cue rides the static's CSS animation (result.css alt-static), so it follows the
-  // tuned timing and stays silent under reduced motion (no animation, no animationstart); the clip is torn up for the
-  // length of the glitch (audio.js glitchSfx)
-  const onStatic = (e) => {
-    if (quiet || e.animationName !== 'alt-static') return;
-    const s = parseFloat(getComputedStyle(e.target).animationDuration);
-    audio.glitchSfx('disconnect', { seconds: Number.isFinite(s) && s > 0 ? s : 1.5 });
-  };
   const boss = r.bossId ? gd.boss(r.bossId) : null;
   // the Hidden Core medal (and its corrupted leader) only once R15 was actually fought
   const hidden = r.hiddenBossId && r.hiddenReached ? gd.boss(r.hiddenBossId) : null;
-  // (fork) with m.result.altArt (server/match/results.js altArtResult) the art cuts in over the settle art
-  // (result.css .result__alt)
   const bg = uiUrl(gd.m, r.victory ? 'settle/settlemen_teamshow_success' : 'settle/settlemen_teamshow_fail');
   const mins = r.durationMs ? Math.round(r.durationMs / 60000) : null;
 
@@ -164,12 +139,9 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
   const rules = pub?.rules || null;
   const inForce = rules ? rulesInForce(rules) : [];
   const badges = ruleBadges(rules);
-  return html`<div class=${cx('screen', 'result', r.victory ? 'is-win' : 'is-lose', r.altArt && 'has-alt-art')}>
+  return html`<div class=${cx('screen', 'result', r.victory ? 'is-win' : 'is-lose')}>
     <div class="result__bg" aria-hidden="true" style=${bg ? `--result-bg:url("${bg}")` : undefined}></div>
-    ${r.altArt ? html`<div class="result__alt" aria-hidden="true" style=${`--alt-art:url("${ALT_ART_BG}")`}></div>` : null}
     <div class="result__grid" aria-hidden="true"></div>
-    ${r.altArt ? html`<a class="result__credit" href=${ALT_ART_SOURCE} target="_blank" rel="noopener noreferrer">${t('鸣谢：{name}，匿名委托', { name: ALT_ART_ARTIST })}</a>` : null}
-    ${r.altArt ? html`<div class="result__static" aria-hidden="true" onAnimationStart=${onStatic}></div>` : null}
     <main class="result__main">
       <section class="result__hero">
         <div class="result__summary">
@@ -181,6 +153,9 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         </div>` : null}
         ${badges.cheats ? html`<div class="result__cheats" role="note">${badges.cheats}</div>` : null}
         <h1 class="result__headline">${r.victory ? t('模拟完成') : t('模拟失败')}</h1>
+        <${UnofficialMark} room=${content ? { content } : null} class="result__modmark" />
+        ${res?.test === true ? html`<p class="result__test" data-testid="result-test"><${TestMark} /> ${t('测试对局')}${Number.isInteger(res.testActions) ? html` · ${t('测试指令 {n} 次', { n: res.testActions })}` : null}</p>
+          <p class="t-dim">${t('本局为测试对局，不计入统计、成就、称号、徽章与卫戍认证。')}</p>` : null}
         <p class="result__sub">${r.victory ? t('成功卫戍 · 敌方领袖已被击败') : t('防线已被突破')}</p>
         <div class="result__rounds">
           <span class="result__rlabel">${t('通过回合')}</span>
@@ -209,8 +184,9 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         <h2 class="brief-h"><span>${t('同盟成员')}</span><${MicroLabel}>ALLIANCE REPORT</${MicroLabel}></h2>
         ${r.players.length ? r.players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} myId=${myId} titles=${titles} best=${best} solo=${r.players.length < 2} />`)
           : html`<p class="t-dim">${t('暂无结算数据')}</p>`}
-        ${damage ? html`<${DamageSummary} history=${damage} />` : null}
+        ${damage ? html`<${CombatSummary} myId=${myId} />` : null}
       </section>
+      ${slot ? html`<div class="ui-slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>` : null}
     </main>
   </div>`;
 }

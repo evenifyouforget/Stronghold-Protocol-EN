@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gotoMock } from '../e2e/mockPage.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = process.env.SP_E2E_OUT ? path.resolve(process.env.SP_E2E_OUT) : path.join(ROOT, 'test/e2e/out');
@@ -58,12 +59,12 @@ describe('0.1.1 gaps: 变形同构体 pairings and 调和\'s +1 (mock harness, h
 
   for (const [name, w, h, touch] of [['1920x1080', 1920, 1080, false], ['844x390', 844, 390, true], ['756x366', 756, 366, true]]) {
     test(`${name}: the 变形同构体 card, its wearer's card and the 调和 row of the bond popup`, { timeout: 120000 }, async () => {
-      const page = await browser.newPage();
+      const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
       await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: touch, hasTouch: touch });
       const problems = [];
       page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
       page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
-      await page.goto(`${base}/dev/game-mock.html?shot=1&render=fallback&phase=PREP&variant=funny,morph,harmony`, { waitUntil: 'networkidle0' });
+      await gotoMock(page, `${base}/dev/game-mock.html?shot=1&render=fallback&phase=PREP&variant=funny,morph,harmony`);
       await page.waitForSelector('.shopbar__item .scard', { timeout: 20000 });
       await sleep(600);
       const minFont = touch ? 9 : 13.5;
@@ -136,12 +137,12 @@ describe('0.1.1 gaps: 变形同构体 pairings and 调和\'s +1 (mock harness, h
   // switches off read 本局禁用 on their card and in the detail pane — and can still be picked
   for (const [name, w, h, touch] of [['1920x1080', 1920, 1080, false], ['844x390', 844, 390, true]]) {
     test(`${name}: the 标准 strategy draft marks 潘格尼尼 / 克莱门莎 / 玛恩纳 本局禁用, and 潘格尼尼 can still be picked`, { timeout: 120000 }, async () => {
-      const page = await browser.newPage();
+      const page = await browser.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
       await page.setViewport({ width: w, height: h, deviceScaleFactor: 1, isMobile: touch, hasTouch: touch });
       const problems = [];
       page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
       page.on('console', (m) => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
-      await page.goto(`${base}/dev/game-mock.html?shot=1&phase=BAND_DRAFT&variant=funny`, { waitUntil: 'networkidle0' });
+      await gotoMock(page, `${base}/dev/game-mock.html?shot=1&phase=BAND_DRAFT&variant=funny`);
       await page.waitForSelector('.draft-grid .dband[data-band]', { timeout: 20000 });
       await sleep(500);
       const tap = async (sel) => { const el = await page.$(sel); assert.ok(el, sel); await el.scrollIntoView(); if (touch) await el.tap(); else await el.click(); await sleep(300); };

@@ -1,20 +1,37 @@
 // server/match/player/items.js — PlayerState methods: items — g.equip (max 2, a 3rd replaces the one the player picks;
-// consume-on-equip items), g.art (Arts on a tile, rotated by the facing) and g.destroy (hand / temp items; equipped
-// ones are locked).
+// consume-on-equip items), g.art (Arts on a tile, rotated by the facing), g.destroy (hand / temp items; equipped
+// ones are locked) and g.unequip (DESIGN §34.15, only when the room's unequip rule is allow).
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
-import { ERR } from '../../../shared/constants.js';
-import { tileKey, inField, parseDir } from '../board.js';
+import { ERR, GEO } from '../../../shared/constants.js';
+import { morphSlotPolicy, ruleOption } from '../../../shared/plugins/rules.js';
+import { tileKey, inField, parseDir, freeSlot } from '../board.js';
 import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
-import { CC } from '../../../shared/ruleData.js';
+import { CC, BOOSTER, BOOSTER_NAME } from '../../../shared/ruleData.js';
 
 /** The item a full carrier loses by default: the oldest that is not the Toxic Waste (SPA-CC Junk). */
 const replaceableIndex = (items) => Math.max(0, items.findIndex((x) => x.id !== CC.junk.itemId));
+/** The slot policy's replaced item, never the Toxic Waste by default (one named by replaceUid is refused in equip). */
+const replacedIndex = (policy, items, replaceUid) => {
+  const i = policy.replacedIndex(items, replaceUid);
+  return items[i]?.id === CC.junk.itemId ? replaceableIndex(items) : i;
+};
 
 export class PlayerItems {
+  /**
+   * A copy that actually leaves the match repays shared-item debt first (#624). Equipping, selling a carrier
+   * (the item returns to the hand) and a merge that keeps the golden do not call this.
+   * @param {any} piece
+   * @returns {number} copies repaid
+   */
+  releaseItemStock(piece) {
+    if (!piece || piece.kind !== 'item' || !this.m?.itemPool) return 0;
+    return this.m.itemPool.repay(piece.id, this.m.itemPool.need(piece.id));
+  }
+
   /**
    * g.equip {itemUid, targetUid, replaceUid?}. A third item on a carrier with both slots used replaces the equipped item
    * the player picked in the replace dialog (`replaceUid`, research 09 §1.2 UseEquipUp.unloadInstId; absent ⇒ the
@@ -32,7 +49,12 @@ export class PlayerItems {
     if (!tloc || tloc.piece.kind !== 'chess' || tloc.area === 'equipped') return fail(ERR.BAD_TARGET);
     const item = iloc.piece;
     const target = tloc.piece;
+    // the boosterPack cheat: the Booster Pack is not attached, it opens its offer
+    if (rec.booster === true) return this.openBooster(target);
     if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) return fail(ERR.BAD_TARGET, 'replace: not equipped on the target');
+    const policy = this._slotPolicy();
+    // [ASSUMED] a second 变形同构体 is refused before anything moves. Official accepts() is always true.
+    if (!policy.accepts(target.items || [], rec)) return fail(ERR.BAD_TARGET, 'morph already equipped');
     // SPA-CC Junk: the Toxic Waste is never the replaced (destroyed) item
     if (replaceUid != null && (target.items || []).some((x) => x.uid === replaceUid && x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be replaced');
     if ((target.items || []).length >= this.gd.equipPerChess && (target.items || []).every((x) => x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be replaced');
@@ -44,14 +66,17 @@ export class PlayerItems {
       // 装备替换为将要佩戴的装备，并销毁被指定的装备"; GitHub #263): the pick (else the oldest) comes off before the effect —
       // which so sees the carrier without it (its bonds) — and is destroyed once the effect went through, leaving the slot
       // free (the normal 博士投影 then takes it: ev.keep, so it no longer pushes the oldest item out). A refusal puts it back.
-      const off = this._takeReplaced(target, replaceUid);
+      const off = this._takeReplaced(target, replaceUid, rec);
       const ev = { item, target, golden: !!rec.isGolden, keep: false, error: null, consumed: true };
       this.m.dispatchItem(this, item, target, 'onEquip', ev);
       if (ev.error) {
         if (off) target.items.splice(Math.min(off.idx, target.items.length), 0, off.piece);
         return fail(ERR[ev.error] ? ev.error : ERR.BAD_TARGET, typeof ev.detail === 'string' ? ev.detail : undefined);
       }
-      if (off) this.m.dispatchItem(this, off.piece, target, 'onDestroy', { item: off.piece, holder: target, reason: 'replace' });
+      if (off) {
+        this.m.dispatchItem(this, off.piece, target, 'onDestroy', { item: off.piece, holder: target, reason: 'replace' });
+        this.releaseItemStock(off.piece);
+      }
       // the handler may have destroyed the target (信标) — resolve the item again
       const again = this.find(item.uid);
       if (again && again.area !== 'equipped') this._detach(again);
@@ -59,6 +84,8 @@ export class PlayerItems {
         const holder = this.find(target.uid);
         if (holder && holder.piece.kind === 'chess') this._attach(holder.piece, item);
       }
+      // !ev.keep, or the carrier is gone: the consumed item left play. A kept item is on the carrier.
+      if (!this.find(item.uid)) this.releaseItemStock(item);
       this.stats.itemsEquipped++;
       this.checkItemMerges();
       this.recompute();
@@ -83,13 +110,24 @@ export class PlayerItems {
    * Attach an item. With both slots used the item `replaceUid` names (the player's pick) is replaced, else the oldest;
    * the replaced item is destroyed.
    */
+  /** The room's equip-slot policy. Official returns the shared frozen singleton, so the numbers stay today's. */
+  _slotPolicy() {
+    return morphSlotPolicy(ruleOption(this.m?.rules, 'morphPairing'), (it) => !!this.gd.item(it?.id)?.canGiveBond);
+  }
+
   _attach(target, item, replaceUid = null) {
     target.items = target.items || [];
-    while (target.items.length >= this.gd.equipPerChess) {
-      const i = replaceUid != null ? target.items.findIndex((x) => x.uid === replaceUid) : -1;
-      const [old] = target.items.splice(i >= 0 ? i : replaceableIndex(target.items), 1);
+    const policy = this._slotPolicy();
+    const rec = this.gd.item(item.id);
+    const cap = policy.slotCap(this.gd.equipPerChess);
+    // A plus morph does not occupy a slot, so this while does not run for it. Official occupies() is always true
+    // and slotsUsed is items.length, so the comparison and the splice index stay today's.
+    while (policy.occupies(rec) && policy.slotsUsed(target.items) >= cap) { // loop-cap: splices one item each pass
+      const i = replacedIndex(policy, target.items, replaceUid);
+      const [old] = target.items.splice(i, 1);
       replaceUid = null;
       this.m.dispatchItem(this, old, target, 'onDestroy', { item: old, holder: target, reason: 'replace' });
+      this.releaseItemStock(old);
     }
     target.items.push(item);
   }
@@ -98,13 +136,35 @@ export class PlayerItems {
    * A consume-on-equip item on a full carrier: take the item `replaceUid` names (else the oldest) off `target` — not yet
    * destroyed — and return { piece, idx } (null while a slot is free).
    */
-  _takeReplaced(target, replaceUid = null) {
+  _takeReplaced(target, replaceUid = null, incoming = null) {
     target.items = target.items || [];
-    if (target.items.length < this.gd.equipPerChess) return null;
-    const i = replaceUid != null ? target.items.findIndex((x) => x.uid === replaceUid) : -1;
-    const idx = i >= 0 ? i : replaceableIndex(target.items);
+    const policy = this._slotPolicy();
+    // A plus morph does not replace anyone. Official occupies() is always true.
+    if (incoming && !policy.occupies(incoming)) return null;
+    if (policy.slotsUsed(target.items) < policy.slotCap(this.gd.equipPerChess)) return null;
+    const idx = replacedIndex(policy, target.items, replaceUid);
     const [piece] = target.items.splice(idx, 1);
     return { piece, idx };
+  }
+
+  /**
+   * The Booster Pack on `target` (the boosterPack cheat, shared/ruleData.js BOOSTER): a free pick-one offer of
+   * BOOSTER.choices operators of the target's tier, the next ones of that tier's fixed order (its base chess ids sorted,
+   * 自选 slots left out) after this player's place in it, which then moves on, round the end of the order. The operators
+   * are listed whatever copies the shared pool has left (a displayed reward survives stock exhaustion, prep.js
+   * pickReward). The pack itself stays where it was.
+   */
+  openBooster(target) {
+    const tier = this.gd.tierOf(target.id);
+    const order = [...this.m.pool.entries.keys()].filter((b) => this.gd.tierOf(b) === tier && !this.gd.chess(b)?.isDiy).sort();
+    if (!order.length) return fail(ERR.BAD_TARGET, 'no operator of that tier');
+    this.boosterAt = this.boosterAt || {};
+    const at = (this.boosterAt[tier] || 0) % order.length;
+    const n = Math.min(BOOSTER.choices, order.length);
+    const ids = Array.from({ length: n }, (_, i) => order[(at + i) % order.length]);
+    this.boosterAt[tier] = (at + n) % order.length;
+    if (!this.pushRewardOffer('booster', { tier, ids, label: BOOSTER_NAME })) return fail(ERR.BAD_TARGET, 'no operator of that tier');
+    return OK;
   }
 
   /** g.art {itemUid, row, col, dir?}: the Art's range grid is rotated by `dir` (absent ⇒ RIGHT). */
@@ -133,6 +193,7 @@ export class PlayerItems {
     if (ev.used !== false) {
       const again = this.find(itemUid);
       if (again) this._detach(again);
+      this.releaseItemStock(loc.piece);
       this.round.arts++;
     }
     this.recompute();
@@ -150,7 +211,30 @@ export class PlayerItems {
     if (loc.area === 'equipped') return fail(ERR.BAD_TARGET, 'equipped items are locked');
     if (loc.piece.id === CC.junk.itemId) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be destroyed'); // SPA-CC Junk
     this._detach(loc);
+    this.releaseItemStock(loc.piece);
     this.m.dispatchItem(this, loc.piece, loc.holder || null, 'onDestroy', { item: loc.piece, holder: loc.holder || null, reason: 'player' });
+    this.recompute();
+    return OK;
+  }
+
+  /**
+   * g.unequip {itemUid}: during PREP, while the seat is not ready, move one equipped item back to the hand
+   * (right→left), else into a free hole of the visible temporary window. Neither free: HAND_FULL and nothing moves.
+   * The official rule returns the same lock as destroy. Bots never send this.
+   * [ASSUMED] shares the existing prep-intent ready lock; hidden temp overflow is not a free slot. Never calls stow.
+   */
+  unequip(itemUid) {
+    const g = this._gate(); if (g) return g;
+    if (ruleOption(this.m?.rules, 'unequip') !== 'allow') return fail(ERR.BAD_TARGET, 'equipped items are locked');
+    const loc = this.find(itemUid);
+    if (!loc || loc.piece.kind !== 'item' || loc.area !== 'equipped') return fail(ERR.BAD_TARGET);
+    const handAt = freeSlot(this.hand);
+    const tempAt = freeSlot(this.temp.slice(0, GEO.TEMP_SIZE));
+    if (handAt < 0 && tempAt < 0) return fail(ERR.HAND_FULL);
+    const piece = loc.piece;
+    this._detach(loc);
+    if (handAt >= 0) this.hand[handAt] = piece;
+    else this._putTemp(tempAt, piece);
     this.recompute();
     return OK;
   }

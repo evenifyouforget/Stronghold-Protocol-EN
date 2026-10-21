@@ -86,7 +86,7 @@ describe('lobby rules', () => {
     assert.equal(seatOf(inMatch, guest.id).ready, true);
 
     await expectError(host, { t: 'room.setRules', rules: { untimed: false } }, ERR.ROOM_STARTED);
-    assert.deepEqual(started.at(-1).rules, { ...DEFAULT_RULES, extraDeploy: true, extraFunds: true, untimed: true }, 'the match gets the room rules');
+    assert.deepEqual(started.at(-1).lobbyRules, { ...DEFAULT_RULES, extraDeploy: true, extraFunds: true, untimed: true }, 'the match gets the room rules');
   });
 
   test('every value type: choices, a stage, ban lists (the same list again changes nothing); a room with rules cannot search', async () => {

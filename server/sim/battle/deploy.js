@@ -43,6 +43,8 @@ export class BattleDeploy {
     u.deployedAt = this.time;
     u.atkCd = 0;
     u.lastAttackAt = -Infinity;
+    u.lastAnimAttackAt = -Infinity;
+    u.quietAttack = false;
     u.elem.burn = u.elem.neural = u.elem.necrosis = u.elem.apoptosis = u.elem.erosion = 0;
     u.ground = this.grid.isLow(R0, C0) && !this._elevated?.has(k);
     u.markDirty();
@@ -263,13 +265,16 @@ export class BattleDeploy {
     const owner = timeout ? e.ownerId : this._ownerForTile([Math.round(e.y), Math.round(e.x)]) ?? e.ownerId;
     const pp = this._pp(owner) ?? this._pp(e.ownerId);
     if (pp) {
-      pp.leaked.push({ enemyKey: e.defId, mods: e.mods ?? null, lpr: e.lpr ?? 1, sourcePlayerId: e.sourcePlayerId ?? e.ownerId, tag: e.tag ?? null, counted: !!e.counted || e.isBoss, boss: e.isBoss || undefined, spawned: true });
+      const entry = { enemyKey: e.defId, mods: e.mods ?? null, lpr: e.lpr ?? 1, sourcePlayerId: e.sourcePlayerId ?? e.ownerId, tag: e.tag ?? null, counted: !!e.counted || e.isBoss, boss: e.isBoss || undefined, spawned: true };
+      // born while a 联防 field ran (spawns.js): the leaker never sent it in, so it costs nobody LP and raises no ×N —
+      // unite.js uniteSurvivors / spec.js uniteLeft filter it; every other reading keeps counting it as usual
+      if (e.uniteRuntime) entry.uniteRuntime = true;
+      pp.leaked.push(entry);
       if (e.counted || e.isBoss) pp.perfect = false;
     }
     if (e.counted) this.leakedCount++;
-    // the HUD capsule's leak counter (DESIGN §14): only the stage's own enemies (`inTotal`) — a leaked split child or
-    // summon still costs LP through `counted`/`leakedCount` and still breaks 完美作战, but it is no 漏掉 of the stage's
-    // own list, so the capsule's numerator does not move for it
+    // of the stage's own list, so the capsule's numerator does not move for it. On a 联防 field it is no LP charge either:
+    // such a leak carries `uniteRuntime` (spawns.js), and the 联防's billing reads that flag instead of this counter.
     if (e.inTotal) {
       this.leakedInTotal++;
       if (pp) pp.leakedInTotal++;

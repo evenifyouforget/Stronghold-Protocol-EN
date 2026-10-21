@@ -61,7 +61,7 @@ test('<6 members>: ATK +(200 + 1.2·L) %, a 屏障 of 2 × max HP and 抵抗; no
 });
 
 test('prep: shop hammers are upgraded and free while 维多利亚 is active; the 休整期 end adds the carriers\' tiers', () => {
-  const h = makeMatch({ mode: 'solo', seed: 4, rules: { victoriaMod: 'C' } }).start();
+  const h = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { victoriaMod: 'C' } }).start();
   h.toPrep(1);
   const ps = h.ps('p_0');
   // 维多利亚 active (as computeBonds would make it), a hammer slot rolled
@@ -84,7 +84,7 @@ test('休整期 end: a member carrying a hammer adds its tier in 维多利亚 st
     const added = [];
     const tiers = { a: 2, b: 3, c: 4 };
     const ctx = {
-      rules: { victoriaMod: 'C' },
+      lobbyRules: { victoriaMod: 'C' },
       bondActive: (id) => active.includes(id),
       bondCount: () => count,
       board: () => [

@@ -16,7 +16,7 @@ import { buildResourceManifest } from '../server/resources.js';
 import { createStaticHandler } from '../server/index.js';
 import { PreloadStore } from '../public/js/resources/store.js';
 import { sanitizePreloadPref, voicePacksOf, missingBytes, preloadPref, tickedVoicePacks, setVoicePack, followVoiceSettings, pausePreload } from '../public/js/resources/index.js';
-import { voiceLangStore } from '../public/js/ui/voiceLang.js';
+import { updateSettings } from '../public/js/ui/settings.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ORIGIN = 'https://sp.test';
@@ -82,18 +82,24 @@ test('keys: one key for encoded and raw brackets; /media/… maps to the stored 
   assert.equal(mediaKeys('/media/bgm/act1.ogg')[0], '/assets/audio/bgm/act1.ogg');
   assert.deepEqual(mediaKeys('/media/../x'), []);
   assert.deepEqual(mediaKeys('/assets/x.png'), []);
+  // the served manifests' content-hashed URLs (shared/assetPaths.js) are the same files
+  assert.equal(resourceKey('/assets/~0123456789abcdef/x/[opt]a.png'), '/assets/x/%5Bopt%5Da.png');
+  assert.equal(resourceKey('/fonts/~0123456789abcdef/a.woff2'), '/fonts/a.woff2');
+  assert.equal(resourceKey('/assets/~xyz/a.png'), '/assets/~xyz/a.png', 'a malformed hash segment is part of the path');
+  assert.deepEqual(mediaKeys('/media/~0123456789abcdef/bgm/act1'), mediaKeys('/media/bgm/act1'));
   assert.equal(formatBytes(470e6), '470 MB');
 });
 
 test('the worker\'s copy of the path rules matches shared/resources.js', () => {
   const sw = loadWorker();
-  for (const p of ['/assets/x/[opt]a.png', '/assets/x/%5Bopt%5Da.png', '/assets/a b.png', '/assets/%E4%B8%AD.png', '/assets/%zz.png']) {
+  for (const p of ['/assets/x/[opt]a.png', '/assets/x/%5Bopt%5Da.png', '/assets/a b.png', '/assets/%E4%B8%AD.png', '/assets/%zz.png',
+    '/assets/~0123456789abcdef/a.png', '/fonts/~0123456789abcdef/a.woff2', '/assets/~0123456789ABCDEF/a.png', '/assets/~0123456789abcdef']) {
     assert.equal(sw.spResources.resourceKey(p), resourceKey(p), p);
   }
   for (const p of ['/assets/audio/voice/kr/a/1.mp3', '/assets/audio/voice/xx/a/1.mp3', '/assets/audio/bgm/a.mp3', '/assets/local/guide/p.png', '/assets/ui/guide/p.png', '/assets/spine/a.skel', '/assets/outfit/art/char_x_epoque_1.webp']) {
     assert.equal(sw.spResources.packOf(p), packOf(p), p);
   }
-  for (const p of ['/media/bgm/act1', '/media/voice/en/char_a/cn_001.mp3', '/media/x.wav', '/media/.x', '/media/']) {
+  for (const p of ['/media/bgm/act1', '/media/voice/en/char_a/cn_001.mp3', '/media/x.wav', '/media/.x', '/media/', '/media/~0123456789abcdef/bgm/act1']) {
     assert.deepEqual([...sw.spResources.mediaKeys(p)], mediaKeys(p), p);
   }
 });
@@ -187,6 +193,22 @@ test('store: downloads ?v= URLs (audio via /media/), verifies, indexes, resumes,
   assert.ok(!keys.includes(`${ORIGIN}/assets/audio/voice/jp/char_a/cn_1.mp3`), 'a complete run drops files the manifest no longer lists');
 });
 
+test('(fork) store: a cache too large for Cache.keys() is scanned file by file (status and resume still work)', async () => {
+  const fx = fixture([['/assets/ui/a.png', 'aaa'], ['/assets/ui/b.png', 'bbb']]);
+  const caches = memoryCaches();
+  const st = new PreloadStore(fx.manifest, { caches, fetcher: fx.fetcher, origin: ORIGIN });
+  await st.download({ packs: ['visual'] });
+  const open = caches.open;
+  caches.open = async (name) => Object.assign(await open(name), { keys: async () => { throw new DOMException('Operation too large', 'OperationError'); } });
+  assert.equal((await st.status()).packs.visual.doneFiles, 2);
+  fx.calls.length = 0;
+  const changed = fixture([['/assets/ui/a.png', 'AAA2'], ['/assets/ui/b.png', 'bbb']]);
+  const st2 = new PreloadStore(changed.manifest, { caches, fetcher: changed.fetcher, origin: ORIGIN });
+  assert.equal((await st2.status()).packs.visual.doneFiles, 1, 'an outdated file does not count as saved');
+  await st2.download({ packs: ['visual'] });
+  assert.deepEqual(changed.calls, [`/assets/ui/a.png?v=${sha('AAA2')}`]);
+});
+
 test('store: a bad checksum fails that file only; an abort keeps what was saved', async () => {
   const fx = fixture([['/assets/ui/a.png', 'aaa'], ['/assets/ui/b.png', 'bbb']]);
   const lying = async (url, init) => (url.startsWith('/assets/ui/b.png') ? new Response('xxx') : fx.fetcher(url, init));
@@ -259,6 +281,23 @@ test('worker: answers current files (also via /media/ and Range), passes outdate
   assert.equal(await ask('/js/main.js'), null);
 });
 
+test('worker: without a preload cache it never fetches the manifest (fork, host bandwidth)', async () => {
+  const caches = memoryCaches();
+  caches.has = async (name) => caches.all.has(name);
+  const asked = [];
+  const sw = loadWorker({ caches, fetchImpl: async (url) => { asked.push(String(url)); return new Response('net'); } });
+  assert.equal(await sw.spResources.answer(sw, new Request(ORIGIN + '/assets/ui/a.png')), null);
+  assert.equal(await sw.spResources.capture(sw, new Request(ORIGIN + '/assets/ui/a.png'), new Response('aaa')), null);
+  sw.spResources.handleFetch({ request: { mode: 'navigate', url: ORIGIN + '/' } });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(asked, [], 'no /data/resource-manifest.json for a player who never preloaded');
+  assert.equal(caches.all.has('sp-resources-v1'), false, 'and the check does not create the cache');
+  // a preload starts: the page says so, and the worker reads the manifest again
+  await caches.open('sp-resources-v1');
+  await sw.spResources.changed();
+  assert.ok(asked.includes('/data/resource-manifest.json'));
+});
+
 test('voice packs follow the voice language settings until the player edits the list', () => {
   assert.deepEqual(sanitizePreloadPref(null), { started: false, paused: false, voice: null });
   assert.deepEqual(sanitizePreloadPref({ started: true, voice: ['kr', 'xx', 'en'] }), { started: true, paused: false, voice: ['en', 'kr'] });
@@ -268,14 +307,15 @@ test('voice packs follow the voice language settings until the player edits the 
   assert.deepEqual(voicePacksOf({ default: 'en', byChar: {} }, am), ['en', 'jp'], 'char_b has no EN dub: it speaks JP');
   assert.deepEqual(voicePacksOf({ default: 'cn', byChar: {} }, am), ['cn']);
   assert.ok(voicePacksOf({ default: 'cn', native: true, byChar: {} }).includes('native'), 'the 本土语言 switch ticks the native pack');
-  voiceLangStore.set({ default: 'jp', byChar: { char_a: 'native' } });
+  updateSettings({ voiceLang: 'jp', voiceNative: false });
+  updateSettings({ voiceOverrides: { char_1_a: 'native' } });
   followVoiceSettings();
   assert.deepEqual(tickedVoicePacks(), ['jp', 'native'], 'ticked from the current voice settings');
-  voiceLangStore.set({ default: 'en', byChar: {} });
+  updateSettings({ voiceLang: 'en' });
   assert.deepEqual(tickedVoicePacks(), ['en'], 'and following them while untouched');
   setVoicePack('kr', true);
   assert.deepEqual(preloadPref.get().voice, ['en', 'kr']);
-  voiceLangStore.set({ default: 'cn', byChar: {} });
+  updateSettings({ voiceLang: 'cn' });
   assert.deepEqual(tickedVoicePacks(), ['en', 'kr'], 'an edited list stays as edited');
   followVoiceSettings();
   assert.deepEqual(tickedVoicePacks(), ['cn']);
@@ -349,4 +389,39 @@ test('worker: nothing is saved before a download was started (no packs entry)', 
   assert.equal(await (await caches.open(CACHE_NAME)).match(`${ORIGIN}/assets/ui/a.png`), undefined);
   assert.equal(PACKS_PATH, '/__sp-resource-packs__', 'the page and the worker use the same entry');
   assert.ok(fs.readFileSync(path.join(ROOT, 'public', 'resource-sw.js'), 'utf8').includes("const PACKS_PATH = '/__sp-resource-packs__';"));
+});
+
+// (fork) the preload zip (tools/preload-pack.mjs) imported in the preload manager (resources/index.js importPreloadZip)
+test('preload zip: the tool writes a zip openZip reads; its entries map to site paths; the store keeps only matching bytes', async () => {
+  const { writeZip } = await import('../tools/preload-pack.mjs');
+  const { openZip } = await import('../public/js/assetPack.js');
+  const { zipEntryPath } = await import('../public/js/resources/index.js');
+  const fx = fixture([['/assets/ui/a.png', 'png-bytes'], ['/assets/local/fx/prefabs/hit.json', '{"k":"hit"}'.repeat(40)], ['/fonts/f.woff2', 'font']]);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-preload-zip-'));
+  try {
+    const zipPath = path.join(tmp, 'p.zip');
+    writeZip(zipPath, [
+      { name: 'pack/README.txt', data: Buffer.from('readme') },
+      { name: 'pack/public/assets/ui/a.png', data: fx.bodies.get('/assets/ui/a.png') },
+      { name: 'pack/public/assets/local/fx/prefabs/hit.json', data: () => fx.bodies.get('/assets/local/fx/prefabs/hit.json') },
+      { name: 'pack/public/fonts/f.woff2', data: Buffer.from('other font') },
+      { name: 'pack/public/assets/ui/not-listed.png', data: Buffer.from('x') },
+    ]);
+    const zip = await openZip(new Blob([fs.readFileSync(zipPath)]));
+    assert.equal(zip.ok, true);
+    assert.equal(zipEntryPath('pack/README.txt'), null);
+    assert.equal(zipEntryPath('a/../public/assets/x.png'), null);
+    assert.equal(zipEntryPath('assets/ui/[opt]a.png'), '/assets/ui/%5Bopt%5Da.png');
+    const entries = zip.entries.map((e) => ({ path: zipEntryPath(e.name), read: () => zip.read(e) })).filter((e) => e.path);
+    assert.deepEqual(entries.map((e) => e.path), ['/assets/ui/a.png', '/assets/local/fx/prefabs/hit.json', '/fonts/f.woff2', '/assets/ui/not-listed.png']);
+    const caches = memoryCaches();
+    const st = new PreloadStore(fx.manifest, { caches, fetcher: fx.fetcher, origin: ORIGIN });
+    const r = await st.importEntries(entries);
+    assert.deepEqual(r, { total: 3, done: 3, saved: 2, mismatched: 1, skipped: 1 }, 'the font differs, the unlisted png is skipped');
+    const status = await st.status();
+    assert.equal(status.packs.visual.doneFiles, 2, 'imported files count as saved (the effects too)');
+    await st.download({ packs: ['visual', 'audio'] });
+    assert.deepEqual(fx.calls.map((u) => u.split('?')[0]), ['/fonts/f.woff2'], 'only the mismatched file is downloaded');
+    assert.deepEqual(await st.importEntries(entries), { total: 3, done: 3, saved: 3, mismatched: 0, skipped: 1 }, 'a second import finds them saved');
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
