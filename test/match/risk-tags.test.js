@@ -79,6 +79,32 @@ test('ccInvestorBench: 投资人 counts the board only', () => {
   } finally { h.m.dispose(); plain.m.dispose(); }
 });
 
+test('ccInvestorBench 2: 缪尔赛思 / 耶拉 / 焰尾\'s 获得时 grants come when they are sold (level 1: when bought)', () => {
+  const ICE = 'chess_item_5_02_e_a', KJERA = 'chess_char_3_20_a';
+  const ice = (ps) => [...ps.hand, ...ps.temp, ...ps.board.values()].filter((p) => p && p.kind === 'item' && ps.gd.item(p.id)?.baseId === ICE).length;
+  for (const level of [1, 2]) {
+    const h = makeMatch({ mode: 'solo', seed: 3, fake: true, lobbyRules: { ccInvestorBench: level } }).start();
+    try {
+      h.toPrep(1);
+      const ps = h.ps('p_0');
+      for (const p of [...ps.board.values(), ...ps.hand.filter(Boolean), ...ps.temp.filter(Boolean)]) if (p.kind === 'chess') ps.returnCopies(p);
+      ps.board.clear(); ps.hand.fill(null); ps.temp.fill(null); ps.offers.length = 0; ps.funds = 50; ps.recompute();
+      for (const id of CC.investorSold.garrisons) {
+        const g = h.m.gd.garrison(id);
+        assert.equal(g.eventType, level >= 2 ? 'SERVER_CHESS_SOLD' : 'SERVER_GAIN', id);
+        assert.ok(g.desc.startsWith(level >= 2 ? '<售出时>' : '<获得时>'), g.desc);
+      }
+      ps.shop.slots[0] = { kind: 'chess', id: KJERA, price: 1, basePrice: 1, sold: false, frozen: false };
+      assert.deepEqual(h.m.handle('p_0', { t: 'g.buy', slot: 0 }), { ok: true });
+      ps.shop.slots[0] = null;
+      assert.equal(ice(ps), level >= 2 ? 0 : 1, `level ${level}: bought`);
+      const kjera = ps.allChess().find((p) => p.id === KJERA);
+      assert.deepEqual(h.m.handle('p_0', { t: 'g.sell', uid: kjera.uid }), { ok: true });
+      assert.equal(ice(ps), 1, `level ${level}: sold`);
+    } finally { h.m.dispose(); }
+  }
+});
+
 test('ccPatriot Undying 1: a round-9 card worth 0 Funds; nobody taking it → the final boss +200 % HP (Undying 2: +100 % ATK)', () => {
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 1 } });
   try {
@@ -317,20 +343,27 @@ test('ccJunk 2: a round\'s income −1 while the Toxic Waste is not equipped', (
   assert.equal(first({ ccJunk: 2 }), first({}), 'round 1 starts with the usual Funds');
 });
 
-test('ccVengeance: Reids by the player\'s stacks in a normal battle (×2 at level 3); the final rounds by everyone\'s, once per field', () => {
+test('ccVengeance: Reids by the highest active alliance — 1 at 200 stacks, +1 per 200 above at level 3; the final rounds always 1 (the highest of anyone\'s), once per field', () => {
   const V = CC.vengeance;
-  for (const [level, mul] of [[1, 1], [3, 2]]) {
+  for (const [level, top] of [[1, 1], [3, 3]]) {
     const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccVengeance: level } });
     try {
       h.m.round = 5;
       const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
-      p0.layers = { yanShip: 250, kjeragShip: 200 }; p1.layers = { yanShip: 150 };
       const reids = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === V.key).reduce((n, b) => n + b.card.count, 0);
-      assert.equal(reids(p0), 1 * mul, `level ${level}: 450 stacks`);
-      assert.equal(reids(p1), 0, `level ${level}: 150 stacks`);
-      const sub = h.m.bossSubWave(['p_0', 'p_1']).get('p_0').filter((b) => b.card.enemyKey === V.key);
-      assert.equal(sub[0].card.count, 2 * mul, '600 stacks over both');
-      assert.ok(sub[0].card.leftFirst);
+      const boss = () => h.m.bossSubWave(['p_0', 'p_1']).get('p_0').filter((b) => b.card.enemyKey === V.key);
+      // p_0: 650 stacks of an active alliance (level 3: 1 + 2 for the 450 above 200); p_1: 150 active, 500 inactive
+      p0.layers = { yanShip: 650, kjeragShip: 200 }; p0.bonds = { yanShip: { active: true }, kjeragShip: { active: true } };
+      p1.layers = { yanShip: 150, kjeragShip: 500 }; p1.bonds = { yanShip: { active: true }, kjeragShip: { active: false } };
+      assert.equal(reids(p0), top, `level ${level}: 650 stacks`);
+      assert.equal(reids(p1), 0, `level ${level}: 150 active (500 inactive)`);
+      assert.equal(boss()[0].card.count, top, 'the final rounds: the highest of anyone\'s');
+      assert.ok(boss()[0].card.leftFirst);
+      p0.layers = { yanShip: 399 };
+      assert.equal(reids(p0), 1, `level ${level}: 399 stacks`);
+      p0.layers = { yanShip: 120 };
+      assert.equal(reids(p0), 0, `level ${level}: below 200`);
+      assert.equal(boss()[0].card.count, 1, 'the final rounds: always 1');
     } finally { h.m.dispose(); }
   }
 });

@@ -20,10 +20,12 @@ Sub-waves added to all fields should be only one per field, not one per side. Pa
 
 ### General
 
-- Objective: Investor - Operators on the bench no longer count toward activating Investor
+- Objective: Investor 1 - Operators on the bench no longer count toward activating Investor
+- - Objective: Investor 2 - Muelsyse, Kjera, Flametail's Attributes trigger on sell instead of when obtained
 - Objective: Swift - Swift formula nerfed from 20 + 0.35 × stacks to 20 + 0.25 × stacks
 - Objective: Foresight - Foresight operators have -20 ASPD
-- Objective: Strategy - All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
+- Objective: Strategy 1 - All strategies that name a specific round number, trigger 1 round later instead; does not affect even/odd rules (ex. Jessica equipment comes rounds 5, 8, 11, and 14)
+- - Objective: Strategy 2 - Russell buff caps at 50%. Du Yaoye only affects 1 refresh per round instead of 2. Amiya requires 1 more active alliance to get her buffs.
 - Objective: Intern - Starting on round 3, the first tier 1 unit you buy that round costs 1 more
 - Originium Zone: Arts - Final boss gains 50 RES after taking 50% max HP as Arts damage
 - Originium Zone: Physical - Final boss gains 5000 DEF after taking 50% max HP as Physical damage
@@ -44,7 +46,7 @@ Sub-waves added to all fields should be only one per field, not one per side. Pa
 - Famiglia: Cleaner 1 - On rounds 10~13, the player with the least total stacks will have 5 Famiglia Shadow Silencer added to their wave.
 - - Famiglia: Unending 2 (2 risk) - Blood Debt and Asset Liquidations are permanently active, for everyone (Asset Liquidations does not summon more Famiglia Shadow Silencer)
 - - Famiglia: Unending 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
-- - Famiglia: Seasonal 2 (2 risk) - Blood Debt is permanently active, for everyone. Blood Debt starts 25% full. Starting on round 10, Blood Debt starts 75% full. (Asset Liquidation summons Famiglia Shadow Silencer as normal)
+- - Famiglia: Seasonal 2 (2 risk) - Blood Debt is permanently active, for everyone. Blood Debt triggers Asset Liquidations at 200 points instead of 500. Starting on round 10, Blood Debt starts 50% full. (Asset Liquidation summons Famiglia Shadow Silencer as normal)
 - - Famiglia: Seasonal 3 (3 risk) - Adds Zaaro, "Signore dei Lupi" to the sub-wave. Zaaro, "Signore dei Lupi" costs 5 life points if leaked.
 
 This branch is the tradeoff between having all enemies constantly buffed, or a risk of spawning more Famiglia Shadow Silencer for everyone due to Asset Liquidation triggering.
@@ -65,9 +67,13 @@ This branch is the tradeoff between having all enemies constantly buffed, or a r
 
 Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (as known by players). Not the mid-tier mob. It's probably best for the in-game text to say Reid, "Hateful Avenger" for clarity even though that's not the official name.
 
-- Vengeance: Invincible Blade 1 - At battle start, add 1 Hateful Avenger to the wave for every 300 total stacks the player has. In final boss round(s), Hateful Avenger is added to every field based on total stacks across all players.
+- Vengeance: Invincible Blade 1 - At battle start, add 1 Hateful Avenger to the wave if player has 200 or more stacks of a single active Alliance. In final boss round(s), Hateful Avenger is always added to the wave.
 - Vengeance: Invincible Blade 2 - Hateful Avengers have +150% max HP and +50% ATK. Hateful Avengers have Status Resistance, 30% Physical and Arts DR when at <50% HP, and are invulnerable for 15 seconds after revival.
-- Vengeance: Invincible Blade 3 - Spawns twice as many Hateful Avengers. Hateful Avengers have +100 ASPD. When Hateful Avengers are below 50% HP, they have 60% Physical and Arts DR and immunity to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure.
+- Vengeance: Invincible Blade 3 - Spawns more Hateful Avenger based on the player's highest stacked active alliance: one additional Hateful Avenger per 200 stacks above 200. In final boss round(s), calculates based on the highest stacked active alliance of any player. Hateful Avengers have +100 ASPD. When Hateful Avengers are below 50% HP, they have 60% Physical and Arts DR and immunity to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate, and Lure.
+
+Vengeance seemed to be too strong in the initial design, due to spawning a large number of Reid that remain invulnerable for 15 seconds. Even with advanced techniques such as using Surtr's immortality to stall, it wasn't possible to stop that many Reid. A typical player's best option is probably to use Mostima skill 3 for the 90% slow field, but this is an extremely specific solution that can't be reliably obtained in SPA.
+
+Spawning based on highest alliance rather than total is a significant nerf overall, and I think this will also be easier for players to understand, since they only need to look at the highest stack. It is also generally more healthy to stack several alliances rather than go all-in on one alliance anyway, and Vengeance 3 makes it extra punishing to stack one alliance extremely high.
 
 ## Implementation notes
 
@@ -78,6 +84,10 @@ Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (
 - **Risk:** 1
 - **Effect:** Operators on the Bench no longer count toward activating Investor. The board still counts.
 - **Notes:** Investor's alliance text gets a "(Risk: Bench Operators no longer count)" suffix.
+- **Investor 2** (Risk 2, includes 1; 2026-10-23): Muelsyse's, Kjera's and Flametail's "When obtained" Attributes (the
+  Damazti Isomorph, the Kjeragandr ice, a Pinus Sylvestris operator; elites: 2) trigger when the operator is sold
+  instead, and their texts read "<When sold>". Investor's ×2 / ×3 multiplies "When obtained" effects only, so it no
+  longer multiplies these. (`ruleDataPatch` turns the six garrisons into `SERVER_CHESS_SOLD` ones, `CC.investorSold`.)
 
 ### 2. `ccSwift`
 
@@ -105,6 +115,9 @@ Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (
   - Harold from round 5, Duck Lord from round 6.
 - **Unchanged:** Strategies on even/odd rounds or every N rounds (Dobermann, Matsukiri, Narantuya). Damazti also keeps
   5/10/15: its text says "every 5 rounds", although its data stores three named rounds.
+- **Strategy 2** (Risk 2, includes 1; 2026-10-23): Ioleta Russell's ATK and HP bonus is at most +50 % each (5 elites
+  reach it); only the first manual refresh of a round is Du Yaoye's special one (the data: the first 2); Amiya's tiers
+  need 4 / 5 / 6 active alliances (the data: 3 / 4 / 5). The Strategies' own texts are unchanged; the tag's text says it.
 
 ### 5. `ccTier1Price`
 
@@ -188,9 +201,10 @@ Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (
 - **Unending 2** (Risk 2, includes Cleaner): every battle is an Asset Liquidation from start to end: every enemy +20 %
   ATK and +15 % DEF, the Silencers also +15 % ATK / DEF and +50 ASPD. No Silencer comes from it.
 - **Seasonal 2** (Risk 2, includes Cleaner, not with Unending): every battle has its own Blood Ledger, fresh each time.
-  It starts 25 % full (125) and fills 3 per game second (+1 per living Zaaro, +35 per second during his Furious Howl).
-  At 500, an Asset Liquidation: the same buffs, one Famiglia Shadow Silencer comes, and the Ledger empties over 35 game
-  seconds without filling. From round 10 it starts 75 % full (375).
+  It starts empty and fills 3 per game second (+1 per living Zaaro, +35 per second during his Furious Howl).
+  At 200 (the official gauge: 500), an Asset Liquidation: the same buffs, one Famiglia Shadow Silencer comes, and the
+  Ledger empties over 35 game seconds without filling. From round 10 it starts 50 % full (100). (2026-10-23; before:
+  500, starting 25 % full, 75 % from round 10.)
 - **Unending 3 / Seasonal 3** (Risk 3): Zaaro joins Cleaner's sub-wave (rounds 10–13, the fewest stacks) and costs 5 LP
   when he leaks.
 - **Every battle:** normal rounds, the Unite Phase and the final boss rounds. A Ledger bar sits in the phase capsule at
@@ -234,12 +248,15 @@ Note: Hateful Avenger here refers to the leader enemy enemy_1539_reid aka Reid (
 
 Reid, "Hateful Avenger" (`enemy_1539_reid`, the leader), shown in the tag texts as `Reid, <his name>`.
 
-- **Invincible Blade 1** (Risk 1): every normal battle gets 1 Reid per 300 total stacks of that player (at most 20). In
-  the final boss rounds: by the total stacks of all alive players, once per field, on the left-first route.
+- **Invincible Blade 1** (Risk 1): a normal battle gets 1 Reid when that player has an active alliance at 200 stacks or
+  more. In the final boss rounds: always 1, once per field, on the left-first route. (2026-10-23; before: 1 per 300
+  total stacks.)
 - **Invincible Blade 2** (Risk 2): those Reids have +150 % max HP, +50 % ATK, Status Resistance, 30 % less Physical /
   Arts damage below 50 % HP, and are invulnerable for 15 s after their revive.
-- **Invincible Blade 3** (Risk 3): twice as many, +100 ASPD; below 50 % HP 60 % less damage instead and immune to Slow,
-  Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure.
+- **Invincible Blade 3** (Risk 3): 1 more Reid per 200 stacks above 200 of the player's highest stacked active alliance
+  (400 → 2, 600 → 3; the final boss rounds: the highest of any alive player's; at most 20), +100 ASPD; below 50 % HP
+  60 % less damage instead and immune to Slow, Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure.
+  (Before: twice as many.)
 - Only the Reids the tag adds get these; a Reid that comes as an ordinary bounty keeps his data.
 
 ### Sub-waves on the final boss fields (Patriot Undying 3, Delegation)
@@ -250,8 +267,8 @@ mobs take (the other half go right first). A one-player field's routes all go le
 
 ## Tile names
 
-The Risk grid's tiles show the tags' names (Fish's, "part of the branding"): Objective: Investor / Swift / Foresight /
-Strategy / Intern / Barge 1–2 / Deep Infiltration / Low Efficiency / Last Line of Defense, Environment: Suffocation 1–3,
+The Risk grid's tiles show the tags' names (Fish's, "part of the branding"): Objective: Investor 1–2 / Swift / Foresight /
+Strategy 1–2 / Intern / Barge 1–2 / Deep Infiltration / Low Efficiency / Last Line of Defense, Environment: Suffocation 1–3,
 Originium Zone: Arts / Physical / Activation 1–3 / Lockout 1–3 / Elements 1–2, Objective: Junk 1–2, Famiglia: Cleaner 1
 / Unending 2–3 / Seasonal 2–3, Patriot: Undying 1–3, Delegation: United 1–3, Vengeance: Invincible Blade 1–3. English is Fish's wording; the Chinese source strings are
 translations of it, and Japanese / Korean / Traditional Chinese fall back to the Chinese until someone translates them.
@@ -347,11 +364,16 @@ the running gauge; the Ledger is fresh every battle and runs in every battle.
    read better: a lock marker on the boss bar while the pool is invulnerable, and/or a tint on the model (cheap in
    Pixi).
 
+### Answers (Fish, 2026-10-16)
+
+- Toxic Waste's −50 % ATK stacks additively with other ATK% modifiers (as built).
+- A leaked Reid costs 1 LP like most enemies (as built).
+- AI teammates ignoring Toxic Waste is fine; revisit if the AI is to play better.
+- The Rosmontis tags are scrapped.
+
 ## Backlog (ideas not built yet)
 
-| Idea                                           | Risk  | Status                              |
-| ---------------------------------------------- | ----- | ----------------------------------- |
-| Final round: Rosmontis, Simulated Sentry joins | 1 / 2 | needs a new enemy (kit with Matrix) |
+(none — every designed tag is built; the Rosmontis tags were scrapped)
 
 ## New suggestions
 

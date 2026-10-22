@@ -20,6 +20,7 @@ import { t } from '../../../shared/i18n.js';
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 const chessName = (id, fallback) => data.lookup('chess', id)?.name || fallback;
 const bondName = (id) => data.lookup('bonds', id)?.name || id;
+const bandName = (id) => data.lookup('bands', id)?.name || id;
 
 /** The short label of a rule in force (the strip, the result screen). */
 export function ruleLabel(key, rules) {
@@ -55,10 +56,14 @@ const pct = (v) => Math.round(v * 100);
 export function riskText(key, level) {
   const enemyName = (k) => data.lookup('enemies', k)?.name || k;
   switch (key) {
-    case 'ccInvestorBench': return { short: t('目标：投资人'), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
+    case 'ccInvestorBench': return level >= 2
+      ? { short: t('目标：投资人 {n}', { n: level }), full: t('{list}的获得时效果改为售出时触发（因此不再受【{bond}】加倍）', { list: CC.investorSold.ops.map((id) => chessName(id, id)).join(t('、')), bond: bondName('investShip') }) }
+      : { short: t('目标：投资人 {n}', { n: level }), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
     case 'ccSwift': return { short: t('目标：迅捷'), full: t('【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）', { bond: bondName('swiftShip') }) };
     case 'ccForesight': return { short: t('目标：远见'), full: t('【{bond}】干员攻击速度-{n}（无论盟约是否激活）', { bond: bondName('visiShip'), n: -CC.foresightAspd }) };
-    case 'ccStrategyLate': return { short: t('目标：策略'), full: t('指定回合数的策略推迟1回合生效（按奇偶或每N回合生效的策略不受影响）') };
+    case 'ccStrategyLate': return level >= 2
+      ? { short: t('目标：策略 {n}', { n: level }), full: t('【{ioleta}】的攻击力与生命值加成最多+{cap}%；【{duyaoy}】每回合只有第{r}次主动刷新为特殊刷新；【{amiya}】每档需要多{n}种激活盟约', { ioleta: bandName('band_ioleta'), cap: pct(CC.strategy2.ioletaCap), duyaoy: bandName('band_duyaoy'), r: CC.strategy2.duyaoyRefreshes, amiya: bandName('band_amiya'), n: CC.strategy2.amiyaExtra }) }
+      : { short: t('目标：策略 {n}', { n: level }), full: t('指定回合数的策略推迟1回合生效（按奇偶或每N回合生效的策略不受影响）') };
     case 'ccTier1Price': return { short: t('目标：实习'), full: t('从第{r}回合起，每回合购买的第一名I阶干员价格+{n}', { r: CC.tier1FromRound, n: CC.tier1Extra }) };
     case 'ccUpgrade': return level >= 2
       ? { short: t('目标：驳船 {n}', { n: level }), full: t('调度中心从4级升到5级、从5级升到6级的价格各+{n}', { n: CC.upgradeExtra[2][4] }) }
@@ -89,9 +94,9 @@ function vengeanceText(level, enemyName) {
   const V = CC.vengeance;
   const name = t('里德，{name}', { name: enemyName(V.key) });
   switch (level) {
-    case 1: return { short: t('复仇：无敌之刃 1'), full: t('每场作战开始时，博士的盟约层数之和每有{n}层，作战中额外出现1名【{name}】；最终领袖回合按所有博士的层数之和计算，每个战场1组', { n: V.perStacks, name }) };
+    case 1: return { short: t('复仇：无敌之刃 1'), full: t('每场作战开始时，若博士有一个已激活盟约达到{n}层，作战中额外出现1名【{name}】；最终领袖回合必定出现1名（每个战场1组）', { n: V.perStacks, name }) };
     case 2: return { short: t('复仇：无敌之刃 2'), full: t('【{name}】最大生命值+{hp}%，攻击力+{atk}%，获得抵抗；生命值低于{low}%时受到的物理与法术伤害-{dr}%；重生后{s}秒内无敌', { name, hp: pct(V.hpPct), atk: pct(V.atkPct), low: pct(V.lowHp), dr: pct(V.lowDr2), s: V.reviveInvincible }) };
-    case 3: return { short: t('复仇：无敌之刃 3'), full: t('【{name}】数量翻倍，攻击速度+{aspd}；生命值低于{low}%时受到的物理与法术伤害改为-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导', { name, aspd: V.aspd, low: pct(V.lowHp), dr: pct(V.lowDr3) }) };
+    case 3: return { short: t('复仇：无敌之刃 3'), full: t('层数最高的已激活盟约在{n}层以上每多{n}层，额外出现1名【{name}】（最终领袖回合按所有博士中最高的计算）；【{name}】攻击速度+{aspd}；生命值低于{low}%时受到的物理与法术伤害改为-{dr}%，并免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导', { n: V.perStacks, name, aspd: V.aspd, low: pct(V.lowHp), dr: pct(V.lowDr3) }) };
     default: return { short: '?', full: '?' };
   }
 }
@@ -102,7 +107,7 @@ function famigliaText(node, enemyName) {
   switch (node) {
     case 'cleaner': return { short: t('家族：清道夫 1'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
     case 'unending2': return { short: t('家族：无尽 2'), full: t('每场作战全程处于清算时刻：敌人攻击力+{atk}%，防御力+{def}%（不会因此出现【{silencer}】）', { atk: pct(F.atkPct), def: pct(F.defPct), silencer }) };
-    case 'seasonal2': return { short: t('家族：季节 2'), full: t('每场作战都有血债账款：开始时为{start}%，每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时为{late}%', { start: pct(F.startShare), n: F.perSec, max: F.max, atk: pct(F.atkPct), def: pct(F.defPct), silencer, s: F.drainSeconds, r: F.lateFrom, late: pct(F.lateShare) }) };
+    case 'seasonal2': return { short: t('家族：季节 2'), full: t('每场作战都有血债账款：从0开始，每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时为{late}%', { n: F.perSec, max: F.max, atk: pct(F.atkPct), def: pct(F.defPct), silencer, s: F.drainSeconds, r: F.lateFrom, late: pct(F.lateShare) }) };
     case 'unending3':
     case 'seasonal3': return { short: node === 'unending3' ? t('家族：无尽 3') : t('家族：季节 3'), full: t('【{zaaro}】加入上述额外敌人，漏过时扣除{lp}点目标生命', { zaaro, lp: F.zaaro.leakLp }) };
     default: return { short: '?', full: '?' };
@@ -161,7 +166,7 @@ function tagLayout(r) {
 
 /** The Risk tags (SPA-CC) as Contingency Contract lays them out: one column per tag, its levels top (1) to bottom. */
 function RiskGrid({ rules, editable, onSet }) {
-  useData('bonds', 'enemies');
+  useData('bonds', 'enemies', 'chess', 'bands'); // names in the texts: alliances, enemies, operators (Investor 2), Strategies (Strategy 2)
   const tags = RULES.filter((r) => r.type === 'level');
   const labels = ruleLabels(rules);
   const on = tags.filter((r) => rules[r.key] > 0);

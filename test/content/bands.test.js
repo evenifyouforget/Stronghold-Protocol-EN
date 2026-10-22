@@ -722,6 +722,42 @@ test('伊奥莱塔 统御号令: n elite operators on the field ⇒ each elite A
   cover('band_ioleta');
 });
 
+test('SPA-CC Strategy 2 (ccStrategyLate 2): 阿米娅 needs 4 / 5 / 6 active bonds; 伊奥莱塔 at most +50 %', () => {
+  const S2 = { rules: { ccStrategyLate: 2 } };
+  const ALL = ['yanShip', 'sargonShip', 'victoriaShip', 'kjeragShip', 'lateranoShip', 'egirShip'];
+  for (const [n, mul] of [[3, 1], [4, 1.2], [5, 1.3], [6, 1.4]]) {
+    const h = fight({ band: 'band_amiya', bonds: active(...ALL.slice(0, n)), units: [{ chessId: 't_op', row: 10, col: 4 }], flags: S2 });
+    h.step(1);
+    close(h.unit('t_op').s.atk, 500 * mul, `${n} bonds ATK`);
+    close(h.unit('t_op').s.maxHp, 2000 * mul, `${n} bonds HP`);
+  }
+  const ids = ['t_e1_b', 't_e2_b', 't_e3_b', 't_e4_b', 't_e5_b', 't_e6_b'];
+  const ops = Object.fromEntries(ids.map((id) => [id, op(id, { golden: true })]));
+  const units = ids.map((chessId, i) => ({ chessId, row: 10 + (i % 3), col: 3 + Math.floor(i / 3) }));
+  for (const [flags, mul] of [[undefined, 1.6], [S2, 1.5], [{ rules: { ccStrategyLate: 1 } }, 1.6]]) {
+    const h = fight({ band: 'band_ioleta', ops, units, flags });
+    h.step(1);
+    for (const id of ids) { close(h.unit(id).s.atk, 500 * mul, `${id} ATK`); close(h.unit(id).s.maxHp, 2000 * mul, `${id} HP`); }
+  }
+});
+
+test('SPA-CC Strategy 2 (ccStrategyLate 2): only the first manual refresh of a round is 杜遥夜\'s special one', () => {
+  const seed = seedWithBond('yanShip', 3, 2);
+  let second = 0;
+  for (let k = 0; k < 8; k++) {
+    const { m, ps } = setup({ band: 'band_duyaoy', seed, rules: { ccStrategyLate: 2 } });
+    ps.shop.level = 3;
+    const yanIn = () => ps.shop.slots.some((sl) => sl && sl.kind === 'chess' && DATA.chess[sl.id].bonds.includes('yanShip'));
+    for (let i = 0; i < k; i++) { ps.shop.freeRefreshes = 1; m.handle('p_0', { t: 'g.refresh' }); } // randomise the stream
+    ps.round.refreshes = 0;
+    assert.deepEqual(m.handle('p_0', { t: 'g.refresh' }), OK);
+    assert.ok(yanIn(), 'refresh 1');
+    m.handle('p_0', { t: 'g.refresh' });
+    if (!yanIn()) second++;
+  }
+  assert.ok(second >= 1, 'the 2nd refresh is not special');
+});
+
 test('Touch 外勤医疗: every player of a match with the band gets 预备干员-医疗 (≤ 1 elite) or Touch (≥ 2 elites) on its stage slot', () => {
   assert.deepEqual(amedicCharsFor(0), ['char_605_cmedic']);
   assert.deepEqual(amedicCharsFor(1), ['char_605_cmedic']);

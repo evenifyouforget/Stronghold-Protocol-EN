@@ -40,6 +40,15 @@ export const CC = Object.freeze({
   swiftPerStack: 0.0025,                       // 迅捷 20 + 0.25 × stacks % (data: 0.0035)
   foresightAspd: -20,                          // 远见 operators, active or not
   tier1Extra: 1, tier1FromRound: 3,            // the first tier-1 operator bought each round from round 3
+  // Investor 2: these operators' 获得时 grants (缪尔赛思's 变形同构体, 耶拉's 谢拉格不融冰, 焰尾's 野鬃 / 灰毫) come when they are
+  // sold instead (Fish 2026-10-23); 投资人's repeat multiplies 获得时 only, so not these any more
+  investorSold: Object.freeze({
+    garrisons: Object.freeze(['garrison_76_a', 'garrison_76_b', 'garrison_92_a', 'garrison_92_b', 'garrison_149_a', 'garrison_149_b']),
+    ops: Object.freeze(['chess_char_6_11_a', 'chess_char_3_20_a', 'chess_char_4_19_a']), // their names in the tag's text
+  }),
+  // Strategy 2 (Fish 2026-10-23): 伊奥莱塔·罗素's 统御号令 ATK / HP at most +50 %; 杜遥夜's 广交豪杰 the first refresh of a
+  // round only (data: the first 2); 阿米娅's 众志合一 needs 1 more active alliance per tier (4 / 5 / 6)
+  strategy2: Object.freeze({ ioletaCap: 0.5, duyaoyRefreshes: 1, amiyaExtra: 1 }),
   upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
   spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
@@ -57,24 +66,27 @@ export const CC = Object.freeze({
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
   // +15 %, +50 ASPD) per Liquidation so far in the battle, up to 5; one Shadow Silencer comes (Seasonal); the gauge drains
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
-  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
+  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare; max 200 instead of the
+  // official 500, empty at the start, half full from round 10 (Fish 2026-10-23; was 500, 25 %, 75 %). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
   // Junk 1: every player gets Toxic Waste at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
   // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
   // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
   // its icon: 源石溶剂 (Originium Solvent)'s vial, drawn colour-inverted — a cyan vial on white (Fish 2026-10-16)
   junk: Object.freeze({ itemId: 'fish_item_toxic_waste', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1125_acarm125' }),
-  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
-  // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
-  // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
-  // after his revive. 3: twice as many, +100 ASPD, below 50 % HP 60 % less damage and immune to the listed statuses.
+  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15, spawns reworked 2026-10-23).
+  // Invincible Blade 1: 1 Reid in a normal battle of a player with an active alliance at perStacks stacks or more; the
+  // final boss rounds: always 1, once per field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts
+  // damage below 50 % HP, 15 s invulnerable after his revive. 3: 1 more per perStacks stacks above perStacks of the
+  // player's highest active alliance (the final boss rounds: the highest of any alive player's), +100 ASPD, below 50 % HP
+  // 60 % less damage and immune to the listed statuses.
   vengeance: Object.freeze({
-    key: 'enemy_1539_reid', perStacks: 300, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
+    key: 'enemy_1539_reid', perStacks: 200, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
     reviveInvincible: 15, aspd: 100,
     immune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
   }),
   famiglia: Object.freeze({
-    max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0.25, lateFrom: 10, lateShare: 0.75,
+    max: 200, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0, lateFrom: 10, lateShare: 0.5,
     atkPct: 0.2, defPct: 0.15,
     silencerKeys: Object.freeze(['enemy_1283_sgkill', 'enemy_1283_sgkill_2']),
     silencer: Object.freeze({ atkPct: 0.15, defPct: 0.15, aspd: 50, maxStacks: 5 }),
@@ -129,6 +141,8 @@ export function riskLeakWeight(rules, enemyKey) {
 
 /** msgid of the note added to 投资人's text when the bench no longer counts. */
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
+/** msgid of the trigger tag that replaces a 获得时 grant's own ("<获得时>") under Investor 2 (CC.investorSold). */
+export const INVESTOR_SOLD_TAG = N_('<售出时>');
 
 
 /**
@@ -206,6 +220,16 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (investor) {
     const note = text(INVESTOR_BENCH_NOTE);
     bonds.investShip = { ...investor, countMode: 'BOARD', countsHand: false, desc: `${investor.desc ?? ''}${note}`, descRaw: `${investor.descRaw ?? investor.desc ?? ''}${note}` };
+  }
+  // Investor 2: the 获得时 grants of CC.investorSold come when the operator is sold (the dispatcher fires a garrison on
+  // its eventType's hook only, server/match/effectsMeta.js); the text's leading trigger tag becomes 售出时's
+  if (rules.ccInvestorBench >= 2) {
+    const tag = text(INVESTOR_SOLD_TAG);
+    const swap = (d) => (typeof d === 'string' ? d.replace(/^<[^>]*>/, tag) : d);
+    for (const id of CC.investorSold.garrisons) {
+      const rec = own(raw.garrisons, id);
+      if (rec && rec.eventType === 'SERVER_GAIN') garrisons[id] = { ...rec, eventType: 'SERVER_CHESS_SOLD', desc: swap(rec.desc), descRaw: swap(rec.descRaw) };
+    }
   }
   const swift = rules.ccSwift > 0 ? own(raw.bonds, 'swiftShip') : null;
   if (swift) {
