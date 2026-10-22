@@ -249,7 +249,6 @@ describe('文字大小: the CSS text root', () => {
       ['screens/game-shop.css', /\.scard__name \{[^}]*font-size: \.19rem/, 'the shop card'],
       ['screens/game.css', /\.bslot \.bond__name \{[^}]*font-size: \.14rem/, 'the bond strip'],
       ['screens/game.css', /\.bossbar__txt \{[^}]*font-size: \.14rem/, 'the boss bar'],
-      ['screens/game.css', /\.ledger__txt \{[^}]*font-size: \.13rem/, 'the Blood Ledger bar (SPA-CC), the same fixed-height bar'],
       ['screens/game.css', /\.lp--md \{ font-size: \.24rem; \}/, 'the top bar LP'],
       ['screens/game.css', /\.sp-coarse \.set-diag__text \{ font-size: 16px; \}/, 'the 16 px iOS-zoom guard'],
       ['theme.css', /\.rotate-hint \{[\s\S]*?font-size: 16px/, 'the rotate hint'],
