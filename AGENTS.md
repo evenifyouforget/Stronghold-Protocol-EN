@@ -48,6 +48,7 @@ Run the tests of what you touched first, then everything before opening the PR:
 ```bash
 node --test test/<area>/<file>.test.js      # targeted
 npm run ci                                  # the CI checks locally (tools/ci.mjs): npm test, smoke, lint, imports, types
+npm run ci -- --quick                       # the quick tier instead (the CI of pull requests into a branch other than main)
 npm run golden                              # golden results
 ```
 

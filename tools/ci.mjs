@@ -4,18 +4,23 @@
 //   node tools/ci.mjs                    every step; stops at the first failing one (exit 1)
 //   node tools/ci.mjs --keep-going       run every step even after a failure (exit 1 when any failed)
 //   node tools/ci.mjs --only lint,test   only the named steps (in the workflow's order)
+//   node tools/ci.mjs --quick            the quick tier instead (ci.yml job `quick`: pull requests into a branch other than main)
 //   node tools/ci.mjs --list             print the steps and the ci.yml step each one mirrors
 //   npm run ci                           the same as the first line
 //
-// Steps, in the order of ci.yml (job `test`, then job `tooling`):
+// Steps, in the order of ci.yml (job `test`, job `quick`, then job `tooling`); the full tier runs all but `quick`, the
+// quick tier all but `test`:
 //   setup      node tools/setup.mjs --check --no-local
-//   test       npm test: node --test over TEST_FILES (package.json "test")
+//   test       node tools/test-tier.mjs: the files of `npm test` (TEST_FILES); ci.yml splits them over 3 runners
+//              (--shard k/3), here they run in one go
 //   smoke      the server on a free port on 127.0.0.1: GET /healthz, / (must contain <html) and /vendor/pixi.min.js,
 //              then node tools/doctor.mjs (its exit code is ignored, like `|| true` in ci.yml), then the server stops
 //   lint       eslint .                                   (npm run lint; warnings do not fail it)
 //   imports    node tools/check-imports.mjs               (npm run check:imports)
 //   typecheck  tsc --noEmit --checkJs -p jsconfig.json    (npm run typecheck)
-// The job `test` steps get ci.yml's env (SP_E2E=0, SP_REAL_E2E=0, RENDER_E2E=0, NO_COLOR=1) unless already set.
+//   quick      node tools/test-tier.mjs --quick: TEST_FILES without its SLOW_TEST_FILES (npm run test:quick)
+// The test-job steps (jobs `test` and `quick`) get ci.yml's env (SP_E2E=0, SP_REAL_E2E=0, RENDER_E2E=0, NO_COLOR=1)
+// unless already set. ci.yml's `full CI` / `quick CI` jobs only sum up a tier: nothing to run here.
 //
 // Not mirrored: actions/checkout and actions/setup-node (GitHub runner setup) and `npm ci` (the install — run it
 // yourself; replacing node_modules is not a check). The OS × Node matrix is whatever this machine has.
@@ -31,8 +36,11 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The env of ci.yml's job `test` (test/ci.test.js compares it with the workflow). */
+/** The env of ci.yml's jobs `test` and `quick` (test/ci.test.js compares it with the workflow). */
 export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_COLOR: '1' };
+
+/** The ci.yml jobs whose steps run the tests (and get CI_TEST_ENV). */
+export const TEST_JOBS = ['test', 'quick'];
 
 /** The paths the smoke step requests (the curl URLs of ci.yml's smoke step; test/ci.test.js compares them). */
 export const SMOKE_PATHS = ['/healthz', '/', '/vendor/pixi.min.js'];
@@ -51,21 +59,27 @@ export const SKIPPED_CI_STEPS = [
   { uses: 'actions/checkout', why: 'GitHub runner: the checkout is this folder' },
   { uses: 'actions/setup-node', why: 'GitHub runner: the Node.js of this machine is used' },
   { name: 'Install (npm ci → postinstall copies public/vendor)', why: 'run `npm ci` yourself; it is not a check' },
+  { name: 'Every job of the full tier passed', why: 'the `full CI` check: a summary of the jobs above' },
+  { name: 'Every job of the quick tier passed', why: 'the `quick CI` check: a summary of the jobs above' },
 ];
 
 /**
- * The local steps (runStep runs them). `ci` names the ci.yml job and step it mirrors; `npm` the package.json script
- * ci.yml runs there, and `describe` is that script's command (test/ci.test.js checks both).
- * @typedef {{ id: string, ci: { job: string, name: string }, npm?: string, describe: string }} Step
+ * The local steps (runStep runs them). `ci` names the ci.yml job and step it mirrors, `alsoIn` the other jobs that run
+ * the same step; `npm` the package.json script ci.yml runs there, and `describe` is that script's command (test/ci.test.js
+ * checks both); `ciArgs` what ci.yml adds to the command (the shard). `tier`: the tier the step belongs to alone
+ * (none = both).
+ * @typedef {{ id: string, ci: { job: string, name: string }, alsoIn?: string[], npm?: string, describe: string,
+ *   ciArgs?: string, tier?: 'full' | 'quick' }} Step
  * @type {Step[]}
  */
 export const STEPS = [
-  { id: 'setup', ci: { job: 'test', name: 'Setup check (no downloads)' }, describe: 'node tools/setup.mjs --check --no-local' },
-  // (the globs quoted: no shell expands them — Node's test runner does, the same on every OS)
-  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, npm: 'test',
-    describe: `node --test ${TEST_FILES.map((g) => `"${g}"`).join(' ')}` },
-  { id: 'smoke', ci: { job: 'test', name: 'Server smoke test (boot, /healthz, index.html, doctor)' },
+  { id: 'setup', ci: { job: 'test', name: 'Setup check (no downloads)' }, alsoIn: ['quick'], describe: 'node tools/setup.mjs --check --no-local' },
+  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, describe: 'node tools/test-tier.mjs',
+    ciArgs: '--shard ${{ matrix.shard }}/3', tier: 'full' },
+  { id: 'smoke', ci: { job: 'test', name: 'Server smoke test (boot, /healthz, index.html, doctor)' }, alsoIn: ['quick'],
     describe: `server on a free port: GET ${SMOKE_PATHS.join(', ')}; node tools/doctor.mjs` },
+  { id: 'quick', ci: { job: 'quick', name: 'Quick tests (the slow files left out)' }, npm: 'test:quick',
+    describe: 'node tools/test-tier.mjs --quick', tier: 'quick' },
   { id: 'lint', ci: { job: 'tooling', name: 'Lint (warnings allowed)' }, npm: 'lint', describe: 'eslint .' },
   { id: 'imports', ci: { job: 'tooling', name: 'Import boundaries' }, npm: 'check:imports', describe: 'node tools/check-imports.mjs' },
   { id: 'typecheck', ci: { job: 'tooling', name: 'Typecheck' }, npm: 'typecheck', describe: 'tsc --noEmit --checkJs -p jsconfig.json' },
@@ -172,15 +186,16 @@ export function isSkippedCiStep(s) {
 
 /**
  * @param {string[]} argv
- * @returns {{ keepGoing: boolean, only: string[] | null, list: boolean, help: boolean }}
+ * @returns {{ keepGoing: boolean, only: string[] | null, quick: boolean, list: boolean, help: boolean }}
  */
 export function parseArgs(argv) {
-  const o = { keepGoing: false, only: /** @type {string[] | null} */ (null), list: false, help: false };
+  const o = { keepGoing: false, only: /** @type {string[] | null} */ (null), quick: false, list: false, help: false };
   const ids = new Set(STEPS.map((s) => s.id));
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--keep-going' || a === '-k') o.keepGoing = true;
     else if (a === '--list') o.list = true;
+    else if (a === '--quick') o.quick = true;
     else if (a === '--help' || a === '-h') o.help = true;
     else if (a === '--only' || a.startsWith('--only=')) {
       const v = a === '--only' ? argv[++i] : a.slice('--only='.length);
@@ -194,15 +209,19 @@ export function parseArgs(argv) {
   return o;
 }
 
-/** The steps to run, in workflow order. @param {string[] | null} only */
-export function selectSteps(only) {
-  return only ? STEPS.filter((s) => only.includes(s.id)) : STEPS.slice();
+/**
+ * The steps to run, in workflow order: the named ones, else the tier's (the full tier by default).
+ * @param {string[] | null} only @param {boolean} [quick]
+ */
+export function selectSteps(only, quick = false) {
+  if (only) return STEPS.filter((s) => only.includes(s.id));
+  return STEPS.filter((s) => !s.tier || s.tier === (quick ? 'quick' : 'full'));
 }
 
 /** A child's env: `base` plus ci.yml's job env for the keys `base` does not set. */
 export function stepEnv(step, base = process.env) {
   const env = { ...base };
-  if (step.ci.job === 'test') for (const [k, v] of Object.entries(CI_TEST_ENV)) if (env[k] === undefined) env[k] = v;
+  if (TEST_JOBS.includes(step.ci.job)) for (const [k, v] of Object.entries(CI_TEST_ENV)) if (env[k] === undefined) env[k] = v;
   return env;
 }
 
@@ -334,7 +353,8 @@ async function smoke(env) {
 function runStep(step, env) {
   switch (step.id) {
     case 'setup': return node(['tools/setup.mjs', '--check', '--no-local'], env);
-    case 'test': return node(['--test', ...TEST_FILES], env);
+    case 'test': return node(['tools/test-tier.mjs'], env);
+    case 'quick': return node(['tools/test-tier.mjs', '--quick'], env);
     case 'smoke': return smoke(env);
     case 'lint': return node([binPath('eslint', 'eslint'), '.'], env);
     case 'imports': return node(['tools/check-imports.mjs'], env);
@@ -347,16 +367,16 @@ export async function main(argv = process.argv.slice(2)) {
   let opts;
   try { opts = parseArgs(argv); } catch (e) { console.error(e.message); return 2; }
   if (opts.help) {
-    console.log('node tools/ci.mjs [--keep-going] [--only <step,…>] [--list]  — the checks of .github/workflows/ci.yml');
+    console.log('node tools/ci.mjs [--keep-going] [--quick] [--only <step,…>] [--list]  — the checks of .github/workflows/ci.yml');
     console.log('steps: ' + STEPS.map((s) => s.id).join(', '));
     return 0;
   }
   if (opts.list) {
-    for (const s of STEPS) console.log(`${s.id.padEnd(10)} ${s.describe}\n${''.padEnd(10)} ← ci.yml ${s.ci.job}: ${s.ci.name}`);
+    for (const s of STEPS) console.log(`${s.id.padEnd(10)} ${s.describe}\n${''.padEnd(10)} ← ci.yml ${[s.ci.job, ...(s.alsoIn || [])].join(', ')}: ${s.ci.name}${s.tier ? ` (${s.tier} tier)` : ''}`);
     for (const s of SKIPPED_CI_STEPS) console.log(`(skipped)  ${s.uses || s.name} — ${s.why}`);
     return 0;
   }
-  const steps = selectSteps(opts.only);
+  const steps = selectSteps(opts.only, opts.quick);
   const results = steps.map((s) => ({ id: s.id, status: /** @type {'ok' | 'fail' | 'not run'} */ ('not run'), ms: undefined, note: undefined }));
   let stopped = false;
   for (let i = 0; i < steps.length; i++) {
