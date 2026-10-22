@@ -50,6 +50,9 @@
 //                                              ALT_ART_EVERY-th match may get the alternate result background (results.js)
 //   opts.altArtChance 'every' | 'picked' | null (optional, fork) the lobby's results.js altArtChance(); absent =
 //                                              derived from serverMatchNo
+//   opts.record      boolean (optional, fork)    keep the anonymous match record (GitHub #32, ./records.js): only `true`
+//                                              turns it on (the lobby, when SP_RECORDS is set); the onEnd summary then
+//                                              carries it as `record`. Observes only: the match plays the same either way
 //   opts.cs          string (optional)          the content hash of the room's content set (DESIGN §32,
 //                                              server/plugins/identity.js; 64 hex digits): copied into every BattleSpec
 //                                              as `cs` — the sim never reads it; absent (or malformed) ⇒ specs carry none
@@ -245,6 +248,7 @@ import { MatchUnite } from './match/unitePhase.js';
 import { MatchBoss } from './match/bossRounds.js';
 import { MatchSettle } from './match/settle.js';
 import { installTestTrace } from './testTrace.js';
+import { installRecorder } from './records.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
 
@@ -545,6 +549,7 @@ export class Match {
     // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
     // above). The input journal records the steps that callback took; replay stops there.
     if (this.test && opts.journal !== false) installTestTrace(this, opts);
+    if (opts.record === true) installRecorder(this);
   }
 }
 
