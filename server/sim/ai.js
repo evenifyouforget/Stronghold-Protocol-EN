@@ -701,7 +701,8 @@ export function updateEnemy(b, e, dt) {
     if (!bl.alive || !bl.deployed || bl.hidden || bl.s.flags.noBlock || bl.s.flags.sleep || ef.unblockable || ef.levitate || ef.fear) b._unblock(e);
     else return;
   }
-  if (!e.hidden && b._checkBlock(e)) return;
+  // (a sliding enemy — pushed or pulled, battle/displacement.js — is blocked where its slide ends, not on the way)
+  if (!e.hidden && !e.shift && b._checkBlock(e)) return;
   if (b.time < e.pauseUntil) return;
   // standing for an attack clip (attackStand, GitHub #58): only the walking waits — a checkpoint's WAIT keeps running
   // and DISAPPEAR / APPEAR legs still happen (advanceRoute); drawn idle (the client plays the clip, then Move again);

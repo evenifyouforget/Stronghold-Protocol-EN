@@ -27,6 +27,10 @@ import { createRng } from '../../server/sim/rng.js';
 
 const REAL = { skip: !hasGeneratedData() };
 const approx = (a, b, eps, msg) => assert.ok(Math.abs(a - b) <= eps, `${msg ?? ''} ${a} ≈ ${b}`);
+/** The table's distances at 30 fps (a push is a slide, battle/displacement.js: 1.698 for 1.7, 0.119 for 0.12). */
+const FRAME_EPS = 0.01;
+/** Where `e`'s slide ends ({y, x}): a push only starts it (GitHub #60). */
+const endOf = (b, e) => (e.shift ? b._shiftPredict(e, e.shift) : { x: e.x, y: e.y });
 const WILDMN = 'chess_char_1_19_a';
 const foe = (key, o = {}) => enemyRec({ key, hp: 1e8, speed: 0, atk: 0, ...o });
 const FULL = PUSH_TILES[0]; // 中力 (1) vs weight 1 = 受力等级 0
@@ -53,7 +57,7 @@ function wildmnHit(dir, off, { side = 'L', kind = 'normal', mass = 1 } = {}) {
     enemies: [{ key: 'enemy_t', pos: [fr + ar, fc + ac] }],
     setup(b) {
       b.on('beforeAttack', (c) => { if (c.attacker.defId === WILDMN && c.isSkill && c.targets[0]) before = [c.targets[0].y, c.targets[0].x]; }, { priority: -2000 });
-      b.on('attack', (c) => { if (c.attacker.defId === WILDMN && c.isSkill && before && !moved) moved = [c.targets[0].y - before[0], c.targets[0].x - before[1]]; }, { priority: -2000 });
+      b.on('attack', (c) => { if (c.attacker.defId === WILDMN && c.isSkill && before && !moved) { const end = endOf(b, c.targets[0]); moved = [end.y - before[0], end.x - before[1]]; } }, { priority: -2000 });
     },
   });
   const u = h.unit(WILDMN);
@@ -69,7 +73,7 @@ test('D2 野鬃 S2 pushes along her direction ("往攻击方向", the 推击手 
   assert.equal(ds.rawChess(WILDMN).skill.bb['attack@force'], 1, 'data: 中等力度 = 1');
   for (const dir of ['RIGHT', 'UP', 'LEFT', 'DOWN']) {
     const m = wildmnHit(dir, [0, 0.7]);
-    approx(m.fwd, FULL, 1e-6, `${dir}: forward`);
+    approx(m.fwd, FULL, FRAME_EPS, `${dir}: forward`);
     approx(m.side, 0, 1e-9, `${dir}: no sideways`);
   }
 });
@@ -78,7 +82,7 @@ test('D2 野鬃 S2: a target within 45° of her direction goes straight along it
   for (const dir of ['RIGHT', 'UP', 'LEFT', 'DOWN']) {
     for (const lat of [0.3, -0.3]) {
       const m = wildmnHit(dir, [lat, 0.6]); // 26.6° off, inside her block radius and her range (tile ahead)
-      approx(m.fwd, FULL, 1e-6, `${dir} ${lat}: along her direction`);
+      approx(m.fwd, FULL, FRAME_EPS, `${dir} ${lat}: along her direction`);
       approx(m.side, 0, 1e-9, `${dir} ${lat}: no sideways (radial would be ${(FULL * lat / Math.hypot(lat, 0.6)).toFixed(2)})`);
     }
   }
@@ -89,17 +93,17 @@ test('D2 野鬃 S2: a target behind her — including one about to leave the til
     // 0.45 behind her centre: 0.05 from the back edge of her tile. Round 40: this push does not reverse.
     for (const backOff of [-0.45, -0.49]) {
       const back = wildmnHit(dir, [0, backOff]);
-      approx(back.len, WEAK, 1e-6, `${dir} behind ${backOff}: the −2 distance`);
+      approx(back.len, WEAK, FRAME_EPS, `${dir} behind ${backOff}: the −2 distance`);
       assert.ok(back.fwd > 0 && Math.abs(back.side) < 1e-9, `${dir} behind ${backOff}: along her attack, not back toward the leak`);
     }
     // beside her, 63° off: radial, −2
     const beside = wildmnHit(dir, [0.6, 0.3]);
-    approx(beside.len, WEAK, 1e-6, `${dir} beside: the −2 distance`);
+    approx(beside.len, WEAK, FRAME_EPS, `${dir} beside: the −2 distance`);
     approx(beside.side / beside.len, 0.6 / Math.hypot(0.6, 0.3), 1e-6, `${dir} beside: radial`);
     // nearer than 0.25 tile: radial, −2
     const near = wildmnHit(dir, [0.1, 0.1]);
     assert.ok(Math.hypot(0.1, 0.1) < PUSH_DIRECTIONAL_MIN_DIST);
-    approx(near.len, WEAK, 1e-6, `${dir} near: the −2 distance`);
+    approx(near.len, WEAK, FRAME_EPS, `${dir} near: the −2 distance`);
     approx(near.side, near.fwd, 1e-6, `${dir} near: radial`);
   }
 });
@@ -107,13 +111,13 @@ test('D2 野鬃 S2: a target behind her — including one about to leave the til
 test('D2 野鬃 S2 on the mirrored right half of the Final Assault field: the same pushes in its own direction', REAL, () => {
   for (const dir of ['RIGHT', 'LEFT']) {
     const ahead = wildmnHit(dir, [0, 0.7], { side: 'R', kind: 'boss' });
-    approx(ahead.fwd, FULL, 1e-6, `R ${dir}: forward`);
+    approx(ahead.fwd, FULL, FRAME_EPS, `R ${dir}: forward`);
     approx(ahead.side, 0, 1e-9, `R ${dir}: no sideways`);
     const diag = wildmnHit(dir, [0.3, 0.6], { side: 'R', kind: 'boss' });
-    approx(diag.fwd, FULL, 1e-6, `R ${dir} diagonal: along its direction`);
+    approx(diag.fwd, FULL, FRAME_EPS, `R ${dir} diagonal: along its direction`);
     approx(diag.side, 0, 1e-9, `R ${dir} diagonal: no sideways`);
     const back = wildmnHit(dir, [0, -0.45], { side: 'R', kind: 'boss' });
-    approx(back.len, WEAK, 1e-6, `R ${dir} behind: the −2 distance`);
+    approx(back.len, WEAK, FRAME_EPS, `R ${dir} behind: the −2 distance`);
     assert.ok(back.fwd > 0 && Math.abs(back.side) < 1e-9, `R ${dir} behind: along her attack`);
   }
 });
@@ -143,7 +147,8 @@ function realRun(chessId, r, c, dir, round = 5) {
     if (o.from !== u) return orig(e, force, o);
     const x0 = e.x, y0 = e.y, behind = (x0 - u.x) * u.fwd[1] + (y0 - u.y) * u.fwd[0] < 0;
     const moved = orig(e, force, o);
-    if (moved > 1e-6) pushes.push({ dx: e.x - x0, dy: e.y - y0, moved, behind, massLevel: e.s.massLevel });
+    const end = endOf(b, e);
+    if (moved > 1e-6) pushes.push({ dx: end.x - x0, dy: end.y - y0, moved, behind, massLevel: e.s.massLevel });
     return moved;
   };
   for (let n = 0; !b.finished && n < 30 * 120; n++) b.step();
@@ -162,7 +167,7 @@ test('D2 real battle (act2 m01, R5 official wave): no push of 野鬃 throws an e
         if (p.behind) behind++;
         // either straight along her direction, or the −2 radial push (受力等级 = 1 − weight − 2)
         if (along < p.moved * (1 - 1e-6)) {
-          assert.ok(p.moved <= PUSH_TILES[-1] + 1e-6, `(${r},${c}) ${chessId}: off-direction push of ${p.moved.toFixed(2)} tiles (weight ${p.massLevel})`);
+          assert.ok(p.moved <= PUSH_TILES[-1] + FRAME_EPS, `(${r},${c}) ${chessId}: off-direction push of ${p.moved.toFixed(2)} tiles (weight ${p.massLevel})`);
         }
       }
     }

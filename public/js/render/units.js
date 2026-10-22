@@ -210,10 +210,10 @@ export const barrierShare = (r) => (r > 0 ? r / (1 + r) : 0);
  */
 export const LIFTOFF_HOVER = 0.3;
 /**
- * A push / pull slide (推拉, PR #380 by @xcdoge). The sim displaces at once — server/sim/battle/displacement.js walks its
- * 0.1-tile steps inside one call — and then holds the enemy in its 失衡 (UNBALANCE) state (PR #392's idea): a push for the
+ * A push / pull slide (推拉, PR #380 by @xcdoge). The sim slides the enemy frame by frame (server/sim/battle/displacement.js:
+ * momentum and friction, GitHub #60) and holds it in its 失衡 (UNBALANCE) state (PR #392's idea): a push for the
  * 位移时间 of its 受力等级 (PRTS 游戏数据基础 推力-位移近似对应表: 0.2 … 35/30 game s), a pull for its force window (推与拉:
- * 0.5 / 1 s). The snapshots only ever show the destination, so the view slides there under a constant deceleration
+ * 0.5 / 1 s). Its `displace` fx names where the slide ends and how long it takes; the view slides there under a constant deceleration
  * (UnitView.slideTo) for that same span: the `displace` fx carries it (`dur`, game seconds) and the view divides it by the
  * playback rate (ctx.animRate — 2 game s per real second by default: a 0.8 s push slides 0.4 real s) — it lands as the
  * sim's state ends. v0 = 2D/T, a = v0/T then run the distance in exactly T. DISPLACE_SLIDE (real s per √tile, kept in

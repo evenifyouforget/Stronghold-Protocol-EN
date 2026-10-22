@@ -719,6 +719,8 @@ test('2_03 崖心 (hidden): 束缚链 drags max_target enemies to the front tile
   const u = h.unit(id);
   h.step();
   approx(u.s.atk, u.base.atk * (1 + t.atk), 'not blocking: ATK +6 %');
+  const atk0 = u.s.atk;   // (the hit's ATK)
+  h.settle();   // the drag's slide (at her front she blocks them)
   const pulled = h.enemies().filter((e) => e.x < 6);
   assert.equal(pulled.length, bb.max_target);
   for (const e of pulled) {
@@ -726,7 +728,7 @@ test('2_03 崖心 (hidden): 束缚链 drags max_target enemies to the front tile
     approx(Math.hypot(e.x - 4, e.y - 10), 0.6708, `at her front (${e.x},${e.y})`, 1e-6);
     const tr = dealt(h, u, (c) => c.target === e && c.type === 'true');
     assert.equal(tr.length, 1);
-    approx(tr[0].amount, u.s.atk * bb.atk_scale);
+    approx(tr[0].amount, atk0 * bb.atk_scale);
     assert.ok(statuses(h, 'stun', (c) => c.target === e && c.duration === bb.stun).length === 1);
   }
   done(h);
