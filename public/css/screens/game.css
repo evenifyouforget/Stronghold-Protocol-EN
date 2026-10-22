@@ -326,14 +326,32 @@
 .bossbar { position: relative; flex: 1; min-width: 2.2rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 122, 51, .5); overflow: hidden; }
 .bossbar__fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #b8340d, var(--orange-hi)); box-shadow: 0 0 .1rem rgba(255, 110, 40, .8); transition: width 300ms var(--ease-out); }
 .bossbar__txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: .14rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
-/* the SPA-CC Blood Ledger (hud.js LedgerBar): crimson as it fills, pulsing during an Asset Liquidation */
-.ledger { position: relative; flex: none; width: 1.3rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid rgba(190, 30, 40, .6); overflow: hidden; }
-.ledger__fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #5a0d12, #c41e2a); transition: width 300ms linear; }
-.ledger__txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: .13rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
-.ledger.is-liquidating { border-color: #ff3b47; animation: ledger-pulse 1s ease-in-out infinite; }
-.ledger.is-liquidating .ledger__fill { background: linear-gradient(90deg, #8c0f18, #ff3b47); }
-@keyframes ledger-pulse { 50% { box-shadow: 0 0 .12rem rgba(255, 59, 71, .9); } }
-@media (prefers-reduced-motion: reduce) { .ledger.is-liquidating { animation: none; } }
+/* the SPA-CC Blood Ledger (hud.js LedgerBar), the Siracusa event's gauge (#48): a wide thin bar centred under the top bar
+   (in the gap above the band row),
+   on a dark translucent track with a hairline border. Cream while it fills, red while an Asset Liquidation drains it. The
+   claw mark sits on its centre, greyed out until a Liquidation starts, then red; it pulses once at the start.
+   [ASSUMED] the size and placement, estimated from the screenshots (about 60% of the screen there, a little narrower here). */
+.ledger {
+  position: absolute; left: 50%; top: 1.02rem; transform: translateX(-50%);
+  width: min(52vw, 10rem); height: .32rem; display: grid; place-items: center;
+}
+.ledger__bar {
+  position: absolute; left: 0; right: 0; top: 50%; height: .11rem; transform: translateY(-50%);
+  background: rgba(10, 12, 16, .55); border: 1px solid rgba(230, 230, 230, .45); padding: 2px;
+}
+.ledger__fill { height: 100%; background: #e8dcbc; transition: width 300ms linear; }
+.ledger__mark {
+  position: relative; width: .5rem; height: .5rem; fill: none; stroke: #a8a8a8; stroke-width: 2.6; stroke-linecap: round;
+  opacity: .85; filter: drop-shadow(0 0 .03rem rgba(0, 0, 0, .9));
+}
+.ledger.is-liquidating .ledger__bar { border-color: rgba(255, 110, 110, .5); }
+.ledger.is-liquidating .ledger__fill { background: #d8333a; }
+.ledger.is-liquidating .ledger__mark {
+  stroke: #ff9a86; opacity: 1; filter: drop-shadow(0 0 .06rem rgba(255, 60, 60, .9));
+  animation: ledger-pulse 700ms var(--ease-out) 1;
+}
+@keyframes ledger-pulse { 0% { transform: scale(1); } 35% { transform: scale(1.6); filter: drop-shadow(0 0 .16rem rgba(255, 60, 60, 1)); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .ledger.is-liquidating .ledger__mark { animation: none; } }
 
 /* LP tower */
 .lp { display: inline-flex; align-items: center; gap: .05rem; color: var(--mint-400); white-space: nowrap; }
