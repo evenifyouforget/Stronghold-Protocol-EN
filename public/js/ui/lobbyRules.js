@@ -31,6 +31,7 @@ export function ruleLabel(key, rules) {
     case 'doubleLp': return t('初始目标生命翻倍');
     case 'tierStart': return t('开局获得各阶干员');
     case 'boosterPack': return t('开局获得补充包');
+    case 'itemBoosterPack': return t('开局获得装备补充包');
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
     case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
@@ -377,6 +378,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Toggle} k="doubleLp" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('doubleLp', rules)} desc=${t('所有博士的初始目标生命翻倍')} />
       <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
       <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />
+      <${Toggle} k="itemBoosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('itemBoosterPack', rules)} desc=${t('开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）')} />
       ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
     <//>
     <${Section} title=${t('盟约模组')} note=${t('不影响结算标签')}>

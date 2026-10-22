@@ -143,16 +143,31 @@ export const BOOSTER = Object.freeze({ itemId: 'fish_item_booster_pack', iconId:
 export const BOOSTER_NAME = N_('补充包');
 export const BOOSTER_DESC = N_('装备到干员上：免费选择一名同阶干员（按固定顺序轮换，每次6名），补充包留在手牌');
 
-/** The Booster Pack's item record (boosterPack) in data/items.json's shape. */
-function boosterRecord(text) {
-  const desc = text(BOOSTER_DESC);
+/**
+ * The itemBoosterPack cheat (Fish, GitHub #56): the Booster Pack's twin for equipment, a separate item with its own
+ * toggle. Equipped on any operator it is not attached either: it offers a free pick of `choices` items, the next ones of
+ * one fixed order through every shop item (tier 1 → 6, ids sorted within a tier), and stays where it was. Each player's
+ * place in the order is kept. AI players neither use nor drop it. Its icon: 紧急调度券 (Emergency Dispatch Voucher)'s.
+ */
+export const ITEM_BOOSTER = Object.freeze({ itemId: 'fish_item_booster_pack_equip', iconId: 'trap_1115_acarm115', choices: 6 });
+/** msgids of the Equipment Booster Pack (the name is also the offer's header). */
+export const ITEM_BOOSTER_NAME = N_('装备补充包');
+export const ITEM_BOOSTER_DESC = N_('装备到任意干员上：免费选择一件装备（按固定顺序轮换全部装备，每次6件），装备补充包留在手牌');
+
+/** A booster's item record in data/items.json's shape: the Booster Pack (boosterPack) or the Equipment Booster Pack
+ *  (itemBoosterPack, `boosts: 'items'`). */
+function boosterRecord(text, items = false) {
+  const B = items ? ITEM_BOOSTER : BOOSTER;
+  const desc = text(items ? ITEM_BOOSTER_DESC : BOOSTER_DESC);
   return {
-    id: BOOSTER.itemId, baseId: BOOSTER.itemId, goldenId: null, isGolden: false, trapId: BOOSTER.iconId, iconId: BOOSTER.iconId,
-    identifier: null, name: text(BOOSTER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true,
+    id: B.itemId, baseId: B.itemId, goldenId: null, isGolden: false, trapId: B.iconId, iconId: B.iconId,
+    identifier: null, name: text(items ? ITEM_BOOSTER_NAME : BOOSTER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true,
     shopExcluded: true, shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1,
     giveBondId: null, givePowerId: null, canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc,
     descRaw: desc, buffs: [], params: {}, category: 'STAT', kind: 'passive', family: null,
-    implFormula: 'a pick-one offer of its target\'s tier (server/match/player/items.js openBooster)', fork: true, booster: true,
+    implFormula: items ? 'a pick-one offer of the next shop items (server/match/player/items.js openItemBooster)'
+      : 'a pick-one offer of its target\'s tier (server/match/player/items.js openBooster)',
+    fork: true, booster: true, boosts: items ? 'items' : 'chess',
   };
 }
 
@@ -185,7 +200,7 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true));
 
 /**
  * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
@@ -201,6 +216,8 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // the boosterPack cheat: the Booster Pack
   if (rules.boosterPack === true) items[BOOSTER.itemId] = boosterRecord(text);
+  // the itemBoosterPack cheat: the Equipment Booster Pack
+  if (rules.itemBoosterPack === true) items[ITEM_BOOSTER.itemId] = boosterRecord(text, true);
   // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
   const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;
   if (investor) {

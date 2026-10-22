@@ -188,7 +188,7 @@ test('the boosterPack cheat: the client has the Booster Pack\'s record, so it is
   const path = await import('node:path');
   const { fileURLToPath } = await import('node:url');
   const { setLang, addMessages } = await import('../../shared/i18n.js');
-  const { BOOSTER } = await import('../../shared/ruleData.js');
+  const { BOOSTER, ITEM_BOOSTER } = await import('../../shared/ruleData.js');
   const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const fetch = async (url) => {
     const abs = path.join(ROOT, url.replace(/^\/data\//, 'data/'));
@@ -211,7 +211,14 @@ test('the boosterPack cheat: the client has the Booster Pack\'s record, so it is
       assert.equal(it.name, 'Booster Pack');
       assert.equal(it.iconId, BOOSTER.iconId);
     }
+    // the itemBoosterPack cheat's Equipment Booster Pack (GitHub #56): its own record and icon
+    d.setRules({ itemBoosterPack: true });
+    assert.equal(d.lookup('items', BOOSTER.itemId), null);
+    const eq = d.lookup('items', ITEM_BOOSTER.itemId);
+    assert.equal(eq.name, 'Equipment Booster Pack');
+    assert.equal(eq.iconId, ITEM_BOOSTER.iconId);
     d.setRules(null);
     assert.equal(d.lookup('items', BOOSTER.itemId), null);
+    assert.equal(d.lookup('items', ITEM_BOOSTER.itemId), null);
   } finally { setLang('zh'); }
 });
