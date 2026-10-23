@@ -1,11 +1,11 @@
 // shared/rules.js — Custom Lobby Modifications (Fish Edition): the host-set rules of a room, all off by default. Pure ESM
 // shared by the server (lobby, match), the sim (BattleSpec flags.rules) and the client (room screen, result screen).
 //
-// Every rule has a category (remove-before-merge/ROADMAP.md "SPA-CC"), which decides how a result is labelled:
+// Every rule has a category (fish-edition/ROADMAP.md "SPA-CC"), which decides how a result is labelled:
 //   neutral  free to take: Alliance Modules, rebalanced alliances
 //   cheat    the end screen carries a "WITH CHEATS" watermark (+2 Deployment Limit, +2 Funds, untimed)
 //   seeded   less luck: "seeded" after the result title (the chosen map, chosen alliance bans)
-//   risk     SPA-CC difficulty tags worth Risk ("Ultimate+5"; remove-before-merge/ROADMAP.md "SPA-CC"); with a cheat on
+//   risk     SPA-CC difficulty tags worth Risk ("Ultimate+5"; fish-edition/ROADMAP.md "SPA-CC"); with a cheat on
 //            the Risk still shows — the "WITH CHEATS" watermark tells (Fish 2026-10-16)
 // A rule's value type:
 //   bool     true / false (default false)

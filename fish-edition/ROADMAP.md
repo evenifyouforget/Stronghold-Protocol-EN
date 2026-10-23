@@ -1,4 +1,4 @@
-No longer read-only. Reorganized 2026-10-24: what is done is a list with pointers, the open ideas and the designs the
+No longer read-only. Reorganized 2026-10-24, and the folder renamed from `remove-before-merge/` to `fish-edition/`: what is done is a list with pointers, the open ideas and the designs the
 code still points to keep Fish's wording. SCOPING.md (Phase 2's feasibility study, written against the pre-rebuild code)
 was removed. Its still-open questions are below.
 
@@ -6,7 +6,7 @@ was removed. Its still-open questions are below.
 
 Hi Claude. You can call me Fish. This game (Stronghold Protocol Alliance) has passed through some different hands, until it ended up open source. I felt the original had some missed opportunities, so I forked the repo so I could mod it myself.
 
-I'm opting to try an AI-first workflow - meaning I'll manually code if needed, but I always offer you the first attempt at any task. Don't delete this remove-before-merge/ directory - that is the human's responsibility to do manually.
+I'm opting to try an AI-first workflow - meaning I'll manually code if needed, but I always offer you the first attempt at any task. Don't delete this fish-edition/ directory - that is the human's responsibility to do manually.
 
 For branding purposes, this fork is Fish Edition, because I am Fish.
 

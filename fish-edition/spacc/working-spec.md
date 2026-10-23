@@ -12,7 +12,7 @@ label** lines of the older notes predate that.
 ## Spec (Fish's)
 
 The tags as Fish designs them — the source of truth; the implementation notes below follow it. (Merged in from
-`remove-before-merge/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
+`fish-edition/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
 
 ### Clarifications
 

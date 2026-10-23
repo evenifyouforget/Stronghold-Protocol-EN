@@ -13,7 +13,7 @@
 
 ## AI players
 
-Findings (2026-10-21): remove-before-merge/ai-players.md — strategy, speed, win rates per difficulty, a
+Findings (2026-10-21): fish-edition/ai-players.md — strategy, speed, win rates per difficulty, a
 per-tag SPA-CC cost table (botbench `--rules`), a record format and what not to collect.
 
 - What strategy do the current AI players use? Is it optimized in any way?
