@@ -37,6 +37,7 @@ import { GEO } from '../../../../shared/constants.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { burstLimit } from '../../../../shared/plugins/steps.js';
 import { buffsOf, num, bandRecord, bandEffectId, gameData } from '../support/index.js';
+import { CC } from '../../../../shared/ruleData.js';
 import { metaBonds } from '../support/meta.js';
 import * as garrisons from '../garrisons.js';
 
@@ -127,7 +128,8 @@ K.prep_finish_char_bond_add_layer = (ps) => ({
 K.band_first_self_refresh_present_char = (ps) => ({
   onRefresh(ctx) {
     const p = ps[0];
-    if ((ctx.roundStats().refreshes || 0) > 2) return;
+    // the first 2 manual refreshes of a round (the text; SPA-CC Strategy 2 — ccStrategyLate 2 —: the first CC.strategy2.duyaoyRefreshes)
+    if ((ctx.roundStats().refreshes || 0) > (ctx.lobbyRules?.ccStrategyLate >= 2 ? CC.strategy2.duyaoyRefreshes : 2)) return;
     const need = timesOf(p.count, 1);
     const idx = chessSlots(ctx);
     const slots = ctx.shopSlots();

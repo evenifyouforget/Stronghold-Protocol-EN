@@ -321,7 +321,8 @@ export function createDataStore(opts = {}) {
     if (!r || r.base !== value || r.lang !== locale || r.backups !== backups) {
       const chessFile = localizedEntry('chess')?.value ?? entries.get('chess')?.value ?? null;
       const bondsFile = localizedEntry('bonds')?.value ?? entries.get('bonds')?.value ?? null;
-      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile }, ruleSet, { text: (s, params) => t(s, params) });
+      const garrisonsFile = localizedEntry('garrisons')?.value ?? entries.get('garrisons')?.value ?? null;
+      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile, garrisons: garrisonsFile }, ruleSet, { text: (s, params) => t(s, params) });
       const extra = patch[name] || {};
       r = { base: value, lang: locale, backups, value: Object.keys(extra).length ? { ...value, ...extra } : value, index: null };
       ruled.set(name, r);

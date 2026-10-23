@@ -51,10 +51,10 @@ export const RULES = Object.freeze([
   { key: 'stage', type: 'stage', category: 'seeded' },
   { key: 'bans', type: 'bans', category: 'seeded' },
   // SPA-CC Risk tags (FINDINGS.md §5)
-  { key: 'ccInvestorBench', type: 'level', risk: [0, 1], category: 'risk' }, // 投资人: the bench no longer counts
+  { key: 'ccInvestorBench', type: 'level', risk: [0, 1, 2], category: 'risk' }, // 投资人: the bench no longer counts (2: 缪尔赛思 / 耶拉 / 焰尾 grant when sold)
   { key: 'ccSwift', type: 'level', risk: [0, 1], category: 'risk' },         // 迅捷: 20 + 0.25 × stacks % (was 0.35)
   { key: 'ccForesight', type: 'level', risk: [0, 1], category: 'risk' },     // 远见 operators −20 ASPD, active or not
-  { key: 'ccStrategyLate', type: 'level', risk: [0, 1], category: 'risk' },  // Strategies' named rounds one round later
+  { key: 'ccStrategyLate', type: 'level', risk: [0, 1, 2], category: 'risk' }, // Strategies' named rounds one round later (2: 伊奥莱塔 ≤ 50 %, 杜遥夜 1 refresh, 阿米娅 +1 alliance)
   { key: 'ccTier1Price', type: 'level', risk: [0, 1], category: 'risk' },    // from round 3, the first tier-1 operator +1
   { key: 'ccUpgrade', type: 'level', risk: [0, 1, 2], category: 'risk' },    // shop upgrade 4→5 +2 (2: and 5→6 +3)
   { key: 'ccSpRecovery', type: 'level', risk: [0, 1, 2, 3], category: 'risk' }, // time SP −0.2 / 0.5 / 0.8 per s
