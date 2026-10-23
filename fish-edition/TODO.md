@@ -200,6 +200,10 @@ Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/.
       #61 (block shifting: inside the tile → just past the nearest edge, 0.51; a shared block position steps 0.2
       aside; [ASSUMED] numbers). Fish's 3×1 scenarios (MISC_USER_QUESTIONS.md, 水月 for Ascalon) are
       test/sim/block-shift.test.js and all six hold. Goldens regenerated: both directions, no match changes result.
+- [x] #64 closed (its changes reached mini through #65's squash); #56–#62 closed with a pointer to their PR.
+- [ ] #68 `wip/rbm-notes`: every note committed, the folder renamed to `fish-edition/`, ROADMAP reorganized,
+      SCOPING removed. After merging: `mv remove-before-merge/images remove-before-merge/untracked fish-edition/`.
+- [ ] #69 `wip/spacc-i18n`: ja / ko / zh-TW for every SPA-CC text (801a9c64 + #63's 8 new ones), botbench `--rules`.
 - #37 still targets the merged `mini/0.3.1-1`: retarget or close.
 - Nothing in this batch has been checked on screen (no game assets in the container).
 
