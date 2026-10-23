@@ -1,6 +1,6 @@
 # SPA-CC working spec
 
-Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
+Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" keeps the design decisions.
 
 State as of 2026-10-15, branch `wip/vengeance-junk` (on `wip/famiglia`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
