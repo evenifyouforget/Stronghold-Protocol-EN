@@ -366,10 +366,11 @@ test('#14 见行者 S2 惊爆射击: angle waived, a target nearer than 0.25 til
   const id = 'chess_char_3_07_a';
   const ds = getDefaultSource();
   const bb = ds.rawChess(id).skill.bb;
-  const run = (pos) => {
+  const run = (pos, { blockable = true } = {}) => {
     const h = makeBattle({
       defs: { enemies: { enemy_t: foe('enemy_t', { speed: 0, mass: 0 }) } }, units: [{ chessId: id, row: 10, col: 3, dir: 'RIGHT', carryState: { sp: 1e3 } }],
       enemies: [{ key: 'enemy_t', pos }], autoFinish: false, timeLimit: 30, hooks: ['statusApplied'], captureNoisy: true,
+      setup(b) { if (!blockable) b.on('enemySpawn', ({ enemy }) => b.addBuff(enemy, { key: 'test:unblockable', flags: { unblockable: true } })); },
     });
     const u = h.unit(id);
     assert.ok(h.runUntil(() => h.hooksOf('statusApplied').some((c) => c.source === u && c.status === 'stun'), 6), 'cast');
@@ -381,8 +382,9 @@ test('#14 见行者 S2 惊爆射击: angle waived, a target nearer than 0.25 til
   const a = run([10, 4]);
   approx(a.end.x, 4 + PUSH_TILES_EFFECT[1], FRAME_EPS, 'ahead: 1.987');
   approx(a.stun, bb['forcer_s_2[hit_directly].stun'], 1e-9, 'open ground: hit_directly stun');
-  // on her own tile, nearer than 0.25: radial at 受力等级 1 − 2 = −1 (0.374), still the short stun (no wall)
-  const b = run([10.1, 3.1]);
+  // on her own tile, nearer than 0.25: radial at 受力等级 1 − 2 = −1 (0.374), still the short stun (no wall) — one she does
+  // not block (a blocked one is shifted to her tile's edge: block shifting, GitHub #61)
+  const b = run([10.1, 3.1], { blockable: false });
   approx(Math.hypot(b.end.x - 3.1, b.end.y - 10.1), PUSH_TILES_EFFECT[-1], FRAME_EPS, 'near: radial −2');
   approx(b.stun, bb['forcer_s_2[hit_directly].stun'], 1e-9, 'near target: not a wall');
 });

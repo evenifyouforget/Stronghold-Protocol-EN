@@ -43,7 +43,7 @@ const HOME = { RIGHT: [10, 4], LEFT: [10, 7], UP: [10, 5], DOWN: [11, 5] };
  * 野鬃 (S2 ready) facing `dir`, one static weight-1 enemy at `off` = [dRow, dCol] from her centre in her facing-RIGHT
  * frame. Returns the enemy's displacement by her first skill hit in that frame: { fwd, side, len }.
  */
-function wildmnHit(dir, off, { side = 'L', kind = 'normal', mass = 1 } = {}) {
+function wildmnHit(dir, off, { side = 'L', kind = 'normal', mass = 1, blockable = true } = {}) {
   const [hr, hc] = HOME[dir];
   // the mirrored right half of a boss field: board (r, c) → field (r − 7, 20 − c), RIGHT ↔ LEFT
   const fr = kind === 'boss' ? hr - 7 : hr, fc = side === 'R' ? 20 - hc : hc;
@@ -56,6 +56,8 @@ function wildmnHit(dir, off, { side = 'L', kind = 'normal', mass = 1 } = {}) {
     players: [{ playerId: 'p1', seat: 0, side, colOffset: 0, units: [{ uid: 1, kind: 'chess', chessId: WILDMN, row: hr, col: hc, dir, carryState: { sp: 1e3 } }], bonds: {}, playerEffects: [] }],
     enemies: [{ key: 'enemy_t', pos: [fr + ar, fc + ac] }],
     setup(b) {
+      // (blocked on her tile, an enemy is shifted to the tile's edge at once: block shifting, GitHub #61)
+      if (!blockable) b.on('enemySpawn', ({ enemy }) => b.addBuff(enemy, { key: 'test:unblockable', flags: { unblockable: true } }));
       b.on('beforeAttack', (c) => { if (c.attacker.defId === WILDMN && c.isSkill && c.targets[0]) before = [c.targets[0].y, c.targets[0].x]; }, { priority: -2000 });
       b.on('attack', (c) => { if (c.attacker.defId === WILDMN && c.isSkill && before && !moved) { const end = endOf(b, c.targets[0]); moved = [end.y - before[0], end.x - before[1]]; } }, { priority: -2000 });
     },
@@ -100,8 +102,8 @@ test('D2 野鬃 S2: a target behind her — including one about to leave the til
     const beside = wildmnHit(dir, [0.6, 0.3]);
     approx(beside.len, WEAK, FRAME_EPS, `${dir} beside: the −2 distance`);
     approx(beside.side / beside.len, 0.6 / Math.hypot(0.6, 0.3), 1e-6, `${dir} beside: radial`);
-    // nearer than 0.25 tile: radial, −2
-    const near = wildmnHit(dir, [0.1, 0.1]);
+    // nearer than 0.25 tile (one she does not block — a blocked one is shifted to her tile's edge): radial, −2
+    const near = wildmnHit(dir, [0.1, 0.1], { blockable: false });
     assert.ok(Math.hypot(0.1, 0.1) < PUSH_DIRECTIONAL_MIN_DIST);
     approx(near.len, WEAK, FRAME_EPS, `${dir} near: the −2 distance`);
     approx(near.side, near.fwd, 1e-6, `${dir} near: radial`);

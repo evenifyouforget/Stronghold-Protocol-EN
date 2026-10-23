@@ -152,6 +152,17 @@ export const PUSH_MOMENTUM = Object.freeze({ '-2': 1, '-1': 2, 0: 4, 1: 4.5, 2: 
 export const SHIFT_FRICTION = 0.5 * 9.81;
 export const PULL_TIME_K = 0.65;
 /**
+ * Block shifting (GitHub #61; arknights.wiki.gg Shift §Block "shifting" — not a push: no weight, no 失衡). An enemy a
+ * ground unit starts blocking while it stands inside that unit's tile (the unit deployed onto it, its stun over, the
+ * enemy blocked before it defeated, a neighbour letting go) moves just outside the nearest edge — BLOCK_EDGE_OUT tiles
+ * from the centre [ASSUMED: "just outside"] — and stays blocked; not when a wall or high ground is there, nor from the
+ * exact centre (a prespawned enemy). An enemy that would stand where another one blocked from the same side stands
+ * moves BLOCK_SPREAD tiles to its left, else to its right, then twice that [ASSUMED: the wiki gives no distance or count,
+ * "slightly left or right"].
+ */
+export const BLOCK_EDGE_OUT = 0.51;
+export const BLOCK_SPREAD = 0.2;
+/**
  * 失衡 (UNBALANCE) — the state machine a force > 0 puts an enemy in (PRTS 失衡位移机制 「当一名敌方单位受到一个任意来源的力，
  * 并且受力大小 > 0 时，该敌方单位将进入失衡（UNBALANCE）状态机」; 异常效果图鉴/失衡免疫 「失衡期间无法自主移动、发动攻击、使用技能」 —
  * not an abnormal status: 异常效果 「失衡…不属于异常效果，它是一种状态机」, so it is no stun). Its length in game seconds:

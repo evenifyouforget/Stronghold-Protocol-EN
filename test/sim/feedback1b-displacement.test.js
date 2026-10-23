@@ -282,9 +282,11 @@ test('B5 audit: 缪尔赛思 S3 — a melee 流形 copy\'s pulse reaches air uni
     const e = h.spawn(key, { routeIndex: route, pos: [10, 7], mods: STILL });
     assert.ok(u.skill.activate('test', { free: true }), 'S3 on');
     h.step(2);
+    const end = endOf(h.b, e);   // where the pull's slide ends (the copy then blocks a ground one inside its tile and
+    // shifts it to the tile's edge: block shifting, GitHub #61)
     for (let k = 0; k < 60 && e.shift; k++) h.step();   // the pull's slide
     // 小力 − weight 0 = 0: all the way to the 急停 radius around the copy's centre (from √2 tiles)
-    if (pulled) approx(Math.hypot(e.x - t.x, e.y - t.y), PULL_STOP_RADIUS, 1e-6, `${key}: pulled to the copy`);
+    if (pulled) approx(Math.hypot(end.x - t.x, end.y - t.y), PULL_STOP_RADIUS, 1e-6, `${key}: pulled to the copy`);
     else approx(Math.hypot(e.x - 7, e.y - 10), 0, 1e-9, `${key}: a 静态刚体 stays`);
   }
 });

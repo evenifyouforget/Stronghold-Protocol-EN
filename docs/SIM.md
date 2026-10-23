@@ -288,6 +288,15 @@ blocked enemy dies, is taken over at once; an enemy that finds no room walks on 
 enemy is checked too — 晕眩 / 冻结 hold no 不可阻挡 (PRTS 异常效果: the STUN / FROZEN state machines stop its moves and
 attacks) —, so an operator redeployed beside a held enemy blocks it where it stands and lifts its 隐匿; one held short of
 contact is blocked once it walks in after the status (GitHub #232; until 0.2.0 the check waited for the status to end).
+**Block shifting** (`Battle._blockShift`, GitHub #61; arknights.wiki.gg Shift §Block "shifting" — not a push: no weight,
+no 失衡, held or not): an enemy a ground unit starts blocking while it stands inside that unit's tile (the unit deployed
+onto it, a stun over, a blocked enemy defeated, a neighbour letting go, a pull ending inside it) moves just past the
+tile's nearest edge — `BLOCK_EDGE_OUT` 0.51 from the centre [ASSUMED: "just outside"] — and stays blocked; not onto a
+tile ground units cannot pass or high ground (it stays where it is), not from the exact centre (a prespawned enemy).
+One that would stand where another enemy blocked from the same side stands steps `BLOCK_SPREAD` 0.2 to its left (of the
+blocking direction), else its right, then twice that [ASSUMED: no numbers on the wiki]. Device and air blocking keep
+their radii and leaders are never moved [ASSUMED]. The shift sends a short `displace` fx. Fish's 3×1 scenarios:
+test/sim/block-shift.test.js.
 Several blockers in contact → the nearest [ASSUMED]. A head-on enemy therefore stops at contact, ~0.71 tile from the blocker's centre, on the
 tile in front of it (PRTS 作战机制: a blocked enemy's collider does not enter the blocker's tile; the official few
 hundredths of a tile of deceleration are not modelled), and **every blocker** — melee units (要塞 / 领主 / 哨戒铁卫
