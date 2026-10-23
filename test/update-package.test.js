@@ -339,6 +339,28 @@ test('the zip reader: stored and deflated entries, zip64, UTF-8 names; damaged a
   }
 });
 
+test('zipFolder without zip or tar on PATH: the built-in writer, UTF-8 names (GitHub #28: Windows\' tar.exe crashing on CI)', { skip: typeof zlib.crc32 !== 'function' && 'zlib.crc32 needs Node ≥ 22.2' }, () => {
+  const dir = tmp('zipw');
+  const pathWas = process.env.PATH;
+  try {
+    put(dir, `${FOLDER}/package.json`, '{"version":"0.2.0"}');
+    put(dir, `${FOLDER}/public/assets/卫戍 a.png`, Buffer.alloc(5000, 7));
+    put(dir, `${FOLDER}/server/empty.js`, '');
+    fs.mkdirSync(path.join(dir, 'empty-path'));
+    process.env.PATH = path.join(dir, 'empty-path');
+    zipFolder(dir, path.join(dir, 'built-in.zip'));
+    process.env.PATH = pathWas;
+    const b = readBase(path.join(dir, 'built-in.zip'));
+    assert.deepEqual([b.version, b.art, b.update], ['0.2.0', 1, false]);
+    assert.deepEqual([...b.files.keys()].sort(), ['package.json', 'public/assets/卫戍 a.png', 'server/empty.js']);
+    assert.deepEqual(b.files.get('public/assets/卫戍 a.png'), dg(Buffer.alloc(5000, 7)));
+    assert.deepEqual(b.files.get('server/empty.js'), dg(''));
+  } finally {
+    process.env.PATH = pathWas;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 /**
  * A zip of stored entries built byte by byte: `{ name: Buffer (the header bytes), data, flags?, extra? }` each — the
  * name encodings and extra fields a zip tool would write, independent of the zip tool and locale of the machine.
