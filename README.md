@@ -122,10 +122,13 @@ npm start          # 启动服务器：http://localhost:3000
 | `DEBUG` | 空 | 设为任意值输出详细日志 |
 | `SP_NO_BROWSER` | 空 | 设为 `1` 时启动脚本不自动打开浏览器 |
 | `SP_BOT_EMOTES` | 空 | AI 队友的对局表情回应（战斗、整备、合成、联防、收礼时即刻的 `m.emote` 广播）；设为 `0` 时整体关闭 |
+| `SP_RECORDS` | 关 | （本分叉）匿名对局记录，用于统计：`on` 时每局结束在 `logs/records/` 写一个 gzip 压缩的 JSON 文件，其他值则是存放的文件夹。用 `node tools/records.mjs` 读取；见下面 |
 | `SP_ASSET_INDEX` | 空 | 素材地址带内容哈希、浏览器长期缓存（0.2.6 起默认开启，哈希存在 `.cache/asset-hashes.json`）；设为 `0` 时关闭，素材清单原样下发 |
 <!-- en: SP_BOT_REHEARSAL: layouts the SERVER rehearses itself (0-8, 0 = heuristics only, no CPU); also the most it takes over when a host's browser does not finish. SP_BOT_REHEARSAL_HOST: on by default, the host's browser rehearses 3 layouts per bot; 0/off disables; upstream's SP_BOT_REHEARSAL=host still enables it. -->
 
 设置方式：macOS / Linux `PORT=8080 npm start`；PowerShell `$env:PORT=8080; npm start`；cmd `set "PORT=8080" && npm start`。健康检查：`GET /healthz`。
+
+**对局记录**（本分叉，默认关闭）：用 `SP_RECORDS=on` 启动服务器（例如 `SP_RECORDS=on npm start`；cmd `set "SP_RECORDS=on" && npm start`）。日志会显示 `[records] match records on: <folder>`，之后除测试房间外每局结束都写入 `logs/records/<YYYY-MM-DD>/<随机 id>.json.gz`。记录不含玩家、房间或具体时刻。`node tools/records.mjs` 输出统计（`--json` 输出 JSON，`--verify` 重演记录的战斗）。分享数据时把某天的文件夹打包即可。后台服务、systemd 的设置和记录的内容见 [docs/DEPLOY.md](docs/DEPLOY.md#11-对局记录可选本分叉) 第 11 节。
 
 ### 和朋友一起玩（局域网）
 

@@ -10,7 +10,7 @@ import { tileKey, inField, parseDir, freeSlot } from '../board.js';
 import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
-import { CC, BOOSTER, BOOSTER_NAME } from '../../../shared/ruleData.js';
+import { CC, BOOSTER, BOOSTER_NAME, ITEM_BOOSTER, ITEM_BOOSTER_NAME } from '../../../shared/ruleData.js';
 
 /** The item a full carrier loses by default: the oldest that is not the Toxic Waste (SPA-CC Junk). */
 const replaceableIndex = (items) => Math.max(0, items.findIndex((x) => x.id !== CC.junk.itemId));
@@ -49,8 +49,8 @@ export class PlayerItems {
     if (!tloc || tloc.piece.kind !== 'chess' || tloc.area === 'equipped') return fail(ERR.BAD_TARGET);
     const item = iloc.piece;
     const target = tloc.piece;
-    // the boosterPack cheat: the Booster Pack is not attached, it opens its offer
-    if (rec.booster === true) return this.openBooster(target);
+    // the boosterPack / itemBoosterPack cheats: a pack is not attached, it opens its offer
+    if (rec.booster === true) return rec.boosts === 'items' ? this.openItemBooster() : this.openBooster(target);
     if (replaceUid != null && !(Number.isInteger(replaceUid) && (target.items || []).some((x) => x.uid === replaceUid))) return fail(ERR.BAD_TARGET, 'replace: not equipped on the target');
     const policy = this._slotPolicy();
     // [ASSUMED] a second 变形同构体 is refused before anything moves. Official accepts() is always true.
@@ -164,6 +164,24 @@ export class PlayerItems {
     const ids = Array.from({ length: n }, (_, i) => order[(at + i) % order.length]);
     this.boosterAt[tier] = (at + n) % order.length;
     if (!this.pushRewardOffer('booster', { tier, ids, label: BOOSTER_NAME })) return fail(ERR.BAD_TARGET, 'no operator of that tier');
+    return OK;
+  }
+
+  /**
+   * The Equipment Booster Pack (the itemBoosterPack cheat, shared/ruleData.js ITEM_BOOSTER) on any operator: a free
+   * pick-one offer of ITEM_BOOSTER.choices items, the next ones of the fixed order through every shop item (gd
+   * shopItemsByTier: tier 1 → 6, ids sorted) after this player's place in it, which then moves on, round the end. Listed
+   * whatever copies the shared stock has left, as the Booster Pack's operators (a displayed reward survives it). The pack
+   * stays where it was.
+   */
+  openItemBooster() {
+    const order = Object.keys(this.gd.shopItemsByTier).map(Number).sort((a, b) => a - b).flatMap((t) => this.gd.shopItemsByTier[t]);
+    if (!order.length) return fail(ERR.BAD_TARGET, 'no item');
+    const at = (this.itemBoosterAt || 0) % order.length;
+    const n = Math.min(ITEM_BOOSTER.choices, order.length);
+    const ids = Array.from({ length: n }, (_, i) => order[(at + i) % order.length]);
+    this.itemBoosterAt = (at + n) % order.length;
+    if (!this.pushItemOffer(ids, { source: 'itemBooster', label: ITEM_BOOSTER_NAME, anyStock: true })) return fail(ERR.BAD_TARGET, 'no item');
     return OK;
   }
 

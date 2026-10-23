@@ -270,7 +270,7 @@ function lendAround(battle, from, share, L) {
 // =====================================================================================================================
 // 维多利亚
 
-// Mod C (Custom Lobby Modifications, shared/rules.js victoriaMod; remove-before-merge/ROADMAP.md "Victoria Mod C") replaces
+// Mod C (Custom Lobby Modifications, shared/rules.js victoriaMod; fish-edition/ROADMAP.md "Victoria Mod C") replaces
 // Mod A in battle: when a member's skill ends, that member recovers VICTORIA_C.spPerHammer SP per 维式重锤 it carries — like
 // 迅捷's (not on a knock-out; Fish, 2026-10-15); <6 members> at battle start every member
 // gets ATK +(atkBase + atkPerStack·L) (直接乘算), a 屏障 of barrier × max HP and 抵抗. Its prep side (free upgraded
@@ -347,7 +347,7 @@ function installKjerag(battle, pid, bb, members) {
 // =====================================================================================================================
 // 拉特兰
 
-// Mod B (Custom Lobby Modifications, shared/rules.js lateranoMod; remove-before-merge/ROADMAP.md "Laterano Mod B"):
+// Mod B (Custom Lobby Modifications, shared/rules.js lateranoMod; fish-edition/ROADMAP.md "Laterano Mod B"):
 //   ammo +min(5 + 1.0·L, 75 + 0.3·L) % instead of +(base_ammo_percent + ammo_percent_per_stack·L);
 //   <At 100 stacks> members deal 200 % damage, and the operators' "every N bullets" 驻守 (莫斯提马, 圣约送葬人, 蕾缪安:
 //   garrisons/battle.js consume_ammo) trigger twice each time they trigger — the Attribute's owner decides

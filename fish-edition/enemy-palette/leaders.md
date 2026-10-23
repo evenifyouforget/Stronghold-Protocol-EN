@@ -79,8 +79,9 @@ from the official data.
   everyone on the way), Raging Blizzard (AoE).
 - Second form: stealth, more DEF penetration (40 %), double hits, and at every 25 % HP lost a burst that clears the SP
   of the operators around him and disarms them.
-- **Gap**: his second form's ATK +50 % (`AtkUp.enemy_blkswb_t_1[reborn].atk` 0.5) is in the data but not applied by the
-  kit — worth fixing before using him in a Risk tag.
+- ~~Gap~~ (corrected 2026-10-16): the ATK +30 % / +50 % in the data (`AtkUp.enemy_blkswb_t_1`, `[reborn]` 0.5) is her
+  Snowfall buff — the game's text: "Gains increased ATK during <Snowfall>". Snowfall isn't modelled in this mode, so
+  the kit rightly leaves it off. Not a gap.
 - Not modelled: **Snowfall** (降雪, an event stage mechanic).
 
 **How strong they get.** Leaders in regular rounds scale with the round's enemy multipliers, not the final boss's pool:

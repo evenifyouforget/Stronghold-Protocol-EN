@@ -927,7 +927,9 @@ round was over. The official 1 s `broadcastBeginDelay` is not modelled.
 * `node tools/botbench.mjs --configs solo:HARD,coop4:HARD --seeds 40 --jobs 4 --json new.json` — the AI player's
   outcomes (wins, rounds passed, LP left, leaks per round, bounties taken / leaked and the kill-chance calibration,
   merges, board value, bond tiers, layers, elites) and its decision time per prep (wall clock and CPU, p50 / p95, the
-  layout rehearsal apart); `--compare old.json new.json` prints the A/B tables (the same seeds on two builds).
+  layout rehearsal apart); `--compare old.json new.json` prints the A/B tables (the same seeds on two builds);
+  `--rules ccBoss=2,ccPatriot` plays every match with those lobby rules (SPA-CC tags, cheats; the bot does not know the
+  tags, so it measures what a tag costs a tag-unaware player).
 * `node tools/balance.mjs --mode multi --difficulty NORMAL` — the competent-board difficulty model (docs/BALANCE.md):
   per round leaks / LP after 联防 / clear time of representative boards against the real waves, boss damage by 150 s
   and kill time; `--tuning off` (research numbers), `--legacy-time`, `--profile weak|strong`, `--bots N`, `--json`.
