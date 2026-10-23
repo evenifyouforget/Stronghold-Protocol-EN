@@ -79,7 +79,7 @@ export class BattleDisplacement {
     let level = this.forceLevel(e, force);
     const fx0 = fin(from?.x, e.x), fy0 = fin(from?.y, e.y);
     const vx = e.x - fx0, vy = e.y - fy0, d = hypot(vx, vy);
-    let ux = 0, uy = 0;
+    let ux, uy;
     const dirX = dir ? fin(dir.x, 0) : 0, dirY = dir ? fin(dir.y, 0) : 0;
     const dl = hypot(dirX, dirY);
     if (dl > 0) {
