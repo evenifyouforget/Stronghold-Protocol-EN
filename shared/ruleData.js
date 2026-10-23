@@ -35,7 +35,7 @@ export const BLAZE_GARRISON_DESC_ELITE = N_('<售出时>获得1名精锐【{name
 
 const own = (o, k) => (o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null);
 
-/** SPA-CC Risk tags' numbers (shared/rules.js; remove-before-merge/FINDINGS.md §5). */
+/** SPA-CC Risk tags' numbers (shared/rules.js; fish-edition/FINDINGS.md §5). */
 export const CC = Object.freeze({
   swiftPerStack: 0.0025,                       // 迅捷 20 + 0.25 × stacks % (data: 0.0035)
   foresightAspd: -20,                          // 远见 operators, active or not

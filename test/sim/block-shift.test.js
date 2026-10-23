@@ -2,7 +2,7 @@
 // §Block "shifting"): an enemy a ground unit starts blocking inside its tile moves just past the nearest edge
 // (BLOCK_EDGE_OUT) and stays blocked; not against a wall, not from the exact centre; one that would stand where another
 // enemy blocked from the same side stands steps BLOCK_SPREAD to the side.
-// Fish's scenarios (remove-before-merge/MISC_USER_QUESTIONS.md), mirrored: the enemy comes from the right, along a 3×1
+// Fish's scenarios (fish-edition/MISC_USER_QUESTIONS.md), mirrored: the enemy comes from the right, along a 3×1
 // corridor A (col 6) · B (col 5) · C (col 4), a wall past C (col 3), the path leaving C downwards. On A 水月 (block 0, like
 // Ascalon) facing the enemy: her range reaches B behind her, not C. On B 泡泡, on C 蛇屠箱: 1×1 ranges, block 3.
 // Run: node --test test/sim/block-shift.test.js

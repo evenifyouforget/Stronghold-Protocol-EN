@@ -1452,7 +1452,7 @@ function enemyOverrideRecord(over, label) {
  * bosses, summons), transitively through extraEnemyKeyList and enemy blackboards.
  */
 /**
- * Fork (Fish Edition) enemies outside the mode's own tables, for the SPA-CC Risk tags (remove-before-merge/FINDINGS.md §5):
+ * Fork (Fish Edition) enemies outside the mode's own tables, for the SPA-CC Risk tags (fish-edition/FINDINGS.md §5):
  * built like any directly spawned enemy, so the sim, the art and the translations get them too.
  */
 export const FORK_ENEMY_KEYS = Object.freeze(['enemy_1506_patrt']);

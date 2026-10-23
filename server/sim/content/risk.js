@@ -1,5 +1,5 @@
 // server/sim/content/risk.js — the battle side of the SPA-CC Risk tags (Custom Lobby Modifications, shared/rules.js,
-// category 'risk'; numbers: shared/ruleData.js CC; remove-before-merge/FINDINGS.md §5). The rules come with the battle
+// category 'risk'; numbers: shared/ruleData.js CC; fish-edition/FINDINGS.md §5). The rules come with the battle
 // (BattleSpec flags.rules). Prep-side tags (prices, shop upgrades, bench counting, Strategy rounds, extra enemies) live
 // with the match.
 //   ccForesight   every 远见 operator −20 ASPD, whether 远见 is active or not (Fish, 2026-10-15)

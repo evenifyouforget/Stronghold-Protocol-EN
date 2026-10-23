@@ -1,6 +1,6 @@
 # SPA-CC working spec
 
-Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" stays the summary.
+Working document for the SPA-CC Risk tags: names, numbers, new ideas. ROADMAP.md "SPA-CC" keeps the design decisions.
 
 State as of 2026-10-15, branch `wip/vengeance-junk` (on `wip/famiglia`). Every tag is a lobby rule in `shared/rules.js` (category `risk`); the
 numbers are in `shared/ruleData.js` `CC`. A tag with levels is one rule, so its levels exclude each other. With any
@@ -12,7 +12,7 @@ label** lines of the older notes predate that.
 ## Spec (Fish's)
 
 The tags as Fish designs them — the source of truth; the implementation notes below follow it. (Merged in from
-`remove-before-merge/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
+`fish-edition/untracked/spacc-live-spec.md`, which stood in for this file while git had lost it.)
 
 ### Clarifications
 
