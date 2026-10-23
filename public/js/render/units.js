@@ -852,6 +852,7 @@ export class UnitView {
     this.body = new P.Container();
     this.root.addChild(this.body);
     this.ribbons = null;                 // the invulnerability ribbons (InvulnRibbons), made the first time it is invulnerable
+    this.officialInvuln = false;         // the official 无敌 loop plays on it (render/vfx/talentfx.js): no ribbons then
     this.fallback = new P.Sprite(P.Texture.EMPTY);
     this.fallback.anchor.set(0.5, 1);
     this.body.addChild(this.fallback);
@@ -1900,8 +1901,9 @@ export class UnitView {
     this.screen.top = by - headTiles * s;
     // the boss HUD `hudDx` tiles beside the model, where the official prefab puts it (BOSS_HUD_DX)
     const hx = this.hudDx ? cam.project(this.x + this.hudDx, this.y, this.z + this.hover + this.lift, HUD_P).x : bx;
-    // invulnerable (无敌, UF.INVULN): two gold ribbons spinning around the model (InvulnRibbons, made on first need)
-    if (this.flags & UF.INVULN) {
+    // invulnerable (无敌, UF.INVULN): two gold ribbons spinning around the model (InvulnRibbons, made on first need) —
+    // unless the official 无敌 loop already plays on it (`officialInvuln`, set by render/vfx/talentfx.js sync; GitHub #57)
+    if ((this.flags & UF.INVULN) && !this.officialInvuln) {
       if (!this.ribbons) this.ribbons = new InvulnRibbons(this.P, this.root, this.body);
       this.ribbons.update(t, s * this.ribbonK, -headTiles * s * RIBBON.centre);
     } else if (this.ribbons) this.ribbons.hide();

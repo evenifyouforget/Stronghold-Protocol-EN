@@ -222,10 +222,11 @@ export class PlayerAcquire {
 
   /**
    * Queue a free pick-one offer of items (凯瑟琳 定向投放, 娜仁图亚 见者有份); shown as shop.rewardOffer with slots of kind
-   * 'item' under its `label` (the effect's name; player report #6 after 0.1.0).
+   * 'item' under its `label` (the effect's name; player report #6 after 0.1.0). `anyStock`: list the items whatever the
+   * shared stock has left (the itemBoosterPack cheat; a displayed reward survives it, pickReward).
    */
-  pushItemOffer(ids, { source = 'effect', tier = null, label = null } = {}) {
-    const list = [...new Set(Array.isArray(ids) ? ids : [])].filter((id) => this.gd.item(id) && this.m.itemPool.canGain(id)).slice(0, MAX_OFFER_SLOTS);
+  pushItemOffer(ids, { source = 'effect', tier = null, label = null, anyStock = false } = {}) {
+    const list = [...new Set(Array.isArray(ids) ? ids : [])].filter((id) => this.gd.item(id) && (anyStock || this.m.itemPool.canGain(id))).slice(0, MAX_OFFER_SLOTS);
     if (!list.length) return null;
     const offer = { tier: Number.isInteger(tier) ? tier : null, source, label: typeof label === 'string' && label ? label : null, slots: list.map((id) => ({ kind: 'item', id, price: 0, sold: false })) };
     this.offers.push(offer);

@@ -10,8 +10,9 @@
 //   * observations in the same list — `shop` (every roll of a seat's shop: round start, refresh, effects) and `gain` (a
 //     piece a seat got outside its own action: round rewards, cards, bands, items; inside an action it is the action's `got`).
 //   * rounds — at each SETTLE, per seat: LP, shop level, funds, board value, units, elites, bonds and tiers, layers, items,
-//     leaks (botbench's row, tools/botbench.mjs); the round the match ended in gets one too (`final: true`: a final boss
-//     or hidden round ends without a SETTLE).
+//     leaks (botbench's row, tools/botbench.mjs); a round without a SETTLE gets one too: `noSettle: true` when the next
+//     round starts (the Final Assault won goes straight to the Hidden Core), `final: true` for the round the match ended in
+//     (a final boss or hidden round ends without a SETTLE; GitHub #59).
 //   * battles — every field's BattleSpec (server/sim/spec.js: deterministic, so the spec replays the battle) with the
 //     digest of the result the match used (resultDigest) and each seat's killed / total / leaks / perfect.
 // finishRecord(m, summary) returns the record with every playerId replaced by its seat id (`s0`…`s3`).
@@ -154,6 +155,14 @@ export function installRecorder(m) {
     const res = settle.apply(this, args);
     try { rec.rounds.push(roundRow(m)); } catch (e) { m.reportError?.('record round', e); }
     return res;
+  };
+  // a round left without a SETTLE when the next one starts (the Final Assault won: straight to the Hidden Core, bossRounds.js)
+  const startRound = m.startRound;
+  m.startRound = function (...args) {
+    if (m.round >= 1 && (!rec.rounds.length || rec.rounds[rec.rounds.length - 1].r !== m.round)) {
+      try { rec.rounds.push({ ...roundRow(m), noSettle: true }); } catch (e) { m.reportError?.('record round', e); }
+    }
+    return startRound.apply(this, args);
   };
   return rec;
 }

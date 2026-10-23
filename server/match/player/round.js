@@ -8,7 +8,7 @@
 
 import { RULE_EXTRA_FUNDS } from '../../../shared/constants.js';
 import { tagLevel } from '../../../shared/rules.js';
-import { CC, BOOSTER } from '../../../shared/ruleData.js';
+import { CC, BOOSTER, ITEM_BOOSTER } from '../../../shared/ruleData.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
@@ -45,6 +45,8 @@ export class PlayerRound {
     if (r === 1 && this.m.lobbyRules?.tierStart) this.grantTierStart();
     // the boosterPack cheat: the Booster Pack at the start (made, not drawn; items.js openBooster)
     if (r === 1 && this.m.lobbyRules?.boosterPack && this.gd.item(BOOSTER.itemId)) this.stow(this.newPiece('item', BOOSTER.itemId), { allowTemp: true });
+    // the itemBoosterPack cheat: the Equipment Booster Pack at the start (items.js openItemBooster)
+    if (r === 1 && this.m.lobbyRules?.itemBoosterPack && this.gd.item(ITEM_BOOSTER.itemId)) this.stow(this.newPiece('item', ITEM_BOOSTER.itemId), { allowTemp: true });
     // (not on round 1: the hammer has just arrived — Fish 2026-10-16, starting on 3 Funds was too harsh)
     const cursed = junk >= 2 && r > 1 && [...this.hand, ...this.temp].some((p) => p && p.kind === 'item' && p.id === CC.junk.itemId) ? CC.junk.incomeLoss : 0;
     this.addFunds(Math.max(0, nonNeg(ev.income) - cursed) + nonNeg(ev.pending) + extra, { reason: 'income' });

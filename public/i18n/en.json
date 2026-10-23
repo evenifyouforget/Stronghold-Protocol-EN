@@ -2508,5 +2508,9 @@
   "补充包": "Booster Pack",
   "装备到干员上：免费选择一名同阶干员（按固定顺序轮换，每次6名），补充包留在手牌": "Equip it on an Operator: pick one Operator of the same tier for free (6 at a time, in a fixed rotating order). The Booster Pack stays in your hand",
   "开局获得补充包": "Start with a Booster Pack",
-  "开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）": "Every Doctor starts with a Booster Pack: equip it on an Operator to pick an Operator of the same tier for free, 6 at a time in a fixed rotating order. The pack stays in your hand (AI players don't use it)"
+  "开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）": "Every Doctor starts with a Booster Pack: equip it on an Operator to pick an Operator of the same tier for free, 6 at a time in a fixed rotating order. The pack stays in your hand (AI players don't use it)",
+  "装备补充包": "Equipment Booster Pack",
+  "装备到任意干员上：免费选择一件装备（按固定顺序轮换全部装备，每次6件），装备补充包留在手牌": "Equip it on any Operator: pick one piece of equipment for free (6 at a time, going through every piece of equipment in a fixed order). The Equipment Booster Pack stays in your hand",
+  "开局获得装备补充包": "Start with an Equipment Booster Pack",
+  "开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）": "Every Doctor starts with an Equipment Booster Pack: equip it on any Operator to pick a piece of equipment for free, 6 at a time, going through every piece of equipment in a fixed order. The pack stays in your hand (AI players don't use it)"
 }
