@@ -99,8 +99,9 @@ upstream rewrote a screen, its new layout is kept and Yuri's features are put ba
 
 Merge commit `ae3bf9f1`, parents `c05aa7e2` (dev-0.2) and `f07b8965` (sganggs 0.3.3).
 
-- `npm test`: 10,348 of 10,478 pass, 128 skipped. Two fail, both because of this environment:
-  - **`test/ipv6-bind.test.js`**: needs IPv6, unavailable in our container.
-  - **"add-only FX extraction retains shared metadata…"** (`version-assets`): needs Python's PIL, not installed here.
+- `npm test`: 10,349 of 10,478 pass, 128 skipped. The one failure is `test/ipv6-bind.test.js`, which needs IPv6,
+  unavailable in our container.
+- A second commit (`3a269451`) brings in sganggs's fix from after 0.3.3 (06b57698, #881): 0.3.3's add-only FX test
+  needed Python's Pillow, which the CI runners don't have, so it failed one shard on every PR, sganggs's own included.
 - Typecheck is clean and lint has 0 errors.
 - Golden replays: every family matches except `diy`, which was regenerated (the 自选 pool changed on both sides).
