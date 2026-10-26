@@ -88,6 +88,8 @@ test('Zaaro adds 1 per second, and 35 per second while his Furious Howl lasts (s
   h.run(4);
   assert.ok(Math.abs(h.b.ledger.value - 4 * (F.perSec + F.zaaroPerSec + F.howl.perSec)) < 2, `39 / s during the Howl: ${h.b.ledger.value}`);
   h.run(10);                                                  // past it
+  h.b.ledger.liquidating = false;                             // (from empty again: 200 is reached quickly)
+  h.b.ledger.value = 0;
   const v2 = h.b.ledger.value;
   h.run(5);
   assert.ok(Math.abs(h.b.ledger.value - v2 - 20) < 1.5, `back to 4 / s: ${h.b.ledger.value - v2}`);

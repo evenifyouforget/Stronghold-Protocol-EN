@@ -12,6 +12,9 @@
 //   --json F    write the raw per-match records to F (the input of --compare)
 //   --jobs N    run the matches in N worker threads (outcomes are identical; the timings are then inflated by the
 //               parallel load — measure decision time with --jobs 1)
+//   --rules R   lobby rules for every match, as key=value pairs (shared/rules.js RULES; e.g. ccPatriot=1,ccBoss=2;
+//               a bare key = 1): the SPA-CC tags, cheats and other modifiers. The bot plays as usual (it does not know
+//               the tags), so this measures how much a tag costs a tag-unaware player
 //   --band ID   solo configs only: the bot plays strategy ID (e.g. band_cannot) instead of its weighted pick — a band's
 //               mechanic in isolation (坎诺特 banking, 杜宾's 教鞭, 昆图斯's 突变细胞)
 //
@@ -66,6 +69,12 @@ const configs = String(opt.configs || 'solo:FUNNY,solo:HARD,coop4:FUNNY,coop4:HA
 });
 const seeds = Math.max(1, Number(opt.seeds) || 10);
 const seed0 = Number(opt.seed) || 1;
+const rules = opt.rules && opt.rules !== true
+  ? Object.fromEntries(String(opt.rules).split(',').filter(Boolean).map((kv) => {
+    const [k, v] = kv.split('=');
+    return [k, v === undefined ? 1 : v === 'true' ? true : v === 'false' ? false : Number.isNaN(Number(v)) ? v : Number(v)];
+  }))
+  : undefined;
 const rehearsal = opt.rehearsal != null && opt.rehearsal !== true ? Math.max(0, Math.floor(Number(opt.rehearsal) || 0)) : undefined;
 
 function runOne(cfg, seed) {
@@ -76,7 +85,7 @@ function runOne(cfg, seed) {
   const errors = [];
   const log = { info() {}, debug() {}, warn() {}, error: (...a) => errors.push(a.map(String).join(' ')) };
   const m = new Match({
-    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal,
+    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal, rules,
     send: () => true, broadcast: () => {}, onEnd: (s) => { summary = s; },
   });
   // --band: the only strategy on offer (botPickBand draws from gd.bandIds()) — also one built around a bond the mode

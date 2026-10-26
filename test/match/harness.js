@@ -89,6 +89,8 @@ export function makeMatch(o = {}) {
     // `hostId` is the executor a task is sent to, `botRehearsalDelegateMs` its answer window
     hostId: o.hostId !== undefined ? o.hostId : (o.test === true ? (seats.find((s) => s && !s.isBot)?.playerId ?? null) : undefined),
     test: o.test === true,
+    // (fork) the anonymous match record (server/match/records.js); off unless a test asks for it
+    ...(o.record !== undefined ? { record: o.record } : {}),
     botRehearsalDelegate: o.botRehearsalDelegate ?? false, // (fork) the Match default is on; tests opt in
     botRehearsalDelegateMs: o.botRehearsalDelegateMs,
     // a gameplay-plugin room (DESIGN §32.6): host rehearsal stays off there (match/rehearsal.js requireCs)

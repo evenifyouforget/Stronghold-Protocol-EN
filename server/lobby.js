@@ -455,6 +455,8 @@ export class Lobby {
     this.matchesCreated = 0;
     /** (fork) server/altArt.js AltArtLedger: picked rooms + the journal (server/index.js sets it; null = neither) */
     this.altArt = null;
+    /** (fork) server/records.js RecordStore: the anonymous match records (server/index.js sets it with SP_RECORDS; null = off) */
+    this.records = null;
     /** log lines said once (warnOnce) */
     this.told = new Set();
     /** a held visual set whose plugins changed on disk: its rooms' hosts are told (header "The room's plugins") */
@@ -1516,6 +1518,8 @@ export class Lobby {
         hostId: room.hostId,
         // only a room created as a test room; a normal match opts object does not grow a test key
         ...(room.test === true ? { test: true } : {}),
+        // (fork) the anonymous match record (server/records.js, SP_RECORDS); a test room's match is never recorded
+        ...(this.records && room.test !== true ? { record: true } : {}),
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)
         matchNo: room.matchCount + 1,
@@ -1572,6 +1576,12 @@ export class Lobby {
   onMatchEnd(room, ctx, summary) {
     if (ctx.ended || !ctx.live || room.matchCtx !== ctx || room.disposed) return;
     ctx.ended = true;
+    // (fork) the match record goes to its file, never into room.lastSummary
+    if (summary && summary.record) {
+      const { record, ...rest } = summary;
+      summary = rest;
+      if (this.records) void this.records.write(record);
+    }
     room.lastSummary = summary ?? null;
     room.match = null;
     room.matchCtx = null;

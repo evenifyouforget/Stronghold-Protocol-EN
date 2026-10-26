@@ -181,3 +181,44 @@ test('SPA-CC Junk: the client shows the Toxic Waste of a match with the tag (its
     assert.equal(d.lookup('items', CC.junk.itemId), null);
   } finally { setLang('zh'); }
 });
+
+test('the boosterPack cheat: the client has the Booster Pack\'s record, so it is drawn with its icon (GitHub #62)', async () => {
+  const { createDataStore } = await import('../../public/js/data.js');
+  const { readFileSync, existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { setLang, addMessages } = await import('../../shared/i18n.js');
+  const { BOOSTER, ITEM_BOOSTER } = await import('../../shared/ruleData.js');
+  const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  const fetch = async (url) => {
+    const abs = path.join(ROOT, url.replace(/^\/data\//, 'data/'));
+    if (!existsSync(abs)) return { ok: false, status: 404, json: async () => null };
+    const text = readFileSync(abs, 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(text) };
+  };
+  addMessages('en', JSON.parse(readFileSync(path.join(ROOT, 'public/i18n/en.json'), 'utf8')));
+  setLang('en');
+  try {
+    const d = createDataStore({ fetch, retryDelays: [] });
+    await d.loadAll('items', 'chess', 'bonds', 'backups');
+    await d.setLocale('en');
+    assert.equal(d.lookup('items', BOOSTER.itemId), null);
+    // the cheat alone, and with another rule that changes data
+    for (const rules of [{ boosterPack: true }, { boosterPack: true, ccJunk: 1 }]) {
+      d.setRules(rules);
+      const it = d.lookup('items', BOOSTER.itemId);
+      assert.ok(it, JSON.stringify(rules));
+      assert.equal(it.name, 'Booster Pack');
+      assert.equal(it.iconId, BOOSTER.iconId);
+    }
+    // the itemBoosterPack cheat's Equipment Booster Pack (GitHub #56): its own record and icon
+    d.setRules({ itemBoosterPack: true });
+    assert.equal(d.lookup('items', BOOSTER.itemId), null);
+    const eq = d.lookup('items', ITEM_BOOSTER.itemId);
+    assert.equal(eq.name, 'Equipment Booster Pack');
+    assert.equal(eq.iconId, ITEM_BOOSTER.iconId);
+    d.setRules(null);
+    assert.equal(d.lookup('items', BOOSTER.itemId), null);
+    assert.equal(d.lookup('items', ITEM_BOOSTER.itemId), null);
+  } finally { setLang('zh'); }
+});

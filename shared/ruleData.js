@@ -35,11 +35,20 @@ export const BLAZE_GARRISON_DESC_ELITE = N_('<售出时>获得1名精锐【{name
 
 const own = (o, k) => (o && Object.prototype.hasOwnProperty.call(o, k) ? o[k] : null);
 
-/** SPA-CC Risk tags' numbers (shared/rules.js; remove-before-merge/FINDINGS.md §5). */
+/** SPA-CC Risk tags' numbers (shared/rules.js; fish-edition/FINDINGS.md §5). */
 export const CC = Object.freeze({
   swiftPerStack: 0.0025,                       // 迅捷 20 + 0.25 × stacks % (data: 0.0035)
   foresightAspd: -20,                          // 远见 operators, active or not
   tier1Extra: 1, tier1FromRound: 3,            // the first tier-1 operator bought each round from round 3
+  // Investor 2: these operators' 获得时 grants (缪尔赛思's 变形同构体, 耶拉's 谢拉格不融冰, 焰尾's 野鬃 / 灰毫) come when they are
+  // sold instead (Fish 2026-10-23); 投资人's repeat multiplies 获得时 only, so not these any more
+  investorSold: Object.freeze({
+    garrisons: Object.freeze(['garrison_76_a', 'garrison_76_b', 'garrison_92_a', 'garrison_92_b', 'garrison_149_a', 'garrison_149_b']),
+    ops: Object.freeze(['chess_char_6_11_a', 'chess_char_3_20_a', 'chess_char_4_19_a']), // their names in the tag's text
+  }),
+  // Strategy 2 (Fish 2026-10-23): 伊奥莱塔·罗素's 统御号令 ATK / HP at most +50 %; 杜遥夜's 广交豪杰 the first refresh of a
+  // round only (data: the first 2); 阿米娅's 众志合一 needs 1 more active alliance per tier (4 / 5 / 6)
+  strategy2: Object.freeze({ ioletaCap: 0.5, duyaoyRefreshes: 1, amiyaExtra: 1 }),
   upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
   spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
@@ -57,24 +66,27 @@ export const CC = Object.freeze({
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
   // +15 %, +50 ASPD) per Liquidation so far in the battle, up to 5; one Shadow Silencer comes (Seasonal); the gauge drains
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
-  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare (Fish 2026-10-15). Tier 3: Zaaro joins Cleaner's sub-wave and
+  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare; max 200 instead of the
+  // official 500, empty at the start, half full from round 10 (Fish 2026-10-23; was 500, 25 %, 75 %). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
   // Junk 1: every player gets Toxic Waste at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
   // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
   // a round's income −1 while it is not equipped (Fish's spec 2026-10-15)
   // its icon: 源石溶剂 (Originium Solvent)'s vial, drawn colour-inverted — a cyan vial on white (Fish 2026-10-16)
   junk: Object.freeze({ itemId: 'fish_item_toxic_waste', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1125_acarm125' }),
-  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15). Invincible Blade 1: 1 per 300
-  // total stacks of the player in every normal battle; the final boss rounds: by the stacks of all players, once per
-  // field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts damage below 50 % HP, 15 s invulnerable
-  // after his revive. 3: twice as many, +100 ASPD, below 50 % HP 60 % less damage and immune to the listed statuses.
+  // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15, spawns reworked 2026-10-23).
+  // Invincible Blade 1: 1 Reid in a normal battle of a player with an active alliance at perStacks stacks or more; the
+  // final boss rounds: always 1, once per field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts
+  // damage below 50 % HP, 15 s invulnerable after his revive. 3: 1 more per perStacks stacks above perStacks of the
+  // player's highest active alliance (the final boss rounds: the highest of any alive player's), +100 ASPD, below 50 % HP
+  // 60 % less damage and immune to the listed statuses.
   vengeance: Object.freeze({
-    key: 'enemy_1539_reid', perStacks: 300, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
+    key: 'enemy_1539_reid', perStacks: 200, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
     reviveInvincible: 15, aspd: 100,
     immune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
   }),
   famiglia: Object.freeze({
-    max: 500, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0.25, lateFrom: 10, lateShare: 0.75,
+    max: 200, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0, lateFrom: 10, lateShare: 0.5,
     atkPct: 0.2, defPct: 0.15,
     silencerKeys: Object.freeze(['enemy_1283_sgkill', 'enemy_1283_sgkill_2']),
     silencer: Object.freeze({ atkPct: 0.15, defPct: 0.15, aspd: 50, maxStacks: 5 }),
@@ -129,6 +141,8 @@ export function riskLeakWeight(rules, enemyKey) {
 
 /** msgid of the note added to 投资人's text when the bench no longer counts. */
 export const INVESTOR_BENCH_NOTE = N_('（风险：整备区的干员不再计入）');
+/** msgid of the trigger tag that replaces a 获得时 grant's own ("<获得时>") under Investor 2 (CC.investorSold). */
+export const INVESTOR_SOLD_TAG = N_('<售出时>');
 
 
 /**
@@ -143,16 +157,31 @@ export const BOOSTER = Object.freeze({ itemId: 'fish_item_booster_pack', iconId:
 export const BOOSTER_NAME = N_('补充包');
 export const BOOSTER_DESC = N_('装备到干员上：免费选择一名同阶干员（按固定顺序轮换，每次6名），补充包留在手牌');
 
-/** The Booster Pack's item record (boosterPack) in data/items.json's shape. */
-function boosterRecord(text) {
-  const desc = text(BOOSTER_DESC);
+/**
+ * The itemBoosterPack cheat (Fish, GitHub #56): the Booster Pack's twin for equipment, a separate item with its own
+ * toggle. Equipped on any operator it is not attached either: it offers a free pick of `choices` items, the next ones of
+ * one fixed order through every shop item (tier 1 → 6, ids sorted within a tier), and stays where it was. Each player's
+ * place in the order is kept. AI players neither use nor drop it. Its icon: 紧急调度券 (Emergency Dispatch Voucher)'s.
+ */
+export const ITEM_BOOSTER = Object.freeze({ itemId: 'fish_item_booster_pack_equip', iconId: 'trap_1115_acarm115', choices: 6 });
+/** msgids of the Equipment Booster Pack (the name is also the offer's header). */
+export const ITEM_BOOSTER_NAME = N_('装备补充包');
+export const ITEM_BOOSTER_DESC = N_('装备到任意干员上：免费选择一件装备（按固定顺序轮换全部装备，每次6件），装备补充包留在手牌');
+
+/** A booster's item record in data/items.json's shape: the Booster Pack (boosterPack) or the Equipment Booster Pack
+ *  (itemBoosterPack, `boosts: 'items'`). */
+function boosterRecord(text, items = false) {
+  const B = items ? ITEM_BOOSTER : BOOSTER;
+  const desc = text(items ? ITEM_BOOSTER_DESC : BOOSTER_DESC);
   return {
-    id: BOOSTER.itemId, baseId: BOOSTER.itemId, goldenId: null, isGolden: false, trapId: BOOSTER.iconId, iconId: BOOSTER.iconId,
-    identifier: null, name: text(BOOSTER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true,
+    id: B.itemId, baseId: B.itemId, goldenId: null, isGolden: false, trapId: B.iconId, iconId: B.iconId,
+    identifier: null, name: text(items ? ITEM_BOOSTER_NAME : BOOSTER_NAME), itemType: 'EQUIP', tier: 1, shopSortId: 999, price: 0, hideInShop: true,
     shopExcluded: true, shopExcludedBy: null, mergeable: false, upgradeNum: 0, upgradeChessId: null, duration: -1,
     giveBondId: null, givePowerId: null, canGiveBond: false, requiresBondId: null, effectId: null, effectName: null, desc,
     descRaw: desc, buffs: [], params: {}, category: 'STAT', kind: 'passive', family: null,
-    implFormula: 'a pick-one offer of its target\'s tier (server/match/player/items.js openBooster)', fork: true, booster: true,
+    implFormula: items ? 'a pick-one offer of the next shop items (server/match/player/items.js openItemBooster)'
+      : 'a pick-one offer of its target\'s tier (server/match/player/items.js openBooster)',
+    fork: true, booster: true, boosts: items ? 'items' : 'chess',
   };
 }
 
@@ -185,7 +214,7 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true));
 
 /**
  * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
@@ -201,11 +230,23 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // the boosterPack cheat: the Booster Pack
   if (rules.boosterPack === true) items[BOOSTER.itemId] = boosterRecord(text);
+  // the itemBoosterPack cheat: the Equipment Booster Pack
+  if (rules.itemBoosterPack === true) items[ITEM_BOOSTER.itemId] = boosterRecord(text, true);
   // SPA-CC: 投资人 counts the board only; 迅捷's chance per stack (the popup's number; the sim reads the rule itself)
   const investor = rules.ccInvestorBench > 0 ? own(raw.bonds, 'investShip') : null;
   if (investor) {
     const note = text(INVESTOR_BENCH_NOTE);
     bonds.investShip = { ...investor, countMode: 'BOARD', countsHand: false, desc: `${investor.desc ?? ''}${note}`, descRaw: `${investor.descRaw ?? investor.desc ?? ''}${note}` };
+  }
+  // Investor 2: the 获得时 grants of CC.investorSold come when the operator is sold (the dispatcher fires a garrison on
+  // its eventType's hook only, server/match/effectsMeta.js); the text's leading trigger tag becomes 售出时's
+  if (rules.ccInvestorBench >= 2) {
+    const tag = text(INVESTOR_SOLD_TAG);
+    const swap = (d) => (typeof d === 'string' ? d.replace(/^<[^>]*>/, tag) : d);
+    for (const id of CC.investorSold.garrisons) {
+      const rec = own(raw.garrisons, id);
+      if (rec && rec.eventType === 'SERVER_GAIN') garrisons[id] = { ...rec, eventType: 'SERVER_CHESS_SOLD', desc: swap(rec.desc), descRaw: swap(rec.descRaw) };
+    }
   }
   const swift = rules.ccSwift > 0 ? own(raw.bonds, 'swiftShip') : null;
   if (swift) {

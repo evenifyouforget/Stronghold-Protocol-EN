@@ -221,15 +221,17 @@ function kitLeaderMisc(key, ab, e, b = null) {
       // the re-aim at the target's tile is not a separate move. Until 0.1.3: any unit within the blackboard's 1.5, 隐匿 / 迷彩
       // ones included, off its path too.
       const rush = ab.sk.Rush;
+      const blade2 = tagHas(b?.flags?.rules, 'ccVengeance', 'blade2') && String(e?.mods?.bountyId ?? '').startsWith('risk:vengeance');
       const prey = (b, e2) => {
         const keys = pathKeysAhead(e2);
         return targetsNear(b, e2, RUSH_RADIUS).filter((u) => u.ground && keys.has(u.tileR * COLS + u.tileC));
       };
       return [lowHpBuff(T(ab, 'atkup.hp_ratio') ?? 0.5, { atkPct: T(ab, 'AtkUp.atk', 'atkup.atk') ?? 0 }),
-        // SPA-CC ccVengeance Invincible Blade 2: a Reid the tag added is invulnerable for 15 s after his revive
+        // SPA-CC ccVengeance Invincible Blade 2: a Reid the tag added is invulnerable for 15 s after his revive — and
+        // untargetable then (#47, the owner's rule: no unit selects him, area hits deal 0, no 诱导; a source-less aura
+        // such as 莫斯提马's 主观缓时 still slows him)
         reborn({ dur: T(ab, 'Reborn.duration') ?? 0, hpRatio: T(ab, 'Reborn.hp_ratio') ?? 0.5,
-          invincible: tagHas(b?.flags?.rules, 'ccVengeance', 'blade2') && String(e?.mods?.bountyId ?? '').startsWith('risk:vengeance')
-            ? CC.vengeance.reviveInvincible : T(ab, 'Reborn.invincible') ?? 0 }),
+          invincible: blade2 ? CC.vengeance.reviveInvincible : T(ab, 'Reborn.invincible') ?? 0, invincibleUntargetable: blade2 }),
         skill(rush, (b, e2) => {
           b.addBuff(e2, { key: 'ab:rush', duration: rush.bb.duration ?? 0, refresh: 'replace', visible: true, mods: { moveMul: 1 + (rush.bb.move_speed ?? 0) } });
           b.fx('charge', { x: e2.x, y: e2.y, id: e2.id, kind: 'avengerRush' });
@@ -682,9 +684,10 @@ function kitWolfLord(ab) {
  *     full), meanwhile PATRIOT_PULSE_SCALE × ATK true damage every immo_trigger[reborning].interval s to the units within
  *     PATRIOT_PULSE_RADIUS;
  *   * 毁灭姿态 (second form): the 行军 buffs go, ATK +immo_trigger[rage].atk, DEF +…def, ASPD from base_attack_time,
- *     move +…move_speed, ranged (PATRIOT_RANGE); reborn_invincible s 无敌; immune to stun / freeze / levitate; the same true
- *     damage pulse (Immo[Rage] atk_scale); every throwspear cd s (first after icd) a spear at the farthest unit on high ground
- *     — a PATRIOT_SPEAR_WINDUP s telegraph, then atk_scale × ATK physical (none without a unit on high ground).
+ *     move +…move_speed, ranged (PATRIOT_RANGE); reborn_invincible s 无敌 (untargetable too, #47); immune to stun /
+ *     freeze / levitate; the same true damage pulse (Immo[Rage] atk_scale); every throwspear cd s (first after icd) a
+ *     spear at the farthest unit on high ground — a PATRIOT_SPEAR_WINDUP s telegraph, then atk_scale × ATK physical (none
+ *     without a unit on high ground).
  */
 const PATRIOT_PULSE_RADIUS = 1.75, PATRIOT_PULSE_SCALE = 0.05, PATRIOT_RANGE = 0.85, PATRIOT_SPEAR_WINDUP = 3, PATRIOT_HITS = 4;
 /** When the spear leaves his hand in his Skill clip (data/assets.json … spine hits.Skill). */
@@ -747,6 +750,9 @@ function kitPatriot(ab) {
   }, { id: 'spear', cond: (b) => P.form2 && b.allies().some((u) => u.ground === false) }),
   reborn({
     dur: T(ab, 'reborn.duration') ?? 0, invincible: T(ab, 'reborn.patrt_t_state_2[reborn_invincible].duration') ?? 0,
+    // his 无敌 is untargetable too (#47, the owner's rule — as Xi's, #510): no unit selects him, area hits deal 0, no
+    // 诱导; a source-less aura such as 莫斯提马's 主观缓时 still slows him
+    invincibleUntargetable: true,
     onKo(b, e) { b.removeBuff(e, 'ab:patriotMarch'); },
     // the HP bar fills back up over the revive (Fish's playtest: it shows how close he is to standing up)
     during(b, e, a, t) {
@@ -934,14 +940,14 @@ export const LEADER_KITS = Object.freeze({
     const st = T(ab, 'StunAfterUnbalance.stun') ?? 0;
     if (st > 0) b.applyStatus(e, 'stun', { duration: st, source: null });
   })],
-  enemy_10138_xdsnow: (ab) => [unbalanced((b, e, a) => {             // 雪孩子 · pushed / pulled into high ground ⇒ hitWall.value damage
+  enemy_10138_xdsnow: (ab) => [unbalanced((b, e, a) => {             // 雪孩子 · pushed / pulled into high ground ⇒ hitWall.value damage (where its slide stops)
     const dx = e.x - a.lx, dy = e.y - a.ly, d = hypot(dx, dy);
     if (!(d > 0)) return;
     const r = Math.round(e.y + (dy / d) * 0.6), c = Math.round(e.x + (dx / d) * 0.6);
     if (b.grid.isLow(r, c) && b.grid.groundPassable(r, c)) return;   // stopped by nothing: no collision
     b.fx('explode', { x: e.x, y: e.y, r: 0.4, kind: 'wallHit', id: e.id });
     hurt(b, null, e, T(ab, 'hitWall.value') ?? 0, 'true', { tags: ['wallHit'] });
-  })],
+  }, { atEnd: true })],
   // 拥霜羽兽 · PRTS 天赋 "不会攻击飞行单位"; unbalanced once ⇒ 失去蛋的模式 "不进行普通攻击，不可阻挡，移动速度最终提升至200%" (until
   // 0.1.3 it kept its ranged attack without the egg and stood for each attack clip — ai.js attackStand —, and shot the 炎佑 dragon)
   enemy_10141_xdpeng_2: (ab) => [noAirTargets(), unbalanced((b, e, a) => {

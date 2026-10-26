@@ -150,7 +150,13 @@ export async function main(argv = process.argv.slice(2)) {
     files: files.map((f) => path.join(ROOT, f)), concurrency: true, cwd: ROOT,
     ...(opts.shard ? { shard: opts.shard } : {}),
   });
-  stream.on('test:fail', (d) => { if (!d.todo) failed = true; });
+  stream.on('test:fail', (d) => {
+    if (d.todo) return;
+    failed = true;
+    // on a runner, each failed test (not a parent failing for its subtests) as an annotation: the API serves those,
+    // where the job log may not be reachable
+    if (process.env.GITHUB_ACTIONS && d.details?.error?.failureType !== 'subtestsFailed') console.log(failAnnotation(d));
+  });
   stream.on('test:pass', (d) => {
     if (d.nesting !== 0 || !d.file) return;
     const f = path.relative(ROOT, d.file).split(path.sep).join('/');
@@ -166,6 +172,24 @@ export async function main(argv = process.argv.slice(2)) {
     }
   }
   return failed ? 1 : 0;
+}
+
+/**
+ * A GitHub `::error` workflow command for a failed test: its file and line, its name, the error's first lines.
+ * @param {{ name: string, file?: string, line?: number, details?: { error?: any } }} d a `test:fail` event's data
+ * @returns {string}
+ */
+export function failAnnotation(d) {
+  const esc = (s, prop = false) => {
+    const t = String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+    return prop ? t.replace(/:/g, '%3A').replace(/,/g, '%2C') : t;
+  };
+  const err = d.details?.error;
+  const cause = err?.cause ?? err;
+  const msg = String(cause?.stack || cause?.message || cause || 'failed').split('\n').slice(0, 12).join('\n');
+  const file = d.file ? path.relative(ROOT, d.file).split(path.sep).join('/') : '';
+  const where = file ? `file=${esc(file, true)},${d.line ? `line=${d.line},` : ''}` : '';
+  return `::error ${where}title=${esc(`test failed: ${d.name}`, true)}::${esc(msg)}`;
 }
 
 function isMain() {

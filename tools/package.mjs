@@ -84,8 +84,10 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findSpecifiers } from './check-imports.mjs';
+import { writeZip } from './preload-pack.mjs';
 import { rewriteManifest } from '../server/http/assetViews.js';
 import { mergeLocalManifests, planFromManifests } from '../public/js/assetPack.js';
 import { writePackIndex } from './packs.mjs';
@@ -643,9 +645,11 @@ export function packageOutIsUnsafe(out, root = REPO) {
 
 /**
  * Zip `cwd`/`folder` (FOLDER unless named: the asset pack's folder) into `zipPath`: Info-ZIP `zip`, else a bsdtar
- * `tar --format zip` (Windows 10+, macOS). bsdtar writes
+ * `tar --format zip` (Windows 10+, macOS), else the built-in writer (tools/preload-pack.mjs writeZip). bsdtar writes
  * the names in UTF-8 (flag bit 11) only when told: its default is the system code page, which loses a name it cannot
  * spell (卫戍 becomes ?? on Windows code page 1252) and leaves no UTF-8 copy for a reader.
+ * The built-in writer is for when bsdtar fails: Windows' own tar.exe crashed (exit 3221225477, an access violation) on
+ * the GitHub Windows runners, every run, from 2026-10 (GitHub #28).
  */
 export function zipFolder(cwd, zipPath, folder = FOLDER) {
   // deflate everything: storing PNG / MP3 as they are made the full zip 8.5 MB larger and saved no real time
@@ -660,11 +664,39 @@ export function zipFolder(cwd, zipPath, folder = FOLDER) {
   const sys = process.platform === 'win32' && process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : null;
   const tar = sys && isFile(sys) ? sys : 'tar';
   const t = spawnSync(tar, ['-c', '--format', 'zip', '--options', 'zip:hdrcharset=UTF-8', '-f', zipPath, folder], io);
-  if (t.error || t.status !== 0 || !isFile(zipPath)) {
-    const said = (r) => `${r.stdout || ''}\n${r.stderr || ''}`.trim().replace(/\s*\n\s*/g, ' | ').slice(-600);
-    const why = (r, name) => `${name}: ${r.error ? r.error.message : `exit ${r.status}${r.signal ? ` (${r.signal})` : ''}`}${said(r) ? ` — ${said(r)}` : ''}`;
-    throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${why(z, 'zip')}; ${why(t, tar)}${!t.error && t.status === 0 ? '; no zip was written' : ''}`);
+  if (!t.error && t.status === 0 && isFile(zipPath)) return;
+  const said = (r) => `${r.stdout || ''}\n${r.stderr || ''}`.trim().replace(/\s*\n\s*/g, ' | ').slice(-600);
+  const why = (r, name) => `${name}: ${r.error ? r.error.message : `exit ${r.status}${r.signal ? ` (${r.signal})` : ''}`}${said(r) ? ` — ${said(r)}` : ''}`;
+  const tools = `${why(z, 'zip')}; ${why(t, tar)}${!t.error && t.status === 0 ? '; no zip was written' : ''}`;
+  // the built-in writer needs zlib.crc32 (Node ≥ 22.2)
+  if (typeof zlib.crc32 !== 'function') throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${tools}`);
+  fs.rmSync(zipPath, { force: true });
+  try {
+    writeZip(zipPath, folderEntries(cwd, folder));
+  } catch (e) {
+    fs.rmSync(zipPath, { force: true });
+    throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${tools}; built-in: ${e?.message || e}`, { cause: e });
   }
+}
+
+/**
+ * `cwd`/`folder`'s files as writeZip entries, '/'-separated names under `folder`, read when written. Links are
+ * followed, as zip and tar do.
+ * @returns {{ name: string, data: () => Buffer }[]}
+ */
+function folderEntries(cwd, folder) {
+  const out = [];
+  const walk = (rel) => {
+    for (const d of fs.readdirSync(path.join(cwd, rel), { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      const r = `${rel}/${d.name}`;
+      const abs = path.join(cwd, r);
+      const st = d.isSymbolicLink() ? fs.statSync(abs) : d;
+      if (st.isDirectory()) walk(r);
+      else if (st.isFile()) out.push({ name: r, data: () => fs.readFileSync(abs) });
+    }
+  };
+  walk(folder);
+  return out;
 }
 
 const isLib = (f) => f.startsWith('node_modules/') || f.startsWith('public/vendor/');
