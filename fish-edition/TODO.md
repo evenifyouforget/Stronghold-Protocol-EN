@@ -15,7 +15,7 @@
 - #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
   never stop (question, bot-players)
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
-  (question, bot-players)
+  (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions

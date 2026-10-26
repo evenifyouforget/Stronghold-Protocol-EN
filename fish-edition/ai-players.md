@@ -282,3 +282,60 @@ Six `SP_RECORDS` files, all from app 0.3.1, all solo. One was abandoned before i
 - Tier Start + Booster Pack + cheats make NORMAL trivial. The NORMAL board was already 8 elites at level 6 after round 1, it never changed, and it lost no LP all match, including Final Assault and Hidden Core. From round 11 the seat only rolled the shop.
 - Stacking 19 Risk tags at ABYSS was steadily lost: 4–12 leaks every round from round 1, LP 52 → 0 by round 10, even with Double LP. One data point for the SPA-CC difficulty curve.
 - Five matches by what looks like one or two players is too few for win rates. Next time it's worth recording co-op and a spread of single Risk tags.
+
+## Why the bot's layouts ignore blocking (#71) and stand on originium (#72) (2026-10-27)
+
+Fish's observations: melee units in the back, ranged units facing backward (#71); units deployed on 活性源石 tiles,
+where humans hold one side, often the right so enemies don't pick up the tiles' buff (#72).
+
+Both come from the layout planner, `server/match/bot.js` `planLayoutSteps` + `Layout.value()`. It is a tower-defense
+model with a "hold time" bonus:
+- every enemy route is a list of tiles with a walking time per tile;
+- a blocker adds `hold × blockCnt` seconds (4 s per block slot) on its own tile;
+- a layout's value is the expected kills: Σ routes n × (1 − e^(−damage taken / (1.5 × HP))), where the damage is
+  seconds on each tile × the DPS of every unit whose range covers it.
+
+### #71: blocking
+
+What the model can't see:
+- **Enemies never hurt operators.** Nothing in the value is about a unit surviving, except a 0.15 penalty per road
+  tile a ranged unit stands on. "Block in front to protect the ranged DPS" is invisible to it.
+- **It doesn't matter where on the route the block happens**, only how much DPS covers the blocker's tile. Blockers
+  are placed first, while no DPS is placed yet, so their tile is decided by their own range alone. The DPS units are
+  then fitted around wherever they went, which can be the back of the route.
+- **The estimate saturates.** Once the units placed so far are expected to kill nearly everything, the
+  e^(−x) term flattens and a further unit adds almost no value anywhere. Its tile and direction are then decided by
+  tiny differences, down to the 1e-6 random tie-break. The code says so for 1-tile-range guards ("the kill estimate
+  saturates in a full layout and then cannot tell the tiles apart") and patches that one case afterwards.
+- **Direction:** of the four, the one whose rotated range covers the most weighted road time wins; RIGHT on a tie.
+  "Facing backward" can still cover the road after a bend, or be a saturated near-tie.
+- **The rehearsal doesn't fix it:** it runs the 3–5 candidates in the real simulation and keeps the one with the
+  fewest leaks, then the most kills (`server/sim/rehearsal.js`, −1000 per leak + kills). Operator deaths don't count.
+  All the candidates come from the same model, with other tunables (`REHEARSAL_VARIANTS`). Boss rounds have no
+  rehearsal at all.
+
+### #72: originium tiles
+
+`fieldModel` knows one tile gimmick, airflow (`airflowAtkMul`). It doesn't know 活性源石:
+- a unit on one takes timed true damage per second, and gains ATK and ASPD (`server/sim/content/devices.js`);
+- ground enemies that walk over one get the same: more ATK and ASPD, and a lasting HP loss.
+
+To the planner such a tile is an ordinary legal tile. Neither the damage to its own unit nor the buff enemies pick up
+on the way is in the value. The rehearsal would see a leak caused by either one, but not a unit dying without a leak.
+
+### What would improve it (not built)
+
+Cheapest first:
+1. **Rehearsal score counts deaths:** e.g. −1000 per leak, −50 per operator death, + kills. Small, and it uses the
+   real simulation, so originium damage and unprotected ranged units both start to cost. It only picks among the
+   candidates, though, so it helps only when one of them is better. No help on boss rounds.
+2. **Originium in `fieldModel`:** a penalty for a unit on a 活性源石 tile (damage per second × the time it stays
+   versus its HP, less when a healer covers it). For enemies, count a route's HP as higher after it crosses one,
+   which favours killing them before. Holding one side would follow from that.
+3. **Front blocking:** a survival term. An enemy not yet blocked threatens the ranged units it walks past, so a
+   blocker that stops it before those tiles is worth more. Or place the blockers after a first pass of DPS units, at
+   the first route tile the DPS covers. This needs tuning against `tools/matchrun.mjs` / botbench, as the current
+   tunables were (META.md: the planner beats random layouts by ≈ 8 points of kill rate, the rehearsal adds ≈ 5).
+
+`bot.js` is upstream's (sganggs; product-policy tracking in their issue #315). Changes here are gameplay-neutral (bots
+only), but they change bot results and the goldens.
