@@ -247,13 +247,12 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 # live PRs to watch (2026-10-27)
 
 - Yuri, all open, no comments yet: #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
-  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art.
+  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27).
 - sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
   Yuri #19 becomes redundant once Yuri syncs 0.3.2.
-- sganggs #861 (TalentBomb's official strike), open, needs an update: Fish confirmed it on screen; sganggs asks to
-  keep only TalentBomb's landing display and the coordinate passing, and drop the old kit changes (the talent sim
-  and `talent: true` are already in their dev, with radius 1.3, one target per round, 0.1 s apart). S3's untagged
-  blast stays as is. The same reasoning likely applies to Yuri #18.
+- sganggs #861 (TalentBomb's official strike): accepted 2026-10-26. sganggs squashed it into their dev (credited in
+  the commit message and CHANGELOG, since the commits' author is "Claude") and closed the PR by hand; it ships in
+  0.3.4. Yuri #18 becomes redundant once Yuri syncs 0.3.4.
 - Upstream: sganggs released 0.3.2 and 0.3.3 (2026-10-25, 267 commits after 0.3.1). Yuri's dev-0.2 hasn't synced
   them (still c05aa7e2, which #54 brought here). Next sync here waits for Yuri, or goes straight from sganggs.
 
@@ -262,8 +261,7 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [x] Upstream ports (2026-10-22): Fish opened them all (sganggs #861, #862; Yuri #18–#21). Status: live PRs above.
 - [x] sganggs #861 (`sg/angel2-talent-strike`): slimmed down as sganggs asked (2026-10-27): sganggs `dev` (f07b8965)
       merged in, the kit change dropped (dev's kit already marks the bombing `talent: true`); 4 files, render + test.
-- [ ] Fish: on sganggs #861, paste pr-descriptions/sganggs-angel2-talent-strike.md as the body and post the reply
-      (Chinese + English, in the 2026-10-27 report). The token can't write to sganggs's repo.
+- [x] Fish: on sganggs #861, update the body and post the reply. Done; sganggs accepted it (2026-10-26).
 - [ ] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). The token can't write to Yuri's repo.
 - `wip/sync-yuri-0.2.6`: stale; can be deleted. Yuri #14 merged and reached here with #39 / #54.
 - `wip/4` (2026-10-27): Fish's scratch branch, from main d115c384. `wip/3` is done: 801a9c64 reached main through
