@@ -1,7 +1,3 @@
-> [!NOTE]
-> 草稿：我们会在装有本地美术的部署上实际看过效果后，再把它标为可审阅。
-> Draft: we'll mark it ready once we've watched the effect in a deployment with the local art.
-
 > English version at the end (English 版本见文末).
 
 > [!IMPORTANT]
@@ -25,7 +21,7 @@
   客户端里这次轰炸是 TalentBomb 能力：由 buff 模板 `angel2_t_1[target]` 在 `ON_BUFF_START` 触发的 `MultiRangedAttack`，命中特效 `angel2_buff_01_trail_01`（带烟尾从天而降的炮弹和红白色爆炸）。我们一直没有播放它：kit 的 `airstrike` fx 落到了程序化的爆炸上。
   - `render/vfx/talents.js`：`POINT_TRIGGERS` 把这个模板对应到 kit 的 `airstrike`，新增导出 `pointKinds()` 标出“在 fx 坐标处打击”的类型；
   - `render/vfx/talentfx.js`：`_strike` 在 (x, y) 的地面上播放 TalentBomb 的命中特效；`FxWiring.simFx` 把 fx 的坐标传给天赋层（`render/vfx/wiring.js`）；
-  - 新约能天使 S3 开场的投送也是 `airstrike`，所以 kit 给天赋这次打上 `talent: true`（`chess_char_6_13-angel2.js`），只有带标记的才播 TalentBomb。这是纯显示用的 fx 字段，黄金结果只统计 fx 的种类，不受影响。
+  - 新约能天使 S3 开场的投送也是 `airstrike`，只有带 `talent: true` 的才播 TalentBomb。开发版的火力电台 kit 已经给轰炸打上这个标记，本 PR 不再改动 kit（已合入 `dev`，按审查意见移除了旧的 kit 改动）。
 - 期望效果：天赋轰炸在被打击的位置播放官方的落弹和爆炸；她的 S3 投送和没有官方特效时的程序化爆炸保持原样。
 - 关联 Issue / PR：无。这是在 EN 翻译分支的分叉 evenifyouforget/Stronghold-Protocol-EN 里发现并修复的，本 PR 把同样的修复移植到 `dev`。只改一名干员（新约能天使）。
 
@@ -42,8 +38,8 @@
 > [!NOTE]
 > 运行相关测试、npm run ci 和 npm run golden，如实记录结果及未运行或跳过原因。Golden 变化说明场景及原因；重构不得改变结果，预期结果有意变化时运行 npm run golden:update 并同提交。界面改动附截图。
 
-- 验证方法：新增单元测试。画面上的效果还没在装有本地美术的部署上看过，这就是本 PR 还是草稿的原因。
-- 相关测试：`test/render/vfx-talents.test.js`：模板的 trigger / point 类型；带标记的 `airstrike` 在被打击的位置（不是新约能天使身上）播放 TalentBomb 的命中特效；不带标记的（她的 S3）和没有坐标的落回程序化爆炸。`node --test test/render/vfx-procedural.test.js test/render/vfx-talents.test.js test/content/kits_layout.test.js`：33 通过，0 失败。
+- 验证方法：新增单元测试；已在装有本地美术的部署上实际看过画面。
+- 相关测试：`test/render/vfx-talents.test.js`：模板的 trigger / point 类型；带标记的 `airstrike` 在被打击的位置（不是新约能天使身上）播放 TalentBomb 的命中特效；不带标记的（她的 S3）和没有坐标的落回程序化爆炸。合入 `dev`（f07b8965）后：`node --test test/render/vfx-talents.test.js` 及引用新约能天使的测试，152 通过，0 失败。
 - npm run ci：setup、smoke、lint（0 错误）、imports、typecheck 通过；test：8791 项，8722 通过，67 跳过，2 失败，都与本改动无关：
   - `test/ipv6-bind.test.js` 的双栈绑定（`EADDRNOTAVAIL`）：需要 IPv6，本机容器没有，与特效代码无关；
   - `test/plugins/script-integration.test.js` 的 all-bot 整局（100 秒超时）：当时机器负载高，单独重跑 3 次均通过。
@@ -54,7 +50,7 @@
 ## 适用性说明
 
 - 不适用项：文档检查、Fidelity checklist。
-- 原因：只改特效显示（kit 里只加了一个显示用的 fx 字段），不改规则，也不是新增干员 kit。
+- 原因：只改特效显示，不改规则，也不改 kit。
 
 ## 检查清单
 
@@ -77,7 +73,7 @@ Type of change: fix (bug fix).
   In the client, that strike is the TalentBomb ability: a `MultiRangedAttack` triggered by the buff template `angel2_t_1[target]` on `ON_BUFF_START`, with the hit effect `angel2_buff_01_trail_01` (a shell dropping from the sky with a smoke trail and a red-white burst). We never played it: the kit's `airstrike` fx fell through to the procedural blast.
   - `render/vfx/talents.js`: `POINT_TRIGGERS` maps that template to the kit's `airstrike`, and the new export `pointKinds()` marks it as a strike at the fx's spot;
   - `render/vfx/talentfx.js`: `_strike` plays TalentBomb's hit on the ground at (x, y); `FxWiring.simFx` (`render/vfx/wiring.js`) passes the fx position to the talent layer;
-  - her S3 opening delivery is an `airstrike` too, so the kit marks the talent's strike `talent: true` (`chess_char_6_13-angel2.js`), and only marked ones get the talent bomb. This is a cosmetic fx field: goldens count fx kinds only, so they don't change.
+  - her S3 opening delivery is an `airstrike` too, so only one marked `talent: true` gets the talent bomb. Dev's 火力电台 kit already marks its bombing that way, so this PR no longer touches the kit (merged with `dev`; the old kit change removed, as the review asked).
 - Expected result: the talent's airstrike plays the official falling shell and burst where it strikes. Her S3 delivery, and the procedural blast without official effects, stay as they were.
 - Related issues / PRs: found and fixed in our fork (evenifyouforget/Stronghold-Protocol-EN). The same fix is offered to YuriRestia's English translation fork. One Operator (Exusiai the New Covenant).
 
@@ -88,8 +84,8 @@ Type of change: fix (bug fix).
 
 #### Verification
 
-- How it was verified: new unit tests. The effect hasn't been looked at on screen yet in a deployment with the local art; that's why this PR is a draft.
-- Related tests: `test/render/vfx-talents.test.js`: the template's trigger and point kinds. A marked `airstrike` plays TalentBomb's hit at the struck spot, not on Exusiai. An unmarked one (her S3) and one with no position fall back to the procedural blast. `node --test test/render/vfx-procedural.test.js test/render/vfx-talents.test.js test/content/kits_layout.test.js`: 33 pass, 0 fail.
+- How it was verified: new unit tests, and watched on screen in a deployment with the local art.
+- Related tests: `test/render/vfx-talents.test.js`: the template's trigger and point kinds. A marked `airstrike` plays TalentBomb's hit at the struck spot, not on Exusiai. An unmarked one (her S3) and one with no position fall back to the procedural blast. Merged with `dev` (f07b8965): `node --test test/render/vfx-talents.test.js` plus the tests that name Exusiai the New Covenant, 152 pass, 0 fail.
 - npm run ci: setup, smoke, lint (0 errors), imports and typecheck pass. Tests: 8,791, of which 8,722 pass, 67 are skipped and 2 fail, neither from this change:
   - the dual-stack bind test in `test/ipv6-bind.test.js` (`EADDRNOTAVAIL`): it needs IPv6, which this container doesn't have;
   - the all-bot full match in `test/plugins/script-integration.test.js` (100 s timeout): the machine was under load; rerun alone it passed 3 times out of 3.
@@ -100,7 +96,7 @@ Type of change: fix (bug fix).
 #### Not applicable
 
 - Items that do not apply: the docs checks, the Fidelity checklist.
-- Why: an effects fix (the kit only gains a display-only fx field); no rule change and no new Operator kit.
+- Why: an effects fix only; no rule change and no kit change.
 
 Checklist (ticked in the Chinese template above): one topic only; related tests, `npm run ci` and `npm run golden` run and reported. The docs-checks and Fidelity-checklist items do not apply.
 

@@ -1,6 +1,6 @@
 # GitHub issues (open, 2026-10-27)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37, which still targets the merged `mini/0.3.1-1`
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37, now into `mini/0.3.1-3`
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
@@ -197,6 +197,11 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
       only a small gold status icon (since the initial import) and, from 0.3.0, the official 无敌 loop for a Reborn
       talent's window, with official effects on. The ribbons cover every invulnerable unit, with or without assets.
 
+# mini/0.3.1-3 (from 2026-10-27)
+
+Base `mini/0.3.1-3` (= main d115c384). PRs into it: #37 (closes #27), the notes of 2026-10-27.
+- #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
+
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
 
 Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/. #66's title and changelog set the
@@ -217,7 +222,7 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [x] #70 `wip/ci-annotations`: closes #28. Windows' own tar.exe crashed on the runners (exit 3221225477), so the
       zip-reader test failed on whichever shard held update-package.test.js; zipFolder falls back to the built-in zip
       writer, and failed tests are GitHub annotations (the job logs can't be fetched from the container).
-- [ ] #37 still targets the merged `mini/0.3.1-1`: retarget onto the next mini branch, or close.
+- [x] #37: main merged into its branch, retargeted onto `mini/0.3.1-3` (2026-10-27).
 - Known flake: `test/studio/review.test.js` "trial uses the actual sandbox executor" went over the 5 s plugin setup
   limit once on Windows (#66, node 22 shard 1/3; passed on re-run). `SP_SCRIPT_PROBE_MS` raises it, but
   test/plugins/script-review.test.js asserts the default 5000.
@@ -255,9 +260,11 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 # need human action - branches that have not been made PRs yet
 
 - [x] Upstream ports (2026-10-22): Fish opened them all (sganggs #861, #862; Yuri #18–#21). Status: live PRs above.
-- [ ] sganggs #861 (`sg/angel2-talent-strike`): slim it down as sganggs asked (live PRs above). Claude can push it to
-      the branch on our fork; ask first.
-- [ ] Yuri issue #16 (EN templates) is still open: Yuri #17 resolved it, so it can be closed.
+- [x] sganggs #861 (`sg/angel2-talent-strike`): slimmed down as sganggs asked (2026-10-27): sganggs `dev` (f07b8965)
+      merged in, the kit change dropped (dev's kit already marks the bombing `talent: true`); 4 files, render + test.
+- [ ] Fish: on sganggs #861, paste pr-descriptions/sganggs-angel2-talent-strike.md as the body and post the reply
+      (Chinese + English, in the 2026-10-27 report). The token can't write to sganggs's repo.
+- [ ] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). The token can't write to Yuri's repo.
 - `wip/sync-yuri-0.2.6`: stale; can be deleted. Yuri #14 merged and reached here with #39 / #54.
 - `wip/4` (2026-10-27): Fish's scratch branch, from main d115c384. `wip/3` is done: 801a9c64 reached main through
   #69, and its uncommitted remove-before-merge/ edits are in `git stash` ("wip/3: remove-before-merge/ edits …").
