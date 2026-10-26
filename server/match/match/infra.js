@@ -13,6 +13,8 @@ export const RISK_PATRIOT_CARD = 'risk:patriot';
 
 /** A player's total stacks: Σ of its alliance layers. */
 const stackTotal = (p) => Object.values(p.layers || {}).reduce((n, v) => n + (Number.isFinite(v) ? v : 0), 0);
+/** The stacks of a player's highest stacked active alliance (0 without one). */
+const topActiveStacks = (p) => Object.entries(p.bonds || {}).reduce((m, [id, b]) => (b && b.active && Number.isFinite(p.layers?.[id]) ? Math.max(m, p.layers[id]) : m), 0);
 
 /** A bounty entry of an SPA-CC sub-wave: no Funds, one battle. */
 const riskCard = (id, key, count, extra = {}) => ({ id, roundsLeft: 1, card: { effectId: id, enemyKey: key, count, coin: 0, payout: 'kill', rounds: 1, ...extra } });
@@ -132,14 +134,17 @@ export class MatchInfra {
   }
 
   /**
-   * ccVengeance: how many Reid, "Hateful Avenger" a battle gets — 1 per CC.vengeance.perStacks total stacks of `players`
-   * (Σ of their alliance layers; Invincible Blade 3: twice as many), at most 20 (a bounty card's cap).
+   * ccVengeance: how many Reid, "Hateful Avenger" a battle gets, by the highest stacked active alliance among the alive
+   * `players` (Fish 2026-10-23). Invincible Blade 1: 1 at CC.vengeance.perStacks stacks or more — in the final boss
+   * rounds (`boss`) always 1; Invincible Blade 3: 1 more per perStacks above perStacks. At most 20 (a bounty card's cap).
    */
-  vengeanceCount(players) {
+  vengeanceCount(players, { boss = false } = {}) {
     const V = CC.vengeance;
     if (!tagHas(this.lobbyRules, 'ccVengeance', 'blade1') || !this.gd.enemy(V.key)) return 0;
-    const stacks = players.reduce((n, p) => n + (p && p.alive ? stackTotal(p) : 0), 0);
-    return Math.min(20, Math.floor(stacks / V.perStacks) * (tagHas(this.lobbyRules, 'ccVengeance', 'blade3') ? 2 : 1));
+    const top = players.reduce((m, p) => (p && p.alive ? Math.max(m, topActiveStacks(p)) : m), 0);
+    if (!boss && top < V.perStacks) return 0;
+    const more = tagHas(this.lobbyRules, 'ccVengeance', 'blade3') ? Math.max(0, Math.floor((top - V.perStacks) / V.perStacks)) : 0;
+    return Math.min(20, 1 + more);
   }
 
   /**
@@ -167,8 +172,8 @@ export class MatchInfra {
       const atkMul = has('united2') ? dg.atkMul.united2 : 1;
       for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
     }
-    // ccVengeance: by the stacks of every alive player, once per field
-    const v = this.vengeanceCount(this.alivePlayers());
+    // ccVengeance: always at least 1, by the highest active alliance of any alive player, once per field
+    const v = this.vengeanceCount(this.alivePlayers(), { boss: true });
     if (v > 0) cards.push(riskCard('risk:vengeance', CC.vengeance.key, v, { leftFirst: true }));
     if (cards.length) out.set(first.playerId, cards);
     return out;

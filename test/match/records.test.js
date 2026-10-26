@@ -69,6 +69,8 @@ test('the record: seats, outcome, actions, shop rolls, round rows and battle spe
   const last = r.rounds[r.rounds.length - 1];
   assert.equal(last.r, recorded().m.round, 'a row for the last round');
   if (r.result.victory) assert.equal(last.final, true, 'the final boss round, marked');
+  // (GitHub #59) no gaps: a round started without a SETTLE before it (the Hidden Core after a Final Assault) has its row
+  assert.deepEqual(r.rounds.map((row) => row.r), Array.from({ length: last.r }, (_, i) => i + 1), 'a row for every round');
   for (const row of r.rounds) for (const s of Object.values(row.seats)) {
     for (const k of ['lp', 'level', 'funds', 'deployed', 'value', 'elites', 'items', 'layers']) assert.equal(typeof s[k], 'number', k);
     assert.ok(Array.isArray(s.units) && Array.isArray(s.bonds));
@@ -131,4 +133,19 @@ test('a human\'s own intents: recorded in order without the bot mark; a refused 
   assert.ok(mine.every((a) => a.s === 's0' && a.r === 1 && !('bot' in a)));
   assert.equal(mine[0].id, id);
   assert.deepEqual(mine[2].ids, ps.shop.slots.map((s) => (s ? s.id : null)), 'the new shop');
+});
+
+test('(GitHub #59) a round the next one starts after without a SETTLE gets its row, once', REAL, () => {
+  const h = makeMatch({ mode: 'solo', seats: [{ ...SEATS[0] }], seed: 21, record: true });
+  h.autoHumans();
+  h.m.start();
+  h.toPrep(2);
+  const rows = h.m._record.rounds;
+  assert.deepEqual(rows.map((row) => row.r), [1]);
+  // as the Final Assault won does (bossRounds.js: straight to the Hidden Core)
+  h.m.startRound(3);
+  assert.deepEqual(rows.map((row) => [row.r, !!row.noSettle]), [[1, false], [2, true]]);
+  for (const s of Object.values(rows[1].seats)) assert.equal(typeof s.lp, 'number');
+  h.toPrep(4);
+  assert.deepEqual(rows.map((row) => [row.r, !!row.noSettle]), [[1, false], [2, true], [3, false]]);
 });

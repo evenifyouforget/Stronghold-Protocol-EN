@@ -83,6 +83,8 @@ export class BattleLifecycle {
       this._phase('buffs', () => this._tickBuffs(dt));
       // Allies whose attack comes off cooldown this tick keep the target they have now, before enemies move.
       this._phase('attackCommit', () => noteAttackCommit(this, dt));
+      // pushed / pulled enemies slide one frame (battle/displacement.js _shiftStep; GitHub #60)
+      this._phase('shift', () => this._shiftStep());
       this._phase('enemies', () => {
         // enemies spawned by hooks during this loop start moving next tick (a leak hook that spawns an enemy which
         // leaks at once would otherwise loop forever inside a single tick)

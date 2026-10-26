@@ -321,7 +321,8 @@ export function createDataStore(opts = {}) {
     if (!r || r.base !== value || r.lang !== locale || r.backups !== backups) {
       const chessFile = localizedEntry('chess')?.value ?? entries.get('chess')?.value ?? null;
       const bondsFile = localizedEntry('bonds')?.value ?? entries.get('bonds')?.value ?? null;
-      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile }, ruleSet, { text: (s, params) => t(s, params) });
+      const garrisonsFile = localizedEntry('garrisons')?.value ?? entries.get('garrisons')?.value ?? null;
+      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile, garrisons: garrisonsFile }, ruleSet, { text: (s, params) => t(s, params) });
       const extra = patch[name] || {};
       r = { base: value, lang: locale, backups, value: Object.keys(extra).length ? { ...value, ...extra } : value, index: null };
       ruled.set(name, r);
@@ -348,7 +349,7 @@ export function createDataStore(opts = {}) {
 
   /** Show the records of a match with these lobby rules (shared/rules.js); null / no data change = the files as they are. */
   function setRules(rules) {
-    const next = rulesChangeData(rules) ? { virtuosaBonds: rules.virtuosaBonds === true, blaze: rules.blaze === true, lateranoMod: rules.lateranoMod ?? 'A', victoriaMod: rules.victoriaMod ?? 'A', ccInvestorBench: rules.ccInvestorBench || 0, ccSwift: rules.ccSwift || 0, ccJunk: rules.ccJunk || 0 } : null;
+    const next = rulesChangeData(rules) ? { virtuosaBonds: rules.virtuosaBonds === true, blaze: rules.blaze === true, lateranoMod: rules.lateranoMod ?? 'A', victoriaMod: rules.victoriaMod ?? 'A', ccInvestorBench: rules.ccInvestorBench || 0, ccSwift: rules.ccSwift || 0, ccJunk: rules.ccJunk || 0, boosterPack: rules.boosterPack === true, itemBoosterPack: rules.itemBoosterPack === true } : null;
     if (JSON.stringify(next) === JSON.stringify(ruleSet)) return;
     ruleSet = next;
     ruled.clear();

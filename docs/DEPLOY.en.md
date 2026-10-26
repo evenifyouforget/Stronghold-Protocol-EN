@@ -561,7 +561,7 @@ rooms, and the seed; per seat (`s0`–`s3`): human or AI, strategy, rounds passe
 the outcome; every action that changed the game, in order, without times (buys, sells, refreshes, level-ups, moves,
 equips, Arts, rewards, draft picks, AI takeover on or off; an action made by the AI for a seat is marked), every shop
 roll and every operator or item gained; a row per round (LP, shop level, funds, board, bonds, layers); and every
-battle's spec with the digest of its result; the round the match ended in has its row too. The battles are deterministic, so a battle replays from its spec.
+battle's spec with the digest of its result; every round has its row, including the one the match ended in and a Final Assault won before the Hidden Core. The battles are deterministic, so a battle replays from its spec.
 
 **What a record never holds**: player names or ids, room codes, IP addresses, tokens, browser or device details, times
 of day (only the date), emotes or chat, the "Report a problem" text. Seats are only `s0`–`s3`, human or AI: nothing

@@ -123,8 +123,11 @@ Listens on **TCP 3000** by default. To change the port: add `--port 3001` to the
 | `DEBUG` | empty | Set to any value for verbose logs |
 | `SP_NO_BROWSER` | empty | Set to `1` so the start script does not open the browser |
 | `SP_BOT_EMOTES` | empty | AI teammates' in-match emote reactions (instant `m.emote` broadcasts on battle, Rest Phase, merges, Joint Defense and gifts); set to `0` to turn them off entirely |
+| `SP_RECORDS` | off | (fork) Anonymous match records for statistics: `on` writes one gzipped JSON file per finished match to `logs/records/`, any other value names the folder. Read them with `node tools/records.mjs`; see below |
 
 How to set them: macOS / Linux `PORT=8080 npm start`; PowerShell `$env:PORT=8080; npm start`; cmd `set "PORT=8080" && npm start`. Health check: `GET /healthz`.
+
+**Match records** (fork, off by default): start the server with `SP_RECORDS=on` (e.g. `SP_RECORDS=on npm start`; cmd `set "SP_RECORDS=on" && npm start`). The log then says `[records] match records on: <folder>`, and every finished match except test rooms writes `logs/records/<YYYY-MM-DD>/<random id>.json.gz`. A record names no player, room or time of day. `node tools/records.mjs` prints the statistics (`--json` for JSON, `--verify` to replay the recorded battles). To share your data, zip a day's folder. For the background service, systemd, and what a record holds, see section 11 of [docs/DEPLOY.en.md](../docs/DEPLOY.en.md#11-match-records-optional-fish-edition).
 
 ### Playing with friends (LAN)
 
