@@ -1,6 +1,7 @@
-# GitHub issues (open, 2026-10-27)
+# GitHub issues (open, 2026-10-28)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37, now into `mini/0.3.1-3`
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
+  for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
@@ -11,12 +12,18 @@
 - #47 SPA-CC bug: Patriot (and Reid) still targeted while invulnerable: should be untargetable, 0 AoE damage, no Lure,
   but still slowed by Mostima's passive
 - #48 Visual bug: the Blood Debt bar lacks the Blood Debt icon
-- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin (priority, Yuri asked; answered in FINDINGS.md §6,
-  2026-10-27: feasible for most, pilot next)
+- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin (answered in FINDINGS.md §6). Fish's decision
+  (2026-10-27): SPA-CC stays in Fish Edition (Lockout etc. can't be plugins); port the compatible subset as plugins in
+  `evenifyouforget/spa-fish-edition-plugins` (plugins #1: four data-only cheats, merged 2026-10-27)
 - #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
   never stop (question, bot-players)
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
   (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
+- #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
+  main). Fixed in `wip/fixes-75-76`. Victoria Mod C's text has the same plain formatting (not reported)
+- #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
+  since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
+  left out Last Line: fixed in `wip/fixes-75-76`. Worth re-testing on a current server
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
@@ -200,7 +207,9 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 
 # mini/0.3.1-3 (from 2026-10-27)
 
-Base `mini/0.3.1-3` (= main d115c384). PRs into it: #37 (closes #27), the notes of 2026-10-27.
+Base `mini/0.3.1-3` (= main d115c384). PRs into it: #73 (the notes of 2026-10-27, merged), #37 (closes #27; waiting on
+j-tai), `wip/fixes-75-76` (closes #75, #76). #74 is the mini → main PR (Fish's draft; its description comes once the
+contents are settled).
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
@@ -245,10 +254,11 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [ ] kaltsit esperanta liftoff altitude bug fix: a bug from our #18, fixed here as #25; Yuri #20 (open).
 - [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (merged).
 
-# live PRs to watch (2026-10-27)
+# live PRs to watch (2026-10-28)
 
 - Yuri, all open, no comments yet: #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
-  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27).
+  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27; CI
+  green since 3a269451 brought sganggs's Pillow test fix). After #22 merges: step B, the sync into our main.
 - sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
   Yuri #19 becomes redundant once Yuri syncs 0.3.2.
 - sganggs #861 (TalentBomb's official strike): accepted 2026-10-26. sganggs squashed it into their dev (credited in
