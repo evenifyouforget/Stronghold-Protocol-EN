@@ -20,10 +20,15 @@
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
   (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
 - #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
-  main). Fixed in `wip/fixes-75-76`. Victoria Mod C's text has the same plain formatting (not reported)
+  main). Fixed in #80 (`wip/fixes-75-76`). Victoria Mod C's text has the same plain formatting (not reported)
 - #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
   since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
-  left out Last Line: fixed in `wip/fixes-75-76`. Worth re-testing on a current server
+  left out Last Line: fixed in #80. Worth re-testing on a current server
+- #77 ammo display options (feature): a number beside the bar (16/30), or no bar and a bullet status icon with the
+  count; a setting picks. Optional: ammo in the details pane. Not started: design choices for Fish
+- #78 the match history's end screen has no SPA-CC +N, tags or WITH CHEATS: records never kept the rules. Fixed in #82
+  (`wip/history-rules`); matches recorded before it can't get them back
+- #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (`wip/issue-templates`)
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
@@ -208,7 +213,7 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 # mini/0.3.1-3 (from 2026-10-27)
 
 Base `mini/0.3.1-3` (= main d115c384). PRs into it: #73 (the notes of 2026-10-27, merged), #37 (closes #27; waiting on
-j-tai), `wip/fixes-75-76` (closes #75, #76). #74 is the mini → main PR (Fish's draft; its description comes once the
+j-tai), #80 (closes #75, #76), #81 (closes #79), #82 (closes #78). #74 is the mini → main PR (Fish's draft; its description comes once the
 contents are settled).
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
