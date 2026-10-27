@@ -302,11 +302,11 @@ are the biggest loss.
 
 ### Cost and benefit
 
-- **Benefit:** the fork's gameplay diff against upstream (today ~2,600 lines across `shared/rules.js`, `ruleData.js`,
-  `risk.js`, `bossRisk.js`, `lobbyRules.js`, match hooks) would mostly move into `plugins/`, which syncs never touch.
+- **Benefit:** the fork's gameplay diff against upstream (about 2,000 added lines across `shared/rules.js`, `ruleData.js`,
+  `risk.js`, `bossRisk.js`, `lobbyRules.js`, the match and kit hooks) would mostly move into `plugins/`, which syncs never touch.
   Yuri would host it, so players on weishuxieyi.icu get it.
-- **Cost:** a rewrite against an experimental API, roughly one PR per plugin. It needs our main on 0.3.3 first (the
-  sync, step B), since 0.3.1's plugin API lacks parts used here. We'd lose the labels and the Risk grid, unless upstream
+- **Cost:** a rewrite against an experimental API, roughly one PR per plugin. It's best built on 0.3.3 (our main is on 0.3.1 until
+  the next sync), the version Yuri's site will run. We'd lose the labels and the Risk grid, unless upstream
   adds hooks. Settings ≤ 32 per plugin is enough for each of the three.
 - **Not verified yet:** that each hook does what its docs say for our cases (e.g. writing the deploy limit in
   `onBattleStart`, `onLevelUp`'s price, the plugin settings panel at 20+ settings). A pilot would settle it.
