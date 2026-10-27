@@ -210,6 +210,10 @@ function cursedHammerRecord(level, text) {
  *  alliance's name, {list} = the names of LATERANO_B_LIST. */
 export const LATERANO_B_TEXT = N_('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）');
 export const LATERANO_B_LIST = Object.freeze(['chess_char_4_02_a', 'chess_char_5_01_a', 'chess_char_6_01_a']);
+/** Laterano Mod B's ammo: +min(base + perStack × L, capBase + capPerStack × L) (server/sim/content/bonds/core.js). */
+export const LATERANO_B_AMMO = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003 });
+/** Mod B's own line of the alliance's text, between Mod A's ammo line and its 6-member line (GitHub #75). */
+export const LATERANO_B_100 = N_('<达到<@autochess.dgreen>100</>层>【{bond}】干员造成的伤害提升至<@ba.vup>200%</>；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限');
 export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带1件维式重锤回复8点技力；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤');
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
@@ -255,8 +259,26 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   }
   // the Alliance Modules: the alliance's text is the module's (its "current effect" line, Mod A's numbers, goes)
   const listNames = LATERANO_B_LIST.map((id) => own(raw.chess, id)?.name ?? id).join(text('、'));
+  // Laterano Mod B (GitHub #75): Mod A's own lines (in the player's language, rich text kept) around Mod B's 100-stack
+  // line, and the "current effect" line's ammo at Mod B's numbers (formatBondEffect's `min`; the keys are Mod B's own)
+  const lat = rules.lateranoMod === 'B' ? own(raw.bonds, 'lateranoShip') : null;
+  if (lat && typeof lat.descRaw === 'string' && lat.descRaw.includes('\n')) {
+    const line = text(LATERANO_B_100, { bond: lat.name ?? 'lateranoShip', list: listNames });
+    const plain = (s) => s.replace(/<@[^>]*>|<\/>/g, '');
+    const splice = (s) => { const [first, ...rest] = s.split('\n'); return [first, line, ...rest].join('\n'); };
+    const A = LATERANO_B_AMMO;
+    const effect = typeof lat.effectDescRaw === 'string' && lat.effectDescRaw.includes('\n') ? splice(lat.effectDescRaw) : null;
+    bonds.lateranoShip = {
+      ...lat, desc: plain(splice(lat.descRaw)), descRaw: splice(lat.descRaw),
+      bb: { ...lat.bb, fish_b_ammo: A.base, fish_b_ammo_per_stack: A.perStack, fish_b_ammo_cap: A.capBase, fish_b_ammo_cap_per_stack: A.capPerStack },
+      ...(effect ? {
+        effectDesc: plain(effect), effectDescRaw: effect,
+        effectDescParams: [{ index: 0, format: '0%', base: 'fish_b_ammo', perStack: 'fish_b_ammo_per_stack', min: { base: 'fish_b_ammo_cap', perStack: 'fish_b_ammo_cap_per_stack' } }],
+      } : { effectDesc: undefined, effectDescRaw: undefined, effectDescParams: undefined }),
+    };
+  }
   for (const { key, bondId, msg, params } of [
-    { key: 'lateranoMod', bondId: 'lateranoShip', msg: LATERANO_B_TEXT, params: { list: listNames } },
+    ...(bonds.lateranoShip ? [] : [{ key: 'lateranoMod', bondId: 'lateranoShip', msg: LATERANO_B_TEXT, params: { list: listNames } }]),
     { key: 'victoriaMod', bondId: 'victoriaShip', msg: VICTORIA_C_TEXT, params: {} },
   ]) {
     const rec = rules[key] && rules[key] !== 'A' ? own(raw.bonds, bondId) : null;

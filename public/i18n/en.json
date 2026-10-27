@@ -2417,6 +2417,7 @@
   "调整": "Edit",
   "随机": "Random",
   "【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）": "[{bond}] Operators gain +min(5 + 1 × stacks, 75 + 0.3 × stacks)% ammo on skill activation (original: 5 + 1.5 × stacks). <At 100 stacks> [{bond}] Operators deal 200% damage. Attributes that trigger on spending bullets ({list}) trigger twice; both triggers count toward the Attribute's per-battle limit. <With 6 different [{bond}] Operators on field> As the original (does not trigger twice)",
+  "<达到<@autochess.dgreen>100</>层>【{bond}】干员造成的伤害提升至<@ba.vup>200%</>；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限": "<At <@autochess.dgreen>100</> stacks> [{bond}] Operators deal <@ba.vup>200%</> damage; Attributes that trigger on spending bullets ({list}) trigger twice, and both triggers count toward the Attribute's per-battle limit",
   "{name}占据{old}在调度中心的位置（相同的阶级与价格，使用为{old}选择的技能），属于【{a}】【{b}】；<售出时>获得1名【{spark}】": "{name} takes {old}'s place in the shop (same Tier and price, using the skill chosen for {old}) and belongs to [{a}] and [{b}]; <When sold> gain 1 [{spark}]",
   "【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）": "[{bond}] SP recovery chance becomes 20% + 0.25% × stacks (was 0.35% × stacks)",
   "【{bond}】干员攻击速度-{n}（无论盟约是否激活）": "[{bond}] Operators ASPD -{n} (whether the Alliance is active or not)",

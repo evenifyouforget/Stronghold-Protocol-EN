@@ -243,10 +243,12 @@ export class MatchViews {
   _pendingLpView(ps) {
     if (!ps || !ps.alive || (this.phase !== PHASE.COMBAT && this.phase !== PHASE.UNITE)) return {};
     const counted = (r) => (r && Array.isArray(r.leaked) ? r.leaked.filter((l) => l && l.counted !== false).length : 0);
-    // 联防: a leaker's enemies still standing on the 联防 field (uncapped), the loss capped like settle()
+    // 联防: a leaker's enemies still standing on the 联防 field (uncapped), the loss as settle() bills it: their LP weights
+    // (a leaked Patriot 5, GitHub #76) capped per round, then the SPA-CC extras (Match.riskLoss: ccLastLine)
     const left = this._uniteLeft(ps);
     if (left != null) {
-      const loss = Math.min(this.gd.lpCapPerRound, left);
+      const own = this.lastResults.get(ps.playerId);
+      const loss = this.riskLoss(own && own.leaked, Math.min(this.gd.lpCapPerRound, this._uniteLeft(ps, true)), false);
       return loss > 0 ? { uniteLeft: left, pendingLp: loss } : { uniteLeft: left };
     }
     let n = 0;

@@ -20,6 +20,8 @@ import {
 import { createStore, emptyMatch } from '../../public/js/store.js';
 import { normalizeResult } from '../../public/js/ui/gameLogic.js';
 import { PHASE } from '../../shared/constants.js';
+import { DEFAULT_RULES, normalizeRules, ruleRisk } from '../../shared/rules.js';
+import { ruleBadges } from '../../public/js/ui/lobbyRules.js';
 
 /** A realistic m.result in the shape server/match/results.js buildResult emits (replayed byte-identically). */
 function baseResult(over = {}) {
@@ -144,6 +146,20 @@ describe('local stats: record building', () => {
     assert.ok(res);
     assert.equal(res.altArt, undefined);
     assert.equal(normalizeResult(res).altArt, false);
+  });
+  test('(fork) the rules in force are kept, and the history re-view shows the +N, the tags and WITH CHEATS (#78)', () => {
+    const rules = { ...DEFAULT_RULES, extraFunds: true, ccInvestorBench: 2, ccSwift: 9, bogus: 1 };
+    const rec = buildRecord(baseResult(), { myId: 'p1', now: 1, rules });
+    assert.deepEqual(rec.rules, { extraFunds: true, ccInvestorBench: 2 });
+    assert.deepEqual(compactRecord(rec).rules, rec.rules);
+    const badges = ruleBadges(normalizeRules(rec.rules));
+    assert.equal(badges.risk, ruleRisk('ccInvestorBench', 2));
+    assert.ok(badges.risk > 0);
+    assert.equal(badges.cheats, 'WITH CHEATS');
+    // no rule in force: no key at all, so the record (and its id) is the same as before
+    const plain = buildRecord(baseResult(), { myId: 'p1', now: 1, rules: { ...DEFAULT_RULES } });
+    assert.equal('rules' in plain, false);
+    assert.deepEqual(plain, buildRecord(baseResult(), { myId: 'p1', now: 1 }));
   });
   test('roomMode falls back to the modeId (single → solo, multi → coop, else null)', () => {
     assert.equal(roomModeOf('mode_multi_funny', null), 'coop');
