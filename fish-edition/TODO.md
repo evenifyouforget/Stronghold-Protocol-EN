@@ -11,7 +11,8 @@
 - #47 SPA-CC bug: Patriot (and Reid) still targeted while invulnerable: should be untargetable, 0 AoE damage, no Lure,
   but still slowed by Mostima's passive
 - #48 Visual bug: the Blood Debt bar lacks the Blood Debt icon
-- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin
+- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin (priority, Yuri asked; answered in FINDINGS.md §6,
+  2026-10-27: feasible for most, pilot next)
 - #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
   never stop (question, bot-players)
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
