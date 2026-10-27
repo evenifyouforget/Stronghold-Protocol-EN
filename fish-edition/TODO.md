@@ -1,6 +1,7 @@
-# GitHub issues (open, 2026-10-27)
+# GitHub issues (open, 2026-10-28; #75, #76, #78, #79 close when #74 reaches main)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37, now into `mini/0.3.1-3`
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
+  for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
@@ -11,11 +12,28 @@
 - #47 SPA-CC bug: Patriot (and Reid) still targeted while invulnerable: should be untargetable, 0 AoE damage, no Lure,
   but still slowed by Mostima's passive
 - #48 Visual bug: the Blood Debt bar lacks the Blood Debt icon
-- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin
+- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin (answered in FINDINGS.md §6). Fish's decision
+  (2026-10-27): SPA-CC stays in Fish Edition (Lockout etc. can't be plugins); port the compatible subset as plugins in
+  `evenifyouforget/spa-fish-edition-plugins` (plugins #1: four data-only cheats, merged 2026-10-27)
 - #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
   never stop (question, bot-players)
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
   (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
+- #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
+  main). Fixed in #80 (merged into `mini/0.3.1-3`). Victoria Mod C's text has the same plain formatting (not reported)
+- #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
+  since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
+  left out Last Line: fixed in #80. Worth re-testing on a current server
+- #77 ammo display options (feature): a number beside the bar (16/30), or no bar and a bullet status icon with the
+  count; a setting picks. Optional: ammo in the details pane. Not started: design choices for Fish. Fish
+  (2026-10-27): client-side only, every operator, "already partly there?" Answer (2026-10-28): partly. The setting
+  「显示弹药与能量数量」 (Ammo and Energy Counts, `ammoEnergyCount`, off by default, render/units.js
+  `_updateAmmoCount`) already draws "16/30" for every own and teammate operator, but under the bar, not to its right,
+  and it also turns on the caster energy count. Missing: the number to the right, the bar-less status-icon mode, and
+  ammo in the details pane (the card shows none)
+- #78 the match history's end screen has no SPA-CC +N, tags or WITH CHEATS: records never kept the rules. Fixed in #82
+  (merged into `mini/0.3.1-3`); matches recorded before it can't get them back
+- #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (merged into `mini/0.3.1-3`)
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
@@ -199,7 +217,10 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 
 # mini/0.3.1-3 (from 2026-10-27)
 
-Base `mini/0.3.1-3` (= main d115c384). PRs into it: #37 (closes #27), the notes of 2026-10-27.
+Base `mini/0.3.1-3` (= main d115c384). Merged into it: #73 (the notes of 2026-10-27), #80 (closes #75, #76), #81
+(closes #79), #82 (closes #78). Open: #83 (the notes of 2026-10-27/28), #37 (closes #27; waiting on j-tai). #74 is the
+mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
+template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
@@ -244,16 +265,16 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [ ] kaltsit esperanta liftoff altitude bug fix: a bug from our #18, fixed here as #25; Yuri #20 (open).
 - [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (merged).
 
-# live PRs to watch (2026-10-27)
+# live PRs to watch (2026-10-28)
 
 - Yuri, all open, no comments yet: #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
-  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art.
+  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27; CI
+  green since 3a269451 brought sganggs's Pillow test fix). After #22 merges: step B, the sync into our main.
 - sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
   Yuri #19 becomes redundant once Yuri syncs 0.3.2.
-- sganggs #861 (TalentBomb's official strike), open, needs an update: Fish confirmed it on screen; sganggs asks to
-  keep only TalentBomb's landing display and the coordinate passing, and drop the old kit changes (the talent sim
-  and `talent: true` are already in their dev, with radius 1.3, one target per round, 0.1 s apart). S3's untagged
-  blast stays as is. The same reasoning likely applies to Yuri #18.
+- sganggs #861 (TalentBomb's official strike): accepted 2026-10-26. sganggs squashed it into their dev (credited in
+  the commit message and CHANGELOG, since the commits' author is "Claude") and closed the PR by hand; it ships in
+  0.3.4. Yuri #18 becomes redundant once Yuri syncs 0.3.4.
 - Upstream: sganggs released 0.3.2 and 0.3.3 (2026-10-25, 267 commits after 0.3.1). Yuri's dev-0.2 hasn't synced
   them (still c05aa7e2, which #54 brought here). Next sync here waits for Yuri, or goes straight from sganggs.
 
@@ -262,9 +283,8 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [x] Upstream ports (2026-10-22): Fish opened them all (sganggs #861, #862; Yuri #18–#21). Status: live PRs above.
 - [x] sganggs #861 (`sg/angel2-talent-strike`): slimmed down as sganggs asked (2026-10-27): sganggs `dev` (f07b8965)
       merged in, the kit change dropped (dev's kit already marks the bombing `talent: true`); 4 files, render + test.
-- [ ] Fish: on sganggs #861, paste pr-descriptions/sganggs-angel2-talent-strike.md as the body and post the reply
-      (Chinese + English, in the 2026-10-27 report). The token can't write to sganggs's repo.
-- [ ] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). The token can't write to Yuri's repo.
+- [x] Fish: on sganggs #861, update the body and post the reply. Done; sganggs accepted it (2026-10-26).
+- [x] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). Done 2026-10-27.
 - `wip/sync-yuri-0.2.6`: stale; can be deleted. Yuri #14 merged and reached here with #39 / #54.
 - `wip/4` (2026-10-27): Fish's scratch branch, from main d115c384. `wip/3` is done: 801a9c64 reached main through
   #69, and its uncommitted remove-before-merge/ edits are in `git stash` ("wip/3: remove-before-merge/ edits …").
