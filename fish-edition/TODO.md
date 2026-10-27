@@ -1,4 +1,4 @@
-# GitHub issues (open, 2026-10-28)
+# GitHub issues (open, 2026-10-28; #75, #76, #78, #79 close when #74 reaches main)
 
 - #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
   for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
@@ -20,15 +20,20 @@
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
   (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
 - #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
-  main). Fixed in #80 (`wip/fixes-75-76`). Victoria Mod C's text has the same plain formatting (not reported)
+  main). Fixed in #80 (merged into `mini/0.3.1-3`). Victoria Mod C's text has the same plain formatting (not reported)
 - #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
   since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
   left out Last Line: fixed in #80. Worth re-testing on a current server
 - #77 ammo display options (feature): a number beside the bar (16/30), or no bar and a bullet status icon with the
-  count; a setting picks. Optional: ammo in the details pane. Not started: design choices for Fish
+  count; a setting picks. Optional: ammo in the details pane. Not started: design choices for Fish. Fish
+  (2026-10-27): client-side only, every operator, "already partly there?" Answer (2026-10-28): partly. The setting
+  「显示弹药与能量数量」 (Ammo and Energy Counts, `ammoEnergyCount`, off by default, render/units.js
+  `_updateAmmoCount`) already draws "16/30" for every own and teammate operator, but under the bar, not to its right,
+  and it also turns on the caster energy count. Missing: the number to the right, the bar-less status-icon mode, and
+  ammo in the details pane (the card shows none)
 - #78 the match history's end screen has no SPA-CC +N, tags or WITH CHEATS: records never kept the rules. Fixed in #82
-  (`wip/history-rules`); matches recorded before it can't get them back
-- #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (`wip/issue-templates`)
+  (merged into `mini/0.3.1-3`); matches recorded before it can't get them back
+- #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (merged into `mini/0.3.1-3`)
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
@@ -212,9 +217,10 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 
 # mini/0.3.1-3 (from 2026-10-27)
 
-Base `mini/0.3.1-3` (= main d115c384). PRs into it: #73 (the notes of 2026-10-27, merged), #37 (closes #27; waiting on
-j-tai), #80 (closes #75, #76), #81 (closes #79), #82 (closes #78). #74 is the mini → main PR (Fish's draft; its description comes once the
-contents are settled).
+Base `mini/0.3.1-3` (= main d115c384). Merged into it: #73 (the notes of 2026-10-27), #80 (closes #75, #76), #81
+(closes #79), #82 (closes #78). Open: #83 (the notes of 2026-10-27/28), #37 (closes #27; waiting on j-tai). #74 is the
+mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
+template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
@@ -278,7 +284,7 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [x] sganggs #861 (`sg/angel2-talent-strike`): slimmed down as sganggs asked (2026-10-27): sganggs `dev` (f07b8965)
       merged in, the kit change dropped (dev's kit already marks the bombing `talent: true`); 4 files, render + test.
 - [x] Fish: on sganggs #861, update the body and post the reply. Done; sganggs accepted it (2026-10-26).
-- [ ] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). The token can't write to Yuri's repo.
+- [x] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). Done 2026-10-27.
 - `wip/sync-yuri-0.2.6`: stale; can be deleted. Yuri #14 merged and reached here with #39 / #54.
 - `wip/4` (2026-10-27): Fish's scratch branch, from main d115c384. `wip/3` is done: 801a9c64 reached main through
   #69, and its uncommitted remove-before-merge/ edits are in `git stash` ("wip/3: remove-before-merge/ edits …").
