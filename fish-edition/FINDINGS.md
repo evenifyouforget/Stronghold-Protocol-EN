@@ -219,3 +219,98 @@ rules dialog, the result labels, rules in every battle spec).
    +15 % ATK, +15 % DEF, up to 5 stacks); in this mode only the two Silencers react to it (5 enemies do in the whole
    game). This mode's Silencer kit is stealth only. A custom version needs: when the gauge fills, what Asset
    Liquidation does, how long it lasts, and how the Silencers' 5 stacks build.
+
+## 6. Our gameplay changes as plugins (#52, 2026-10-27)
+
+Yuri's proposal (Yuri issue #13, 2026-10-21): if the Custom Lobby Modifications and SPA-CC can be made into plugins under
+upstream's 0.3.x plugin system, Yuri would merge them and host them on weishuxieyi.icu. Read against sganggs `dev` (0.3.3
+plus fixes): docs/PLUGINS.md §10–§13, docs/PLUGIN-API.md, docs/META.md §2.
+
+**Verdict: feasible for most of it.** Nearly every rule fits one of upstream's plugin parts, and the battle half of
+SPA-CC (`server/sim/content/risk.js`) is already written the way a script plugin is: `battle.on(…)` hooks and passive
+buffs, keyed off the rules. Six pieces need a small engine change in upstream, or are lost (below). The result labels
+are the biggest loss.
+
+### What upstream's plugin system offers
+
+| Part | Code? | What it can do | Server needs |
+|---|---|---|---|
+| Data patches (`content`) | no | change any number in `data/*.json` (`set` / `merge` / `append` …), add records: operators, enemies, items, bonds, modes. A value can come from a plugin setting (`{ "$setting": … }`) | nothing: on by default |
+| Rule switches | no | four fixed switches only (`shopBias`, `prepLoadout`, `morphPairing`, `unequip`); not extensible | nothing |
+| DSL | no | JSON skills, talents and small prep effects (funds, layers, grant an item), with conditions | nothing |
+| Offers | no | "pick one of N cards" windows at round start: funds, layers, an item or an operator | nothing |
+| Script: meta (`sp.meta.register`) | yes | the prep-side hooks of META §2: `onIncome`, `onPrice`, `onRoundStart`, `onSold`, `onBattleStart` (edit the battle input and the spawns), `onBattleResult` … | `SP_PLUGIN_SCRIPTS=sandbox` |
+| Script: battle (`sp.content.register({ install })`) | yes | per-battle `battle.on(…)` hooks, `sp.kit.statBuff`, new enemy kits, replacing an official kit (`overrides`) | same |
+| Cosmetic | no | art, models, audio, for records the installation already has the files of | nothing |
+| Interface (`ui`) | sandboxed iframe | a read-only panel; can't change the match | nothing |
+
+- **Settings:** a plugin may declare up to 32 settings, each a `boolean`, an `integer` (min/max) or an `enum`. The room's
+  host sets them in the room's 插件 panel (`room.setPlugins { plugins: [{ id, settings }] }`), and they are part of the
+  content hash. A Risk tag with levels 0–3 is one integer setting, so our rules map onto settings almost one to one.
+- **Marks:** every plugin room is marked 非官方 (unofficial) in the room, briefing, HUD and result, and kept out of the
+  statistics overview. This fits our categories in spirit, but replaces them (see the losses).
+- **Scripts are off by default.** A server runs them only with `SP_PLUGIN_SCRIPTS=sandbox` (SES compartments, a browser
+  Worker, a child process on the server). Without it, only the data / DSL / offers parts work. Yuri's site would need
+  sandbox mode on. Upstream marks the script API **experimental** (it may change within 0.3.x).
+- Per-battle state goes in `unit.mem` or a WeakMap; randomness comes from `battle.rng`; a callback budget of 8000 per
+  battle per plugin. risk.js already keeps to these.
+
+### Rule by rule
+
+| Our rule | Plugin part | Notes |
+|---|---|---|
+| +2 Funds | data or DSL | `economy.income` patch, or a prep-DSL funds grant each round |
+| Untimed | data | the modes' `prepTime` and `config.timers` (the training mode already uses 999) |
+| +2 Deployment Limit, double LP, one operator per tier, Booster Pack, Equipment Booster Pack | meta script (+ data for the two packs' item records) | `onBattleStart` / `onRoundStart` grants. The packs' sprites go in a cosmetic part, if the art is in the installation |
+| Laterano Mod B, Victoria Mod C | meta script (and battle script where the effect is in battle) | `bond:` handlers; plus the alliance texts through the plugin's `i18n` |
+| Virtuosa in Swift and Support, Blaze replaces Catherine | data | chess `bonds` patches; Blaze's record swap. To check: whether the shop-slot replacement fits `set` on the chess record |
+| Chosen map | partly | not a room option upstream. A mode per stage (a mode with a fixed stage) would do it, but clutters the mode list |
+| Chosen bans | partly | modes have `inactiveBondIds`; a fixed ban set per mode works, a host-picked set doesn't (32 settings can't hold one switch per alliance) |
+| Investor bench, Strategies one round later, tier-1 price, shop upgrade prices, Last Line | meta script | `onPrice`, `onLevelUp`, counters, `onBattleResult`. The Strategy delays touch ~15 band handlers: the plugin would wrap or replace their `band:` keys |
+| Swift 0.25 | data | one bond number |
+| Foresight −20 ASPD, SP recovery, leader DR, boss ATK, Deep Infiltration, Low Efficiency, Toxic Waste's ATK, Vengeance, Famiglia's ledger | battle script | already the shape of risk.js. The engine fields they use (`spRecoveryFlat`, `redeployMul`, `dpPerSec`, `burstLock`, `enemyScale`, `lpr`) all exist upstream |
+| Final boss HP | meta script | the pool size: `config.bossHpScale` patch, or `onBattleStart` |
+| Toxic Waste (the item) | data + meta script | a new item record; its "can't be replaced" rules need `item:` handlers |
+
+### What doesn't fit (needs upstream engine changes, or is lost)
+
+1. **The result labels.** "WITH CHEATS", "seeded" and "Ultimate+5" are drawn by core screens. A plugin room shows
+   非官方 and the plugin list instead. An interface plugin could show the Risk total in a side panel, not on the result
+   title. To keep them, upstream would need a small "plugin-supplied result label" API.
+2. **The rules dialog and its Risk grid.** Plugin settings show as generic controls in the 插件 panel. Usable, but not
+   the CC-style grid.
+3. **The shared boss pool's tags** (Originium Zone Arts / Physical, Lockout, Delegation United 2). These need the server
+   to hold and broadcast pool-wide state (`sharedBoss.setHold`, server/sim/bossRisk.js), which only exists on our fork.
+   It would be an upstream PR first: a generic "pool threshold" hook that plugins can use.
+4. **Patriot** (Undying). His record and stats come from our `tools/build-data.mjs` (`FORK_ENEMY_KEYS`), and his model
+   from our manifest entry. A plugin can add the enemy record and its kit (`sp.enemies.register`), but not his art
+   unless the installation already has it. His `moveFloor` mod is fork-only too.
+5. **Delegation United 3.** Its gate lives inside the official Degenbrecher kit (enemies/leaders.js). A plugin can only
+   replace that kit whole (`overrides`), which means copying upstream's kit and re-copying it after every upstream
+   change.
+6. **The fork's engine fixes are not gameplay mods**: shift physics and block shifting (#67), the match records, the
+   Windows zip fallback. They stay as code, and are better offered upstream as ordinary PRs.
+
+### Suggested split
+
+- **`fish-cheats`**: the seven cheats; data + meta script.
+- **`fish-alliances`**: Alliance Modules and the rebalanced alliances; data + meta script. No Risk, so it could even be
+  offered without the "cheat" framing.
+- **`spa-cc`**: the Risk tags; meta + battle script, needs sandbox mode. Patriot, the pool tags and United 3 stay out
+  until upstream has the hooks for them.
+- Seeded map and bans: drop, or propose upstream as a room option.
+
+### Cost and benefit
+
+- **Benefit:** the fork's gameplay diff against upstream (today ~2,600 lines across `shared/rules.js`, `ruleData.js`,
+  `risk.js`, `bossRisk.js`, `lobbyRules.js`, match hooks) would mostly move into `plugins/`, which syncs never touch.
+  Yuri would host it, so players on weishuxieyi.icu get it.
+- **Cost:** a rewrite against an experimental API, roughly one PR per plugin. It needs our main on 0.3.3 first (the
+  sync, step B), since 0.3.1's plugin API lacks parts used here. We'd lose the labels and the Risk grid, unless upstream
+  adds hooks. Settings ≤ 32 per plugin is enough for each of the three.
+- **Not verified yet:** that each hook does what its docs say for our cases (e.g. writing the deploy limit in
+  `onBattleStart`, `onLevelUp`'s price, the plugin settings panel at 20+ settings). A pilot would settle it.
+
+**Suggested next step:** a pilot plugin with three tags, one of each kind: Swift 0.25 (data), the tier-1 price (meta
+script), and Deep Infiltration (battle script). Built against 0.3.3 with `node tools/plugin.mjs new / check / test`,
+it shows how much of the rest is mechanical.
