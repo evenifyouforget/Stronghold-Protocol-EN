@@ -49,6 +49,13 @@ export const CC = Object.freeze({
   // Strategy 2 (Fish 2026-10-23): 伊奥莱塔·罗素's 统御号令 ATK / HP at most +50 %; 杜遥夜's 广交豪杰 the first refresh of a
   // round only (data: the first 2); 阿米娅's 众志合一 needs 1 more active alliance per tier (4 / 5 / 6)
   strategy2: Object.freeze({ ioletaCap: 0.5, duyaoyRefreshes: 1, amiyaExtra: 1 }),
+  // Strategy 1: the Strategy handlers whose `round` comes one round later (server/sim/content/bands/meta.js namedRound),
+  // and the Strategies that keep theirs, being by period (达马兹提: "every 5 rounds" in its text, Fish 2026-10-15)
+  strategyLate: Object.freeze({
+    keys: Object.freeze(['preparation_start_gain_chess_from_round', 'give_coin_in_round', 'prep_start_gain_chess_from_pool_in_round',
+      'gain_bond_char_per_round', 'round_start_bond_check_gain_layer', 'round_start_all_player_change_enemy_2']),
+    periodic: Object.freeze(['band_damaztic']),
+  }),
   upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
   spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
@@ -218,18 +225,52 @@ export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true
+  || rules.ccStrategyLate > 0));
+
+// The round numbers a Strategy's text names, in each language's data: zh / zh-TW 第4、7、10回合, en "Round(s) 4, 7 and 10",
+// ja 第4/7/10ラウンド (not "2ラウンドごと", every 2 rounds), ko 4/7/10라운드 (not "2라운드마다"). Each match is a group of numbers.
+const ROUND_GROUPS = [/第\d+(?:、\d+)*回合/g, /\b[Rr]ounds? \d+(?:(?:, | and |, and )\d+)*/g, /\d+(?:[/、]\d+)*ラウンド(?!ごと)/g, /\d+(?:\/\d+)*라운드(?!마다)/g];
+/**
+ * Strategy 1 (GitHub #88): `text` with each of `rounds` it names as a round moved one round later, through `mark` (the
+ * rich text highlights it). Other numbers (tiers, counts, "every 2 rounds") stay.
+ */
+function shiftRounds(text, rounds, mark) {
+  if (typeof text !== 'string') return text;
+  let out = text;
+  for (const re of ROUND_GROUPS) out = out.replace(re, (g) => g.replace(/\d+/g, (n) => (rounds.has(Number(n)) ? mark(Number(n) + 1) : n)));
+  return out;
+}
+/**
+ * Strategy 1: the Strategy records whose named rounds come one round later (CC.strategyLate), their texts with the
+ * new rounds, highlighted in `descRaw`. A record whose text names none of them is left out.
+ */
+function strategyLateBands(bands) {
+  const out = {};
+  if (!bands || typeof bands !== 'object') return out;
+  for (const [id, b] of Object.entries(bands)) {
+    if (!b || CC.strategyLate.periodic.includes(id) || !Array.isArray(b.buffs)) continue;
+    const rounds = new Set(b.buffs.filter((x) => x && CC.strategyLate.keys.includes(x.key) && Number.isInteger(x.bb?.round)).map((x) => x.bb.round));
+    if (!rounds.size) continue;
+    const desc = shiftRounds(b.desc, rounds, String);
+    const descRaw = shiftRounds(b.descRaw ?? b.desc, rounds, (n) => `<@ba.vup>${n}</>`);
+    if (desc !== b.desc || descRaw !== (b.descRaw ?? b.desc)) out[id] = { ...b, desc, descRaw };
+  }
+  return out;
+}
 
 /**
- * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
+ * The records `rules` change: `{ chess, garrisons, bonds, items, bands: { [id]: record } }` — new objects, the inputs are not
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
- * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object }} raw the raw data maps (id → record)
+ * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object, bands?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
  * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
 export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
   const chess = {}, garrisons = {}, bonds = {}, items = {};
-  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items };
+  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items, bands: {} };
+  // SPA-CC Strategy 1: the Strategies' texts name their rounds one round later (only the client passes `bands`)
+  const bands = rules.ccStrategyLate > 0 ? strategyLateBands(raw.bands) : {};
   // SPA-CC Junk: the Toxic Waste
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // the boosterPack cheat: the Booster Pack
@@ -319,5 +360,5 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
       };
     }
   }
-  return { chess, garrisons, bonds, items };
+  return { chess, garrisons, bonds, items, bands };
 }

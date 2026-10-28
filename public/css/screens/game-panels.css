@@ -426,6 +426,10 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
 .istage b { color: var(--text-hi); }
 .ihead { font-size: calc(.16 * var(--t)); color: var(--mint-400); display: flex; gap: .08rem; align-items: baseline; }
 .ihead small { color: var(--text-lo); font-size: calc(.14 * var(--t)); }
+/* (fork) the room's rules in force (GitHub #86; the chips: .rules-chip in screens/room.css) */
+.irules { display: flex; flex-direction: column; gap: .06rem; }
+.ihead .irules__risk { color: #ffb48a; font-weight: 700; }
+.ihead .irules__cheats { color: #ff9a86; font-weight: 700; }
 .ibonds { display: flex; flex-wrap: wrap; gap: .06rem; }
 .ibond { display: inline-flex; align-items: center; gap: .05rem; padding: .03rem .08rem .03rem .04rem; font-size: calc(.14 * var(--t)); border: 1px solid var(--line-2); color: var(--text-md); }
 .ibond.is-off { color: var(--text-dim); background: rgba(255, 255, 255, .02); text-decoration: line-through; text-decoration-color: rgba(255, 84, 84, .6); }

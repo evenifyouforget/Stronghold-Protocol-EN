@@ -43,6 +43,19 @@ export function ruleLabel(key, rules) {
   }
 }
 
+/**
+ * The rules in force as chips, in RULES order: the result screen's list and the in-game 本局信息 tab's (GitHub #86). A Risk
+ * tag's chip carries its effects (every level in force) as its tooltip.
+ * @param {{ rules: any }} props
+ */
+export function RulesChips({ rules }) {
+  return html`<ul class="rules-chips">${rulesInForce(rules).map((k) => {
+    const r = ruleOf(k);
+    const tip = r.type === 'level' ? levelsInForce(r, rules[k]).map((l) => riskText(k, l).full).join('\n') : undefined;
+    return html`<li key=${k} class=${`rules-chip rules-chip--${r.category}`} title=${tip}>${ruleLabel(k, rules)}</li>`;
+  })}</ul>`;
+}
+
 /** The result-title suffix and watermark of `rules`: `{ seeded, cheats, risk }` (null / 0 when not labelled). */
 export function ruleBadges(rules) {
   const l = ruleLabels(rules);
