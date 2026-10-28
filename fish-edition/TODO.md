@@ -24,16 +24,31 @@
 - #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
   since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
   left out Last Line: fixed in #80. Worth re-testing on a current server
-- #77 ammo display options (feature): a number beside the bar (16/30), or no bar and a bullet status icon with the
-  count; a setting picks. Optional: ammo in the details pane. Not started: design choices for Fish. Fish
-  (2026-10-27): client-side only, every operator, "already partly there?" Answer (2026-10-28): partly. The setting
-  「显示弹药与能量数量」 (Ammo and Energy Counts, `ammoEnergyCount`, off by default, render/units.js
-  `_updateAmmoCount`) already draws "16/30" for every own and teammate operator, but under the bar, not to its right,
-  and it also turns on the caster energy count. Missing: the number to the right, the bar-less status-icon mode, and
-  ammo in the details pane (the card shows none)
 - #78 the match history's end screen has no SPA-CC +N, tags or WITH CHEATS: records never kept the rules. Fixed in #82
   (merged into `mini/0.3.1-3`); matches recorded before it can't get them back
 - #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (merged into `mini/0.3.1-3`)
+- #84 SPA-CC: Investor 2 / Strategy 2 show only their level-2 effect. Real, text only: the sim applies both levels (and
+  Junk 2 too); the rules dialog treated every chain as replacing. Fixed in #94 (`wip/spacc-text-84-91`)
+- #86 feature: the rules (SPA-CC tags included) in the match's Match Info tab (本局信息). Not started; small: the
+  result screen's rules list already exists to reuse
+- #87 feature: show an AI player's personality / profile. There are no bot profiles yet, here or upstream (only
+  `BOT_NAMES`); waits for the bot-player research (ai-players.md)
+- #88 feature: under Strategy 1, highlight the changed round numbers in the Strategy texts. Found: the texts don't
+  change at all under Strategy 1 (Jessica still says 4/7/10/13; the game uses 5/8/11/14), for the 9 Strategies whose
+  text names rounds. Not started: needs a text patch per Strategy (shared/ruleData.js), then the colour
+- #89 feature: English names for the AI players. `BOT_NAMES` (server/lobby.js) are six operator names in Chinese
+  ("AI·华法琳" …), upstream marks them i18n-ignore. Not started; a client-side translation of "AI·<operator>" through
+  the operator names would cover every language
+- #90 Du Yaoye's 2nd refresh without a Yan operator: not reproduced in code. The counter goes up before the hook
+  (refreshes 1 and 2 pass, test/content/bands.test.js checks both); the trait adds one only if the shared pool still
+  has a Yan operator at or below the shop level (level 1: only Leizi; level 2: + Xiaoman), which the text's 优先
+  allows. Needs the replay's shop level and who held those copies
+- #91 Last Line of Defense's wording. The rule matches Fish's description (once per round, also after Unite, past
+  the 10 LP cap, up to 12), except the 2 LP is charged at settlement, not instantly. Text reworded in #94
+- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposes 0.2/0.4/0.6. Fish's call
+  (`CC.spRecovery`, shared/ruleData.js). Against #93's rule 3, level 3's change is 25 %, not a halving
+- #93 SPA-CC balance guidelines (tracking, Fish's post): no change needed
+- Closed 2026-10-27/28: #77 (the count under the bar is enough, Fish), #85 (not a bug: the match had no Investor 1).
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
