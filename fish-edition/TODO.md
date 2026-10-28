@@ -42,12 +42,34 @@
 - #90 Du Yaoye's 2nd refresh without a Yan operator: not reproduced in code. The counter goes up before the hook
   (refreshes 1 and 2 pass, test/content/bands.test.js checks both); the trait adds one only if the shared pool still
   has a Yan operator at or below the shop level (level 1: only Leizi; level 2: + Xiaoman), which the text's 优先
-  allows. Needs the replay's shop level and who held those copies
+  allows. Replays of 2026-10-27/28 (logs/, 3 Du Yaoye matches): every Yan operator bought from a slot the trait
+  filled came on refresh 1 or 2 of its round (35f692: 9, 290f7d: 7), none on a 3rd: consistent with the code. Not
+  settled: a record logs the shop right after the roll, before the trait (server/match/records.js `shop`), so a
+  refresh where the trait added nothing can't be seen. Logging the shop after onRefresh too would settle the next one
 - #91 Last Line of Defense's wording. The rule matches Fish's description (once per round, also after Unite, past
   the 10 LP cap, up to 12), except the 2 LP is charged at settlement, not instantly. Text reworded in #94
-- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposes 0.2/0.4/0.6. On hold (Fish, 2026-10-29)
+- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposed 0.2/0.4/0.6, then (comments of
+  2026-10-28) argued for 0.1/0.3/0.5: 1 − 0.8 vs 1 − 0.6 SP/s is a doubling, and fewer skills mean less stack scaling.
+  On hold (Fish, 2026-10-29)
   (`CC.spRecovery`, shared/ruleData.js). Against #93's rule 3, level 3's change is 25 %, not a halving
 - #93 SPA-CC balance guidelines (tracking, Fish's post): no change needed
+- #98 the title screen's version doesn't tell Fish Edition from Yuri's: real. Both say v0.3.1 (shared/constants.js
+  APP_VERSION). Also: the title's 项目仓库 (project repo) links sganggs; "About this server" (public/js/ui/about.js,
+  Yuri's) says the server is run by Yuri, with Yuri's repo and email, on any server running Fish Edition. It already
+  shows branch / commit from public/server-info.json (scripts/server-info.mjs, run before start on Yuri's VPS). Not
+  started: needs Fish's text for the About panel (who runs which server: per-server settings?)
+- #99 a detailed, mostly automatic version info / changelog from git, like fcsim (its SConstruct writes version.js:
+  the last tag and `git log <tag>..HEAD --oneline`, linked). Proposal: extend scripts/server-info.mjs (or the server's
+  boot) with the edition, the commit and the commits since the last release tag (on main: the mini squash titles), and
+  a "What's new" panel on the title screen; tools/package.mjs writes the same into release zips. Not started
+- #100 an in-game link to a new issue with the template open and the version filled in. Today: Settings → 问题反馈
+  copies diagnostics and names sganggs's issues (public/js/ui/settings.js ISSUES_URL). Proposal: point it at this repo,
+  and add "Report a bug" / "Suggest a feature" links to issues/new?template=BugReport(.en).yml&version=<version>
+  (issue forms prefill a field by its id), the English template for English. Not started; small
+- Replays of 2026-10-27/28 (logs/2026-10-27 records.tar.xz, 7 matches): `tools/records.mjs --verify`: 171 battles
+  replay the same, 2 differ (32cd92, seat s0, rounds 3 and 4), on main as on mini. Same kills and the same 8 / 9 leaks;
+  the difference is in what the record keeps only as a hash (time, damage, units' end HP / SP, coins, stacks), and
+  `app` says only "0.3.1", not the build. Lead, not chased: record the commit (see #98 / #99) and the digest's JSON
 - Closed 2026-10-27/28: #77 (the count under the bar is enough, Fish), #85 (not a bug: the match had no Investor 1).
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
