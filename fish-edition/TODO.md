@@ -1,4 +1,4 @@
-# GitHub issues (open, 2026-10-28; #75, #76, #78, #79 close when #74 reaches main)
+# GitHub issues (open, 2026-10-29; #75, #76, #78, #79, #84, #91 close when #74 reaches main)
 
 - #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
   for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
@@ -28,24 +28,24 @@
   (merged into `mini/0.3.1-3`); matches recorded before it can't get them back
 - #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (merged into `mini/0.3.1-3`)
 - #84 SPA-CC: Investor 2 / Strategy 2 show only their level-2 effect. Real, text only: the sim applies both levels (and
-  Junk 2 too); the rules dialog treated every chain as replacing. Fixed in #94 (`wip/spacc-text-84-91`)
-- #86 feature: the rules (SPA-CC tags included) in the match's Match Info tab (本局信息). Not started; small: the
-  result screen's rules list already exists to reuse
+  Junk 2 too); the rules dialog treated every chain as replacing. Fixed in #94 (merged into `mini/0.3.1-3`)
+- #86 feature: the rules (SPA-CC tags included) in the match's Match Info tab (本局信息). Fish: yes (2026-10-29). In
+  `wip/display-86-88-89` (#96)
 - #87 feature: show an AI player's personality / profile. There are no bot profiles yet, here or upstream (only
   `BOT_NAMES`); waits for the bot-player research (ai-players.md)
-- #88 feature: under Strategy 1, highlight the changed round numbers in the Strategy texts. Found: the texts don't
-  change at all under Strategy 1 (Jessica still says 4/7/10/13; the game uses 5/8/11/14), for the 9 Strategies whose
-  text names rounds. Not started: needs a text patch per Strategy (shared/ruleData.js), then the colour
-- #89 feature: English names for the AI players. `BOT_NAMES` (server/lobby.js) are six operator names in Chinese
-  ("AI·华法琳" …), upstream marks them i18n-ignore. Not started; a client-side translation of "AI·<operator>" through
-  the operator names would cover every language
+- #88 feature: under Strategy 1, highlight the changed round numbers in the Strategy texts. Found: the texts didn't
+  change at all under Strategy 1 (Jessica still said 4/7/10/13; the game uses 5/8/11/14). Fish: fix it and highlight
+  (2026-10-29). In #96: the 12 Strategies whose rounds move, in every language. Strategy 2's three Strategy changes
+  (Ioleta, Du Yaoye, Amiya) still aren't in their texts
+- #89 feature: English names for the AI players. Fish: yes (2026-10-29). In #96: the host's client sends its language
+  with room.addBot / queue.ai and the server names the AI in it (en / ja / ko / zh-TW, else Chinese)
 - #90 Du Yaoye's 2nd refresh without a Yan operator: not reproduced in code. The counter goes up before the hook
   (refreshes 1 and 2 pass, test/content/bands.test.js checks both); the trait adds one only if the shared pool still
   has a Yan operator at or below the shop level (level 1: only Leizi; level 2: + Xiaoman), which the text's 优先
   allows. Needs the replay's shop level and who held those copies
 - #91 Last Line of Defense's wording. The rule matches Fish's description (once per round, also after Unite, past
   the 10 LP cap, up to 12), except the 2 LP is charged at settlement, not instantly. Text reworded in #94
-- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposes 0.2/0.4/0.6. Fish's call
+- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposes 0.2/0.4/0.6. On hold (Fish, 2026-10-29)
   (`CC.spRecovery`, shared/ruleData.js). Against #93's rule 3, level 3's change is 25 %, not a halving
 - #93 SPA-CC balance guidelines (tracking, Fish's post): no change needed
 - Closed 2026-10-27/28: #77 (the count under the bar is enough, Fish), #85 (not a bug: the match had no Investor 1).
@@ -233,7 +233,8 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 # mini/0.3.1-3 (from 2026-10-27)
 
 Base `mini/0.3.1-3` (= main d115c384). Merged into it: #73 (the notes of 2026-10-27), #80 (closes #75, #76), #81
-(closes #79), #82 (closes #78). Open: #83 (the notes of 2026-10-27/28), #37 (closes #27; waiting on j-tai). #74 is the
+(closes #79), #82 (closes #78), #83 (the notes of 2026-10-27/28), #94 (closes #84, #91), #95 (the notes of 2026-10-28).
+Open: #96 (closes #86, #88, #89), #37 (closes #27; waiting on j-tai). #74 is the
 mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
 template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
