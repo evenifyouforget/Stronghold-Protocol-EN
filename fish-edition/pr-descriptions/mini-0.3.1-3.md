@@ -22,8 +22,8 @@ Base: `main`. Branch `mini/0.3.1-3`. Squash-merged: the squash commit's message 
 - **Issue templates** (#81, closes #79): the "latest version" badge shows our main's version (it showed sganggs's 0.3.3) and the links point at this repo.
 
 ### Fork notes
-- The notes of the loops of 2026-10-27 to 10-29 (#73, #83, #95, #97):
-  - TODO.md, with the triage of #84–#93;
+- The notes of the loops of 2026-10-27 to 10-29 (#73, #83, #95, #97, #101):
+  - TODO.md, with the triage of #84–#93 and #98–#100, and the replays of 2026-10-27/28;
   - STANDARD_LOOP.md rewritten into 11 steps;
   - FINDINGS.md §6: which gameplay changes could be plugins (#52);
   - ai-players.md: #71 / #72;
@@ -45,4 +45,5 @@ Closes #91
 - **AI names:** an AI keeps the host's language; someone in the room with another language sees the host's names.
 - Victoria Mod C's alliance text has the same one-paragraph formatting #75 reported for Laterano (not reported, not changed).
 - **Not in this release:** #37 (closes #27) is waiting on j-tai's sourceless-damage version.
+- **Windows CI timing flake:** the plugin sandbox's 5 s setup limit, on a busy Windows runner. Since #66 it was `test/studio/review.test.js`; on this PR's first run it was `test/plugins/script-sandbox-integration.test.js` ("script setup exceeded 5000 ms", Windows node 22, shard 1/3). The failed job was re-run.
 - **Not checked on screen:** no game assets in the CI or dev container.
