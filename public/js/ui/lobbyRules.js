@@ -50,6 +50,11 @@ export function ruleBadges(rules) {
 }
 
 const pct = (v) => Math.round(v * 100);
+/** Last Line of Defense (GitHub #91: once per round, past the cap, so a round costs at most cap + n). */
+function lastLineText() {
+  const cap = data.get('config')?.lpCapPerRound ?? 10;
+  return t('每回合自己的作战只要漏过敌人，结算时额外扣除{n}点目标生命（每回合一次，不论漏过几个；即使联防消灭了所有漏过的敌人也照扣；不计入每回合{cap}点的扣除上限，因此一回合最多扣除{max}点）', { n: CC.lastLineLp, cap, max: cap + CC.lastLineLp });
+}
 /**
  * The texts of SPA-CC Risk tag `key` at `level` (1 …): `short` (the grid tile, the strip) and `full` (the effects list).
  * Alliance and enemy names come from the data.
@@ -74,7 +79,7 @@ export function riskText(key, level) {
     case 'ccLeaderDr': return { short: t('源石区域：元素 {n}', { n: level }), full: t('领袖（最终领袖与领袖级悬赏敌人）受到的物理与法术伤害-{n}%，处于元素爆发效果时除外', { n: pct(CC.leaderDr[level]) }) };
     case 'ccDeepInfiltration': return { short: t('目标：深入敌阵'), full: t('部署费用的回复速度-{n}%', { n: pct(1 - CC.dpPerSecMul) }) };
     case 'ccLowEfficiency': return { short: t('目标：低效'), full: t('我方单位的再部署时间+{n}%', { n: pct(CC.redeployMul - 1) }) };
-    case 'ccLastLine': return { short: t('目标：最后防线'), full: t('每回合自己的作战漏过敌人时额外扣除{n}点目标生命（即使联防中没有漏怪；不受每回合扣除上限限制）', { n: CC.lastLineLp }) };
+    case 'ccLastLine': return { short: t('目标：最后防线'), full: lastLineText() };
     case 'ccOzArts': return { short: t('源石区域：法术'), full: t('最终领袖受到的法术伤害累计达到其最大生命值的{p}%后，法术抗性+{n}', { p: pct(CC.ozArts.share), n: CC.ozArts.res }) };
     case 'ccOzPhys': return { short: t('源石区域：物理'), full: t('最终领袖受到的物理伤害累计达到其最大生命值的{p}%后，防御力+{n}', { p: pct(CC.ozPhys.share), n: CC.ozPhys.def }) };
     case 'ccLockout': return { short: t('源石区域：封锁 {n}', { n: level }), full: t('最终领袖每损失{p}%最大生命值，获得{s}秒无敌（期间生命值不会继续减少）', { p: pct(CC.lockout.every[level]), s: CC.lockout.seconds }) };
@@ -137,9 +142,12 @@ function delegationText(node, enemyName) {
   }
 }
 
-/** The levels a tag's chosen level includes, top first (a tag group's ancestors; a chain's level alone). */
-function levelsInForce(r, level) {
-  if (!Array.isArray(r.parent)) return level > 0 ? [level] : [];
+/**
+ * The levels a tag's chosen level includes, top first: a tag group's ancestors; a `stacks` chain's levels up to it
+ * (GitHub #84: Investor 2 lists Investor 1's effect too); another chain's level alone.
+ */
+export function levelsInForce(r, level) {
+  if (!Array.isArray(r.parent)) return level > 0 ? (r.stacks ? Array.from({ length: Math.min(level, 16) }, (_, i) => i + 1) : [level]) : [];
   const out = [];
   for (let l = level; l > 0 && out.length < 16; l = tagParent(r.key, l)) out.unshift(l);
   return out;
