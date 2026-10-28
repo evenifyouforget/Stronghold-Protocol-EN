@@ -39,7 +39,7 @@ import { net } from '../net.js';
 import { audio } from '../audio.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
 import { difficultyInfo } from './lobby.js';
-import { t, tc } from '../../../shared/i18n.js';
+import { t, tc, getLang } from '../../../shared/i18n.js';
 import { SearchBar, SearchButton, SearchStatus, useSearchNotice, useFindMates, canFindMates } from '../ui/matchSearch.js';
 import { OnlinePill } from '../ui/presence.js';
 import { publicPath } from '../gen.js';
@@ -283,7 +283,8 @@ export function RoomScreen() {
   // the strategy draft's 确认选择 sound on ready (gameActions SUCCESS_SFX g.band), 'back' on cancel — as the HUD's g.ready
   const toggleReady = () => run('ready', async () => { const on = !myReady; await net.request('room.ready', { ready: on }); audio.sfx(on ? 'confirm' : 'back'); });
   const start = () => run('start', () => net.request('room.start', {}));
-  const addBot = () => run('add', () => net.request('room.addBot', {}));
+  // (fork) the AI is named in this client's language (GitHub #89)
+  const addBot = () => run('add', () => net.request('room.addBot', { lang: getLang() }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
   // the host removes a human before the match (community report #17): asked first; the player may join again. The
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.

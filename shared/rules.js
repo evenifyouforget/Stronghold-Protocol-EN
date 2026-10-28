@@ -30,8 +30,9 @@ export const RULE_EXTRA_FUNDS = 2;
 export const RULE_BANS_MAX = 12;
 
 /**
- * The rules, in the order the room screen lists them.
- * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number[], nodes?: (string|null)[], parent?: number[] }>}
+ * The rules, in the order the room screen lists them. `stacks` (a Risk tag chain): each level adds to the ones below it,
+ * which stay in force (the sim reads `> 0` for level 1's part); otherwise a chain's level replaces the ones below.
+ * @type {ReadonlyArray<{ key: string, type: string, category: string, options?: string[], risk?: number[], nodes?: (string|null)[], parent?: number[], stacks?: boolean }>}
  */
 export const RULES = Object.freeze([
   // cheats
@@ -52,10 +53,10 @@ export const RULES = Object.freeze([
   { key: 'stage', type: 'stage', category: 'seeded' },
   { key: 'bans', type: 'bans', category: 'seeded' },
   // SPA-CC Risk tags (FINDINGS.md §5)
-  { key: 'ccInvestorBench', type: 'level', risk: [0, 1, 2], category: 'risk' }, // 投资人: the bench no longer counts (2: 缪尔赛思 / 耶拉 / 焰尾 grant when sold)
+  { key: 'ccInvestorBench', type: 'level', risk: [0, 1, 2], stacks: true, category: 'risk' }, // 投资人: the bench no longer counts (2: 缪尔赛思 / 耶拉 / 焰尾 grant when sold)
   { key: 'ccSwift', type: 'level', risk: [0, 1], category: 'risk' },         // 迅捷: 20 + 0.25 × stacks % (was 0.35)
   { key: 'ccForesight', type: 'level', risk: [0, 1], category: 'risk' },     // 远见 operators −20 ASPD, active or not
-  { key: 'ccStrategyLate', type: 'level', risk: [0, 1, 2], category: 'risk' }, // Strategies' named rounds one round later (2: 伊奥莱塔 ≤ 50 %, 杜遥夜 1 refresh, 阿米娅 +1 alliance)
+  { key: 'ccStrategyLate', type: 'level', risk: [0, 1, 2], stacks: true, category: 'risk' }, // Strategies' named rounds one round later (2: 伊奥莱塔 ≤ 50 %, 杜遥夜 1 refresh, 阿米娅 +1 alliance)
   { key: 'ccTier1Price', type: 'level', risk: [0, 1], category: 'risk' },    // from round 3, the first tier-1 operator +1
   { key: 'ccUpgrade', type: 'level', risk: [0, 1, 2], category: 'risk' },    // shop upgrade 4→5 +2 (2: and 5→6 +3)
   { key: 'ccSpRecovery', type: 'level', risk: [0, 1, 2, 3], category: 'risk' }, // time SP −0.2 / 0.5 / 0.8 per s
@@ -64,7 +65,7 @@ export const RULES = Object.freeze([
   { key: 'ccDeepInfiltration', type: 'level', risk: [0, 1], category: 'risk' }, // DP generation −50 %
   { key: 'ccLowEfficiency', type: 'level', risk: [0, 1], category: 'risk' },  // redeployment time +75 %
   { key: 'ccLastLine', type: 'level', risk: [0, 1], category: 'risk' },       // the first leak each round: +2 LP, past the cap
-  { key: 'ccJunk', type: 'level', risk: [0, 1, 2], category: 'risk' },       // Toxic Waste for everyone (2: −1 income unequipped)
+  { key: 'ccJunk', type: 'level', risk: [0, 1, 2], stacks: true, category: 'risk' },       // Toxic Waste for everyone (2: −1 income unequipped)
   { key: 'ccOzArts', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +50 RES after 50 % of its pool as Arts
   { key: 'ccOzPhys', type: 'level', risk: [0, 1], category: 'risk' },         // final boss +5000 DEF after 50 % as Physical
   { key: 'ccLockout', type: 'level', risk: [0, 1, 2, 3], category: 'risk' },  // final boss invulnerable 10 s every 68/28/18 %

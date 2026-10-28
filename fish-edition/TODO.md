@@ -1,13 +1,55 @@
-# GitHub issues (for contributors to claim, 2026-10-21)
+# GitHub issues (open, 2026-10-29; #75, #76, #78, #79, #84, #91 close when #74 reaches main)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue)
-- #28 Windows CI: intermittent zip-reader test (bug, good first issue)
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
+  for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
 - #32 Opt-in anonymous match records + tools/records.mjs
 - #33 Gameplay accuracy audit (tracking)
 - #34 Effects: official effects instead of placeholders (Lemuen first)
+- #36 What strategy do the AI players use? Is it optimized? (answered in ai-players.md)
+- #47 SPA-CC bug: Patriot (and Reid) still targeted while invulnerable: should be untargetable, 0 AoE damage, no Lure,
+  but still slowed by Mostima's passive
+- #48 Visual bug: the Blood Debt bar lacks the Blood Debt icon
+- #52 Feasibility: SPA-CC and the other gameplay changes as a plugin (answered in FINDINGS.md §6). Fish's decision
+  (2026-10-27): SPA-CC stays in Fish Edition (Lockout etc. can't be plugins); port the compatible subset as plugins in
+  `evenifyouforget/spa-fish-edition-plugins` (plugins #1: four data-only cheats, merged 2026-10-27)
+- #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
+  never stop (question, bot-players)
+- #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
+  (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
+- #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
+  main). Fixed in #80 (merged into `mini/0.3.1-3`). Victoria Mod C's text has the same plain formatting (not reported)
+- #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
+  since #20 (2026-10-15; test/match/risk-tags.test.js), but the Unite HUD's "costs up to N LP" counted him as 1 and
+  left out Last Line: fixed in #80. Worth re-testing on a current server
+- #78 the match history's end screen has no SPA-CC +N, tags or WITH CHEATS: records never kept the rules. Fixed in #82
+  (merged into `mini/0.3.1-3`); matches recorded before it can't get them back
+- #79 the issue templates' version badge showed sganggs's 0.3.3: fixed in #81 (merged into `mini/0.3.1-3`)
+- #84 SPA-CC: Investor 2 / Strategy 2 show only their level-2 effect. Real, text only: the sim applies both levels (and
+  Junk 2 too); the rules dialog treated every chain as replacing. Fixed in #94 (merged into `mini/0.3.1-3`)
+- #86 feature: the rules (SPA-CC tags included) in the match's Match Info tab (本局信息). Fish: yes (2026-10-29). In
+  `wip/display-86-88-89` (#96)
+- #87 feature: show an AI player's personality / profile. There are no bot profiles yet, here or upstream (only
+  `BOT_NAMES`); waits for the bot-player research (ai-players.md)
+- #88 feature: under Strategy 1, highlight the changed round numbers in the Strategy texts. Found: the texts didn't
+  change at all under Strategy 1 (Jessica still said 4/7/10/13; the game uses 5/8/11/14). Fish: fix it and highlight
+  (2026-10-29). In #96: the 12 Strategies whose rounds move, in every language. Strategy 2's three Strategy changes
+  (Ioleta, Du Yaoye, Amiya) still aren't in their texts
+- #89 feature: English names for the AI players. Fish: yes (2026-10-29). In #96: the host's client sends its language
+  with room.addBot / queue.ai and the server names the AI in it (en / ja / ko / zh-TW, else Chinese)
+- #90 Du Yaoye's 2nd refresh without a Yan operator: not reproduced in code. The counter goes up before the hook
+  (refreshes 1 and 2 pass, test/content/bands.test.js checks both); the trait adds one only if the shared pool still
+  has a Yan operator at or below the shop level (level 1: only Leizi; level 2: + Xiaoman), which the text's 优先
+  allows. Needs the replay's shop level and who held those copies
+- #91 Last Line of Defense's wording. The rule matches Fish's description (once per round, also after Unite, past
+  the 10 LP cap, up to 12), except the 2 LP is charged at settlement, not instantly. Text reworded in #94
+- #92 SPA-CC balance: Suffocation 0.2/0.5/0.8 → 0.1/0.3/0.5 suggested; Fish proposes 0.2/0.4/0.6. On hold (Fish, 2026-10-29)
+  (`CC.spRecovery`, shared/ruleData.js). Against #93's rule 3, level 3's change is 25 %, not a halving
+- #93 SPA-CC balance guidelines (tracking, Fish's post): no change needed
+- Closed 2026-10-27/28: #77 (the count under the bar is enough, Fish), #85 (not a bug: the match had no Investor 1).
+- Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
 # Investigation/questions
 
@@ -188,9 +230,20 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
       only a small gold status icon (since the initial import) and, from 0.3.0, the official 无敌 loop for a Reborn
       talent's window, with official effects on. The ribbons cover every invulnerable unit, with or without assets.
 
-# mini/0.3.1-2 (2026-10-23/24)
+# mini/0.3.1-3 (from 2026-10-27)
 
-Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/.
+Base `mini/0.3.1-3` (= main d115c384). Merged into it: #73 (the notes of 2026-10-27), #80 (closes #75, #76), #81
+(closes #79), #82 (closes #78), #83 (the notes of 2026-10-27/28), #94 (closes #84, #91), #95 (the notes of 2026-10-28).
+Open: #96 (closes #86, #88, #89), #37 (closes #27; waiting on j-tai). #74 is the
+mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
+template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
+- #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
+
+# mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
+
+Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/. #66's title and changelog set the
+convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash message lacks #70 and "Closes #28":
+#66 merged before the update, so #28 was closed by hand.
 
 - [x] #63 `wip/spacc-tags-2`: Fish's SPA-CC spec updates (Investor 2, Strategy 2, Seasonal 2, Vengeance spawns).
 - [x] #64 `wip/mini-fixes`: closes #57 (official 无敌 loop vs ribbons), #58 (README match recording), #59 (no-SETTLE
@@ -200,7 +253,16 @@ Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/.
       #61 (block shifting: inside the tile → just past the nearest edge, 0.51; a shared block position steps 0.2
       aside; [ASSUMED] numbers). Fish's 3×1 scenarios (MISC_USER_QUESTIONS.md, 水月 for Ascalon) are
       test/sim/block-shift.test.js and all six hold. Goldens regenerated: both directions, no match changes result.
-- #37 still targets the merged `mini/0.3.1-1`: retarget or close.
+- [x] #68 `wip/rbm-notes`: every note committed; `remove-before-merge/` renamed `fish-edition/`; ROADMAP reorganized,
+      SCOPING removed.
+- [x] #69 `wip/spacc-i18n`: ja / ko / zh-TW for every SPA-CC text (801a9c64 at last); `botbench --rules`.
+- [x] #70 `wip/ci-annotations`: closes #28. Windows' own tar.exe crashed on the runners (exit 3221225477), so the
+      zip-reader test failed on whichever shard held update-package.test.js; zipFolder falls back to the built-in zip
+      writer, and failed tests are GitHub annotations (the job logs can't be fetched from the container).
+- [x] #37: main merged into its branch, retargeted onto `mini/0.3.1-3` (2026-10-27).
+- Known flake: `test/studio/review.test.js` "trial uses the actual sandbox executor" went over the 5 s plugin setup
+  limit once on Windows (#66, node 22 shard 1/3; passed on re-run). `SP_SCRIPT_PROBE_MS` raises it, but
+  test/plugins/script-review.test.js asserts the default 5000.
 - Nothing in this batch has been checked on screen (no game assets in the container).
 
 # to be ported to yuri
@@ -216,35 +278,29 @@ Base `mini/0.3.1-2` (= main 75c57d5c). Descriptions in pr-descriptions/.
 - [ ] Custom Lobby Modifications (lobby rules) and the SPA-CC tags: main only for now. Fish is asking Yuri (2026-10-16)
       whether gameplay mods are welcome as dormant code behind a server option (off by default) before porting.
 - [x] sgangss sync PR: Yuri #14, merged. It also fixed dev-0.2's own red CI (three causes).
-- [ ] kaltsit esperanta liftoff altitude bug fix (if it is determined to be a bug and not working as intended): a bug
-      from our #18. Fixed on `wip/liftoff-hover` (a talent's liftoff hovers low, a skill's flies; Fish's official
-      measurements). Merged here as #25; port branch `yuri/liftoff-hover` pushed (closes Yuri #15), PR not opened yet.
-- [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (open, closes #51).
+- [ ] kaltsit esperanta liftoff altitude bug fix: a bug from our #18, fixed here as #25; Yuri #20 (open).
+- [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (merged).
 
-# live PRs to watch
+# live PRs to watch (2026-10-28)
 
-- Yuri #14 `yuri/sync-sganggs-0.3.2`: the sgangss sync + dev-0.2 CI fixes. CI green. Update its PR text from
-  pr-descriptions/yuri-sync-sganggs-0.3.2.md (three fixes since it was opened).
-- Yuri #12 `yuri/invuln-ribbons`: the invulnerability ribbons.
-- Yuri #17 `yuri/en-templates`: English issue and PR templates (+ #14's two CI fixes, cherry-picked).
-  Its Windows jobs failed (2026-10-21) on an intermittent upstream test, not on the templates: "the zip reader …"
-  (test/update-package.test.js) → tools/package.mjs zipFolder → "zipping failed: install `zip` (or a bsdtar `tar`)".
-  The same test failed once on #14 (Windows node 22) and passed on its next run. We can't re-run jobs on Yuri's repo:
-  ask Yuri to re-run, or push to retrigger. If it keeps happening: make zipFolder print why tar failed, and on
-  Windows call %SystemRoot%\System32\tar.exe (bsdtar) explicitly, in case a GNU tar (no --format zip) comes first on PATH.
+- Yuri, all open, no comments yet: #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
+  Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27; CI
+  green since 3a269451 brought sganggs's Pillow test fix). After #22 merges: step B, the sync into our main.
+- sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
+  Yuri #19 becomes redundant once Yuri syncs 0.3.2.
+- sganggs #861 (TalentBomb's official strike): accepted 2026-10-26. sganggs squashed it into their dev (credited in
+  the commit message and CHANGELOG, since the commits' author is "Claude") and closed the PR by hand; it ships in
+  0.3.4. Yuri #18 becomes redundant once Yuri syncs 0.3.4.
+- Upstream: sganggs released 0.3.2 and 0.3.3 (2026-10-25, 267 commits after 0.3.1). Yuri's dev-0.2 hasn't synced
+  them (still c05aa7e2, which #54 brought here). Next sync here waits for Yuri, or goes straight from sganggs.
 
 # need human action - branches that have not been made PRs yet
 
-- Upstream ports (2026-10-22), pushed to our fork; the token can't open PRs on other repos, so Fish opens them from the
-  compare links (title + body in pr-descriptions/<file>):
-  - sganggs `dev`: `sg/angel2-talent-strike` (**draft** until Fish has watched it with the local art;
-    sganggs-angel2-talent-strike.md), `sg/lemuen-lock-crosshair` (sganggs-lemuen-crosshair.md). #49 split in two:
-    their one-topic rule. Chinese template plus a collapsible English version.
-  - Yuri `dev-0.2`: `yuri/angel2-talent-strike` (**draft**), `yuri/lemuen-lock-crosshair`, `yuri/liftoff-hover` (#25,
-    closes Yuri #15), `yuri/release-local-art` (#24 + #41); yuri-*.md.
-  - Yuri #16 (EN templates) can be closed: #17 merged.
-- `wip/sync-yuri-0.2.6`: stale (Yuri is at 0.3.1 now). Don't open; I'll rebuild the main ← Yuri sync after Yuri #14
-  merges.
-- `wip/3` (2026-10-21): Fish's scratch branch (like `wip/1`, `wip/2`), not tied to a PR yet. It also carries
-  801a9c64, which never reached main (#22 was squash-merged before it was pushed): ja / ko / zh-TW for the 63 SPA-CC
-  texts and that day's TODO / working-spec / leaders.md updates.
+- [x] Upstream ports (2026-10-22): Fish opened them all (sganggs #861, #862; Yuri #18–#21). Status: live PRs above.
+- [x] sganggs #861 (`sg/angel2-talent-strike`): slimmed down as sganggs asked (2026-10-27): sganggs `dev` (f07b8965)
+      merged in, the kit change dropped (dev's kit already marks the bombing `talent: true`); 4 files, render + test.
+- [x] Fish: on sganggs #861, update the body and post the reply. Done; sganggs accepted it (2026-10-26).
+- [x] Fish: close Yuri issue #16 (EN templates; Yuri #17 resolved it). Done 2026-10-27.
+- `wip/sync-yuri-0.2.6`: stale; can be deleted. Yuri #14 merged and reached here with #39 / #54.
+- `wip/4` (2026-10-27): Fish's scratch branch, from main d115c384. `wip/3` is done: 801a9c64 reached main through
+  #69, and its uncommitted remove-before-merge/ edits are in `git stash` ("wip/3: remove-before-merge/ edits …").

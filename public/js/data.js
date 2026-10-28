@@ -48,7 +48,7 @@ import { ruleDataPatch, rulesChangeData } from '../../shared/ruleData.js';
 import { t } from '../../shared/i18n.js';
 
 /** Files the lobby rules change (setRules). */
-const RULED_FILES = new Set(['chess', 'garrisons', 'bonds', 'items']);
+const RULED_FILES = new Set(['chess', 'garrisons', 'bonds', 'items', 'bands']);
 
 /** Known data files (name → URL basename). Unknown names are allowed too (`/data/<name>.json`). */
 export const DATA_FILES = Object.freeze({
@@ -322,7 +322,8 @@ export function createDataStore(opts = {}) {
       const chessFile = localizedEntry('chess')?.value ?? entries.get('chess')?.value ?? null;
       const bondsFile = localizedEntry('bonds')?.value ?? entries.get('bonds')?.value ?? null;
       const garrisonsFile = localizedEntry('garrisons')?.value ?? entries.get('garrisons')?.value ?? null;
-      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile, garrisons: garrisonsFile }, ruleSet, { text: (s, params) => t(s, params) });
+      const bandsFile = localizedEntry('bands')?.value ?? entries.get('bands')?.value ?? null;
+      const patch = ruleDataPatch({ chess: chessFile, backups, bonds: bondsFile, garrisons: garrisonsFile, bands: bandsFile }, ruleSet, { text: (s, params) => t(s, params) });
       const extra = patch[name] || {};
       r = { base: value, lang: locale, backups, value: Object.keys(extra).length ? { ...value, ...extra } : value, index: null };
       ruled.set(name, r);

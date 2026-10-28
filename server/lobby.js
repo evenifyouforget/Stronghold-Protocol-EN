@@ -203,6 +203,22 @@ export const SOLO_RECONNECT_FALLBACK_SEC = 86_400;
 
 /** Display names for AI teammates (the tutorial NPCs first, then a few familiar faces). */
 export const BOT_NAMES = Object.freeze(['AI·华法琳', 'AI·阿米娅', 'AI·惊蛰', 'AI·杜宾', 'AI·凯尔希', 'AI·可露希尔']); // i18n-ignore: player names (docs/I18N.md)
+/**
+ * (fork) The same names in the other languages (GitHub #89): the host's client sends its language with room.addBot /
+ * queue.ai, and the AI is named in it once, for everyone in the room. The official names (data/i18n names; 可露希尔 isn't
+ * an operator there).
+ */
+export const BOT_NAMES_BY_LANG = Object.freeze({ // i18n-ignore: player names (docs/I18N.md)
+  en: Object.freeze(['AI·Warfarin', 'AI·Amiya', 'AI·Leizi', 'AI·Dobermann', "AI·Kal'tsit", 'AI·Closure']),
+  ja: Object.freeze(['AI·ワルファリン', 'AI·アーミヤ', 'AI·レイズ', 'AI·ドーベルマン', 'AI·ケルシー', 'AI·クロージャ']),
+  ko: Object.freeze(['AI·와파린', 'AI·아미야', 'AI·레이즈', 'AI·도베르만', 'AI·켈시', 'AI·클로저']),
+  'zh-TW': Object.freeze(['AI·華法琳', 'AI·阿米婭', 'AI·驚蟄', 'AI·杜賓', 'AI·凱爾希', 'AI·可露希爾']),  // i18n-ignore: player names
+});
+/** The AI names for a client language (`en`, `en-US`, `zh-TW` …); Chinese (BOT_NAMES) for any other. */
+export function botNames(lang) {
+  if (typeof lang !== 'string') return BOT_NAMES;
+  return BOT_NAMES_BY_LANG[lang] || (lang.startsWith('zh') ? null : BOT_NAMES_BY_LANG[lang.split('-')[0]]) || BOT_NAMES;
+}
 
 const OK = Object.freeze({ ok: true });
 const fail = (code, detail) => (detail ? { error: code, detail } : { error: code });
@@ -703,7 +719,7 @@ export class Lobby {
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setRules': return this.setRules(session, msg);
-      case 'room.addBot': return this.addBot(session);
+      case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
@@ -719,7 +735,7 @@ export class Lobby {
       case 'room.search': return this.search(session, msg);
       case 'queue.join': return this.queueJoin(session, msg);
       case 'queue.leave': return this.queueLeave(session);
-      case 'queue.ai': return this.queueAi(session);
+      case 'queue.ai': return this.queueAi(session, msg);
       case 'room.setPlugins': return this.setPlugins(session, msg);
       case 'room.setMode': return this.setMode(session, msg);
       case 'room.contentReady': return this.contentReady(session, msg, ctx);
@@ -1152,7 +1168,7 @@ export class Lobby {
     return OK;
   }
 
-  addBot(session) {
+  addBot(session, msg = {}) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
@@ -1162,7 +1178,7 @@ export class Lobby {
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
     const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
-    const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+    const name = botNames(msg.lang).find((n) => !used.has(n)) || `AI·${idx + 1}`;
     let playerId;
     do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
     room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false };
@@ -1864,9 +1880,10 @@ export class Lobby {
         // (fork) matched: the target room's cosmetic plugins are not drawn for this player (room.state seats[].matched)
         target.seats[idx] = { ...s, seat: idx, ready: true, ...(s.isBot ? {} : { matched: true }) };
         if (s.isBot) {
-          // both rooms named their AI from the start of BOT_NAMES
+          // both rooms named their AI from the start of BOT_NAMES (or its language's list: the one this name is from)
           const used = new Set(target.seats.filter((b) => b && b.isBot && b !== target.seats[idx]).map((b) => b.name));
-          if (used.has(s.name)) target.seats[idx].name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+          const names = Object.values(BOT_NAMES_BY_LANG).find((l) => l.includes(s.name)) || BOT_NAMES;
+          if (used.has(s.name)) target.seats[idx].name = names.find((n) => !used.has(n)) || `AI·${idx + 1}`;
           while (target.seats.some((b) => b && b !== target.seats[idx] && b.playerId === target.seats[idx].playerId)) {
             target.seats[idx].playerId = 'ai_' + randomBytes(4).toString('hex');
           }
@@ -1952,7 +1969,7 @@ export class Lobby {
   }
 
   /** queue.ai: after soloAiAfterMs, a co-op room of this Doctor and AI teammates, started at once. */
-  queueAi(session) {
+  queueAi(session, msg = {}) {
     const e = this.soloQueue.get(session.playerId);
     if (!e) return fail(ERR.NOT_READY, 'not queued');
     if (this.now() - e.since < this.matchmaker.opts.soloAiAfterMs) return fail(ERR.NOT_READY, 'still searching');
@@ -1964,7 +1981,7 @@ export class Lobby {
       const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
       let playerId;
       do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
-      room.seats[idx] = { seat: idx, playerId, name: BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`, isBot: true, ready: true, connected: true, left: false };
+      room.seats[idx] = { seat: idx, playerId, name: botNames(msg.lang).find((n) => !used.has(n)) || `AI·${idx + 1}`, isBot: true, ready: true, connected: true, left: false };
     }
     this.log.info(`[lobby] ${room.code} solo queue → AI teammates (${room.difficulty})`);
     const res = this.start(session); // its first room.state already says inMatch: no room screen
