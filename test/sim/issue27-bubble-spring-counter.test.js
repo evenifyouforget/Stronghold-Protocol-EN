@@ -1,8 +1,8 @@
 // test/sim/issue27-bubble-spring-counter.test.js — issue #27: 泡泡 (chess_char_2_08) S2 “挨打” and “碎铳之簧” 法术护盾
 // (enemy_9018_actrpa) set each other off: her counter is physical, the shield answers a physical hit with its own counter on
 // the attacker, and she answered that one in turn — down to the hook depth limit (`hook nesting deeper than 32`), with the
-// handlers further down skipped. The spring's counter is now tagged 'counter' like the operators' counters, and a counter
-// never answers another counter (kits/shared/tier1.js byEnemyAttack: no ping-pong).
+// handlers further down skipped. The spring's physical counter is 无来源 (PRTS "对来源造成…无来源物理附加伤害"): hooks see no
+// source, and no operator counter strikes back at sourceless damage (kits/shared/tier1.js byEnemyAttack).
 // Run: node --test test/sim/issue27-bubble-spring-counter.test.js
 
 import { test } from 'node:test';
@@ -33,10 +33,10 @@ test('泡泡 S2 “挨打” against “碎铳之簧” 法术护盾: one counte
 
   const dmg = h.hooksOf('damaged');
   const answers = dmg.filter((c) => c.source === u && c.target === spring && c.type === 'phys' && tagged('counter')(c));
-  const springCounters = dmg.filter((c) => c.source === spring && c.target === u && c.type === 'phys' && tagged('springCounter')(c));
+  const springCounters = dmg.filter((c) => c.credit === spring && c.target === u && c.type === 'phys' && tagged('springCounter')(c));
   const springHits = dmg.filter((c) => c.source === spring && c.target === u && !tagged('springCounter')(c) && c.type !== 'element');
   assert.ok(answers.length > 0, 'her counter lands on the spring');
   assert.ok(springCounters.length > 0, 'the shield answers her physical counter');
-  assert.ok(springCounters.every(tagged('counter')), 'the shield\'s counter is a counter');
+  assert.ok(springCounters.every((c) => c.source === null && c.dmg.sourceless), 'the shield\'s counter is 无来源 (hooks see no source)');
   assert.equal(answers.length, springHits.length, 'she answers the spring\'s own hits only, not its counters');
 });
