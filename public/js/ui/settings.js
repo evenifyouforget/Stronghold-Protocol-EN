@@ -7,7 +7,8 @@
 // `_meta.machineTranslated`) and the 快捷键 section that rebinds the in-match shortcuts (the key map:
 // ui/gameLogic/shortcuts.js; the community request 「快捷键可不可以自己设置」, the owner's decision of 2026-10-07) and
 // 问题反馈, which copies the diagnostics of this page for a bug report (diag.js: the error log, this browser, optionally
-// the battle on screen; nothing is uploaded). 素材存储 asks the browser to keep this site's storage, where an imported asset
+// the battle on screen; nothing is uploaded), with (fork, GitHub #100) links that open a new issue on our repository, its
+// form and version filled in (ui/about.js IssueLinks). 素材存储 asks the browser to keep this site's storage, where an imported asset
 // pack lives (assetCache.js), and 清理旧版本素材 deletes the imported copies this server's version no longer uses
 // (assetPack.js pruneImportedAssets; both the maintainer's requests of 2026-10-17). The lobby and the room open it from a 设置 button next to 玩法说明
 // (SettingsButton, GitHub #238); the title screen and the match have their own gear.
@@ -42,6 +43,7 @@ import { PreloadRow } from './preload.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
 import { copyText } from './clipboard.js';
+import { ISSUES_URL, IssueLinks } from './about.js';
 import { catalog, loadCatalog, cosmeticPlugins, installedCount, isPersonalCosmetic, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
 import { resolveThemeVars, themeVarsOf } from '../../../shared/plugins/theme.js';
 import { setUiPlugin, uiPluginEntries, uiPlugins } from './uiPlugins.js';
@@ -236,8 +238,6 @@ function HotkeySection({ keys, touchUi }) {
   </section>`;
 }
 
-/** Where a report goes: the upstream issue tracker (shown as text the player can select; a link may open nothing). */
-export const ISSUES_URL = 'https://github.com/sganggs/Stronghold-Protocol/issues';
 
 /**
  * 问题反馈: copy the diagnostics of this page (diag.js) for a GitHub issue — the errors recorded since the page opened,
@@ -277,6 +277,7 @@ function DiagSection() {
       <span class="set-diag__stat">${t('已记录的错误')}<b class=${cx('set-diag__count num', n > 0 && 'is-warn')} data-testid="diag-count">${n}</b></span>
       <span class="set-diag__url">${ISSUES_URL.replace(/^https:\/\//, '')}</span>
     </div>
+    <${IssueLinks} class="set-diag__issues" />
     ${battle ? html`<${Toggle} label=${t('附上本场战斗')} micro="BATTLE DATA" value=${attach} onChange=${setAttach} />
       <p class="set-hint set-diag__battle-hint">${t('开发者可以用附上的战斗数据重现这场战斗。')}</p>` : null}
     ${note ? html`<p class=${cx('set-keys__note', note === 'refused' && 'is-warn')} role="status" aria-live="polite">${t(DIAG_NOTES[note])}</p>` : null}
