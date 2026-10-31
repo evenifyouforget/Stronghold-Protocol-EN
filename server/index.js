@@ -77,6 +77,7 @@ import { MaintenanceBoard } from './maintenance.js';
 import { Presence } from './presence.js';
 import { GenerationWatch } from './generation.js';
 import { GEN_ID_RE } from '../shared/gen.js';
+import { writeServerInfo } from './serverInfo.js';
 
 // The public API of this module (tests and tools import it from here); the code lives in ./http/.
 export {
@@ -289,4 +290,5 @@ export async function startServer(opts = {}) {
 }
 
 // `node server/index.js` / npm start: listen, print the banner, stop on SIGINT / SIGTERM (http/boot.js).
-if (isProcessEntry(import.meta.url)) runMain(() => startServer({ warmResources: true, altArtDir: path.join(ROOT, 'logs'), recordsDir: recordsDirFrom(process.env.SP_RECORDS, ROOT) }));
+// (fork) public/server-info.json first: the title screen's version line and "What's new" (serverInfo.js)
+if (isProcessEntry(import.meta.url)) runMain(() => (writeServerInfo(ROOT), startServer({ warmResources: true, altArtDir: path.join(ROOT, 'logs'), recordsDir: recordsDirFrom(process.env.SP_RECORDS, ROOT) })));
