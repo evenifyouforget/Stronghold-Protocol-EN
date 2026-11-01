@@ -463,3 +463,77 @@ Rules:
 
 What a run fixes, so it can be repeated: the tactic code, the training seeds and the held-back seeds, and the fitness
 (which modes and difficulties, how win rate and LP weigh). Its result is a profile file anyone can play or re-score.
+
+## Hypothesis tests: human Final Assault boards (2026-11-01)
+
+Fish's questions (TODO.md "# GitHub"): does a human's final board beat every boss, and can the AI win from a human's
+final board? Plus a third test that closes the loop. All on `mini/0.3.1-4` (03a9f044), solo Standard (FUNNY), whose
+final boss comes at round 9.
+
+**Method.**
+- The records keep each Final Assault's BattleSpec, and a solo one replays exactly (same digest).
+- To face another boss, the wave (template, routes, overrides) is rebuilt with `waves.js buildBossWave`, and the pool
+  with `finalAssault.js bossPoolHp`. Rebuilding the recorded boss this way gives the recorded template, routes and pool.
+- **Won** means the pool emptied before the LP lost reached the LP the player brought in. LP lost counts leaks at the
+  enemy's LP cost, leaders' LP effects, and the overtime drain, which for a solo team starts at the 120 s countdown.
+- **Validated:** on 160 bot matches, this standalone verdict for the boss the match drew agrees with the match's own
+  result on 160 of 160.
+- **Not covered:** co-op Final Assaults, whose fields share one pool. The one human Perilous win had cheats (Tier
+  Start, Booster Pack) that change the random draws, so its seed doesn't rebuild the match for H1.
+
+| | boards | bosses beaten | notes |
+|---|---|---|---|
+| **H2:** the human's board, as placed, vs all 7 bosses | 5 human Standard wins (+1 Perilous with cheats) | **7 of 7, every board**, 0 LP lost | all well inside the countdown |
+| **H1:** the bot places the human's units (same operators, elites, items, loadouts, bonds, layers) | the same 5 | **7 of 7, every board**, 0 LP lost | fights take a median 1.36× as long (0.82–3.36×) |
+| **H3:** the bot's own board (its normal prep) vs all 7 bosses | 160 seeds | 52 % on average; 16 of 160 beat all 7; 21 beat none | shop level 4 on 157 of 160 boards; the humans' were all level 5 |
+
+The bot's boards, by boss (all 160 / the 87 whose match was won):
+
+| boss | 1 胄 | 2 铳 | 3 管 | 4 昆图斯 | 5 卢西恩 | 6 阿利斯泰尔 | 7 萨米的意志 |
+|---|---|---|---|---|---|---|---|
+| all bot boards | 75 % | 32 % | 74 % | 69 % | 59 % | **17 %** | 36 % |
+| bot boards that won | 87 % | 48 % | 86 % | 84 % | 78 % | 30 % | 48 % |
+
+**Answers.**
+- **Does the human's final board beat every boss? Yes.** Every recorded human Standard board beats all seven, with no
+  LP lost. Even among bot boards that won their own match, only 18 % do. Five boards in a row at that rate: p ≈ 2 × 10⁻⁴.
+- **Can the AI win from a human's final board? Yes, every time.** On that board, only placement and items are left to
+  decide. The bot's placement of the human's units beats every boss too, only more slowly. It is never slow enough to
+  reach the drain.
+- **So the bot's Standard losses come from the board it builds, not from how it places it.** This agrees with the
+  2026-10-22 finding: its level curve is indexed by round, so it meets the round-9 boss at shop level 4. The humans
+  were at level 5. Alistair is the clearest case: 17 % of bot boards beat him, every human board does.
+
+**Caveats.**
+- 5 human boards, probably from one or two players, and only won matches; Standard only.
+- "The bot from the human's board" is tested at the final board. Taking over at an earlier round needs the match
+  rebuilt from the record's actions (see H8 below).
+- Escorts don't vary: the faction setup of the match seed fixes them, so each fight is one deterministic run.
+
+**Scripts** (scratch, in `untracked/hypotheses/`; offered as `tools/` if wanted):
+- `h2-boss-swap.mjs <repo> <records…>`;
+- `h1-bot-places-human-units.mjs <repo> <records…>`;
+- `h3-bot-boards.mjs <repo> FUNNY 1 160`, ~1.5 min on 4 processes;
+- with their results as `.jsonl`.
+
+### More hypotheses worth testing
+
+Cheapest first; the first three reuse the scripts above.
+- **H4: Does the bossRound-scaled level curve close the gap?** Re-run H3 with the scratch `LEVEL_TARGET` change of
+  2026-10-22. Expect level-5 boards and a higher all-7 rate. Bots only; it would be the evidence for that PR, here or
+  for sganggs.
+- **H5: How far up does a Standard-winning board carry?** The human boards against Perilous, Dire and Ultimate's Final
+  Assault: the same boss, with that difficulty's pool and escorts. It says how much stronger a board must be per
+  difficulty.
+- **H6: Which SPA-CC tags would a winning human board still beat?** Each tag's Final Assault effect on the human boards:
+  Activation (pool +50/150/400 %), Elements (leader DR), Originium Zone, Lockout. It measures tag cost on human play
+  instead of the tag-blind bot, and feeds the clears tracking issue.
+- **H7: Does the bot use the features humans use?** From the records: humans' refreshes, levels, freezes, sells and
+  merges per round, against the bot's on the same seeds (botbench). The 2026-10-22 table did this for levels and tiers
+  only.
+- **H8: Can the bot take over mid-match from a human?** Rebuild a recorded match from its seed and actions up to round
+  k, then hand the seat to the bot (autoplay). If the rebuild is exact, this tests the bot's play from human
+  positions. Unknown whether the recorded actions rebuild the match exactly. Worth one try, since it would also
+  verify the records.
+- **H9: Is the bot's random band the problem?** Humans choose their band, the bot picks at random. Run botbench by
+  band, and compare with the bands humans won with.
