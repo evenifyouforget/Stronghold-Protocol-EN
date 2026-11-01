@@ -17,6 +17,7 @@ New (2026-11-01):
   - #27 / #37: reviewed. Merged locally onto `mini/0.3.1-4`, its test, the goldens and all sim tests pass;
   - `mini/0.3.1-3` is marked merged (#74);
   - what's new on sganggs dev since 0.3.3: no release, but ≈ 20 bot commits and several sim fixes.
+- **ai-players.md:** the hypothesis tests on human Final Assault boards (H1–H3) and six more proposed (H4–H9).
 - **pr-descriptions/:**
   - removed `mini-0.3.1-2.md` (#66 merged; `mini-0.3.1-3.md` is now the template) and `loop-notes-2026-10-29b.md` (#101, replaced by this PR);
   - added a "Branch" line to the four Yuri descriptions that had none (Yuri #18–#21);
