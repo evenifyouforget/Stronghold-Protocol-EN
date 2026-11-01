@@ -1,7 +1,8 @@
-# GitHub issues (open, 2026-10-29; #75, #76, #78, #79, #84, #91 close when #74 reaches main)
+# GitHub issues (open, 2026-11-01; #98, #99, #100 close when `mini/0.3.1-4` reaches main)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), now into `mini/0.3.1-3`; waiting
-  for j-tai to make it sourceless damage, as Fish asked on 2026-10-22
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai). j-tai made the counter sourceless
+  (2026-10-29), as Fish asked. Reviewed 2026-11-01: merged onto `mini/0.3.1-4` locally, its test, the goldens and all
+  978 sim tests pass. Ready once Fish retargets it from `mini/0.3.1-3` to `mini/0.3.1-4`
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
@@ -53,23 +54,15 @@
   On hold (Fish, 2026-10-29)
   (`CC.spRecovery`, shared/ruleData.js). Against #93's rule 3, level 3's change is 25 %, not a halving
 - #93 SPA-CC balance guidelines (tracking, Fish's post): no change needed
-- #98 the title screen's version doesn't tell Fish Edition from Yuri's: real. Both say v0.3.1 (shared/constants.js
-  APP_VERSION). Also: the title's 项目仓库 (project repo) links sganggs; "About this server" (public/js/ui/about.js,
-  Yuri's) says the server is run by Yuri, with Yuri's repo and email, on any server running Fish Edition. It already
-  shows branch / commit from public/server-info.json (scripts/server-info.mjs, run before start on Yuri's VPS). Not
-  started: needs Fish's text for the About panel (who runs which server: per-server settings?)
-- #99 a detailed, mostly automatic version info / changelog from git, like fcsim (its SConstruct writes version.js:
-  the last tag and `git log <tag>..HEAD --oneline`, linked). Proposal: extend scripts/server-info.mjs (or the server's
-  boot) with the edition, the commit and the commits since the last release tag (on main: the mini squash titles), and
-  a "What's new" panel on the title screen; tools/package.mjs writes the same into release zips. Not started
-- #100 an in-game link to a new issue with the template open and the version filled in. Today: Settings → 问题反馈
-  copies diagnostics and names sganggs's issues (public/js/ui/settings.js ISSUES_URL). Proposal: point it at this repo,
-  and add "Report a bug" / "Suggest a feature" links to issues/new?template=BugReport(.en).yml&version=<version>
-  (issue forms prefill a field by its id), the English template for English. Not started; small
+- #98 / #99 / #100 (version info, What's new from git, prefilled issue links): built in #102 (merged into
+  `mini/0.3.1-4`, 2026-10-31). Contact is GitHub issues only: no emails or Discord handles in About (Fish, 2026-10-31).
+  Not done: tools/package.mjs doesn't put server-info.json in release zips; docs/PLAYING.md (Chinese, upstream's)
+  still names sganggs's issues; the title's Discord button (stronghold-en.dev's community) is unchanged
 - Replays of 2026-10-27/28 (logs/2026-10-27 records.tar.xz, 7 matches): `tools/records.mjs --verify`: 171 battles
   replay the same, 2 differ (32cd92, seat s0, rounds 3 and 4), on main as on mini. Same kills and the same 8 / 9 leaks;
   the difference is in what the record keeps only as a hash (time, damage, units' end HP / SP, coins, stacks), and
-  `app` says only "0.3.1", not the build. Lead, not chased: record the commit (see #98 / #99) and the digest's JSON
+  `app` says only "0.3.1", not the build. Lead, not chased: record the commit (server/serverInfo.js has it since
+  #102) and the digest's JSON
 - Closed 2026-10-27/28: #77 (the count under the bar is enough, Fish), #85 (not a bug: the match had no Investor 1).
 - Closed 2026-10-27: #28 (Windows zip-reader test; fixed by #70, reached main with #66).
 
@@ -252,13 +245,27 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
       only a small gold status icon (since the initial import) and, from 0.3.0, the official 无敌 loop for a Reborn
       talent's window, with official effects on. The ribbons cover every invulnerable unit, with or without assets.
 
-# mini/0.3.1-3 (from 2026-10-27)
+# mini/0.3.1-4 (from 2026-10-31)
+
+Base `mini/0.3.1-4` (= main 8c963917). Merged into it: #102 (closes #98, #99, #100). To come: #37 (closes #27; Fish
+retargets it), the notes PR of 2026-11-01 (replaces #101, which was based on the merged `mini/0.3.1-3`).
+
+- Fish's # GitHub items (2026-11-01), drafts in `untracked/` for Fish to post:
+  - SPA-CC clears tracking issue: `untracked/tracking-issue-spacc-clears.md`, from the 13 records Fish shared
+    (`untracked/spacc-clears.mjs` regenerates the rows). Only two clears with no cheat: Standard solo Risk 0, and
+    Standard co-op Risk 1 (Vengeance 1, 1 human + 3 bots). Only one of the 20 tags has ever been cleared.
+  - Bot findings: `untracked/bot-findings-post.md`, signed by Claude. Suggested for an issue on sganggs's repo: bot.js
+    is theirs, and their dev (91024ce0, ≈ 20 "Bots:" commits since 10-22) still has all three findings (the
+    round-indexed LEVEL_TARGET, rehearsal blind to deaths, no 活性源石 in fieldModel). Ours already has #29–#31.
+
+# mini/0.3.1-3 (2026-10-27 to 10-28) — merged into main as #74 (8c963917, 2026-10-28)
 
 Base `mini/0.3.1-3` (= main d115c384). Merged into it: #73 (the notes of 2026-10-27), #80 (closes #75, #76), #81
 (closes #79), #82 (closes #78), #83 (the notes of 2026-10-27/28), #94 (closes #84, #91), #95 (the notes of 2026-10-28).
 Open: #96 (closes #86, #88, #89), #37 (closes #27; waiting on j-tai). #74 is the
 mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
 template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
+
 - #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
@@ -303,9 +310,9 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [ ] kaltsit esperanta liftoff altitude bug fix: a bug from our #18, fixed here as #25; Yuri #20 (open).
 - [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (merged).
 
-# live PRs to watch (2026-10-28)
+# live PRs to watch (2026-11-01)
 
-- Yuri, all open, no comments yet: #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
+- Yuri, all open, no comments yet (no change since 2026-10-28): #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
   Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27; CI
   green since 3a269451 brought sganggs's Pillow test fix). After #22 merges: step B, the sync into our main.
 - sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
@@ -315,6 +322,10 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
   0.3.4. Yuri #18 becomes redundant once Yuri syncs 0.3.4.
 - Upstream: sganggs released 0.3.2 and 0.3.3 (2026-10-25, 267 commits after 0.3.1). Yuri's dev-0.2 hasn't synced
   them (still c05aa7e2, which #54 brought here). Next sync here waits for Yuri, or goes straight from sganggs.
+- sganggs dev since 0.3.3 (to 91024ce0, 2026-11-01): no new release. ≈ 20 "Bots:" commits (bot.js +1,900 lines), an
+  entry animation with official sounds (their #878), 乌尔比安 S3 and 鸭爵 fixes (#903, #839), two identical items on one
+  operator both count (#902), 缇缇 S2 ties (#906), channelled skills only stand still while channelling (#904), a
+  Korean translation update (#908). Comes to us with 0.3.4 via Yuri #22's successor, or a direct sync
 
 # need human action - branches that have not been made PRs yet
 

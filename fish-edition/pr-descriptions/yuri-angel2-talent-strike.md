@@ -1,3 +1,5 @@
+<!-- Branch `yuri/angel2-talent-strike` (Yuri #18); the body below is the PR description as posted. -->
+
 > [!NOTE]
 > Draft: we'll mark it ready once we've watched the effect in a deployment with the local art.
 
