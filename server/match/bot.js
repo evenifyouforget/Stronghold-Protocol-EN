@@ -4068,8 +4068,9 @@ function faItemHunt(m, ps) {
   }
 }
 
-// Explicit operation references keep the default policy and RNG consumption unchanged.
-const LEGACY_PREP_ACTIONS = Object.freeze({
+// Explicit operation references keep the default policy and RNG consumption unchanged. (fork) Exported for the
+// tactics chains (botTactics.js): a decision point no tactic takes runs these.
+export const LEGACY_PREP_ACTIONS = Object.freeze({
   takeOffers, sellJunk, buyLoopSteps, levelUp, advisorSpendSteps, spendDown, economyPlan, maybeFreeze, arrangeSteps, equipItems,
   applyPlanSteps, resolveTemp, freeHandSlot, rememberOwned,
   hasHandRoom: (ps) => freeSlot(ps.hand) >= 0,
