@@ -97,8 +97,8 @@ test('#782 野鬃 S2: behind targets move away radially at reduced force (mainta
     // Include the back edge of her tile, the case round 40 incorrectly kept along her deployment direction.
     for (const backOff of [-0.45, -0.49]) {
       const back = wildmnHit(dir, [0, backOff]);
-      approx(back.len, REAR, 1e-6, `${dir} behind ${backOff}: the −2 distance`);
-      approx(back.fwd, -REAR, 1e-6, `${dir} behind ${backOff}: away from her`);
+      approx(back.len, REAR, FRAME_EPS, `${dir} behind ${backOff}: the −2 distance`);
+      approx(back.fwd, -REAR, FRAME_EPS, `${dir} behind ${backOff}: away from her`);
       approx(back.side, 0, 1e-9, `${dir} behind ${backOff}: no lateral offset`);
     }
   }
@@ -109,9 +109,9 @@ test('#782 野鬃 S2: side targets keep the >45° radial correction in every fac
     // Both lateral directions, including exactly perpendicular (dot = 0, not the rear hemisphere).
     for (const off of [[0.6, 0.3], [-0.6, 0.3], [0.45, 0], [-0.45, 0]]) {
       const beside = wildmnHit(dir, off);
-      approx(beside.len, WEAK, 1e-6, `${dir} ${off}: the −2 distance`);
-      approx(beside.side, WEAK * off[0] / Math.hypot(...off), 1e-6, `${dir} ${off}: radial sideways`);
-      approx(beside.fwd, WEAK * off[1] / Math.hypot(...off), 1e-6, `${dir} ${off}: radial forward`);
+      approx(beside.len, WEAK, FRAME_EPS, `${dir} ${off}: the −2 distance`);
+      approx(beside.side, WEAK * off[0] / Math.hypot(...off), FRAME_EPS, `${dir} ${off}: radial sideways`);
+      approx(beside.fwd, WEAK * off[1] / Math.hypot(...off), FRAME_EPS, `${dir} ${off}: radial forward`);
     }
   }
 });
@@ -123,7 +123,7 @@ test('#782 野鬃 S2: near targets keep the <0.25-tile radial correction in ever
     const near = wildmnHit(dir, [0.1, 0.1], { blockable: false });
     assert.ok(Math.hypot(0.1, 0.1) < PUSH_DIRECTIONAL_MIN_DIST);
     approx(near.len, WEAK, FRAME_EPS, `${dir} near: the −2 distance`);
-    approx(near.side, near.fwd, 1e-6, `${dir} near: radial`);
+    approx(near.side, near.fwd, FRAME_EPS, `${dir} near: radial`);
   }
 });
 
@@ -136,15 +136,16 @@ test('#782 野鬃 S2 on the mirrored right boss half: front, behind, side and ne
     approx(diag.fwd, FULL, FRAME_EPS, `R ${dir} diagonal: along its direction`);
     approx(diag.side, 0, 1e-9, `R ${dir} diagonal: no sideways`);
     const back = wildmnHit(dir, [0, -0.45], { side: 'R', kind: 'boss' });
-    approx(back.len, REAR, 1e-6, `R ${dir} behind: the −2 distance`);
-    approx(back.fwd, -REAR, 1e-6, `R ${dir} behind: away from her`);
+    approx(back.len, REAR, FRAME_EPS, `R ${dir} behind: the −2 distance`);
+    approx(back.fwd, -REAR, FRAME_EPS, `R ${dir} behind: away from her`);
     approx(back.side, 0, 1e-9, `R ${dir} behind: no sideways`);
     for (const off of [[0.6, 0.3], [-0.6, 0.3], [0.1, 0.1], [-0.1, -0.1]]) {
-      const m = wildmnHit(dir, off, { side: 'R', kind: 'boss' });
+      // (fork) the near ones unblocked: a blocked one is shifted to her tile's edge first (GitHub #61)
+      const m = wildmnHit(dir, off, { side: 'R', kind: 'boss', blockable: Math.hypot(...off) >= PUSH_DIRECTIONAL_MIN_DIST });
       const distance = off[1] < 0 ? REAR : WEAK;
-      approx(m.len, distance, 1e-6, `R ${dir} ${off}: reduced distance`);
-      approx(m.side, distance * off[0] / Math.hypot(...off), 1e-6, `R ${dir} ${off}: radial sideways`);
-      approx(m.fwd, distance * off[1] / Math.hypot(...off), 1e-6, `R ${dir} ${off}: radial forward`);
+      approx(m.len, distance, FRAME_EPS, `R ${dir} ${off}: reduced distance`);
+      approx(m.side, distance * off[0] / Math.hypot(...off), FRAME_EPS, `R ${dir} ${off}: radial sideways`);
+      approx(m.fwd, distance * off[1] / Math.hypot(...off), FRAME_EPS, `R ${dir} ${off}: radial forward`);
     }
   }
 });
@@ -153,11 +154,12 @@ test('#782 野鬃 S2: normal and elite behind hits use force minus weight minus 
   for (const chessId of [WILDMN, 'chess_char_1_19_b']) {
     for (const dir of ['RIGHT', 'UP', 'LEFT', 'DOWN']) {
       for (const mass of [0, 1, 2, 3, 4]) {
-        const off = [0.2, -0.45], m = wildmnHit(dir, off, { chessId, mass });
+        // (fork) unblocked: a blocked one is shifted to her tile's edge first (GitHub #61)
+        const off = [0.2, -0.45], m = wildmnHit(dir, off, { chessId, mass, blockable: false });
         const expected = mass >= 2 ? 0 : PUSH_TILES_EFFECT[1 - mass - 2];
-        approx(m.len, expected, 1e-6, `${chessId} ${dir} weight ${mass}: reduced distance`);
-        approx(m.fwd, expected * off[1] / Math.hypot(...off), 1e-6, 'behind diagonal is radial');
-        approx(m.side, expected * off[0] / Math.hypot(...off), 1e-6, 'behind diagonal retains its lateral component');
+        approx(m.len, expected, FRAME_EPS, `${chessId} ${dir} weight ${mass}: reduced distance`);
+        approx(m.fwd, expected * off[1] / Math.hypot(...off), FRAME_EPS, 'behind diagonal is radial');
+        approx(m.side, expected * off[0] / Math.hypot(...off), FRAME_EPS, 'behind diagonal retains its lateral component');
       }
     }
   }
@@ -165,14 +167,15 @@ test('#782 野鬃 S2: normal and elite behind hits use force minus weight minus 
 
 test('#782 野鬃 S2: a forward target at 0.25 tile keeps full force; below it is reduced', REAL, () => {
   for (const distance of [0.249, 0.25, 0.251]) {
-    const m = wildmnHit('RIGHT', [0, distance]);
-    approx(m.fwd, distance < 0.25 ? WEAK : FULL, 1e-6, `distance ${distance}`);
+    // (fork) unblocked: a blocked one is shifted to her tile's edge first (GitHub #61)
+    const m = wildmnHit('RIGHT', [0, distance], { blockable: false });
+    approx(m.fwd, distance < 0.25 ? WEAK : FULL, FRAME_EPS, `distance ${distance}`);
   }
 });
 
 test('#782 野鬃 S2: a coincident target has finite reduced movement along the deployment direction', REAL, () => {
-  const m = wildmnHit('RIGHT', [0, 0]);
-  approx(m.fwd, WEAK, 1e-6, 'existing zero-vector fallback');
+  const m = wildmnHit('RIGHT', [0, 0], { blockable: false }); // (fork) unblocked, as above
+  approx(m.fwd, WEAK, FRAME_EPS, 'existing zero-vector fallback');
   approx(m.side, 0, 1e-9, 'no arbitrary radial direction at coincidence');
 });
 
@@ -201,7 +204,9 @@ function realRun(chessId, r, c, dir, round = 5) {
     if (o.from !== u) return orig(e, force, o);
     const x0 = e.x, y0 = e.y, behind = (x0 - u.x) * u.fwd[1] + (y0 - u.y) * u.fwd[0] < 0;
     const moved = orig(e, force, o);
-    if (moved > 1e-6) pushes.push({ dx: e.x - x0, dy: e.y - y0, vx: x0 - u.x, vy: y0 - u.y, moved, behind, massLevel: e.s.massLevel });
+    // (fork) a push starts a slide (GitHub #60): measure where it ends
+    const end = endOf(b, e);
+    if (moved > 1e-6) pushes.push({ dx: end.x - x0, dy: end.y - y0, vx: x0 - u.x, vy: y0 - u.y, moved, behind, massLevel: e.s.massLevel });
     return moved;
   };
   for (let n = 0; !b.finished && n < 30 * 120; n++) b.step();
@@ -222,7 +227,7 @@ test('#782 real battle (act2 m01, R5 official wave): rear hand-overs push away r
           assert.ok(along < 0, 'a rear hit moves away, never along deployment facing');
           approx(p.dx * p.vy - p.dy * p.vx, 0, 1e-6, 'rear movement is radial');
           const expected = p.massLevel >= 2 ? 0 : PUSH_TILES_EFFECT[1 - p.massLevel - 2];
-          assert.ok(p.moved <= expected + 1e-6, 'rear movement is bounded by its reduced force row');
+          assert.ok(p.moved <= expected + FRAME_EPS, 'rear movement is bounded by its reduced force row');
         }
         // either straight along her direction, or the −2 radial push (受力等级 = 1 − weight − 2)
         if (along < p.moved * (1 - 1e-6)) {

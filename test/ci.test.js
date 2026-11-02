@@ -104,9 +104,11 @@ test('the full Golden check runs independently once on Ubuntu / Node 22 and cann
   assert.match(jobText, /^    timeout-minutes: 15$/m);
   assert.match(jobText, /^          node-version: 22$/m);
   assert.match(jobText, /^          cache: npm$/m);
-  assert.doesNotMatch(jobText, /^\s*(strategy|needs|if|continue-on-error|defaults|env):/m);
+  // (fork) the full tier only, like the test shards (GitHub #43)
+  assert.match(jobText, /^    if: github\.event_name != 'pull_request' \|\| github\.base_ref == 'main'$/m);
+  assert.doesNotMatch(jobText, /^\s*(strategy|needs|continue-on-error|defaults|env):/m);
   assert.equal(pkg.scripts.golden, 'node tools/golden.mjs');
-  assert.deepEqual(STEPS.map((s) => s.id), ['setup', 'test', 'smoke', 'guards', 'lint', 'imports', 'typecheck']);
+  assert.deepEqual(STEPS.map((s) => s.id), ['setup', 'test', 'smoke', 'quick', 'guards', 'lint', 'imports', 'typecheck']);
 });
 
 test('the separate Golden skip is scoped to its job, step name and unfiltered comparison command', () => {
@@ -199,7 +201,7 @@ test('arguments: --keep-going, --only (comma list, repeated, = form) in workflow
   assert.equal(parseArgs(['--quick']).quick, true);
   assert.deepEqual(selectSteps(['lint', 'test', 'smoke']).map((s) => s.id), ['test', 'smoke', 'lint']);
   // the tiers: the full one by default (the whole suite), the quick one with --quick (the quick tests instead)
-  assert.deepEqual(selectSteps(null).map((s) => s.id), ['setup', 'test', 'smoke', 'lint', 'imports', 'typecheck']);
+  assert.deepEqual(selectSteps(null).map((s) => s.id), ['setup', 'test', 'smoke', 'guards', 'lint', 'imports', 'typecheck']);
   assert.deepEqual(selectSteps(null, true).map((s) => s.id), ['setup', 'smoke', 'quick', 'lint', 'imports', 'typecheck']);
   assert.deepEqual(selectSteps(['quick'], false).map((s) => s.id), ['quick'], '--only names any step');
   assert.equal(parseArgs(['--list']).list, true);
@@ -217,18 +219,18 @@ test("env: the job test steps get ci.yml's env for unset keys only; the tooling 
   assert.equal(stepEnv(STEPS.find((s) => s.id === 'quick'), {}).SP_E2E, '0', 'job quick has the same env');
 });
 
-test("the workflow's tiers: the full suite in 3 shards on every OS × Node, the quick tier and the two summary checks", () => {
+test("the workflow's tiers: the full suite in 4 shards on every OS, the quick tier and the two summary checks", () => {
   const yml = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
   /** One job block of ci.yml: from `  <id>:` to the blank line before the next job (or its comment). */
   const job = (id) => { const at = yml.indexOf(`\n  ${id}:\n`); assert.ok(at >= 0, id); const m = /\n\n {2}(?=[#\w])/.exec(yml.slice(at + 1)); return yml.slice(at, m ? at + 1 + m.index : undefined); };
   // push runs: main only (a pull request's branch gets its run from pull_request)
   assert.match(yml, /\non:\n {2}push:\n {4}branches: \[main\]\n {2}pull_request:\n {2}workflow_dispatch:\n/);
   const test_ = job('test');
-  assert.match(test_, /shard: \[1, 2, 3\]/);
+  assert.match(test_, /shard: \[0, 1, 2, 3\]/);
+  assert.match(test_, /SHARD: \$\{\{ matrix\.shard \}\}/);
   assert.ok(test_.includes("if: github.event_name != 'pull_request' || github.base_ref == 'main'"), test_);
-  assert.ok(STEPS.find((s) => s.id === 'test').ciArgs.endsWith('/3'), 'the shard count of the matrix');
   assert.ok(job('quick').includes("if: github.event_name == 'pull_request' && github.base_ref != 'main'"));
-  assert.match(job('full'), /name: full CI\n {4}needs: \[test, tooling\]/);
+  assert.match(job('full'), /name: full CI\n {4}needs: \[test, node24, golden, tooling\]/);
   assert.ok(job('full').includes("!cancelled() && (github.event_name != 'pull_request' || github.base_ref == 'main')"));
   assert.match(job('quick-ci'), /name: quick CI\n {4}needs: \[quick, tooling\]/);
   assert.ok(job('quick-ci').includes("!cancelled() && github.event_name == 'pull_request' && github.base_ref != 'main'"));
