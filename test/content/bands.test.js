@@ -187,10 +187,10 @@ test('SPA-CC ccStrategyLate: every named round one round later; 达马兹提 and
     ['band_pith', 'chess_char_1_15_a', [2]],
   ];
   for (const [band, id, rounds] of CASES) {
-    const { ps, roundStart } = setup({ band, seed: 5, rules: { ccStrategyLate: 1 } });
+    const { ps, prepStart } = setup({ band, seed: 5, rules: { ccStrategyLate: 1 } });
     for (let r = 1; r <= 15; r++) {
       const before = handIds(ps).filter((x) => x === id).length;
-      roundStart(r);
+      prepStart(r); // 0.3.3: some named rounds fire at onPrepStart
       const got = handIds(ps).filter((x) => x === id).length - before;
       assert.equal(got, rounds.includes(r) ? 1 : 0, `${band} R${r}`);
       ps.hand.fill(null); ps.temp.fill(null);
@@ -198,7 +198,7 @@ test('SPA-CC ccStrategyLate: every named round one round later; 达马兹提 and
   }
   const dob = setup({ band: 'band_doberm', rules: { ccStrategyLate: 1 } });
   const even = [];
-  for (let r = 1; r <= 6; r++) { dob.roundStart(r); if (handIds(dob.ps, 'item').includes('chess_item_6_03_m')) even.push(r); dob.ps.hand.fill(null); }
+  for (let r = 1; r <= 6; r++) { dob.prepStart(r); if (handIds(dob.ps, 'item').includes('chess_item_6_03_m')) even.push(r); dob.ps.hand.fill(null); }
   assert.deepEqual(even, [2, 4, 6], '杜宾: even rounds');
   // 老鲤: Funds held on rounds 2 and 3, released on 4 (Fish, 2026-10-15)
   const lee = setup({ band: 'band_lmlee', seed: 14, rules: { ccStrategyLate: 1 } });
