@@ -27,6 +27,7 @@ import { identity } from '../net.js';
 import { TITLE_HEX_SECTORS, titleSectorClip } from '../ui/titleHexagon.js';
 import { store, createStore, useStore, selectRoute } from '../store.js';
 import { ResultView } from './result.js';
+import { normalizeRules } from '../../../shared/rules.js';
 import { toast, toastError } from '../ui/toasts.js';
 import {
   loadStats, saveStats, emptyStats, importStats, exportStats, aggregateStats, countsTowardStats, selfRowOf, roundsOf, isModdedRecord,
@@ -479,7 +480,9 @@ function Replay({ rec, onBack }) {
   const gd = useGameData();
   const res = useMemo(() => recordToResult(rec), [rec]);
   if (!gd.ready) return html`<div class="st-loading"><${Spinner} size="md" /></div>`;
-  return html`<${ResultView} res=${res} pub=${null} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
+  // (fork) the match's rules, the only part of m.public the settlement view needs (#78)
+  const pub = useMemo(() => (rec.rules ? { rules: normalizeRules(rec.rules) } : null), [rec]);
+  return html`<${ResultView} res=${res} pub=${pub} myId=${rec.selfId} backLabel=${t('返回统计')} onBack=${onBack} quiet=${true}
     content=${rec.content ? { cs: rec.content.cs, vanilla: false, plugins: rec.content.plugins } : null} />`;
 }
 

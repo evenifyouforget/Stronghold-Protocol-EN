@@ -49,6 +49,13 @@ export const CC = Object.freeze({
   // Strategy 2 (Fish 2026-10-23): 伊奥莱塔·罗素's 统御号令 ATK / HP at most +50 %; 杜遥夜's 广交豪杰 the first refresh of a
   // round only (data: the first 2); 阿米娅's 众志合一 needs 1 more active alliance per tier (4 / 5 / 6)
   strategy2: Object.freeze({ ioletaCap: 0.5, duyaoyRefreshes: 1, amiyaExtra: 1 }),
+  // Strategy 1: the Strategy handlers whose `round` comes one round later (server/sim/content/bands/meta.js namedRound),
+  // and the Strategies that keep theirs, being by period (达马兹提: "every 5 rounds" in its text, Fish 2026-10-15)
+  strategyLate: Object.freeze({
+    keys: Object.freeze(['preparation_start_gain_chess_from_round', 'give_coin_in_round', 'prep_start_gain_chess_from_pool_in_round',
+      'gain_bond_char_per_round', 'round_start_bond_check_gain_layer', 'round_start_all_player_change_enemy_2']),
+    periodic: Object.freeze(['band_damaztic']),
+  }),
   upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
   spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
@@ -210,22 +217,60 @@ function cursedHammerRecord(level, text) {
  *  alliance's name, {list} = the names of LATERANO_B_LIST. */
 export const LATERANO_B_TEXT = N_('【{bond}】干员开启技能获得的弹药量提升min(5 + 1×层数, 75 + 0.3×层数)%（原版：5 + 1.5×层数）。<达到100层>【{bond}】干员造成的伤害提升至200%；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限。<在场6名不同【{bond}】干员>与原版相同（不会触发两次）');
 export const LATERANO_B_LIST = Object.freeze(['chess_char_4_02_a', 'chess_char_5_01_a', 'chess_char_6_01_a']);
+/** Laterano Mod B's ammo: +min(base + perStack × L, capBase + capPerStack × L) (server/sim/content/bonds/core.js). */
+export const LATERANO_B_AMMO = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003 });
+/** Mod B's own line of the alliance's text, between Mod A's ammo line and its 6-member line (GitHub #75). */
+export const LATERANO_B_100 = N_('<达到<@autochess.dgreen>100</>层>【{bond}】干员造成的伤害提升至<@ba.vup>200%</>；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限');
 export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带1件维式重锤回复8点技力；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤');
 
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
-  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true));
+  || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true
+  || rules.ccStrategyLate > 0));
+
+// The round numbers a Strategy's text names, in each language's data: zh / zh-TW 第4、7、10回合, en "Round(s) 4, 7 and 10",
+// ja 第4/7/10ラウンド (not "2ラウンドごと", every 2 rounds), ko 4/7/10라운드 (not "2라운드마다"). Each match is a group of numbers.
+const ROUND_GROUPS = [/第\d+(?:、\d+)*回合/g, /\b[Rr]ounds? \d+(?:(?:, | and |, and )\d+)*/g, /\d+(?:[/、]\d+)*ラウンド(?!ごと)/g, /\d+(?:\/\d+)*라운드(?!마다)/g];
+/**
+ * Strategy 1 (GitHub #88): `text` with each of `rounds` it names as a round moved one round later, through `mark` (the
+ * rich text highlights it). Other numbers (tiers, counts, "every 2 rounds") stay.
+ */
+function shiftRounds(text, rounds, mark) {
+  if (typeof text !== 'string') return text;
+  let out = text;
+  for (const re of ROUND_GROUPS) out = out.replace(re, (g) => g.replace(/\d+/g, (n) => (rounds.has(Number(n)) ? mark(Number(n) + 1) : n)));
+  return out;
+}
+/**
+ * Strategy 1: the Strategy records whose named rounds come one round later (CC.strategyLate), their texts with the
+ * new rounds, highlighted in `descRaw`. A record whose text names none of them is left out.
+ */
+function strategyLateBands(bands) {
+  const out = {};
+  if (!bands || typeof bands !== 'object') return out;
+  for (const [id, b] of Object.entries(bands)) {
+    if (!b || CC.strategyLate.periodic.includes(id) || !Array.isArray(b.buffs)) continue;
+    const rounds = new Set(b.buffs.filter((x) => x && CC.strategyLate.keys.includes(x.key) && Number.isInteger(x.bb?.round)).map((x) => x.bb.round));
+    if (!rounds.size) continue;
+    const desc = shiftRounds(b.desc, rounds, String);
+    const descRaw = shiftRounds(b.descRaw ?? b.desc, rounds, (n) => `<@ba.vup>${n}</>`);
+    if (desc !== b.desc || descRaw !== (b.descRaw ?? b.desc)) out[id] = { ...b, desc, descRaw };
+  }
+  return out;
+}
 
 /**
- * The records `rules` change: `{ chess, garrisons, bonds, items: { [id]: record } }` — new objects, the inputs are not
+ * The records `rules` change: `{ chess, garrisons, bonds, items, bands: { [id]: record } }` — new objects, the inputs are not
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
- * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object }} raw the raw data maps (id → record)
+ * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object, bands?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
  * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
 export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\}/g, (m, k) => (p && p[k] != null ? String(p[k]) : m)) } = {}) {
   const chess = {}, garrisons = {}, bonds = {}, items = {};
-  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items };
+  if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items, bands: {} };
+  // SPA-CC Strategy 1: the Strategies' texts name their rounds one round later (only the client passes `bands`)
+  const bands = rules.ccStrategyLate > 0 ? strategyLateBands(raw.bands) : {};
   // SPA-CC Junk: the Toxic Waste
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // the boosterPack cheat: the Booster Pack
@@ -255,8 +300,26 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   }
   // the Alliance Modules: the alliance's text is the module's (its "current effect" line, Mod A's numbers, goes)
   const listNames = LATERANO_B_LIST.map((id) => own(raw.chess, id)?.name ?? id).join(text('、'));
+  // Laterano Mod B (GitHub #75): Mod A's own lines (in the player's language, rich text kept) around Mod B's 100-stack
+  // line, and the "current effect" line's ammo at Mod B's numbers (formatBondEffect's `min`; the keys are Mod B's own)
+  const lat = rules.lateranoMod === 'B' ? own(raw.bonds, 'lateranoShip') : null;
+  if (lat && typeof lat.descRaw === 'string' && lat.descRaw.includes('\n')) {
+    const line = text(LATERANO_B_100, { bond: lat.name ?? 'lateranoShip', list: listNames });
+    const plain = (s) => s.replace(/<@[^>]*>|<\/>/g, '');
+    const splice = (s) => { const [first, ...rest] = s.split('\n'); return [first, line, ...rest].join('\n'); };
+    const A = LATERANO_B_AMMO;
+    const effect = typeof lat.effectDescRaw === 'string' && lat.effectDescRaw.includes('\n') ? splice(lat.effectDescRaw) : null;
+    bonds.lateranoShip = {
+      ...lat, desc: plain(splice(lat.descRaw)), descRaw: splice(lat.descRaw),
+      bb: { ...lat.bb, fish_b_ammo: A.base, fish_b_ammo_per_stack: A.perStack, fish_b_ammo_cap: A.capBase, fish_b_ammo_cap_per_stack: A.capPerStack },
+      ...(effect ? {
+        effectDesc: plain(effect), effectDescRaw: effect,
+        effectDescParams: [{ index: 0, format: '0%', base: 'fish_b_ammo', perStack: 'fish_b_ammo_per_stack', min: { base: 'fish_b_ammo_cap', perStack: 'fish_b_ammo_cap_per_stack' } }],
+      } : { effectDesc: undefined, effectDescRaw: undefined, effectDescParams: undefined }),
+    };
+  }
   for (const { key, bondId, msg, params } of [
-    { key: 'lateranoMod', bondId: 'lateranoShip', msg: LATERANO_B_TEXT, params: { list: listNames } },
+    ...(bonds.lateranoShip ? [] : [{ key: 'lateranoMod', bondId: 'lateranoShip', msg: LATERANO_B_TEXT, params: { list: listNames } }]),
     { key: 'victoriaMod', bondId: 'victoriaShip', msg: VICTORIA_C_TEXT, params: {} },
   ]) {
     const rec = rules[key] && rules[key] !== 'A' ? own(raw.bonds, bondId) : null;
@@ -297,5 +360,5 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
       };
     }
   }
-  return { chess, garrisons, bonds, items };
+  return { chess, garrisons, bonds, items, bands };
 }

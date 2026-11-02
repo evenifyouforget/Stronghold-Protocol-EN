@@ -345,6 +345,7 @@
 
 /* ---- Custom Lobby Modifications (ui/lobbyRules.js): the strip's summary and the dialog ----------------------------- */
 .rules-summary { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .08rem; }
+.rules-chips { display: flex; flex-wrap: wrap; gap: .06rem; margin: 0; padding: 0; list-style: none; }
 .rules-chip {
   padding: .03rem .12rem;
   border: 1px solid var(--line-2);

@@ -49,6 +49,7 @@
 // saveStats / their helpers.
 
 import { PHASE } from '../../../shared/constants.js';
+import { normalizeRules, rulesInForce } from '../../../shared/rules.js';
 import { sanitizeName } from './playerName.js';
 
 /** Current record-envelope version (bump + add a MIGRATIONS step when the record shape changes). */
@@ -84,6 +85,17 @@ export function contentOf(c) {
     .map((p) => (typeof p === 'string' ? p : isObj(p) && typeof p.id === 'string' ? `${p.id}@${typeof p.version === 'string' ? p.version : '?'}` : null))
     .filter((x) => typeof x === 'string' && x.length <= 80).slice(0, 32);
   return { cs: c.cs, plugins: list };
+}
+/**
+ * (fork) The Custom Lobby Modifications a record keeps (m.public rules, shared/rules.js): only the rules in force, valid
+ * values only; null when none was (#78: the re-viewed settlement shows the +N, the tags and WITH CHEATS like the live one).
+ * @param {any} v
+ */
+export function rulesOf(v) {
+  if (!isObj(v)) return null;
+  const n = normalizeRules(v);
+  const keys = rulesInForce(n);
+  return keys.length ? Object.fromEntries(keys.map((k) => [k, n[k]])) : null;
 }
 /** Did the record's match play gameplay plugins (unofficial)? @param {any} rec */
 export const isModdedRecord = (rec) => !!(isObj(rec) && rec.content);
@@ -254,6 +266,9 @@ export function normalizeRecord(raw) {
   // an id-less (hand-made) record gets a content id, so both copies of it land on the same key (`vs` and `content` left
   // out: the id of a record from before 0.3.0 stays the same)
   if (!rec.id) rec.id = `c.${fnv1a(JSON.stringify({ ...rec, vs: undefined, content: undefined }))}`;
+  // (fork) set after the id, and only when a rule was in force: the id of a record from before it stays the same
+  const rules = rulesOf(r.rules);
+  if (rules) rec.rules = rules;
   return rec;
 }
 
@@ -336,7 +351,7 @@ export function loadStats() {
 // ---- compaction + the storage budget ---------------------------------------------------------------------------
 
 const COMPACT_FRAME = ['id', 'v', 't', 'end', 'victory', 'roundsPassed', 'lastRound', 'hiddenReached', 'hiddenCleared', 'reason', 'modeId',
-  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'test', 'testActions'];
+  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'test', 'testActions', 'rules'];
 
 /**
  * The compact form of a record: the frame and the player's OWN row without lineup, bonds and name — everything the
@@ -436,9 +451,9 @@ export function roomModeOf(modeId, roomMode) {
  * without players (the error-path settlement) or matches the local player did not take part in (spectator
  * seats get every result pushed too — eliminated players, who ARE in players[], keep recording).
  * @param {any} res raw m.result payload
- * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, now?: number }} ctx
+ * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, rules?: any, now?: number }} ctx
  *   vs: the room's visual set (room.state.content.vs); content: room.state.content (its content set when it played
- *   gameplay plugins) — see the header
+ *   gameplay plugins) — see the header; (fork) rules: the match's m.public rules (rulesOf)
  * @returns {any|null}
  */
 export function buildRecord(res, ctx = {}) {
@@ -472,6 +487,7 @@ export function buildRecord(res, ctx = {}) {
     content: contentOf(ctx.content),
     players: r.players,
     altArt: r.altArt === true,
+    rules: ctx.rules,
   });
 }
 

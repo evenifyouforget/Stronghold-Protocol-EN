@@ -270,6 +270,29 @@ test('a Patriot who leaks and survives the Unite Phase still costs his leaker 5 
   }
 });
 
+test('while the Unite Phase runs, a leaker\'s pending LP weighs a Patriot like the settlement (GitHub #76)', () => {
+  for (const [rules, want] of [[{ ccPatriot: 1 }, CC.patriot.leakLp + 1], [{ ccPatriot: 1, ccLastLine: 1 }, CC.patriot.leakLp + 1 + CC.lastLineLp], [{}, 2]]) {
+    const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: rules }).start();
+    try {
+      h.toPrep(2);
+      const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
+      const clean = () => ({ leaked: [], perfect: true, coins: 0, layerGains: {}, killed: 0, damageDealt: 0 });
+      const leaks = [{ enemyKey: CC.patriot.key, counted: true }, { enemyKey: 'enemy_1007_slime', counted: true }];
+      h.m.lastResults = new Map([[p0.playerId, { ...clean(), perfect: false, leaked: leaks }], [p1.playerId, clean()]]);
+      h.m.unitePlan = { helpers: [p1], leakers: [p0], leaked: leaks.map((l) => ({ enemyKey: l.enemyKey, sourcePlayerId: p0.playerId })), notReentered: new Map() };
+      h.m.phase = 'UNITE';
+      h.m.fields = [];
+      // nothing killed yet: both still stand (the enemy count stays 2; the LP is what settle() would bill)
+      assert.deepEqual(h.m._pendingLpView(p0), { uniteLeft: 2, pendingLp: want }, JSON.stringify(rules));
+      // the result is in: the helpers killed the other one, the Patriot got through
+      h.m.fields = [{ kind: 'unite', cc: true, done: true, result: { perPlayer: { [p1.playerId]: { leaked: [{ ...leaks[0], sourcePlayerId: p0.playerId }] } }, unspawned: [] } }];
+      const one = rules.ccPatriot ? CC.patriot.leakLp + (rules.ccLastLine ? CC.lastLineLp : 0) : 1;
+      assert.deepEqual(h.m._pendingLpView(p0), { uniteLeft: 1, pendingLp: one }, JSON.stringify(rules));
+      h.m.phase = 'PREP';
+    } finally { h.m.dispose(); }
+  }
+});
+
 test('the battle\'s live leak count weighs a Patriot like the settlement (the HUD\'s pending LP)', async () => {
   const { battleProgress } = await import('../../server/sim/spec.js');
   const fake = (rules) => ({ flags: { rules }, _perPlayer: { p_0: { leaked: [{ enemyKey: CC.patriot.key, counted: true }, { enemyKey: 'enemy_x', counted: true }] } } });

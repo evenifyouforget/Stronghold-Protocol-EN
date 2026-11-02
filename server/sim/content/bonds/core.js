@@ -46,6 +46,7 @@ import { FORCED_EXIT } from '../../constants.js';
 import { msg } from '../../../../shared/i18n.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { textFinite } from '../../../../shared/plugins/textNumber.js';
+import { LATERANO_B_AMMO } from '../../../../shared/ruleData.js';
 
 const num = S.num;
 
@@ -353,7 +354,7 @@ function installKjerag(battle, pid, bb, members) {
 //   garrisons/battle.js consume_ammo) trigger twice each time they trigger — the Attribute's owner decides
 //   (S.lateranoB100), not whoever spent the bullets; the bullets count as usual and both triggers count toward the
 //   Attribute's per-battle limit; the 6-member ATK per bullet is Mod A's and is not doubled.
-export const LATERANO_B = Object.freeze({ base: 0.05, perStack: 0.01, capBase: 0.75, capPerStack: 0.003, dmg: 2 });
+export const LATERANO_B = Object.freeze({ ...LATERANO_B_AMMO, dmg: 2 });
 
 function installLaterano(battle, pid, bb, members) {
   const memberSet = new Set(members);

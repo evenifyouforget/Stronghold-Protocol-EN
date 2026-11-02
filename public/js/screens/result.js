@@ -26,8 +26,8 @@ import { CombatSummary } from '../ui/combatSummary.js';
 import { sentText } from '../ui/lang.js';
 import { UnofficialMark } from '../ui/pluginTag.js';
 import { TestMark } from '../ui/testConsole.js';
-import { ruleLabel, ruleBadges } from '../ui/lobbyRules.js';
-import { rulesInForce, ruleOf } from '../../../shared/rules.js';
+import { ruleBadges, RulesChips } from '../ui/lobbyRules.js';
+import { rulesInForce } from '../../../shared/rules.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -172,7 +172,7 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         </div>
         ${inForce.length ? html`<div class="result__rules">
           <span class="result__rlabel">${t('本局房间改动')}</span>
-          <ul>${inForce.map((k) => html`<li key=${k} class=${`rules-chip rules-chip--${ruleOf(k).category}`}>${ruleLabel(k, rules)}</li>`)}</ul>
+          <${RulesChips} rules=${rules} />
         </div>` : null}
         ${mins ? html`<p class="result__time t-lo">${tParts('本局耗时 {n} 分钟', { n: html`<b class="num">${mins}</b>`, mins })}</p>` : null}
         </div>

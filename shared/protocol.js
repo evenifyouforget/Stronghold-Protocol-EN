@@ -516,7 +516,8 @@ export const C2S = {
   // (bool, a choice's option, a stage id or null, a list of bond ids) — merged into the room's rules
   'room.setRules': { rules: (v) => isMap(v, RULE_KEYS.length, (k) => RULE_KEYS.includes(k), () => true) && Object.keys(v).length > 0
     && Object.entries(v).every(([k, x]) => isRuleValue(k, x)) },
-  'room.addBot': {},
+  // (fork) lang: the host's language, for the AI's name (server/lobby.js botNames; GitHub #89)
+  'room.addBot': { lang: (v) => isStr(v, 16), $optional: ['lang'] },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused
@@ -549,7 +550,7 @@ export const C2S = {
   // 单人匹配 (DESIGN §90): queue from the lobby without a room; queue.ai once queue.state's aiAt has passed
   'queue.join': { difficulty: (v) => DIFFICULTIES.includes(v) },
   'queue.leave': {},
-  'queue.ai': {},
+  'queue.ai': { lang: (v) => isStr(v, 16), $optional: ['lang'] },
   // the room's plugins (DESIGN §32, P1a; host, before the match — like a difficulty change it un-readies the others):
   // the plugins of this server the room switches on, in any order (the server closes the set over their requirements
   // and sorts it: shared/plugins/order.js); [] = the original content. Cosmetic plugins (art: the room's visual set,

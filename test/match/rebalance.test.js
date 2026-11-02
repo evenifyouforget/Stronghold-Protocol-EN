@@ -114,13 +114,18 @@ test('煌 takes the skill (and module) the player chose for 凯瑟琳: her loado
   }
 });
 
-test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod A "current effect") in the match and the client', async () => {
+test('Alliance Modules: 拉特兰 Mod B\'s text and current effect, 维多利亚 Mod C\'s text, in the match and the client (GitHub #75)', async () => {
+  const { formatBondEffect } = await import('../../public/js/ui/richText.js');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { lateranoMod: 'B', victoriaMod: 'C' } });
   try {
     const lat = h.m.gd.bond('lateranoShip'), vic = h.m.gd.bond('victoriaShip');
-    assert.match(lat.desc, /min\(5 \+ 1×层数/);
-    assert.match(lat.desc, /莫斯提马/);
-    assert.equal(lat.effectDesc, undefined);
+    // Mod A's ammo line, Mod B's 100-stack line, Mod A's 6-member line: three paragraphs, rich text kept in descRaw
+    assert.equal(lat.desc.split('\n').length, 3);
+    assert.match(lat.desc.split('\n')[1], /^<达到100层>.*莫斯提马/);
+    assert.match(lat.descRaw, /<@ba\.vup>200%<\/>/);
+    assert.equal(lat.effectDescRaw.split('\n').length, 3);
+    // the current effect: +min(5 + 1 × L, 75 + 0.3 × L) %
+    for (const [L, pct] of [[0, '5%'], [50, '55%'], [300, '165%']]) assert.match(formatBondEffect(lat, L), new RegExp(`\\+${pct}`), `${L} stacks`);
     assert.match(vic.desc, /每携带1件维式重锤回复8点技力/);
   } finally { h.m.dispose(); }
   const { createDataStore } = await import('../../public/js/data.js');
@@ -143,11 +148,11 @@ test('Alliance Modules: 拉特兰 / 维多利亚 show the module\'s text (no Mod
     await d.setLocale('en');
     d.setRules({ lateranoMod: 'B' });
     const lat = d.lookup('bonds', 'lateranoShip');
-    assert.match(lat.desc, /\[Laterano\] Operators gain \+min/);
-    assert.match(lat.desc, /Mostima/);
-    assert.ok(!lat.effectDescRaw && !lat.effectDesc, 'no Mod A current-effect line');
+    assert.match(lat.desc, /^\[Laterano\] Operators gain ammo/);
+    assert.match(lat.desc, /\n<At 100 stacks> \[Laterano\] Operators deal 200% damage.*Mostima/);
+    assert.match(formatBondEffect(lat, 300), /\+165%/);
     d.setRules(null);
-    assert.ok(d.lookup('bonds', 'lateranoShip').effectDescRaw, 'Mod A again');
+    assert.match(formatBondEffect(d.lookup('bonds', 'lateranoShip'), 300), /\+455%/, 'Mod A again: 5 + 1.5 × L');
   } finally { setLang('zh'); }
 });
 

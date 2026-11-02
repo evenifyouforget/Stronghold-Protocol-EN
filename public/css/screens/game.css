@@ -942,6 +942,8 @@
 .set-diag__count.is-warn { color: var(--amber); }
 .set-diag__url { min-width: 0; font-size: calc(.13 * var(--t)); color: var(--text-dim); overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
 .set-diag__battle-hint { margin-top: -.06rem; }
+.set-diag__issues { font-size: calc(.14 * var(--t)); }
+.set-diag__issues a { color: var(--mint-400); }
 .set-diag__text {
   box-sizing: border-box; width: 100%; height: max(2rem, 140px); min-height: 120px; resize: vertical;
   padding: max(.1rem, 8px) max(.12rem, 10px);

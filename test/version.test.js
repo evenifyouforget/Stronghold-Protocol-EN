@@ -43,7 +43,9 @@ test('CHANGELOG.md opens with the release version, and the README links it', () 
 });
 
 test('the release version is what players see', () => {
-  assert.match(read('public/js/screens/title.js'), /v\$\{APP_VERSION\}/, 'title screen footer');
+  // (fork, GitHub #98) the footer's version line is ui/about.js VersionButton
+  assert.match(read('public/js/screens/title.js'), /<\$\{VersionButton\} \/>/, 'title screen footer');
+  assert.match(read('public/js/ui/about.js'), /v\$\{APP_VERSION\}/, 'title screen footer');
   assert.ok(!/PROTOCOL v1/.test(read('public/js/screens/title.js')), 'no protocol number posing as a version');
   // the server's entry is server/index.js; the banner and /healthz live in server/http/ (boot.js, routes.js)
   assert.match(read('server/http/boot.js'), /Stronghold Protocol: Alliance v\$\{APP_VERSION\}/, 'boot banner');

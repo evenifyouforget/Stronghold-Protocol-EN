@@ -51,7 +51,7 @@ const timesOf = (v, d = 1) => Math.min(bbCap('count'), Math.max(1, int(v, d)));
  * by period keep theirs: "every N rounds" / even rounds (杜宾, 松桐, 娜仁图亚) and 达马兹提 — "every 5 rounds" in its text,
  * rounds 5 / 10 / 15 in the data (Fish, 2026-10-15).
  */
-const PERIODIC_BANDS = new Set(['band_damaztic']);
+const PERIODIC_BANDS = new Set(CC.strategyLate.periodic);
 const roundLate = (ctx, bandId) => (ctx.lobbyRules?.ccStrategyLate > 0 && !PERIODIC_BANDS.has(bandId) ? 1 : 0);
 /** The round a Strategy's `round` names, after ccStrategyLate. */
 const namedRound = (ctx, p, bandId, d = -1) => int(p.round, d) + roundLate(ctx, bandId);
