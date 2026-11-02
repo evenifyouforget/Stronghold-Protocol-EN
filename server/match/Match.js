@@ -273,6 +273,8 @@ export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.
  * for about a third more rehearsal time per prep. More layouts only in the Final Assault changed nothing.
  */
 const BOT_REHEARSAL_DEFAULT = 6;
+/** (fork) Layouts a delegated rehearsal offers the host's browser by default: 3, the count before upstream's 6 (README). */
+const BOT_REHEARSAL_HOST_DEFAULT = 3;
 /** Wall-clock ms of bot layout rehearsal per scheduler callback (real time; virtual time runs it in one go). */
 const BOT_SLICE_MS = 8;
 const env = (k) => (typeof process !== 'undefined' && process.env ? process.env[k] : undefined);
@@ -395,7 +397,7 @@ export class Match {
      */
     this.botRehearsalDelegate = opts.botRehearsalDelegate != null ? !!opts.botRehearsalDelegate : envBotRehearsal();
     /** (fork) layouts a delegated rehearsal offers the host's browser (its CPU, not the server's) */
-    this.botRehearsalHost = Number.isInteger(opts.botRehearsalHost) && opts.botRehearsalHost >= 2 ? Math.min(opts.botRehearsalHost, 8) : BOT_REHEARSAL_DEFAULT;
+    this.botRehearsalHost = Number.isInteger(opts.botRehearsalHost) && opts.botRehearsalHost >= 2 ? Math.min(opts.botRehearsalHost, 8) : BOT_REHEARSAL_HOST_DEFAULT;
     /** wall-clock ms the host has to answer a delegated rehearsal (engine option: tests shorten it) */
     this.botRehearsalDelegateMs = Number.isFinite(opts.botRehearsalDelegateMs) && opts.botRehearsalDelegateMs > 0 ? opts.botRehearsalDelegateMs : REHEARSAL_ANSWER_MS;
     /** the room's current host (opts.hostId; server/lobby.js room.hostId — setHost follows a migration) */
