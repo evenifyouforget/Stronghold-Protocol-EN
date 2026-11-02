@@ -36,7 +36,10 @@ The rest by hand, keeping both:
 - **Tests**: upstream's `seedReleaseRead` (the release notes, #603) before our `?lang=zh` / mock-page navigation.
   `asset-download.browser.test.js` stays deleted, as Yuri deleted it (Yuri 51974653, 0.3.0 import fixes).
 - **Docs**: README / META / client.md / network.md merged word by word.
-- `README.md`: `SP_BOT_REHEARSAL`'s default is now upstream's 6 (it said 3).
+- `README.md`: `SP_BOT_REHEARSAL`'s default is now upstream's 6 (it said 3). The host browser's count
+  (`SP_BOT_REHEARSAL_HOST`) keeps its own default of 3: it used the shared constant, which upstream raised.
+- i18n: upstream's extractor now flags literals inside a computed msgid (#849); three fork strings go through `N_()`.
+- `deploy-middle` test (upstream's #692): a missing value takes the fork's default, off.
 
 ### Regenerated, not hand-merged
 - `test/golden/*.json` and the three versions' goldens (`golden.mjs --update`, `--version <id> --update`). Per
@@ -47,7 +50,9 @@ The rest by hand, keeping both:
 ## Tests
 
 - Local: lint (0 errors), import boundaries (the 3 known `nodeData.js` notes) and typecheck pass. The full suite
-  (4 shards) was still running when this PR was opened; results follow in a comment.
+  (4 shards) fails on only two tests, which need things this container lacks: IPv6, and an asset copy as new as
+  the manifest (skipped in CI). The sandbox tests need a real `node_modules` (a symlinked one fails the Node
+  permission model's read checks).
 - CI on this PR is the quick tier only.
 
 ## Known issues
