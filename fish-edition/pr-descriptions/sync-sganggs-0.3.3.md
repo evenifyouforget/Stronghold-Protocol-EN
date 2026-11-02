@@ -60,17 +60,32 @@ The rule throughout: keep both. Fork features stay, and upstream's go in around 
   (README's link follows).
 
 ### Regenerated, not hand-merged
-- `data/assets.json`: `node tools/fetch-assets.mjs --add-only`. It keeps every entry of upstream's and adds ours
-  (爱国者). The 28 entries of ours it lacks are 弑君者's old sound pool keys, which upstream renamed (0.3.2 mode banks).
+- `data/assets.json`: a three-way merge of the manifests (base `c05aa7e2`, ours, Yuri #22): every entry of upstream's,
+  plus ours (爱国者, the outfits). `fetch-assets --add-only` was tried first, but it also takes in whatever is on the
+  local disk (212 voiced operators instead of 193), which the audio and voice tests caught.
 - `test/golden/*.json`: `npm run golden:update`. Per family, the merged goldens differ from upstream's in exactly as
   many scenarios as ours differed from the base before (bonds 32/46, diy 117/141, fields 17/22, matches 20/21,
   roster 48/49, standins 10/10): the fork's own changes, nothing new.
+- `test/golden/act1autochess*/`, `act2autochess-v2_1/` (new in 0.3.3, the official versions' goldens):
+  `node tools/golden.mjs --version <id> --update`. Upstream's were computed without the fork's sim changes (the sliding
+  push, #60, and the rest).
 - `test/audio-pools-data.test.js`: upstream's counts + 爱国者's 2 references and 2 pools (991 / 1032).
+
+### Tests adapted to the fork
+- 0.3.3's #782 野鬃 tests: the fork's push is a 30 fps slide (#60) and a blocked enemy is shifted to its tile's edge
+  first (#61). The same changes our older push tests already had: the slide's end point, `FRAME_EPS`, unblocked
+  near targets.
+- ccStrategyLate: 0.3.3 moves the named rounds of 小贾斯汀, 杰西卡, 杜宾 and others to `onPrepStart`.
+- `ci.test.js`: the merged workflow. `lobby-versions` / `versions-default-guard`: a match and the default
+  `room.state` carry the fork's lobby rules (#78). `data-versions`: 黑天鹅's SPA-CC `level1` (#17) differs from V2_1's.
 
 ## Tests
 
-- Local: lint (0 errors), import boundaries and typecheck pass. The full suite (4 shards) was still running when
-  this PR was opened; results follow in a comment.
+- Local: lint (0 errors), import boundaries and typecheck pass. The full suite (4 shards, `tools/test-run.mjs`) passes
+  apart from two tests that need what this container lacks: an IPv6 socket (`ipv6-bind`), and an asset copy as new as
+  the manifest ("every manifest path exists on disk"; it skips without `public/assets`, as in CI). The four shards
+  run side by side also time out some plugin / studio sandbox tests; all of them pass with less load.
+- The three official versions' goldens pass (`golden.mjs --version …`).
 - CI on this PR is the quick tier only (base `mini/0.3.1-4`); Windows, the full shards and Golden run when the mini
   goes to main.
 
