@@ -11,6 +11,7 @@ import { tagLevel } from '../../../shared/rules.js';
 import { CC, BOOSTER, ITEM_BOOSTER } from '../../../shared/ruleData.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { boardOrder, pieceDir } from '../board.js';
+import { equippedItemProgress } from '../itemProgress.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
 
 export class PlayerRound {
@@ -165,6 +166,8 @@ export class PlayerRound {
     for (const { r, c, piece } of boardOrder(this.board)) {
       if (piece.kind === 'chess') {
         const u = { uid: piece.uid, kind: 'chess', chessId: piece.id, row: r, col: c, dir: pieceDir(piece), items: (piece.items || []).map((i) => i.id) };
+        const progress = equippedItemProgress(this, piece);
+        if (progress) u.itemProgress = progress;
         const pick = this.diyPickOf(piece.id);
         if (pick) {
           // 0.2.0 自选编队: a slotted DIY slot fights as its pick (sim getChess(id, { diy }): the operator's body, the pick's
@@ -197,6 +200,7 @@ export class PlayerRound {
         units.push(u);
       }
     }
+    const bandProgress = this.bandProgressView();
     return {
       playerId: this.playerId,
       seat: this.seat,
@@ -205,6 +209,7 @@ export class PlayerRound {
       units,
       bonds: bondSnapshot(reached ? this.bondsView() : this.bonds),
       bandId: this.bandId,
+      ...(bandProgress ? { bandProgress } : {}),
       playerEffects: this.effects.filter((e) => e.battle !== false).map((e) => ({
         id: e.id, key: e.key ?? null, source: e.iconKind ?? null, params: e.params ?? null, counter: e.counter ?? null, data: e.data ?? null,
       })),

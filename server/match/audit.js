@@ -314,6 +314,8 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
     check('bands', () => {
       for (const ps of m.order) {
         if (!ps.bandId || !gd.bandAllowed(ps.bandId)) fail(`${ps.playerId}: band ${ps.bandId} not allowed`);
+        // a seat gone before its pick keeps the 0 LP it left with (§37.65)
+        if (!ps.alive) { if (ps.lp !== 0) fail(`${ps.playerId}: LP ${ps.lp} of a departed seat`); continue; }
         const lp0 = typeof m.startLp === 'function' ? m.startLp(ps.bandId) : gd.startLp(ps.bandId); // the doubleLp cheat
         if (ps.lp !== lp0) fail(`${ps.playerId}: LP ${ps.lp} != start LP ${lp0} of ${ps.bandId}`);
       }
