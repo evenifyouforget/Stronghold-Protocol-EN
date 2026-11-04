@@ -95,7 +95,12 @@ export class MatchInfra {
    * any match: a phase then ends when every alive player is ready (a disconnected human is waited for until the
    * reconnect window turns the drop into onLeave).
    */
-  get soloUntimed() { return this.isSolo || this.loneHuman || !!this.lobbyRules?.untimed; }
+  get soloUntimed() {
+    // Maintainer decision: historical solo uses its timer unless 「不限时」 is opted into;
+    // the single-human convenience rule still applies to co-op. (fork) The `untimed` lobby rule switches it off for both.
+    if (this.lobbyRules?.untimed) return true;
+    return this.isSolo ? this.gd.config.version?.rules?.soloTimed !== true || this.opts.soloUnlimited === true : this.loneHuman;
+  }
 
   nextUid() { return ++this.uidSeq; }
 
@@ -301,6 +306,7 @@ export class MatchInfra {
   }
 
   dispatch(ps, hook, ev = {}, opts = {}) {
+    this.externalAI?.observe(ps, hook, ev);
     try { return this.dispatcher.dispatch(ps, hook, ev, opts); } catch (e) { this.reportError(`dispatch ${hook}`, e); return ev; }
   }
 
