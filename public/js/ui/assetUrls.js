@@ -6,6 +6,15 @@
 const str = (v) => (typeof v === 'string' && v ? v : null);
 const obj = (v) => (v && typeof v === 'object' ? v : null);
 
+/** Skin pictures belong to the effective operator, never the original chess of a stand-in / DIY slot. */
+function skinPicture(m, chess, skinId, field) {
+  if (!skinId) return null;
+  const id = chess?.charId || str(chess?.assets?.[field])?.replace(/_[12]$/, '');
+  const skin = m?.chars?.[id]?.skins?.[skinId];
+  const elite = chess?.isGolden || /_2$/.test(chess?.assets?.[field] || '');
+  return str(elite && skin?.[`${field}E2`]) || str(skin?.[field]) || (field === 'portrait' ? str(skin?.illust) : null);
+}
+
 /** @param {any} m manifest @param {string} key 'group/key' */
 export function uiUrl(m, key) {
   return str(obj(obj(m)?.ui)?.[key]);
@@ -31,6 +40,8 @@ function outfitArt(m, chess, kind, o) {
 export function chessAvatarUrl(m, chess, o) {
   const of = outfitArt(m, chess, 'avatar', o);
   if (of) return of;
+  const picture = skinPicture(m, chess, o?.skin ?? null, 'avatar');
+  if (picture) return picture;
   const chars = obj(obj(m)?.chars);
   const id = str(chess?.assets?.avatar) || str(chess?.charId);
   if (!chars || !id) return null;
@@ -54,6 +65,8 @@ export function chessAvatarUrl(m, chess, o) {
 export function chessPortraitUrl(m, chess, o) {
   const of = outfitArt(m, chess, 'portrait', o);
   if (of) return of;
+  const picture = skinPicture(m, chess, o?.skin ?? null, 'portrait');
+  if (picture) return picture;
   const chars = obj(obj(m)?.chars);
   const id = str(chess?.assets?.portrait);
   if (!chars) return null;
@@ -112,6 +125,12 @@ export function profIconUrl(m, profession) {
   return k ? str(obj(obj(obj(m)?.prof)?.icon)?.[k]) : null;
 }
 
+/** Square profession glyph (manifest `prof.large`: a black glyph on white, drawn as a white one by loadout.css). */
+export function profGlyphUrl(m, profession) {
+  const v = obj(obj(obj(m)?.prof)?.large)?.[String(profession || '').toLowerCase()];
+  return str(v);
+}
+
 /** Sub-profession icon from a chess record (`assets.subProfIcon` = 'sub_<id>_icon'). */
 export function subProfIconUrl(m, chess) {
   const sub = obj(obj(obj(m)?.prof)?.sub);
@@ -148,12 +167,15 @@ export function enemyIconUrl(m, enemyKey) {
   return base && base !== enemyKey ? str(obj(obj(obj(m)?.enemies)?.[base])?.icon) : null;
 }
 
-/** Token avatar, falling back to its owner operator's avatar. */
-export function tokenAvatarUrl(m, tokenId) {
+/** Token avatar: `tokens[id].skins[opts.skin]`, else the token's avatar, else its owner's (docs/SKINS.md). */
+export function tokenAvatarUrl(m, tokenId, opts) {
   const tokens = obj(obj(m)?.tokens);
   const t = tokenId ? obj(tokens?.[tokenId]) : null;
-  if (t?.avatar) return str(t.avatar);
-  if (t?.owner) return str(obj(obj(obj(m)?.chars)?.[t.owner])?.avatar);
+  if (!t) return null;
+  const skin = opts?.skin ? obj(obj(t.skins)?.[String(opts.skin)]) : null;
+  if (skin?.avatar) return str(skin.avatar);
+  if (t.avatar) return str(t.avatar);
+  if (t.owner) return str(obj(obj(obj(m)?.chars)?.[t.owner])?.avatar);
   return null;
 }
 

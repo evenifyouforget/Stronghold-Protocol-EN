@@ -43,6 +43,7 @@ import { isPotential, isCultivate } from '../../shared/potential.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
 import { riskLeakWeight } from '../../shared/ruleData.js';
+import { DEFAULT_VERSION, versionById, versionOfData } from '../../shared/versions.js';
 
 export const SPEC_VERSION = 1;
 
@@ -63,6 +64,7 @@ const specReplacer = (k, v) => (typeof v === 'number' && !Number.isFinite(v) ? (
  * @returns {object} a fresh JSON-safe object
  */
 export function buildBattleSpec(o = {}) {
+  if (o.version != null && !versionById(o.version)) throw new RangeError(`Unknown battle version ${o.version}`);
   const bossLike = o.kind === 'boss' || o.kind === 'hidden';
   const tl = Number(o.timeLimit);
   const spec = {
@@ -90,6 +92,7 @@ export function buildBattleSpec(o = {}) {
     // the content set the battle runs on and the art it was drawn with (header): not read by the sim
     ...(isContentHash(o.cs) ? { cs: o.cs } : {}),
     ...(isContentHash(o.vs) ? { vs: o.vs } : {}),
+    ...(o.version && o.version !== DEFAULT_VERSION ? { version: o.version } : {}),
     // morphPairing plus only. An official spec grows no key (identity and extra-field tests).
     ...(o.morphPairing === 'plus' ? { morphPairing: 'plus' } : {}),
   };
@@ -145,11 +148,14 @@ export { withUnitLoadouts };
  * @param {object} spec BattleSpec
  * @param {any} dataSource DataSource (or raw data maps; default: the sim's default source)
  * @param {{ sharedBoss?: object|null, BattleClass?: Function, logger?: object, recordEvents?: boolean, quiet?: boolean,
- *           content?: string }} [opts]
+ *           content?: string, resourceNumbers?: boolean }} [opts]
  */
 export function createBattleFromSpec(spec, dataSource, opts = {}) {
   if (!spec || typeof spec !== 'object') throw new TypeError('createBattleFromSpec: spec required');
   const s = jsonClone(spec);
+  if (s.version != null && (!versionById(s.version) || versionOfData(toDataSource(dataSource).raw) !== s.version)) {
+    throw new RangeError(`Battle version ${s.version} does not match loaded data`);
+  }
   const bossLike = s.kind === 'boss' || s.kind === 'hidden';
   let sharedBoss = opts.sharedBoss ?? null;
   if (!sharedBoss && bossLike && s.boss) sharedBoss = new LocalBossPool(s.boss.poolMax, s.boss.poolHp, s.boss.risk ?? null);
@@ -179,6 +185,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
   if (opts.logger) battleOpts.logger = opts.logger;
   if (opts.recordEvents === false) battleOpts.recordEvents = false;
   if (opts.quiet) battleOpts.quiet = true;
+  if (opts.resourceNumbers) battleOpts.resourceNumbers = true;
   const b = new BattleClass(battleOpts);
   b.battleId = s.battleId ?? null;
   return b;

@@ -1,3 +1,5 @@
+<!-- Branch `yuri/release-local-art` (Yuri #21); the body below is the PR description as posted. -->
+
 > [!IMPORTANT]
 > Pick one type of change and fill in everything below. Write "None" where there is nothing to say and "N/A" where it does not apply.
 

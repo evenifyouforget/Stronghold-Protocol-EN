@@ -1259,7 +1259,7 @@ export function shadowTexture() {
   return _shadow;
 }
 
-/** Item pedestal composite (icon in a rounded frame coloured by tier). */
+/** Item pedestal composite (icon in a rounded frame coloured by tier), keyed by resolved icon URL, never item id. */
 const _items = new Map();
 let _cursedFlame = null;
 /**
@@ -1297,8 +1297,8 @@ export function cursedFlameTexture() {
  * An item's plate: a dark rounded square in `color` with the icon. `invert` (the SPA-CC Toxic Waste): the finished
  * plate's colours inverted — a white plate, the icon's colours turned to their complements (its red vial cyan).
  */
-export function itemTexture(key, img, color, { invert = false } = {}) {
-  const k = `${key}|${img ? 1 : 0}|${color}|${invert ? 1 : 0}`;
+export function itemTexture(url, img, color, { invert = false } = {}) {
+  const k = `${url}|${img ? 1 : 0}|${color}|${invert ? 1 : 0}`;
   let tex = _items.get(k);
   if (tex) return tex;
   const P = PIXI();

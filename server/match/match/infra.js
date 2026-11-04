@@ -1,7 +1,8 @@
 // server/match/match/infra.js — Match methods: infrastructure — error isolation (guard, reportError), timers tracked
 // for dispose (later, cancel, scaled) and the phase deadline (setDeadline), soloUntimed, uids, the player lists
-// (alivePlayers, humans), the bonds this match's pool holds (bondInPool, bondLive), a player's boss-round group, deploy
-// field and deploy map, and the guarded meta dispatch (dispatch, dispatchItem → effectsMeta.js EffectDispatcher).
+// (alivePlayers, humans), a seat's bot strategy (botFor), the bonds this match's pool holds (bondInPool, bondLive), a
+// player's boss-round group, deploy field and deploy map, and the guarded meta dispatch (dispatch, dispatchItem →
+// effectsMeta.js EffectDispatcher).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { buildDeployMap } from '../board.js';
@@ -95,7 +96,12 @@ export class MatchInfra {
    * any match: a phase then ends when every alive player is ready (a disconnected human is waited for until the
    * reconnect window turns the drop into onLeave).
    */
-  get soloUntimed() { return this.isSolo || this.loneHuman || !!this.lobbyRules?.untimed; }
+  get soloUntimed() {
+    // Maintainer decision: historical solo uses its timer unless 「不限时」 is opted into;
+    // the single-human convenience rule still applies to co-op. (fork) The `untimed` lobby rule switches it off for both.
+    if (this.lobbyRules?.untimed) return true;
+    return this.isSolo ? this.gd.config.version?.rules?.soloTimed !== true || this.opts.soloUnlimited === true : this.loneHuman;
+  }
 
   nextUid() { return ++this.uidSeq; }
 
@@ -247,6 +253,9 @@ export class MatchInfra {
   /** A player's starting LP: its strategy's (GameData.startLp), twice that with the `doubleLp` cheat. */
   startLp(bandId) { return this.gd.startLp(bandId) * (this.lobbyRules?.doubleLp ? 2 : 1); }
 
+  /** The strategy that plays a bot-controlled seat: its SP_BOT_STRATEGY_SEATS override, else the match's (#816 P1). */
+  botFor(ps) { return this.seatBots[ps.seat] ?? this.bot; }
+
   /** Whether any chess of a bond is in this match's pool (a 驰援 card of a fully banned bond is never offered). */
   bondInPool(bondId) {
     for (const id of this.pool.entries.keys()) {
@@ -301,6 +310,7 @@ export class MatchInfra {
   }
 
   dispatch(ps, hook, ev = {}, opts = {}) {
+    this.externalAI?.observe(ps, hook, ev);
     try { return this.dispatcher.dispatch(ps, hook, ev, opts); } catch (e) { this.reportError(`dispatch ${hook}`, e); return ev; }
   }
 
