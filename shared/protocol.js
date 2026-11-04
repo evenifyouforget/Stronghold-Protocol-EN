@@ -11,6 +11,7 @@ import { isPluginId } from './plugins/manifest.js';
 import { isTestCommand } from './testMode.js';
 import { PLUGIN_OFFER_SLOTS } from './plugins/limits.js';
 import { isRuleValue } from './rules.js';
+import { isRoomBot, isFillPreset } from './botProfiles.js';
 
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -542,8 +543,12 @@ export const C2S = {
   'room.aiRequest': { botId: isId },
   'room.aiVote': { voteId: (v) => typeof v === 'string' && v.length <= 16, approve: isBool },
   // (fork) lang: the host's language, for the AI's name (server/lobby.js botNames; GitHub #89)
-  'room.addBot': { lang: (v) => isStr(v, 16), $optional: ['lang'] },
+  // (fork, GitHub #107) bot: the AI seat's profile (shared/botProfiles.js ROOM_BOTS; absent = the default)
+  'room.addBot': { lang: (v) => isStr(v, 16), bot: isRoomBot, $optional: ['lang', 'bot'] },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
+  // (fork, GitHub #107) the host changes an AI seat's profile, or fills every free seat with a preset's AI
+  'room.setBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1), bot: isRoomBot },
+  'room.fillBots': { preset: isFillPreset, lang: (v) => isStr(v, 16), $optional: ['lang'] },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused
   'room.kick': { seat: (v) => isInt(v, 0, MAX_SEATS - 1), playerId: isId },

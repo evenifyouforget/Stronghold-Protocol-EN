@@ -379,6 +379,14 @@
 .seat__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat__you { flex: none; padding: 0 .06rem; font-size: calc(.12 * var(--t)); font-weight: 700; color: var(--text-on-mint); background: var(--mint-500); }
 .rseat__doc { font-size: calc(.11 * var(--t)); letter-spacing: .1em; color: #7f8583; }
+/* (fork, GitHub #107) the host's bot-profile pick on an AI seat's plate */
+.rseat__botpick {
+  min-width: 0; max-width: 100%; justify-self: start; padding: 0 .04rem;
+  font: inherit; font-size: calc(.13 * var(--t)); color: #cfd4d2;
+  background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; cursor: pointer;
+}
+.rseat__botpick:hover, .rseat__botpick:focus-visible { border-color: #5df0c6; outline: none; }
+.rseat__botpick option { color: #eef0ef; background: #1b1e1d; }
 .rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: #4fe8c0; border-radius: 3px; }
 .rseat__me .icon { width: 80%; height: 80%; }
 .rseat__plate--empty { display: flex; justify-content: center; border-style: dashed; border-color: rgba(255, 255, 255, .12); background: none; font-size: calc(.15 * var(--t)); }
@@ -519,6 +527,17 @@
   z-index: 2;
 }
 .rs-foot__left { min-width: 0; }
+/* (fork, GitHub #107) 「用 AI 填满空位」 */
+.rs-fill { display: inline-flex; align-items: center; gap: .06rem; max-width: 100%; color: #9aa19e; }
+.rs-fill .icon { flex: none; width: max(.2rem, 13px); height: max(.2rem, 13px); color: #4fe8c0; }
+.rs-fill__sel {
+  min-width: 0; max-width: 100%; min-height: max(.36rem, 28px); padding: 0 .1rem;
+  font: inherit; font-size: calc(.15 * var(--t)); color: #eef0ef;
+  background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 2px; cursor: pointer;
+}
+.rs-fill__sel:hover, .rs-fill__sel:focus-visible { border-color: #5df0c6; outline: none; }
+.rs-fill__sel:disabled { opacity: .6; cursor: default; }
+.rs-fill__sel option { color: #eef0ef; background: #1b1e1d; }
 .rs-foot__center { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .08rem; }
 .rs-hint { margin: 0; font-size: calc(.18 * var(--t)); color: #d6dad8; text-align: center; }
 .room-bar__status .icon { width: 1.1em; height: 1.1em; margin-right: 4px; vertical-align: -2px; }
@@ -954,6 +973,13 @@
   .rs-foot { grid-template-columns: minmax(0, 1fr) auto; }
   .rs-foot__left { display: none; }
   .rs-foot__center { justify-self: start; max-width: 100%; }
+  /* (fork, GitHub #107) 「用 AI 填满空位」 stays, as the robot only: the drop-down lies over it, invisible */
+  .rs-foot--fill { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .rs-foot--fill .rs-foot__left { display: block; }
+  .rs-fill { position: relative; justify-content: center; width: max(.5rem, 32px, calc(36px * var(--sp-ui, 1))); height: max(.5rem, 32px, calc(36px * var(--sp-ui, 1))); border: 1px solid rgba(255, 255, 255, .16); background: rgba(0, 0, 0, .35); border-radius: 2px; }
+  .rs-fill .icon { width: 55%; height: 55%; }
+  .rs-fill__sel { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; }
+  .rs-fill:focus-within { border-color: #5df0c6; }
 }
 @media (max-aspect-ratio: 1/1) {
   .rs-seats { justify-content: flex-start; }

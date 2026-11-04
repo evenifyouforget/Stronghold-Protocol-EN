@@ -85,6 +85,7 @@ import { SearchBar, SearchButton, SearchStatus, useSearchNotice, useFindMates, c
 import { OnlinePill } from '../ui/presence.js';
 import { publicPath } from '../gen.js';
 import { t, tc, getLang } from '../../../shared/i18n.js';
+import { ROOM_BOTS, FILL_PRESETS, roomBot } from '../../../shared/botProfiles.js';
 
 /**
  * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
@@ -142,6 +143,16 @@ export function roomFacts(room, myId) {
     spectators: Array.isArray(room?.spectators) ? room.spectators.filter((s) => s && typeof s === 'object') : [],
     spectating: isSpectating(room, myId),
   };
+}
+
+/**
+ * (fork, GitHub #107) Whether this player gets 「用 AI 填满空位」: the host of a co-op room with a free seat, while it isn't
+ * searching for teammates (搜寻队友 fills the seats).
+ * @param {any} room room.state payload
+ * @param {ReturnType<typeof roomFacts>} facts
+ */
+export function fillAiShown(room, facts) {
+  return !!room && room.mode !== 'solo' && facts.isHost && !room.searching && facts.emptySeats > 0;
 }
 
 /**
@@ -264,7 +275,7 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
  * host of a co-op room, 添加 AI 队友. `portrait` is the outfit's picture, `portraitDefault` the operator's default one
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
  */
-function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {
+function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onSetBot = null, onKick, onInvite, portrait = null, portraitDefault = null, operator = null, onPickCard = null, fresh = false }) {
   const [badArt, setBadArt] = useState([]);
   const coop = room.mode !== 'solo';
   // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
@@ -299,6 +310,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
   const canPick = isMe && !seat.isBot && !!onPickCard;
   // an AI teammate's name without its 「AI·」 prefix on a phone (room.css; botNameParts)
   const botPrefix = botNameParts(seat);
+  // (fork, GitHub #107) an AI seat's bot profile: the host picks it, the others see it when it isn't the default
+  const prof = seat.isBot ? roomBot(seat.bot) : null;
   return html`<article class=${`seat rseat${isMe ? ' is-me' : ''}${isHostSeat ? ' is-host' : ''}${seat.isBot ? ' is-bot' : ''}${art ? ' has-art' : ''}${lit ? ' is-lit' : ''}${flash ? ' is-flash' : ''} is-${state}`}
       style=${`--i:${index}`}>
     <span class="rseat__clip" aria-hidden="true"></span>
@@ -336,9 +349,27 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       ${isMe ? html`<span class="rseat__me" role="img" aria-label=${t('你')} title=${t('你')}><${Icon} name="info" /></span>` : null}
       <${AvatarFrame} size="sm" name=${seat.name} seat=${index} bot=${seat.isBot} self=${isMe} />
       <span class="rseat__who"><b class="seat__name">${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.name || t('博士')}</b>${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}</span>
-      <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
+      ${prof && facts.isHost && onSetBot
+        ? html`<select class="rseat__botpick" data-testid="seat-bot" value=${prof.id} disabled=${busy === `bot${index}`} title=${t(prof.desc)}
+            aria-label=${t('AI 方案')} onChange=${(e) => onSetBot(index, e.currentTarget.value)}>
+            ${ROOM_BOTS.map((b) => html`<option key=${b.id} value=${b.id}>${t(b.label)}</option>`)}</select>`
+        : html`<small class="rseat__doc" title=${prof ? t(prof.desc) : undefined}>${prof ? (seat.bot ? t(prof.label) : 'AUTONOMOUS UNIT') : `DOCTOR #${doctorNo(seat.playerId)}`}</small>`}
     </div>
   </article>`;
+}
+
+/**
+ * (fork, GitHub #107) 「用 AI 填满空位」: a drop-down of the presets (shared/botProfiles.js FILL_PRESETS); choosing one
+ * fills every free seat (room.fillBots) and the drop-down returns to its label.
+ */
+function FillAi({ busy, onFill }) {
+  const label = t('用 AI 填满空位');
+  return html`<label class="rs-fill" data-testid="room-fill-ai"><${Icon} name="robot" />
+    <select class="rs-fill__sel" value="" disabled=${!!busy} aria-label=${label}
+      onChange=${(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) onFill(v); }}>
+      <option value="" disabled>${label}</option>
+      ${FILL_PRESETS.map((p) => html`<option key=${p.id} value=${p.id}>${t(p.label)}</option>`)}
+    </select></label>`;
 }
 
 /** 观战席: the room's spectators (host: ✕ frees a seat), and 入座 for a spectator while a player seat is free. */
@@ -555,6 +586,9 @@ export function RoomScreen() {
   // (fork) the AI is named in this client's language (GitHub #89)
   const addBot = () => run('add', () => net.request('room.addBot', { lang: getLang() }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
+  // (fork, GitHub #107) an AI seat's bot profile, and 「用 AI 填满空位」 (named in this client's language like addBot)
+  const setBot = (seat, bot) => run(`bot${seat}`, () => net.request('room.setBot', { seat, bot }));
+  const fillBots = (preset) => run('fill', () => net.request('room.fillBots', { preset, lang: getLang() }));
   // the host removes a human before the match (community report #17): asked first; the player may join again. The
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.
   const kick = async (seat, name, playerId) => {
@@ -722,7 +756,7 @@ export function RoomScreen() {
         // the player's outfit for that operator (header "Outfits"); null = the default art
         const skin = op ? seatCardSkin(s, op.chess.charId, { myId: me.playerId, localSkins, players: facts.occupied, otherSkins }) : null;
         return html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
-          myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onKick=${kick} onInvite=${() => copy('code')}
+          myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onSetBot=${setBot} onKick=${kick} onInvite=${() => copy('code')}
           portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null}
           portraitDefault=${op && skin ? chessPortraitUrl(data.get('assets'), op.chess) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)}
           fresh=${shownRoom.current === room.code} />`;
@@ -744,8 +778,10 @@ export function RoomScreen() {
     <${SearchBar} room=${room} facts=${facts} findMates=${findMates} setFindMates=${setFindMates} />
     <${RulesBar} room=${room} isHost=${facts.isHost} busy=${busy} onSet=${setRules} />
 
-    <footer class="room-bar rs-foot">
-      <div class="rs-foot__left" aria-hidden="true"></div>
+    <footer class=${`room-bar rs-foot${fillAiShown(room, facts) ? ' rs-foot--fill' : ''}`}>
+      ${fillAiShown(room, facts)
+        ? html`<div class="rs-foot__left"><${FillAi} busy=${busy} onFill=${fillBots} /></div>`
+        : html`<div class="rs-foot__left" aria-hidden="true"></div>`}
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
