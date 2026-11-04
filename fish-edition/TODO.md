@@ -133,10 +133,11 @@ More generally, is there a process step we're missing before the PRs go up, to e
 
 # GitHub
 
-Make tracking Issue with tables:
+Make tracking Issue with tables: → #121 (2026-11-05, from 81 records; `untracked/spacc-clears.mjs` and
+`untracked/tracking-issue-spacc-clears.md` to update it)
 
-- [ ] For each difficulty (and treating solo/coop as separate), the highest SPA-CC risk achieved, who did the clear, and when
-- [ ] For each SPA-CC tag, the highest difficulty it has been cleared on, who did the clear, and when
+- [x] For each difficulty (and treating solo/coop as separate), the highest SPA-CC risk achieved, who did the clear, and when
+- [x] For each SPA-CC tag, the highest difficulty it has been cleared on, who did the clear, and when
 
 This should help us track the sanity check progress of which tags have been cleared, ever.
 
