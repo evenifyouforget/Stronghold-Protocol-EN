@@ -93,7 +93,7 @@ function makeIndex() {
           uses: [use('loop', 'exa_cast', { node: 'Modes/Default/Talents/1', ability: 'MultiMeleeAttack', startEvent: 'ON_CAST_START', endEvent: 'ON_CAST_END', oneshot: false, list: 'cast', mode: 'Default' }),
             { role: 'hit', keys: ['exa_hit'], from: 'UberEffectEmitter._hitEffects', node: 'Modes/Default/Talents/1', ability: 'MultiMeleeAttack', list: 'hit', oneshot: true, mode: 'Default' }] } },
       },
-      // 新约能天使's 火力电台 (#46): an ally's spent bullet may call TalentBomb (its trigger template angel2_t_1[target])
+      // 新约能天使's 火力电台: an ally's spent bullet may call TalentBomb (its trigger template angel2_t_1[target])
       char_810_bomb: {
         kind: 'char', skills: {}, talentKeys: { base: {} }, modes: [{ name: 'Default', attack: melee([]) }],
         abilities: [{ kind: 'common', name: 'TalentBomb', node: 'Others/Direction/CommonAbilities/TalentBomb', class: 'MultiRangedAttack', when: null,
@@ -292,7 +292,7 @@ describe('talent and ability effects in a battle (talentfx.js)', () => {
     assert.equal(live('reb_post') + live('atk_buff'), 0);
   });
 
-  test("新约能天使's 'airstrike' (#46): TalentBomb's hit on the ground at the struck spot, not on her; the procedural blast is skipped", async () => {
+  test("新约能天使's 'airstrike': TalentBomb's hit on the ground at the struck spot, not on her; the procedural blast is skipped", async () => {
     const { w, handles, view, frame } = await setup();
     view(7, 'char_810_bomb');
     frame();

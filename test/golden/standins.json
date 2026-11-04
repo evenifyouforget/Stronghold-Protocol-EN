@@ -71,7 +71,7 @@
       "hooks": [1,93,5100,846,846,1311,1309,3783,43,83,37,35,0,19018,18,42,50,27,1,44,5,0,5],
       "events": {"atk":925,"bounty":2,"cast":8,"deploy":43,"die":56,"dmg":1309,"engage":11,"fx":104,"heal":25,"layer":5,"leak":27,"rate":83,"skill":72,"spawn":62,"status":112},
       "fx": {"beam":4,"blink":13,"displace":17,"dodge":5,"dp":8,"garrison":5,"liberate":14,"phase":13,"slash":24,"telegraph":1},
-      "snaps": "857e2323 e280e6d9 9a8bd597 e7345517 19af8386 cea49e39 cae7c361 61ed6bc9 8bf959e4 321bddc2 c88165e8 b9156b0a ad1c36af dfddd234 6a43c3f3 b16d602f 0062796d"
+      "snaps": "857e2323 e280e6d9 9a8bd597 e7345517 19af8386 cea49e39 4dea906f bc13a6a7 647211e6 cd567034 d50db02a c6009430 5d912cdd 5312343e 2b0ba559 64d483c9 c223b077"
     },
     "standin-02": {
       "about": "normal band 5 as stand-ins: chess_char_4_17_a→char_610_acfend chess_char_4_18_a→char_602_cdfend chess_char_5_05_a→char_602_cdfend chess_char_4_19_a→char_608_acpion chess_char_5_01_a→char_600_cpione chess_char_4_22_a→char_609_acguad chess_char_4_23_a→char_609_acguad chess_char_5_06_a→char_609_acguad chess_char_4_20_a→char_603_csnipe chess_char_4_24_a→char_604_ccast chess_char_5_02_a→char_604_ccast chess_char_5_03_a→char_612_accast",

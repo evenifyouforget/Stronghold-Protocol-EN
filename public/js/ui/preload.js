@@ -59,6 +59,7 @@ const TX = {
   cardMore: N_('可下载更多'), // en: "Download More"
   options: N_('预载设置'), // en: "Preload Settings"
   resumeShort: N_('继续'), // en: "Resume"
+  pauseShort: N_('暂停'), // en: "Pause"
   importHead: N_('导入素材包'), // en: "Import asset pack"
   importHint: N_('已有本服务器提供的预载 zip？在这里导入，与服务器文件一致的部分无需再下载。不用解压。'), // en: "Have this server's preload zip? Import it here: every file that matches the server's is not downloaded again. No need to unzip."
   importZip: N_('导入 zip'), // en: "Import zip"
@@ -193,8 +194,8 @@ export function PreloadCard({ class: cls }) {
           <${ProgressBar} value=${done} max=${Math.max(1, total)} size="sm" tone=${paused ? 'amber' : 'mint'} />
           <span class="num">${formatBytes(done)} / ${formatBytes(total)}</span>
         </div>
-        <button type="button" class="title-preload__gear fsbtn tapx" title=${t(paused ? TX.resumeShort : '暂停')}
-          aria-label=${t(paused ? TX.resumeShort : '暂停')} onClick=${() => (paused ? startPreload() : pausePreload())}>
+        <button type="button" class="title-preload__gear fsbtn tapx" title=${t(paused ? TX.resumeShort : TX.pauseShort)}
+          aria-label=${t(paused ? TX.resumeShort : TX.pauseShort)} onClick=${() => (paused ? startPreload() : pausePreload())}>
           <${Icon} name=${paused ? 'play' : 'pause'} /></button>
         ${gear}
       </div>`;

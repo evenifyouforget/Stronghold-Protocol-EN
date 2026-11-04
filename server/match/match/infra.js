@@ -1,7 +1,8 @@
 // server/match/match/infra.js — Match methods: infrastructure — error isolation (guard, reportError), timers tracked
 // for dispose (later, cancel, scaled) and the phase deadline (setDeadline), soloUntimed, uids, the player lists
-// (alivePlayers, humans), the bonds this match's pool holds (bondInPool, bondLive), a player's boss-round group, deploy
-// field and deploy map, and the guarded meta dispatch (dispatch, dispatchItem → effectsMeta.js EffectDispatcher).
+// (alivePlayers, humans), a seat's bot strategy (botFor), the bonds this match's pool holds (bondInPool, bondLive), a
+// player's boss-round group, deploy field and deploy map, and the guarded meta dispatch (dispatch, dispatchItem →
+// effectsMeta.js EffectDispatcher).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { buildDeployMap } from '../board.js';
@@ -251,6 +252,9 @@ export class MatchInfra {
 
   /** A player's starting LP: its strategy's (GameData.startLp), twice that with the `doubleLp` cheat. */
   startLp(bandId) { return this.gd.startLp(bandId) * (this.lobbyRules?.doubleLp ? 2 : 1); }
+
+  /** The strategy that plays a bot-controlled seat: its SP_BOT_STRATEGY_SEATS override, else the match's (#816 P1). */
+  botFor(ps) { return this.seatBots[ps.seat] ?? this.bot; }
 
   /** Whether any chess of a bond is in this match's pool (a 驰援 card of a fully banned bond is never offered). */
   bondInPool(bondId) {
