@@ -139,6 +139,7 @@ Base: `main`. Branch `mini/0.3.1-4`. It is squash-merged, and the squash commit'
 
 ### Tools and CI
 - **The Python 3.8 syntax check runs on ubuntu-24.04** (#112): `ubuntu-latest` became Ubuntu 26.04, which has no Python 3.8 build, so the check failed on every run.
+- **Upstream's Windows fixes for the manual-seat tests** (#119, sganggs 61e0debb and 4bccd295 cherry-picked): the dev-only launcher tests expected a graceful stop from `kill('SIGTERM')`, which Windows doesn't have, so the Windows shard 1 failed on every run. Manual-seat pages also retry a rename that Windows refuses while the file is open.
 
 ### Fork notes
 - Kept through both syncs: lobby rules, SPA-CC, records, the AI names in the host's language, and the sliding push.
