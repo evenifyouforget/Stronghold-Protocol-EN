@@ -778,7 +778,7 @@ export function RoomScreen() {
     <${SearchBar} room=${room} facts=${facts} findMates=${findMates} setFindMates=${setFindMates} />
     <${RulesBar} room=${room} isHost=${facts.isHost} busy=${busy} onSet=${setRules} />
 
-    <footer class="room-bar rs-foot">
+    <footer class=${`room-bar rs-foot${fillAiShown(room, facts) ? ' rs-foot--fill' : ''}`}>
       ${fillAiShown(room, facts)
         ? html`<div class="rs-foot__left"><${FillAi} busy=${busy} onFill=${fillBots} /></div>`
         : html`<div class="rs-foot__left" aria-hidden="true"></div>`}

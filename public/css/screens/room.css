@@ -974,12 +974,12 @@
   .rs-foot__left { display: none; }
   .rs-foot__center { justify-self: start; max-width: 100%; }
   /* (fork, GitHub #107) 「用 AI 填满空位」 stays, as the robot only: the drop-down lies over it, invisible */
-  .rs-foot:has(.rs-fill) { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .rs-foot__left:has(.rs-fill) { display: block; }
-  .rs-fill { position: relative; justify-content: center; width: max(.5rem, 34px); height: max(.5rem, 34px); border: 1px solid rgba(255, 255, 255, .16); background: rgba(0, 0, 0, .35); border-radius: 2px; }
+  .rs-foot--fill { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .rs-foot--fill .rs-foot__left { display: block; }
+  .rs-fill { position: relative; justify-content: center; width: max(.5rem, 32px, calc(36px * var(--sp-ui, 1))); height: max(.5rem, 32px, calc(36px * var(--sp-ui, 1))); border: 1px solid rgba(255, 255, 255, .16); background: rgba(0, 0, 0, .35); border-radius: 2px; }
   .rs-fill .icon { width: 55%; height: 55%; }
   .rs-fill__sel { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; }
-  .rs-fill:has(.rs-fill__sel:focus-visible) { border-color: #5df0c6; }
+  .rs-fill:focus-within { border-color: #5df0c6; }
 }
 @media (max-aspect-ratio: 1/1) {
   .rs-seats { justify-content: flex-start; }
