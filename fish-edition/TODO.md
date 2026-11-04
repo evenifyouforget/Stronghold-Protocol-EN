@@ -1,8 +1,7 @@
-# GitHub issues (open, 2026-11-01; #98, #99, #100 close when `mini/0.3.1-4` reaches main)
+# GitHub issues (open, 2026-11-05; #27, #98, #99, #100 close when `mini/0.3.1-4` reaches main)
 
-- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai). j-tai made the counter sourceless
-  (2026-10-29), as Fish asked. Reviewed 2026-11-01: merged onto `mini/0.3.1-4` locally, its test, the goldens and all
-  978 sim tests pass. Ready once Fish retargets it from `mini/0.3.1-3` to `mini/0.3.1-4`
+- #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), merged into `mini/0.3.1-4`
+  (8fa35339). Upstream's 0.3.3 makes the counter sourceless the same way (#106 took theirs; #37's test stays)
 - #29 AI: recalibrate the bounty kill-chance estimate
 - #30 AI: solo FUNNY vs NORMAL, and Alistair (boss_6)
 - #31 SPA-CC Risk balance: extend the botbench tag sweep
@@ -32,8 +31,8 @@
   Junk 2 too); the rules dialog treated every chain as replacing. Fixed in #94 (merged into `mini/0.3.1-3`)
 - #86 feature: the rules (SPA-CC tags included) in the match's Match Info tab (本局信息). Fish: yes (2026-10-29). In
   `wip/display-86-88-89` (#96)
-- #87 feature: show an AI player's personality / profile. There are no bot profiles yet, here or upstream (only
-  `BOT_NAMES`); waits for the bot-player research (ai-players.md)
+- #87 feature: show an AI player's personality / profile. Profiles exist since #110 (to come; `profileOf(id)` gives
+  a profile's tactics and slots), so the UI can show one once a seat can pick it (#107)
 - #88 feature: under Strategy 1, highlight the changed round numbers in the Strategy texts. Found: the texts didn't
   change at all under Strategy 1 (Jessica still said 4/7/10/13; the game uses 5/8/11/14). Fish: fix it and highlight
   (2026-10-29). In #96: the 12 Strategies whose rounds move, in every language. Strategy 2's three Strategy changes
@@ -58,6 +57,15 @@
   `mini/0.3.1-4`, 2026-10-31). Contact is GitHub issues only: no emails or Discord handles in About (Fish, 2026-10-31).
   Not done: tools/package.mjs doesn't put server-info.json in release zips; docs/PLAYING.md (Chinese, upstream's)
   still names sganggs's issues; the title's Discord button (stronghold-en.dev's community) is unchanged
+- #104 R&D: a match record good enough to continue the match from mid-way, for the bot research (can a bot take over
+  a human's board and win?). Not a save/restore feature. Today a record keeps each battle's BattleSpec and the shop
+  rolls, not the whole PlayerState (shop pool, bench, items, counters, the match RNG streams): what H1–H3 needed the
+  standalone fight for. Lead: a per-prep snapshot of PlayerState + `m.rng*` states, restored into a fresh Match
+- #105 feature: in the 机变 (improv) screen, pull the overlay down to check one's own and others' boards (which
+  bounty to take depends on the board). Not triaged against the client yet
+- #107 bot-players: pick a profile per bot seat, and a "fill with AI" dropdown (All basic bot; later Recommended,
+  Optimized). The server side exists: per-seat strategies (#111, sganggs #890) and profiles as strategy ids (#110),
+  so the room needs `room.addBot { strategy }` and a seat menu. Next after #110
 - Replays of 2026-10-27/28 (logs/2026-10-27 records.tar.xz, 7 matches): `tools/records.mjs --verify`: 171 battles
   replay the same, 2 differ (32cd92, seat s0, rounds 3 and 4), on main as on mini. Same kills and the same 8 / 9 leaks;
   the difference is in what the record keeps only as a hash (time, damage, units' end HP / SP, coins, stacks), and
@@ -247,8 +255,14 @@ invulnerability ribbons, two cheats, the Risk kept with cheats, ja / ko / zh-TW 
 
 # mini/0.3.1-4 (from 2026-10-31)
 
-Base `mini/0.3.1-4` (= main 8c963917). Merged into it: #102 (closes #98, #99, #100). To come: #37 (closes #27; Fish
-retargets it), the notes PR of 2026-11-01 (replaces #101, which was based on the merged `mini/0.3.1-3`).
+Base `mini/0.3.1-4` (= main 8c963917). Merged into it: #102 (closes #98, #99, #100), #103 (notes of 2026-11-01), #37
+(closes #27), #106 (sganggs 0.3.3). To come: #111 (sganggs `dev` after 0.3.3; replaces #109, which was squashed into
+the already-merged `wip/sync-sganggs-0.3.3` and never reached the mini), #110 (bot tactics, stacked on #111), #112
+(local-extract CI on ubuntu-24.04: `ubuntu-latest` is Ubuntu 26.04 now, no Python 3.8; fails every run), and this
+loop's notes PR. #108 (mini → main) is open, its description in `pr-descriptions/mini-0.3.1-4.md`.
+
+- The repo merges by squash only, so a sync PR loses upstream's history (#106 too): every sync needs a hand-picked
+  merge base. Allowing merge commits for sync PRs would make the next one a plain `git merge` (Fish's call).
 
 - Fish's # GitHub items (2026-11-01), drafts in `untracked/` for Fish to post:
   - SPA-CC clears tracking issue: `untracked/tracking-issue-spacc-clears.md`, from the 13 records Fish shared
@@ -310,9 +324,9 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - [ ] kaltsit esperanta liftoff altitude bug fix: a bug from our #18, fixed here as #25; Yuri #20 (open).
 - [x] EN versions of issue template and PR template: Yuri #17, merged; synced to main by #54 (merged).
 
-# live PRs to watch (2026-11-01)
+# live PRs to watch (2026-11-05)
 
-- Yuri, all open, no comments yet (no change since 2026-10-28): #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
+- Yuri, all open, no comments yet (no change since 2026-10-27): #12 invulnerability ribbons; #18 Exusiai the New Covenant's talent strike; #19
   Lemuen's S3 crosshair; #20 liftoff hover; #21 release local art; #22 sync with sganggs 0.3.3 (opened 2026-10-27; CI
   green since 3a269451 brought sganggs's Pillow test fix). After #22 merges: step B, the sync into our main.
 - sganggs #862 (Lemuen's crosshair): squash-merged by sganggs into their dev, author kept, released in 0.3.2, so
@@ -325,7 +339,9 @@ convention for a mini → main PR (pr-descriptions/mini-0.3.1-2.md). Its squash 
 - sganggs dev since 0.3.3 (to 91024ce0, 2026-11-01): no new release. ≈ 20 "Bots:" commits (bot.js +1,900 lines), an
   entry animation with official sounds (their #878), 乌尔比安 S3 and 鸭爵 fixes (#903, #839), two identical items on one
   operator both count (#902), 缇缇 S2 ties (#906), channelled skills only stand still while channelling (#904), a
-  Korean translation update (#908). Comes to us with 0.3.4 via Yuri #22's successor, or a direct sync
+  Korean translation update (#908). Synced to bfd2a920 by #111 (to come). Since then (to e017558a, 2026-11-04), 50
+  more: bots name their own focus as a plan main each prep (solo 终极 wins 149 → 183 of 480), 卢西恩 / 铳 in the Final
+  Assault field model, LLM-adapter work (SP_LLM_KINDS, shared plans), the Python 3.8 CI fix (#112 takes it)
 
 # need human action - branches that have not been made PRs yet
 

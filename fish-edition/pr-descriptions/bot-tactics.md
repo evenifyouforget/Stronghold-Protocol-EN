@@ -1,6 +1,6 @@
 # Bots: tactics and profiles on the strategy registry
 
-Base: `wip/sync-sganggs-dev` (#109, stacked on it). Branch `wip/bot-tactics`. PR #110.
+Base: `wip/sync-sganggs-dev-2` (#111, stacked on it; retarget to `mini/0.3.1-4` after #111). Branch `wip/bot-tactics`. PR #110.
 
 The layered bot of fish-edition/ai-players.md ("Standard terms for the new bot", agreed 2026-10-27), built as an
 entry of upstream's strategy registry. Nothing changes for anyone who doesn't select a profile: `legacy` stays the

@@ -1,10 +1,14 @@
 # Sync sganggs dev after 0.3.3 (per-seat bots, recent bot work)
 
-Base: `wip/sync-sganggs-0.3.3` (#106, stacked on it). Branch `wip/sync-sganggs-dev`. PR #109.
+Base: `mini/0.3.1-4`. Branch `wip/sync-sganggs-dev-2`. PR #111, replaces #109.
+
+#109 was squash-merged into its base, `wip/sync-sganggs-0.3.3`, after #106 had been squashed into the mini, so its
+content never reached the mini. This branch is the mini plus #109's final tree, unchanged (the mini's tree is #106's
+head, which #109 was built on). The text below is #109's.
 
 This merges sganggs `dev` at `bfd2a920`: the 111 commits after 0.3.3, no release yet (0.3.4's notes are in
-`docs/history/0.3.4.md`). It's a real merge commit, so the next sync from sganggs or Yuri is a plain `git merge`.
-Merge #106 first, then retarget this PR to `mini/0.3.1-4`.
+`docs/history/0.3.4.md`). The repo merges PRs by squash only, so the next sync again needs the custom merge base
+(see Known issues).
 
 What it brings, for the bot research above all:
 - **Per-seat bot strategies** (sganggs #890, part of RFC #816): `SP_BOT_STRATEGY_SEATS` / `Match.botFor(ps)`, so one
@@ -56,6 +60,9 @@ The rest by hand, keeping both:
 - CI on this PR is the quick tier only.
 
 ## Known issues
+
+- Squash-only merging drops upstream's history from every sync: the next one again has to merge against a hand-picked
+  base. Allowing merge commits for sync PRs would make it a plain `git merge`.
 
 - Six rehearsed layouts instead of three: more server CPU for each AI teammate's prep when the host's browser doesn't
   take it (`SP_BOT_REHEARSAL` sets it back).
