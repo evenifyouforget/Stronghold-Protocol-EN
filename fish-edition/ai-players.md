@@ -703,3 +703,67 @@ Placement, skills and bands are not where it loses.
 scratch `bot.js` gate and `H4_SCALE=1` for H4), `default-skills.mjs`, `without-tier6.mjs`,
 `h5-h6-other-mode-and-tags.mjs <repo> <modeId> <records…>` (`RULES='{"ccBoss":2}'` for H6), `h7-shop-actions.mjs`,
 `h12-damage-shares.mjs`, and `h9-botbench-solo-funny-320.json`.
+
+## Our profiles on the new bot: is the research redundant? (2026-11-05)
+
+`main` now has upstream's bot work from 0.3.2 to `dev` (#108), which made `legacy` much stronger. So the question: do our profiles still improve on it?
+
+**Method.**
+- `botbench` on `main`'s code (mini/0.3.1-4 with #119), the three bots on the same seeds: solo seeds 1–160, co-op seeds 1–80.
+- "Flips" count seeds won by the profile and lost by legacy (+), and the other way round (−).
+- Boss damage is the leader damage per match, paired by seed, relative to legacy, ± one standard error.
+
+|                    | legacy wins | `fish-level`               | `fish-tier6`                 |
+| ------------------ | ----------- | -------------------------- | ---------------------------- |
+| solo Standard      | 141 (88 %)  | 146 (+13 / −8), +0.3 ± 0.9 % | 141 (+9 / −9), −0.1 ± 0.7 %  |
+| solo Ultimate      | 36 (23 %)   | 36, identical on every seed | 31 (+8 / −13), −17 ± 6 %     |
+| 4-bot co-op Ultimate | 37 of 80 (46 %) | 36 (+0 / −1), −0.3 ± 0.3 % | **15 (+0 / −22), −52 ± 10 %** |
+
+**What it shows.**
+- **Neither profile beats the new legacy.**
+- **Levelling (H4, H7):** upstream's bot already did this on its own.
+  - On Standard, legacy now wins 88 % (H4's 0.3.1 baseline: 54 %).
+  - `fish-level` reaches shop level 5 by round 7 where legacy is at 4, and wins 5 more of 160. That's noise: 13 flips against 8.
+  - On Ultimate the curve, read on a 14-round mode, *is* legacy's, and both stop at level 5. So `fish-level` plays legacy's exact games.
+- **Tier 6 on Ultimate:** wrong there.
+  - `fish-tier6` levels to 6 at round 13. Its board is worth less at round 13 (Σ shop price 36.6 against 41.2), with fewer elites (2.2 against 2.8).
+  - It loses 22 co-op games and wins none back.
+  - Upstream measured the same (§37.38: dropping level 6 raised the solo Ultimate pool finished from 30.9 % to 38.7 %). The tier-6 finding came from round-9 Standard boards. On Ultimate, paying for level 6 costs more than the tier-6 operators bring.
+
+**Is our research redundant?** Partly.
+- **Overtaken:**
+  - the levelling findings, which upstream fixed on Standard;
+  - "level 6 for tier 6", which is wrong on Ultimate.
+
+  Keep both profiles as examples of the API, not as candidates.
+- **Not redundant: gaps the new bot still has.**
+  1. **Each Alliance's own layer engine.** Upstream names it as the remaining gap (§37.35, §37.36):
+     - in Du Yaoye games with Xiaoman on the field, the bot gains 2.4–3.5 operators per round, where humans gain about ten;
+     - it has 1.65 distinct Yan operators at round 5, and 2.83 at round 7.
+
+     It's Upstream's measure of the bot's own strength by Strategy (`BAND_STRENGTH`, solo Ultimate pool finished): Du Yaoye is 35.8 %, 25th of 40 (Amiya 51.8 %).
+  2. **DIY picks:** the bot's own seats field none. It only uses them taking over a human's seat (`DIY_PIECE_BONUS`). Two of the five human Standard boards were carried by DIY picks (H12). Not measured yet.
+  3. **Bosses on Ultimate, solo, legacy:**
+     - Gunshatter (`boss_2`) 1 of 27, the Will of Sami 1 of 15, Pipe 2 of 20, Lucien 4 of 37;
+     - Helm 15 of 24.
+  4. **The bounty estimate (#29):** still too pessimistic. Cards the bot rates 20–50 % are killed 94 % of the time.
+- **The method isn't redundant either.** Upstream tunes the bot against itself with `botbench`. Our hypothesis tests compare it with human boards and records, which is how H1–H12 found what the bot doesn't do.
+
+**Fish's Du Yaoye tactics: helpful, not redundant.** They target gap 1, the one upstream names and hasn't closed. The bot's Du Yaoye handling today is:
+- Yan is the main Alliance from round 1 (§37.35);
+- her two rigged refreshes come before the level-up;
+- it aims for the 9-Yan line with Muelsyse (§37.43);
+- it gives the layer engines a buy and lineup bonus (§37.36).
+
+Nothing manages Xiaoman's gain-per-operator layers the way a human does. To write them so each can be built and measured:
+- one tactic per idea: **when** (round, board, shop: "Xiaoman on the field and …"), **what** (buy / sell / refresh / level / place …), and what it gives up;
+- each becomes a `defineTactic` at one decision point, in a profile `[dyy tactics…, legacy]`;
+- measured as upstream measures Strategies: Du Yaoye forced with `botbench --band band_duyaoy`, solo Ultimate, paired seeds, against legacy forced the same way. Seeds 1–40 to develop, the rest held back.
+
+The forced-Du Yaoye baseline is not run yet. The first try was stopped because the machine ran low on memory, so run it on its own, with fewer jobs:
+
+```
+node tools/botbench.mjs --configs solo:ABYSS --seeds 160 --seed 1 --jobs 4 --bot legacy --band band_duyaoy --json dyy-legacy.json
+```
+
+Data: `untracked/bench-2026-11-05/` (the nine `--json` runs and their tables).
