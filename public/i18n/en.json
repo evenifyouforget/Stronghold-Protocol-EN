@@ -2728,5 +2728,20 @@
   "拖动及选择朝向时：关闭保持原视角；适度缩小保留七成大小的商店，镜头适度放大；完全收起使用原有放大视角。结束后恢复原状。": "While dragging or choosing a facing: Off keeps the view; Moderate keeps the shop at 70% with a smaller zoom; Fully collapse uses the original zoom. The view returns afterwards.",
   "出售干员": "Operators sold",
   "点击进入": "Tap to start",
-  "点击跳过": "Tap to skip"
+  "点击跳过": "Tap to skip",
+  "基础 AI": "Basic bot",
+  "原版 AI，未选择时的默认": "The game's original AI; the default when none is picked",
+  "升级曲线": "Level curve",
+  "按模式长度换算的升级曲线，其余同基础 AI": "Levels up on a curve scaled to the mode's length; otherwise the basic bot",
+  "六星优先": "Tier 6 first",
+  "优先购买六星干员，升级到 6 级，其余同基础 AI": "Buys tier 6 Operators first and levels up to 6; otherwise the basic bot",
+  "伊奥莱塔开局": "Ioleta opening",
+  "开局优先选择伊奥莱塔盟约": "Picks the Ioleta Russell Alliance at the start when it can",
+  "自适应布阵": "Adaptive placement",
+  "按地图搜索部署位置": "Searches deployment positions for each map",
+  "伊奥莱塔开局 + 自适应布阵": "Ioleta opening + adaptive placement",
+  "伊奥莱塔开局，并按地图搜索部署位置": "The Ioleta opening, and deployment positions searched for each map",
+  "全部基础 AI": "All basic bot",
+  "用 AI 填满空位": "Fill remaining seats with AI",
+  "AI 方案": "Bot profile"
 }
