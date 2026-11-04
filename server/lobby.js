@@ -13,7 +13,11 @@
 //     difficulty is not recorded [ASSUMED: 标准, the first one unlocked; the event room research 06 §3.2 describes shows
 //     ♜ 标准模拟 in its footer pill]. The game's own lobby always sends the remembered one.
 //   * Host-only: room.setDifficulty, room.setAiPicksLast, room.setRules, room.setSoloUnlimited, room.addBot,
-//     room.removeBot, room.kick, room.start.
+//     room.removeBot, room.kick, room.start; (fork, GitHub #107) room.setBot, room.fillBots.
+//     ▸ (fork) An AI seat plays a bot profile (shared/botProfiles.js): room.addBot { bot? }, room.setBot { seat, bot },
+//       room.fillBots { preset } (every free seat). The default profile is stored as none; room.state names a seat's
+//       `bot` only when it is another, and the match's opts.botStrategySeats exist only when some seat has one (merged
+//       over SP_BOT_STRATEGY_SEATS), so a default room's state and opts keep their keys.
 //     ▸ Changing the difficulty, the AI-picks-last option (co-op only) or the lobby rules un-readies the other humans.
 //     ▸ 「不限时」 (room.setSoloUnlimited { on }, DESIGN §35.23.10): a solo room of a version whose rules.soloTimed is
 //       true, off by default. On, the match is built with opts.soloUnlimited (preparation and 机变 untimed — the existing
@@ -252,6 +256,7 @@ import { isContentHash } from '../shared/plugins/identity.js';
 import { ruleOption } from '../shared/plugins/rules.js';
 import { msg, wireMessage } from '../shared/i18n.js';
 import { DEFAULT_VERSION } from '../shared/versions.js';
+import { DEFAULT_ROOM_BOT, FILL_PRESETS, isRoomBot } from '../shared/botProfiles.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
@@ -301,6 +306,33 @@ export const BOT_NAMES_BY_LANG = Object.freeze({ // i18n-ignore: player names (d
 export function botNames(lang) {
   if (typeof lang !== 'string') return BOT_NAMES;
   return BOT_NAMES_BY_LANG[lang] || (lang.startsWith('zh') ? null : BOT_NAMES_BY_LANG[lang.split('-')[0]]) || BOT_NAMES;
+}
+
+/**
+ * (fork) Seats a new AI at free seat `idx`: named in `lang` (botNames), playing `bot` (GitHub #107; the default profile is
+ * stored as none, header).
+ */
+function seatBot(room, idx, lang, bot) {
+  const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
+  const name = botNames(lang).find((n) => !used.has(n)) || `AI·${idx + 1}`;
+  let playerId;
+  do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
+  room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false,
+    ...(isRoomBot(bot) && bot !== DEFAULT_ROOM_BOT ? { bot } : null) };
+}
+
+/**
+ * (fork, GitHub #107) Match opts.botStrategySeats for the room's AI seats that play another profile than the default,
+ * over the operator's SP_BOT_STRATEGY_SEATS (which Match reads only when the opts have none): {} when no seat has one.
+ * @returns {{ botStrategySeats?: Record<string, string> }}
+ */
+export function roomBotSeats(room, envSeats = process.env.SP_BOT_STRATEGY_SEATS) {
+  const picks = Object.fromEntries(room.seats.filter((s) => s && s.isBot && s.bot).map((s) => [String(s.seat), s.bot]));
+  if (!Object.keys(picks).length) return {};
+  const fromEnv = typeof envSeats === 'string' && envSeats.trim()
+    ? Object.fromEntries(envSeats.split(',').map((part) => part.split(':').map((x) => x.trim())).filter(([k, v]) => k && v))
+    : {};
+  return { botStrategySeats: { ...fromEnv, ...picks } };
 }
 
 const OK = Object.freeze({ ok: true });
@@ -523,6 +555,8 @@ export class Room {
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left,
           // (fork, docs/OUTFITS.md) the seat's outfit choice, when it has one
           ...(s.outfits && Object.keys(s.outfits).length ? { outfits: s.outfits } : null),
+          // (fork, GitHub #107) an AI seat's bot profile, only when it is not the default
+          ...(s.isBot && s.bot ? { bot: s.bot } : null),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.needsContent && !s.isBot ? { content: s.content || 'loading' } : {}),
           // (fork) came by 搜寻队友 / 单人匹配: this player's page leaves the room's cosmetic plugins out (content.js)
@@ -905,6 +939,8 @@ export class Lobby {
       case 'room.aiVote': return aiTakeover(this, session, msg);
       case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
+      case 'room.setBot': return this.setBot(session, msg);
+      case 'room.fillBots': return this.fillBots(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
       case 'room.rerollSetup': return this.rerollSetup(session, msg);
@@ -1705,11 +1741,41 @@ export class Lobby {
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo rooms cannot have AI teammates');
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
-    const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
-    const name = botNames(msg.lang).find((n) => !used.has(n)) || `AI·${idx + 1}`;
-    let playerId;
-    do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
-    room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false };
+    seatBot(room, idx, msg.lang, msg.bot);
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** (fork, GitHub #107) The host gives an AI seat another bot profile (header). */
+  setBot(session, { seat, bot }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    const target = room.seats[seat];
+    if (!target || !target.isBot) return fail(ERR.BAD_TARGET, 'seat does not hold an AI');
+    if (!isRoomBot(bot)) return fail(ERR.BAD_MSG, 'unknown bot');
+    this.dropReplay(room, session.playerId);
+    if (bot === DEFAULT_ROOM_BOT) delete target.bot;
+    else target.bot = bot;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** (fork, GitHub #107) 「用 AI 填满空位」: every free seat gets an AI of the preset (header). */
+  fillBots(session, { preset, lang }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo rooms cannot have AI teammates');
+    const p = FILL_PRESETS.find((x) => x.id === preset);
+    if (!p) return fail(ERR.BAD_MSG, 'unknown preset');
+    const free = room.seats.flatMap((s, i) => (s ? [] : [i]));
+    if (!free.length) return fail(ERR.ROOM_FULL);
+    this.dropReplay(room, session.playerId);
+    const bots = p.bots(free.length);
+    free.forEach((idx, k) => seatBot(room, idx, lang, bots[k]));
     this.broadcastState(room);
     return OK;
   }
@@ -2152,6 +2218,8 @@ export class Lobby {
         aiPicksLast: room.mode !== 'solo' && room.aiPicksLast === true,
         // lobby rules (Fish Edition): fixed for the match
         lobbyRules: room.rules,
+        // (fork, GitHub #107) the AI seats' bot profiles over SP_BOT_STRATEGY_SEATS; only when some seat has one
+        ...roomBotSeats(room),
         seats,
         // the spectator seats (header): watched like eliminated players, never players
         spectators: room.spectators.map((s) => s.playerId),
