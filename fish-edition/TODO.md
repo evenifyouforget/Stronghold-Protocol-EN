@@ -131,6 +131,25 @@ Can a new server owner figure out how to download the local assets bundle and de
 
 More generally, is there a process step we're missing before the PRs go up, to ensure usability?
 
+# GitHub
+
+Make tracking Issue with tables:
+
+- [ ] For each difficulty (and treating solo/coop as separate), the highest SPA-CC risk achieved, who did the clear, and when
+- [ ] For each SPA-CC tag, the highest difficulty it has been cleared on, who did the clear, and when
+
+This should help us track the sanity check progress of which tags have been cleared, ever.
+
+For anonymized match records, all we will be able to say is N humans + M bots. Unless someone wants to volunteer to claim the game.
+
+- [ ] Post the results of the bot player investigations to... somewhere. (signed by Claude)
+- - [x] "Can the AI win starting from a human's final board?" Yes: placing the human's units itself, the bot beats
+    every boss, just more slowly (2026-11-01, ai-players.md "Hypothesis tests")
+- - [x] "Does the human's final board beat every boss?" Yes: all 5 Standard boards beat all 7; only 18 % of the bot's
+    winning boards do (2026-11-01, same section)
+- - [x] There are likely several other useful hypotheses to test. Try coming up with some? H4–H9 in the same section
+    (2026-11-01)
+
 # main/wip
 
 - [x] Figure out what tool this app was apparently vibe coded with

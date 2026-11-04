@@ -386,6 +386,7 @@ Other areas can also be investigated. For example, does the AI player make use o
 ## Response (Claude, 2026-10-27)
 
 **On the assumption:** half right. Tests do depend on the bot, but they don't freeze it.
+
 - 19 test files import `server/match/bot.js`, and the match goldens record bot games.
 - Goldens can be regenerated, though: #67 did it here, and sganggs's 0.3.2 changed `legacy` itself (leveling,
   core-bond commitment, a full-bench-swap fix) and updated its goldens.
@@ -397,6 +398,7 @@ Other areas can also be investigated. For example, does the AI player make use o
 So the conclusion holds.
 
 **Upstream already has the framework** (sganggs 0.3.2 / 0.3.3; not in our 0.3.1 main yet):
+
 - **A bot registry (sganggs #673):** `docs/BOT_STRATEGIES.md`, `server/match/botStrategies.js`. The original bot is
   `legacy`, the default.
   - A new entry is made with `defineBotStrategy` and overrides only the hooks it wants: band pick, card pick, prep,
@@ -408,6 +410,7 @@ So the conclusion holds.
   (`SP_BOT_STRATEGY_SEATS`), is sganggs PR #890 (opened 2026-10-26).
 
 **Suggested order:**
+
 1. Sync sganggs 0.3.3 (directly; Yuri hasn't). It's large: 267 commits, 548 files since 0.3.1.
 2. Build the new bot as a registry entry: the per-seat choice, the replay rules and botbench support come with it.
    Leave `legacy` alone.
@@ -419,6 +422,7 @@ So the conclusion holds.
    - a fitness score over several modes and difficulties.
 
 **On the human-game experiments:**
+
 - **The human's final board against every boss:** feasible now. The records keep each battle's BattleSpec, and
   `tools/records.mjs --verify` already replays them, so it's that replay with the boss swapped.
 - **The bot continuing from a human's board:** needs a way to start a match mid-way. More work.
@@ -430,15 +434,16 @@ So the conclusion holds.
 Upstream's "strategy" means a whole bot (`SP_BOT_STRATEGY=legacy`, `defineBotStrategy`), so we don't use the word for
 the parts.
 
-| Term | Meaning | Upstream |
-|---|---|---|
-| **profile** | What one bot seat runs: an ordered list of tactics, with their parameters | RFC sganggs #816's "profile"; run by registering it as a strategy id |
-| **tactic** | One item of a profile. Asked at a decision point, it returns an action or **passes** | — |
-| **decision point** | Where the game asks the bot: band pick, card pick, each prep step, bounty choice | the registry's hooks (`pickBand`, `pickCard`, `prepBegin`, …) |
-| **action** | One validated game action: buy, sell, merge, level, freeze, place, ready, … | the game's own |
-| **legacy** | The original bot, unchanged | same |
+| Term               | Meaning                                                                              | Upstream                                                             |
+| ------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| **profile**        | What one bot seat runs: an ordered list of tactics, with their parameters            | RFC sganggs #816's "profile"; run by registering it as a strategy id |
+| **tactic**         | One item of a profile. Asked at a decision point, it returns an action or **passes** | —                                                                    |
+| **decision point** | Where the game asks the bot: band pick, card pick, each prep step, bounty choice     | the registry's hooks (`pickBand`, `pickCard`, `prepBegin`, …)        |
+| **action**         | One validated game action: buy, sell, merge, level, freeze, place, ready, …          | the game's own                                                       |
+| **legacy**         | The original bot, unchanged                                                          | same                                                                 |
 
 Rules:
+
 - At each decision point the tactics are asked in order. The first that returns an action wins.
 - After an action, the next decision starts again from the top. There's a cap on actions per prep, so a looping
   tactic can't stall the round.
@@ -451,12 +456,14 @@ Rules:
 ## Evolution (agreed 2026-10-27)
 
 A candidate is a profile. What mutates:
+
 - which tactics are in it (add, remove; the same tactic may appear twice with different parameters);
 - their order (move), since in a priority list order is behaviour;
 - each tactic's parameters. Every tactic declares its parameters (integer, decimal or choice; bounds; default), and
   mutation stays inside them.
 
 Rules:
+
 - legacy stays fixed at the bottom, so every candidate is a complete player.
 - A length cap or a small fitness cost per tactic, against bloat.
 - Crossover is optional. If added: merge two parents' tactics in order, each keeping its parameters.
@@ -471,6 +478,7 @@ final board? Plus a third test that closes the loop. All on `mini/0.3.1-4` (03a9
 final boss comes at round 9.
 
 **Method.**
+
 - The records keep each Final Assault's BattleSpec, and a solo one replays exactly (same digest).
 - To face another boss, the wave (template, routes, overrides) is rebuilt with `waves.js buildBossWave`, and the pool
   with `finalAssault.js bossPoolHp`. Rebuilding the recorded boss this way gives the recorded template, routes and pool.
@@ -481,20 +489,21 @@ final boss comes at round 9.
 - **Not covered:** co-op Final Assaults, whose fields share one pool. The one human Perilous win had cheats (Tier
   Start, Booster Pack) that change the random draws, so its seed doesn't rebuild the match for H1.
 
-| | boards | bosses beaten | notes |
-|---|---|---|---|
-| **H2:** the human's board, as placed, vs all 7 bosses | 5 human Standard wins (+1 Perilous with cheats) | **7 of 7, every board**, 0 LP lost | all well inside the countdown |
-| **H1:** the bot places the human's units (same operators, elites, items, loadouts, bonds, layers) | the same 5 | **7 of 7, every board**, 0 LP lost | fights take a median 1.36× as long (0.82–3.36×) |
-| **H3:** the bot's own board (its normal prep) vs all 7 bosses | 160 seeds | 52 % on average; 16 of 160 beat all 7; 21 beat none | shop level 4 on 157 of 160 boards; the humans' were all level 5 |
+|                                                                                                   | boards                                          | bosses beaten                                       | notes                                                           |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| **H2:** the human's board, as placed, vs all 7 bosses                                             | 5 human Standard wins (+1 Perilous with cheats) | **7 of 7, every board**, 0 LP lost                  | all well inside the countdown                                   |
+| **H1:** the bot places the human's units (same operators, elites, items, loadouts, bonds, layers) | the same 5                                      | **7 of 7, every board**, 0 LP lost                  | fights take a median 1.36× as long (0.82–3.36×)                 |
+| **H3:** the bot's own board (its normal prep) vs all 7 bosses                                     | 160 seeds                                       | 52 % on average; 16 of 160 beat all 7; 21 beat none | shop level 4 on 157 of 160 boards; the humans' were all level 5 |
 
 The bot's boards, by boss (all 160 / the 87 whose match was won):
 
-| boss | 1 胄 | 2 铳 | 3 管 | 4 昆图斯 | 5 卢西恩 | 6 阿利斯泰尔 | 7 萨米的意志 |
-|---|---|---|---|---|---|---|---|
-| all bot boards | 75 % | 32 % | 74 % | 69 % | 59 % | **17 %** | 36 % |
-| bot boards that won | 87 % | 48 % | 86 % | 84 % | 78 % | 30 % | 48 % |
+| boss                | 1 胄 | 2 铳 | 3 管 | 4 昆图斯 | 5 卢西恩 | 6 阿利斯泰尔 | 7 萨米的意志 |
+| ------------------- | ---- | ---- | ---- | -------- | -------- | ------------ | ------------ |
+| all bot boards      | 75 % | 32 % | 74 % | 69 %     | 59 %     | **17 %**     | 36 %         |
+| bot boards that won | 87 % | 48 % | 86 % | 84 %     | 78 %     | 30 %         | 48 %         |
 
 **Answers.**
+
 - **Does the human's final board beat every boss? Yes.** Every recorded human Standard board beats all seven, with no
   LP lost. Even among bot boards that won their own match, only 18 % do. Five boards in a row at that rate: p ≈ 2 × 10⁻⁴.
 - **Can the AI win from a human's final board? Yes, every time.** On that board, only placement and items are left to
@@ -505,12 +514,14 @@ The bot's boards, by boss (all 160 / the 87 whose match was won):
   were at level 5. Alistair is the clearest case: 17 % of bot boards beat him, every human board does.
 
 **Caveats.**
+
 - 5 human boards, probably from one or two players, and only won matches; Standard only.
 - "The bot from the human's board" is tested at the final board. Taking over at an earlier round needs the match
   rebuilt from the record's actions (see H8 below).
 - Escorts don't vary: the faction setup of the match seed fixes them, so each fight is one deterministic run.
 
 **Scripts** (scratch, in `untracked/hypotheses/`; offered as `tools/` if wanted):
+
 - `h2-boss-swap.mjs <repo> <records…>`;
 - `h1-bot-places-human-units.mjs <repo> <records…>`;
 - `h3-bot-boards.mjs <repo> FUNNY 1 160`, ~1.5 min on 4 processes;
@@ -519,6 +530,7 @@ The bot's boards, by boss (all 160 / the 87 whose match was won):
 ### More hypotheses worth testing
 
 Cheapest first; the first three reuse the scripts above.
+
 - **H4: Does the bossRound-scaled level curve close the gap?** Re-run H3 with the scratch `LEVEL_TARGET` change of
   2026-10-22. Expect level-5 boards and a higher all-7 rate. Bots only; it would be the evidence for that PR, here or
   for sganggs.
@@ -537,6 +549,9 @@ Cheapest first; the first three reuse the scripts above.
   verify the records.
 - **H9: Is the bot's random band the problem?** Humans choose their band, the bot picks at random. Run botbench by
   band, and compare with the bands humans won with.
+- **H10: Do bots benefit by switching bands?** Humans commit late, or are able to change strategy on the fly. Is committing to a band hurting the bots? Does continuing the match from round 7 with each possible new band choice reveal a different band is more winning?
+- **H11: Are any human games "almost" won?** Sometimes we blame our teammates. Is the best board x4 enough to win the matches when the original match did not win?
+- **H12: Who does the damage in the final round?** Is the distribution roughly even across operators, or does one DPS operator stand out? This influences whether bots should go for a more rounded playstyle, or focus on getting one operator as buffed as possible.
 
 ## Hypothesis tests, continued: H4–H9 and H12 (2026-11-01)
 
@@ -549,12 +564,12 @@ placement can be useless (one board dealt Alistair no damage at all). So H3 unde
 each boss, the bot places its own units again with `arrange` against that boss's wave (`m.bossWaves` swapped,
 `m._botPath` reset), as it would in a match.
 
-|                                         | mean bosses beaten | beat all 7 | 1 胄 | 2 铳 | 3 管 | 4 昆图斯 | 5 卢西恩 | 6 阿利斯泰尔 | 7 萨米的意志 |
-| --------------------------------------- | ------------------ | ---------- | ---- | ---- | ---- | -------- | -------- | ------------ | ------------ |
-| H3 (fixed placement), 160 bot boards    | 52 %               | 16         | 75 % | 32 % | 74 % | 69 %     | 59 %     | 17 %         | 36 %         |
-| **H3b** (re-placed per boss)            | 59 %               | 23 (14 %)  | 88 % | 33 % | 78 % | 87 %     | 64 %     | 28 %         | 36 %         |
-| H3b, the 87 boards whose match was won  | —                  | 23 (26 %)  |      |      |      |          |          |              |              |
-| the 5 human boards, same treatment      | 100 %              | 5 of 5     |      |      |      |          |          |              |              |
+|                                        | mean bosses beaten | beat all 7 | 1 胄 | 2 铳 | 3 管 | 4 昆图斯 | 5 卢西恩 | 6 阿利斯泰尔 | 7 萨米的意志 |
+| -------------------------------------- | ------------------ | ---------- | ---- | ---- | ---- | -------- | -------- | ------------ | ------------ |
+| H3 (fixed placement), 160 bot boards   | 52 %               | 16         | 75 % | 32 % | 74 % | 69 %     | 59 %     | 17 %         | 36 %         |
+| **H3b** (re-placed per boss)           | 59 %               | 23 (14 %)  | 88 % | 33 % | 78 % | 87 %     | 64 %     | 28 %         | 36 %         |
+| H3b, the 87 boards whose match was won | —                  | 23 (26 %)  |      |      |      |          |          |              |              |
+| the 5 human boards, same treatment     | 100 %              | 5 of 5     |      |      |      |          |          |              |              |
 
 The H1–H3 answers stand, at a smaller margin: five human boards in a row at 26 % is p ≈ 10⁻³.
 
@@ -562,10 +577,10 @@ The H1–H3 answers stand, at a smaller margin: five human boards in a row at 26
 
 The scratch change (`LEVEL_TARGET` indexed by `round × 14 / bossRound`), 160 seeds:
 
-|                   | match wins     | shop level at the boss | bosses beaten (H3b) | beat all 7 | Alistair |
-| ----------------- | -------------- | ---------------------- | ------------------- | ---------- | -------- |
-| current curve     | 87 (54 %)      | 4 on 157 boards        | 59 %                | 23         | 28 %     |
-| **scaled curve**  | **108 (68 %)** | 6 on all 160           | 62 %                | 23         | 35 %     |
+|                  | match wins     | shop level at the boss | bosses beaten (H3b) | beat all 7 | Alistair |
+| ---------------- | -------------- | ---------------------- | ------------------- | ---------- | -------- |
+| current curve    | 87 (54 %)      | 4 on 157 boards        | 59 %                | 23         | 28 %     |
+| **scaled curve** | **108 (68 %)** | 6 on all 160           | 62 %                | 23         | 35 %     |
 
 Levelling wins matches, mostly against the easier bosses. Level 6 boards still beat all seven only as often as level 4
 boards did. So level alone is not the gap.
@@ -612,12 +627,12 @@ none (156 of 160 boards).
 The five human boards, unchanged and with the LP they had, against each difficulty's Final Assault (its round, enemy
 scaling, escorts and pool; one escort draw per boss):
 
-|               | pool (boss 1) | won       | how they lose                                          |
-| ------------- | ------------- | --------- | ------------------------------------------------------ |
-| Standard      | 247,500       | 35 of 35  |                                                        |
-| Perilous      | 675,000       | 28 of 35  | they clear the boss but too late: the drain takes the LP |
-| Dire          | 1,800,000     | 5 of 35   | the same (median 483 s); only fe12 wins any (5 of 7)   |
-| Ultimate      | 3,600,000     | 0 of 35   | half never clear                                       |
+|          | pool (boss 1) | won      | how they lose                                            |
+| -------- | ------------- | -------- | -------------------------------------------------------- |
+| Standard | 247,500       | 35 of 35 |                                                          |
+| Perilous | 675,000       | 28 of 35 | they clear the boss but too late: the drain takes the LP |
+| Dire     | 1,800,000     | 5 of 35  | the same (median 483 s); only fe12 wins any (5 of 7)     |
+| Ultimate | 3,600,000     | 0 of 35  | half never clear                                         |
 
 A round-9 Standard board is roughly Perilous-ready. The higher difficulties have five more rounds to build in, so this
 measures the pool, not what those players would have fielded there.
@@ -628,17 +643,17 @@ Each tag alone, on the five Standard boards. The pool tags (Originium Zone, Lock
 `SharedBossPool`, with the lockout released after `CC.lockout.seconds` as the match does; without it the standalone
 fight silently ignores them.
 
-| tag                          | won      | per board     | effect                                              |
-| ---------------------------- | -------- | ------------- | --------------------------------------------------- |
-| Activation 1 (ccBoss 1)      | 35 of 35 |               |                                                     |
-| Activation 2                 | 28 of 35 | 7,4,6,4,7     |                                                     |
-| Activation 3                 | 10 of 35 | 1,1,1,1,6     | only fe12 survives it                               |
-| Elements 1 (ccLeaderDr 1)    | 35 of 35 |               | fights ≈ 1.4× longer                                |
-| Elements 2                   | 25 of 35 | 7,6,5,5,2     | two fights reach the 3600 s cap                     |
-| Originium Zone, Arts         | 33 of 35 | 7,6,7,6,7     | total fight time ×3.1                               |
-| Originium Zone, Physical     | 35 of 35 |               | no effect: these boards deal little Physical damage (not checked) |
-| Lockout 1 / 2 / 3            | 35 / 35 / 34 |           | median fight 58 → 81 / 111 / 133 s                  |
-| OZ Arts + OZ Phys + Lockout 3 | 31 of 35 | 7,6,7,4,7    |                                                     |
+| tag                           | won          | per board | effect                                                            |
+| ----------------------------- | ------------ | --------- | ----------------------------------------------------------------- |
+| Activation 1 (ccBoss 1)       | 35 of 35     |           |                                                                   |
+| Activation 2                  | 28 of 35     | 7,4,6,4,7 |                                                                   |
+| Activation 3                  | 10 of 35     | 1,1,1,1,6 | only fe12 survives it                                             |
+| Elements 1 (ccLeaderDr 1)     | 35 of 35     |           | fights ≈ 1.4× longer                                              |
+| Elements 2                    | 25 of 35     | 7,6,5,5,2 | two fights reach the 3600 s cap                                   |
+| Originium Zone, Arts          | 33 of 35     | 7,6,7,6,7 | total fight time ×3.1                                             |
+| Originium Zone, Physical      | 35 of 35     |           | no effect: these boards deal little Physical damage (not checked) |
+| Lockout 1 / 2 / 3             | 35 / 35 / 34 |           | median fight 58 → 81 / 111 / 133 s                                |
+| OZ Arts + OZ Phys + Lockout 3 | 31 of 35     | 7,6,7,4,7 |                                                                   |
 
 For the clears tracking issue: on these boards the expensive tags are Activation 2–3 and Elements 2; the others cost
 time, rarely the fight.
@@ -703,6 +718,92 @@ Placement, skills and bands are not where it loses.
 scratch `bot.js` gate and `H4_SCALE=1` for H4), `default-skills.mjs`, `without-tier6.mjs`,
 `h5-h6-other-mode-and-tags.mjs <repo> <modeId> <records…>` (`RULES='{"ccBoss":2}'` for H6), `h7-shop-actions.mjs`,
 `h12-damage-shares.mjs`, and `h9-botbench-solo-funny-320.json`.
+
+## Predictive modeling tests
+
+One of the simplest predictive models is a linear model: add the score of each operator, and compare it to the score of the boss. If the operator sum score is greater, we predict a win. Scores of operators and bosses can be trained. This can be considered the most degenerate form of a neural network, with no intermediate layers.
+
+We can generate test cases by running matches, and further generate more synthetic test cases by running just the boss round with "mutated boards" (replace one operator with a random different operator and let the bot re-position the board).
+
+We can also do the same with human boards, though we have less data there, and it's probably worth separating human boards and their mutants from the fully synthetic test data.
+
+Then we can run different configurations of the model, for example:
+
+- Predict based on only operator tiers (mask all other information)
+- Predict based on only alliance activations and stack counts (mask all other information)
+- Predict based on each operator, but do not differentiate elite 1 and elite 2
+- Predict baesd on only Strategy (Commander) chosen (ex. Pith. I will call them Commanders to avoid confusion)
+
+This will tell us:
+
+- What information is useful
+- If any particularly standout good options exist (ex. best boss DPS carry) or terrible options exist
+
+We do have to be careful in some cases ex. Executor the Ex Foedore (aka Fedex) may predict a win, not because he's good against the boss, but because a run that includes him has probably generated a lot of Foresight stacks and therefore Funds. Results should be recorded, interpreted, and scrutinized. Further hypotheses may be formed and tested.
+
+# DYYBot
+
+This is my first attempt writing a list of tactics that result in a very strong bot, based on my own human games. It includes general strategies, and optimizations for playing Du Yaoye.
+
+## General insights
+
+According to my mentor, Du Yaoye is actually stronger when Yan is banned, as all the remaining Yan operators must have at least 2 Alliances and are therefore generally better quality.
+
+We want to speed-level to barge level 5, which should happen around round 7. Typically we level on rounds 2, 4, 5, 7.
+
+Most of our boss DPS will come from one operator. Therefore we plan around having one DPS operator. Dusk is very strong, so she's fine as a fallback option that we can usually get thanks to Du Yaoye. If possible, certain operators given Yan membership with Damazti Isomorph will be significantly stronger than Dusk. Therefore we want to pick up one carry operator and plan around that carry operator for the boss.
+
+Chen the Dawnstreak might be a particularly good carry, though I haven't tested thoroughly. While putting her in tier 6 would dilute the pool and therefore make it harder to get Muelsyse, she has Yan membership herself already.
+
+Adding one operator to Yan is relatively cheap; the second Yan blade will merge into the first one, so you won't get to Isomorph a second Yan operator until the third Yan blade, which most games don't have good enough RNG to hit.
+
+Yan generally prefers building Investor rather than Foresight or Marvel, but it's good to pick up Foresight or Marvel along the way if it's offered.
+
+Items that let us duplicate Muelsyse or upgrade Muelsyse (and therefore print more Damazti Isomorph) will be on our shopping list. Durable, Raid, Arcane, Swift, and Precision are particularly good for adding a member via Damazti Isomorph, as our team is already capable of getting one member normally.
+
+We definitely want one healer for the boss. 0 healing is very bad. It's perfectly acceptable to Isomorph the healer into Yan if we're already using a Yan carry operator.
+
+We want to hit 6 Yan members if possible, as Gunshatterer with elemental shield can really screw over a team that has no elemental damage. The burn increasing arts damage somewhat and letting Blaze alter deal true damage is nice, but the countermeasure against Gunshatterer is the real reason we always want to have a source of elemental damage.
+
+For DYY, using the last 1 Funds to refresh the shop to get a Yan operator and then freezing, is generally better than buying a 1 cost equipment.
+
+Getting duplicates of Yan operators (particularly Swire/Swire Alter) is more consistent than getting duplicates of other operators, even vs Kazemaru, and even when the pool is already somewhat depleted by ourselves. This can probably be verified with math if it's really true.
+
+## State and shopping list
+
+While tactics can be refactored to all be stateless, it's easier to initially state related tactics as sharing a shopping list.
+
+In particular, our shopping list might include:
+
+- One carry operator (as in, after we pick up any carry operator, this slot is filled, but we don't commit until we know who it will be)
+- One healer
+- 5 other Yan operators (again, slots, that we don't fill until we know who it is)
+- Muelsyse/Damazti Isomorph
+- Yan item
+- Up to 5 more Isomorph-compatible items
+
+Muelsyse cloning items are also indirectly on the shopping list. Sometimes we get these before we get Muelsyse.
+
+## Variable valuation
+
+I realize I often implicitly weigh the worth of an action rather than always taking it or not taking it. For example, Arcane Arts Circle (to give membership into Arcane) might be taken when I already have 1 Arcane, but it might be not taken when I already have 3 Arcane, or if it's earlier game and I have 0 Arcane. I'm not really sure what the rules would be in boolean predicate logic, but it might actually be easier to construct this system by having the bot assign a valuation to various items, that can change based on the current state. This lets us reason with numbers, and the bot can decide if an item is not worth it.
+
+## Tactics that are likely to be consistent
+
+- Round 1: Buy 2 operators (buy until out of funds)
+- - This will probably be replaced by a more general set of tactics to cover buying operators on all rounds.
+- Round 2 or later AND Can upgrade barge to level 2/3/4/5: Upgrade barge
+- Foresight not active AND unowned Foresight operator in shop: Buy that operator
+- - Same for Marvel and Investor
+- (1 Funds left OR 5 or more Funds left) AND no Yan operator in shop AND shop item is not needed AND used less than 2 refreshes this round: Refresh
+- Shopping list operator in shop AND can buy it by selling operators: Sell operators to buy shopping list operator
+- - Unneeded operators (safe to sell) determination: Below tier 6 AND not currently on board AND not unpromoted Yan operator AND not required to keep Foresight/Marvel/Investor active
+- 0 Funds left AND (Yan operator in shop OR shop item is needed): Freeze
+- Can upgrade barge to level 6 AND Muelsyse in inventory AND less than 6 Damazti Isomorph owned in total AND (cloning item in inventory OR cloning item in shop): Upgrade barge
+- Can clone Muelsyse AND less than 6 Damazti Isomorph owned in total: Clone Muelsyse
+- Muelsyse in inventory and 6 or more Damazti Isomorph owned in total: Sell Muelsyse
+
+You should test mutants of these! Maybe I am wrong and these are not optimal.
 
 ## Our profiles on the new bot: is the research redundant? (2026-11-05)
 
