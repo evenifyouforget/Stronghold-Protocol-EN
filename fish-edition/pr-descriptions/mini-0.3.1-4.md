@@ -2,7 +2,7 @@ The fourth mini release on 0.3.1: upstream's 0.3.3 and its `dev` since (per-seat
 
 Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message is this PR's title, so its changes stay readable in `main`'s history.
 
-**Not ready yet**: #111 (sganggs `dev`), #112 (the CI fix every run needs) and #110 (bot tactics) are still open against `mini/0.3.1-4`. Their lines below are marked *(to come)*.
+**Not ready yet**: #111 (sganggs `dev`), #112 (the CI fix every run needs) #110 (bot tactics) and #113 (notes) are still open against `mini/0.3.1-4`. Their lines below are marked *(to come)*.
 
 ## Changelog
 
@@ -24,6 +24,7 @@ Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message 
 
 ### Fork notes
 - The notes of the loops of 2026-11-01 (#103): the hypothesis tests on human Final Assault boards and the bot (ai-players.md H1–H9, H12), TODO.md, `pr-descriptions/`.
+- The notes of the loop of 2026-11-05 (#113) *(to come)*: TODO.md (the squash fallout, #104 / #105 / #107 triaged), `pr-descriptions/`.
 
 Closes #27
 Closes #98
