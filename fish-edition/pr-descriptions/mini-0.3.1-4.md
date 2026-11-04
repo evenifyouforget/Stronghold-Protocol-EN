@@ -2,7 +2,7 @@ The fourth mini release on 0.3.1: upstream's 0.3.3 and its `dev` since (per-seat
 
 Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message is this PR's title, so its changes stay readable in `main`'s history.
 
-**Not ready yet**: #111 (sganggs `dev`), #112 (the CI fix every run needs) #110 (bot tactics) and #113 (notes) are still open against `mini/0.3.1-4`. Their lines below are marked *(to come)*.
+**Not ready yet**: #111 (sganggs `dev`), #110 (bot tactics) and #114 (bot profiles in the room, stacked on #110) are still open. Their lines below are marked *(to come)*.
 
 ## Changelog
 
@@ -11,7 +11,8 @@ Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message 
 - **sganggs `dev` after 0.3.3** (#111, replaces #109) *(to come)*: per-seat bot strategies (`SP_BOT_STRATEGY_SEATS`, sganggs #890), ≈ 40 bot improvements, `botbench --layers`, an opt-in P2P relay of match state (`SP_P2P`), fixes for 鸭爵, 乌尔比安, 缇缇, channelled casts, two identical items, enemy wind-up facing, and UI fixes. The bot rehearses 6 layouts per prep instead of 3 (`SP_BOT_REHEARSAL`); the host browser's count stays 3.
 
 ### Bots
-- **Tactics and profiles** (#110) *(to come)*: a profile is an ordered list of tactics with legacy at the bottom, registered as an ordinary bot strategy (fish-edition/ai-players.md). Two opt-in profiles, `fish-level` and `fish-tier6`, from the hypothesis tests. Nothing changes unless one is selected; selecting one in the room is #107.
+- **Tactics and profiles** (#110) *(to come)*: a profile is an ordered list of tactics with legacy at the bottom, registered as an ordinary bot strategy (fish-edition/ai-players.md). Two opt-in profiles, `fish-level` and `fish-tier6`, from the hypothesis tests. Nothing changes unless one is selected.
+- **Bot profiles in the room** (#114, closes #107) *(to come)*: the host picks each AI seat's profile on its plate, and "Fill remaining seats with AI" fills the free seats from a drop-down (All basic bot; Recommended and Optimized later). A room where nobody picks plays as before.
 
 ### Features
 - **Fish Edition's version on the title screen** (#102, closes #98, #99, #100): the version and commit, What's new from git, and issue links prefilled with the version.
@@ -20,16 +21,17 @@ Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message 
 - **Gunshatter's Arts shield counter** (#37 by j-tai, closes #27): tagged as a counter, so Bubble's S2 no longer answers it in a loop.
 
 ### Tools and CI
-- **The Python 3.8 syntax check runs on ubuntu-24.04** (#112) *(to come)*: `ubuntu-latest` became Ubuntu 26.04, which has no Python 3.8 build, so the check failed on every run.
+- **The Python 3.8 syntax check runs on ubuntu-24.04** (#112): `ubuntu-latest` became Ubuntu 26.04, which has no Python 3.8 build, so the check failed on every run.
 
 ### Fork notes
 - The notes of the loops of 2026-11-01 (#103): the hypothesis tests on human Final Assault boards and the bot (ai-players.md H1–H9, H12), TODO.md, `pr-descriptions/`.
-- The notes of the loop of 2026-11-05 (#113) *(to come)*: TODO.md (the squash fallout, #104 / #105 / #107 triaged), `pr-descriptions/`.
+- The notes of the loop of 2026-11-05 (#113): TODO.md (the squash fallout, #104 / #105 / #107 triaged), `pr-descriptions/`.
 
 Closes #27
 Closes #98
 Closes #99
 Closes #100
+Closes #107
 
 ## Known issues
 
