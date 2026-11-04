@@ -1,6 +1,6 @@
 The fork notes of the loop of 2026-11-05. Only `fish-edition/` changes.
 
-Base: `mini/0.3.1-4`. Branch `wip/loop-notes-2026-11-05`.
+Base: `mini/0.3.1-4`. Branch `wip/loop-notes-2026-11-05`. PR #113.
 
 - **TODO.md:**
   - `mini/0.3.1-4`: #37, #103 and #106 merged; to come #111 (replaces #109, which was squashed into the dead
