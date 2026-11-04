@@ -2,17 +2,17 @@ The fourth mini release on 0.3.1: upstream's 0.3.3 and its `dev` since (per-seat
 
 Base: `main`. Branch `mini/0.3.1-4`. Squash-merged: the squash commit's message is this PR's title, so its changes stay readable in `main`'s history.
 
-**Not ready yet**: #111 (sganggs `dev`), #110 (bot tactics) and #114 (bot profiles in the room, stacked on #110) are still open. Their lines below are marked *(to come)*.
+**Not ready yet**: #110 (bot tactics, carrying #114's bot profiles in the room) is still open. Its lines below are marked *(to come)*.
 
 ## Changelog
 
 ### Upstream
 - **sganggs 0.3.3** (#106, via Yuri #22, which Yuri hasn't merged yet): the official versions (第一期 / 第二期 rooms, version vote), the bot strategy registry (`SP_BOT_STRATEGY`, `botbench --bot` / `--compare`), 「不限时」 for timed historical solo, 名片干员 seat cards and skins, the redesigned lobby and waiting room, CI in 4 shards with a Node 24 lane and a Golden job. Fork features kept throughout: lobby rules, SPA-CC, records, the AI names, the sliding push.
-- **sganggs `dev` after 0.3.3** (#111, replaces #109) *(to come)*: per-seat bot strategies (`SP_BOT_STRATEGY_SEATS`, sganggs #890), ≈ 40 bot improvements, `botbench --layers`, an opt-in P2P relay of match state (`SP_P2P`), fixes for 鸭爵, 乌尔比安, 缇缇, channelled casts, two identical items, enemy wind-up facing, and UI fixes. The bot rehearses 6 layouts per prep instead of 3 (`SP_BOT_REHEARSAL`); the host browser's count stays 3.
+- **sganggs `dev` after 0.3.3** (#111, replaces #109): per-seat bot strategies (`SP_BOT_STRATEGY_SEATS`, sganggs #890), ≈ 40 bot improvements, `botbench --layers`, an opt-in P2P relay of match state (`SP_P2P`), fixes for 鸭爵, 乌尔比安, 缇缇, channelled casts, two identical items, enemy wind-up facing, and UI fixes. The bot rehearses 6 layouts per prep instead of 3 (`SP_BOT_REHEARSAL`); the host browser's count stays 3.
 
 ### Bots
 - **Tactics and profiles** (#110) *(to come)*: a profile is an ordered list of tactics with legacy at the bottom, registered as an ordinary bot strategy (fish-edition/ai-players.md). Two opt-in profiles, `fish-level` and `fish-tier6`, from the hypothesis tests. Nothing changes unless one is selected.
-- **Bot profiles in the room** (#114, closes #107) *(to come)*: the host picks each AI seat's profile on its plate, and "Fill remaining seats with AI" fills the free seats from a drop-down (All basic bot; Recommended and Optimized later). A room where nobody picks plays as before.
+- **Bot profiles in the room** (#114 via #110, closes #107) *(to come)*: the host picks each AI seat's profile on its plate, and "Fill remaining seats with AI" fills the free seats from a drop-down (All basic bot; Recommended and Optimized later). A room where nobody picks plays as before.
 
 ### Features
 - **Fish Edition's version on the title screen** (#102, closes #98, #99, #100): the version and commit, What's new from git, and issue links prefilled with the version.

@@ -1,6 +1,6 @@
 # Room: bot profiles per AI seat, and "Fill remaining seats with AI"
 
-Base: `wip/bot-tactics` (#110, stacked on it; **retarget to `mini/0.3.1-4` after #110 merges**, the repo squashes only). Branch `wip/bot-profile-select`. PR #114.
+Base: `wip/bot-tactics` (#110). Branch `wip/bot-profile-select`. PR #114, merged into `wip/bot-tactics` on 2026-11-05: it reaches the mini with #110.
 
 Closes #107.
 
