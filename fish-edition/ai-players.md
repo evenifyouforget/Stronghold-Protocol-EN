@@ -757,6 +757,146 @@ It would also be good to have some way to monitor the progress, so we know if th
 
 I'm very curious to see the top 10, and what makes them stand out.
 
+## Predictive modeling and carry rank: results so far (2026-11-05)
+
+Both run on `main`'s code (4a19df6b: sganggs 0.3.3 and `dev`). The data is stored, so it can be re-analysed without
+running the bench again: `untracked/predict/` (`boards-*.jsonl`) and `untracked/carry-rank/` (`keep-*.jsonl`,
+`replace-*.jsonl`). Progress shows in the `.err` file of each process, one line per board and boss with its time.
+
+**One way to measure boss damage, used by both:** the boss can't die. Its pool keeps its real max HP, so the effects
+that read it stay right, but its HP never goes down. The damage dealt to it by the 120 s countdown is the score, as a %
+of the real pool, and it can pass 100 %. Example: one human Ultimate board kills boss_7 (6M HP) in 30 game seconds in
+a normal fight, and the record agrees.
+
+### Predictive models
+
+**Data.** 300 solo legacy-bot matches, 150 on Ultimate and 150 on Standard, each with a Strategy drawn at random so
+every Commander gets games. For each final board:
+- 8 mutants: one random operator swapped for a random different one, at the same elite level, with its items kept;
+  the bot re-places the whole board, and the Alliance counts are the new board's;
+- every board fights every boss of the round, twice: a normal fight gives win or loss, the unkillable boss gives the
+  damage.
+
+That makes 2,079 boards that reached the boss, and 14,553 board × boss samples. Win rate: 38 %.
+
+**Model.** Your linear model: logistic regression with one score per feature, against one learned score per boss (and
+mode). Each model sees one kind of feature only. The folds keep a board and its mutants together, so no model is
+tested on a near-copy of a board it trained on.
+
+AUC is the chance that the model ranks a random won board above a random lost one: 0.5 is a coin toss, 1 is perfect.
+The boss alone already reaches 0.85 over both modes, because Ultimate vs Standard decides most outcomes. So the columns
+that matter are the ones within one mode:
+
+| features (+ boss score) | win AUC within Ultimate | within Standard | damage R² within Ultimate | within Standard |
+| --- | --- | --- | --- | --- |
+| boss only | 0.52 | 0.72 | 0.06 | 0.10 |
+| tiers | 0.63 | 0.76 | 0.05 | 0.14 |
+| tiers + elite | 0.72 | 0.76 | 0.10 | 0.14 |
+| Alliances (tier + stacks) | 0.64 | 0.78 | −0.02 | 0.18 |
+| Commander only | 0.66 | 0.72 | 0.09 | 0.06 |
+| operators, elite ignored | 0.71 | 0.77 | 0.10 | 0.16 |
+| operators with elite | **0.76** | 0.78 | −0.03 | 0.17 |
+| items | 0.46 | 0.72 | 0.03 | 0.06 |
+| all of the above | 0.63 | **0.80** | −0.02 | **0.24** |
+
+**What it shows.**
+- **On Ultimate, elite status carries most of the information.** Counting tiers with elite (6 numbers) predicts almost
+  as well as knowing every operator (0.72 against 0.76). Without elite, tiers alone fall to 0.63. The tier-6 elite is
+  worth the most: +1.13 log-odds each, against +0.36 for a tier-5 elite. Unpromoted tier 1–3 operators count against.
+- **On Standard, everything predicts about equally** (0.76–0.80), and Alliances do best of the single kinds.
+- **Items predict nothing**, and the model with every feature overfits on Ultimate: too many features for 150 seeds.
+- **Damage is hard to predict linearly** (R² at most 0.24). A sum of operator scores can say who wins; it can't say by
+  how much.
+- **Mutants help:** on the 231 original boards alone, every model is weaker (within Ultimate 0.48–0.64). A mutant is a
+  small controlled experiment: one operator changed, everything else equal.
+
+**Operator scores (operators with elite, at least 30 samples, i.e. about 5 boards).** Top: Lappland the Decadenza (E),
+Caper (E), Vina Victoria (E), Thorns the Lodestar (E), Meteor (E), Pramanix the Prerita (E), Snow Hunter (E), Reed the
+Flame Shadow (E), Exusiai the New Covenant (E), Gavial the Invincible (E). Bottom: Ptilopsis (E), Hoshiguma (E),
+Kazemaru, Warfarin (E), Swire (E), Papyrus (E), Grain Buds (E), Specter the Unchained, Bubble (E).
+- Healers and defenders score low: they don't win boss fights by themselves, and a board that fields many of them has
+  fewer damage dealers.
+- **Your Executor the Ex Foedere worry doesn't show here:** his score is negative (−1.09 elite, −0.91 any). On bot
+  boards he doesn't stand in for a rich Foresight game. The same caution still applies to every score: they are
+  associations on bot boards, not proof that the operator is good.
+
+**Commanders (the bot plays each one without adapting).** Top: Ch'en, Mulberry, Chiave, Qalaiša, Du Yaoye, Goliath.
+Bottom: Narantuya, Cannot, Shamare, Touch, Pith, Damazti Cluster, Paganini. Du Yaoye is 5th, ahead of upstream's
+`BAND_STRENGTH` rank (25th of 40). That measure is the bot's own Final Assault pool on Ultimate. Here it is the board's
+odds against every boss, so the two can differ.
+
+**Alliances.** Second tiers score highest: Kazimierz 2 (+4.3), Yan 2 (+3.3), Laterano 2 (+3.2), Siracusa 2,
+Victoria 2, Precision 2; Raid 1 is the best first tier. Investor stacks score low (−2.4). Investor pays in funds during
+the game, not in the boss fight, so its stacks only say the board spent its time on economy.
+
+**Not done yet:**
+- the human boards, scored separately from the synthetic data (your suggestion);
+- a check of the top and bottom operators by hand, e.g. with the carry rank below.
+
+### Carry rank
+
+**Data.**
+- **Boards:** the 20 solo human Final Assault boards in the records, each against every boss of its round. The ranking
+  uses only the 12 won boards: 5 Standard, 5 Ultimate, 1 Perilous, 1 Dire.
+- **Candidates:** 518 in all: every tier-6 operator with each of its skills, and every DIY pick with each skill, in a
+  tier-5 and a tier-6 slot.
+- **Swap:** each candidate takes the carry's place with the carry's items and elite level (49 of 81 carries were
+  elite), at potential 6 and 练度 3.
+- **Placement variants:** "leave as is" puts the candidate on the carry's tile and facing, finished. "The bot re-places
+  the board" is 6 of 20 boards done; it crashed when the match replay lost before the boss round, and runs again now
+  beside the tag sweep.
+
+**Score:** the candidate's boss damage relative to the original carry on the same board and boss, as a geometric mean
+over the 81 board × boss pairs. Each operator keeps its best skill. The carry itself is left out of its own board's
+ranking. Without its carry, a board deals 48 % of its original damage.
+
+**Top 10, leave as is** (each ± about 5 %):
+
+| # | operator (skill) | vs. the original carry |
+| --- | --- | --- |
+| 1 | Logos (DIY, tier 6) S2 | 79 % |
+| 2 | Qiubai S1 | 76 % |
+| 3 | Ch'en the Dawnstreak (DIY, tier 6) S3 | 76 % |
+| 4 | Exusiai the New Covenant S2 | 76 % |
+| 5 | Goldenglow (DIY, tier 6) S3 | 75 % |
+| 6 | Lappland the Decadenza S2 | 74 % |
+| 7 | Togawa Sakiko (DIY, tier 6) S3 | 74 % |
+| 8 | Reed the Flame Shadow S2 | 74 % |
+| 9 | Narantuya (DIY, tier 6) S3 | 72 % |
+| 10 | Astgenne the Lightchaser S3 | 70 % |
+
+Next: Clementia, Leizi the Thunderbringer, Eyjafjalla (all DIY), Chongyue (DIY), Rosmontis. Bottom (about 50 %, the
+same as having no carry): Shining, Misery, Kal'tsit, the Reserve Operators, Thorns, Stormeye, Weedy.
+
+**By boss, the best stand-in:**
+- Ch'en the Dawnstreak against Helm (`boss_1`, 95 %) and Pipe (`boss_3`, 85 %);
+- Narantuya and Qiubai against Gunshatter (`boss_2`, 82 %);
+- Exusiai the New Covenant against Quintus (`boss_4`, 79 %);
+- Qiubai against Lucien (`boss_5`, 78 %) and the Will of Sami (`boss_7`, 87 %);
+- Chongyue against Alistair (`boss_6`, 85 %).
+
+**What stands out.**
+- **No stand-in reaches the human's own carry.** The best average 76–79 %. The human picked the carry for that
+  board: its Alliances, its items, its tile. A swap keeps all three for the carry's sake, not the candidate's.
+- **DIY picks are half of the top 15:** Logos, Ch'en the Dawnstreak, Goldenglow, Togawa Sakiko, Narantuya, Clementia,
+  Leizi the Thunderbringer, Eyjafjalla. The tier-5 slot is almost as good as the tier-6 one (Logos 76 % against 79 %).
+  That fits H12 (two of five human Standard boards carried by DIY picks) and the gap that bot seats field no DIY pick.
+- **Your guess about Ch'en the Dawnstreak holds:** 3rd overall, the best stand-in against Helm and Pipe.
+- **The top is mostly ranged damage on S2 / S3,** Arts casters among them (Logos, Goldenglow, Eyjafjalla).
+- **"The bot re-places the board" agrees so far:** Ch'en the Dawnstreak, Goldenglow, Leizi the Thunderbringer and
+  Narantuya are in its top 10 too, with Pramanix the Prerita 1st (80 %). With 6 boards its errors are about ±15 %.
+- **Caveat:** in "leave as is", the Alliance block stays the original board's, so a candidate gets no credit for an
+  Alliance it would add or lose.
+
+### Queued: each SPA-CC tag version on 4-bot Ultimate (#31)
+
+- **Setup:** 4 legacy bots on Ultimate, the same seeds 1–80 for every config: no tags, then each of the 41 tag
+  versions alone, level 1 of every tag first. 10 threads, about 100 s per match per thread.
+- **Timing:** about 9–10 h in all; started 2026-11-05 11:09.
+- **Files:** results in `untracked/tag-sweep/`, progress in its `sweep.log`.
+- **Same caveat as #31:** the bot doesn't know the tags exist, so this measures what a tag costs a player who doesn't
+  adapt.
+
 # DYYBot
 
 This is my first attempt writing a list of tactics that result in a very strong bot, based on my own human games. It includes general strategies, and optimizations for playing Du Yaoye.
@@ -910,5 +1050,10 @@ Fang: Transmitter is notably useless in solo. Its real strength is being able to
 - Send those key operators
 
 Russell: We will never level the barge higher than 2. This lets us get many promoted operators, and make a board that is very strong at cleaning up our own waves and cleaning up waves in Unite Phase. It's not so good against the boss. The real strength is this lets our teammates play very greedy.
+
+Russell (diet variation) tactics:
+
+- Willing to level barge and buy higher tier units if already have N different promoted operators
+- Willing to pick up a tier 5/6 carry operator if upgrade can be guaranteed by Doctor Hologram or another method
 
 Both of these strategies don't show their strength in solo, so they would need to be evaluated in a full 4-man lobby. This means our evolutionary arena needs to support a 4-man configuration, where all bots are always evaluated in full 4-man lobbies. A bot that is itself weak but boosts its team could get a better winrate overall.
