@@ -888,7 +888,7 @@ same as having no carry): Shining, Misery, Kal'tsit, the Reserve Operators, Thor
 - **Caveat:** in "leave as is", the Alliance block stays the original board's, so a candidate gets no credit for an
   Alliance it would add or lose.
 
-### Queued: each SPA-CC tag version on 4-bot Ultimate (#31)
+### Running: each SPA-CC tag version on 4-bot Ultimate (#31)
 
 - **Setup:** 4 legacy bots on Ultimate, the same seeds 1–80 for every config: no tags, then each of the 41 tag
   versions alone, level 1 of every tag first. 10 threads, about 100 s per match per thread.
