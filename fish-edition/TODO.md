@@ -1,3 +1,11 @@
+# Next standard loop: first (Fish, 2026-11-07)
+
+- [ ] **Sync PR sganggs → Yuri: Yuri asked for it; top priority.** Our open one is Yuri#22 ("Sync dev-0.2 with sganggs
+  0.3.3"): bring it up to sganggs's latest and refresh its description, or replace it. The token can't write to Yuri's
+  repo, so the branch is ours and Yuri merges.
+- [ ] #126 botbench `--rules` now applies the SPA-CC tags (it didn't since #39): review and merge. The #31 tag sweep is
+  re-running with the fix (`untracked/tag-sweep/`, about 10 h from 2026-11-07 09:14).
+
 # GitHub issues (open, 2026-11-05; #27, #98, #99, #100 close when `mini/0.3.1-4` reaches main)
 
 - #27 Bubble ↔ 碎铳之簧 damage loop (bug, good first issue): fixed by #37 (j-tai), merged into `mini/0.3.1-4`
@@ -8,7 +16,7 @@
 - #32 Opt-in anonymous match records + tools/records.mjs
 - #33 Gameplay accuracy audit (tracking)
 - #34 Effects: official effects instead of placeholders (Lemuen first)
-- #36 What strategy do the AI players use? Is it optimized? (answered in ai-players.md)
+- #36 What strategy do the AI players use? Is it optimized? (answered in ai-players/)
 - #47 SPA-CC bug: Patriot (and Reid) still targeted while invulnerable: should be untargetable, 0 AoE damage, no Lure,
   but still slowed by Mostima's passive
 - #48 Visual bug: the Blood Debt bar lacks the Blood Debt icon
@@ -18,7 +26,7 @@
 - #71 AI: layouts ignore blocking (melee in the back, ranged facing backward); maximises range overlap as if enemies
   never stop (question, bot-players)
 - #72 AI: deploys on originium tiles; humans hold one side, often the right to keep enemies off the tiles' buff
-  (question, bot-players). Both answered in ai-players.md "Why the bot's layouts ignore blocking …" (2026-10-27).
+  (question, bot-players). Both answered in ai-players/ "Why the bot's layouts ignore blocking …" (2026-10-27).
 - #75 Laterano Mod B's alliance text: no live ammo % and no paragraphs (reported on a 0.2.5 server; still true on
   main). Fixed in #80 (merged into `mini/0.3.1-3`). Victoria Mod C's text has the same plain formatting (not reported)
 - #76 a Patriot leaked through the Unite Phase costs 1 LP (reported on a 0.2.5 server). Settlement on main charges 5
@@ -78,7 +86,7 @@
 
 ## AI players
 
-Findings (2026-10-21): fish-edition/ai-players.md — strategy, speed, win rates per difficulty, a
+Findings (2026-10-21): fish-edition/ai-players/ — strategy, speed, win rates per difficulty, a
 per-tag SPA-CC cost table (botbench `--rules`), a record format and what not to collect.
 
 - What strategy do the current AI players use? Is it optimized in any way?
@@ -103,7 +111,7 @@ per-tag SPA-CC cost table (botbench `--rules`), a record format and what not to 
 - Try processing the batch of game logs in 2026-10-21.7z . Did the logging system work? What can we learn from these games?
 - - Done (2026-10-22): yes, it works (`records.mjs --verify`: 47 battles replay the same, 0 differ). Findings, one logging gap
     (no round row for a won match's last rounds) and two untraced oddities (ABYSS kills above the total, a frozen board):
-    ai-players.md "The first human match records".
+    ai-players/ "The first human match records".
 
 ## Gameplay replication accuracy
 
@@ -145,7 +153,7 @@ For anonymized match records, all we will be able to say is N humans + M bots. U
 
 - [ ] Post the results of the bot player investigations to... somewhere. (signed by Claude)
 - - [x] "Can the AI win starting from a human's final board?" Yes: placing the human's units itself, the bot beats
-    every boss, just more slowly (2026-11-01, ai-players.md "Hypothesis tests")
+    every boss, just more slowly (2026-11-01, ai-players/ "Hypothesis tests")
 - - [x] "Does the human's final board beat every boss?" Yes: all 5 Standard boards beat all 7; only 18 % of the bot's
     winning boards do (2026-11-01, same section)
 - - [x] There are likely several other useful hypotheses to test. Try coming up with some? H4–H9 in the same section
@@ -300,7 +308,7 @@ Open: #96 (closes #86, #88, #89), #37 (closes #27; waiting on j-tai). #74 is the
 mini → main PR (draft; title and description written 2026-10-28, pr-descriptions/mini-0.3.1-3.md, which becomes the
 template once it merges). Merging it is Fish's call; with #37 still out, #27 stays open.
 
-- #71 / #72: answered (ai-players.md); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
+- #71 / #72: answered (ai-players/); no bot change for now. Fish (2026-10-27): holistic bot-player research later.
 
 # mini/0.3.1-2 (2026-10-23/24) — merged into main as #66 (d115c384, 2026-10-26)
 

@@ -73,7 +73,7 @@ Features, research, and questions.
 - Dev work targets the current `mini/*` branch where possible. Those PRs run quick CI only.
 - Keep one audience per PR: upstream-friendly display changes apart from fork-only gameplay mods.
 - Log every answer to a question in a file, not only in chat:
-  - questions about the bots go in `ai-players.md`;
+  - questions about the bots go in `ai-players/`;
   - other answers go next to the question in TODO.md;
   - Fish's own questions and scenarios are in `MISC_USER_QUESTIONS.md`.
 - Mark answered TODO items `[x]` with the date and where the answer is.
