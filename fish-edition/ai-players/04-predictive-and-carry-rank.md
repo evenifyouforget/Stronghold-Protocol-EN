@@ -254,9 +254,57 @@ The full re-placement carry rank (186 operators, 518 candidates) agrees with "le
 
 All of these are against the human-placed original, so the ~70 % placement gap is included.
 
+### Where the placement gap comes from (2026-11-07)
+
+**Test.** `untracked/carry-rank/placement.mjs`, analysed with `analyze-placement.mjs`. Setup:
+- **Boards:** the same 12 won human boards. One (fe12) is left out because the bot couldn't be given its DIY pick, which
+  leaves 77 board × boss pairs.
+- **Re-placement:** the bot re-places each board's own units (`arrange` final, on a replay of the match to its boss
+  prep).
+- **Pool:** the HP-tracking one, with the human layout as 100 %.
+
+| Layout | Damage at 120 s | Kill speed |
+| --- | --- | --- |
+| the bot's layout | 74 % | 74 % |
+| the bot's layout, with the carry put back on its human tile and facing | 82 % | 85 % |
+| the human layout, with the carry moved to the bot's tile and facing for it | 76 % | 82 % |
+| the bot's tiles, each unit with its human facing | 66 % | 72 % |
+| the human tiles, each unit with the bot's facing | **70 %** | 66 % |
+
+**Against the boss the human actually placed for** (the recorded one), the bot's layout reaches only **66 %** and beats
+the human on 1 board of 11. Against the other bosses it beats the human layout in 19 of 66 pairs: there the human
+layout wasn't made for that boss either.
+
+**What the bot does differently**
+
+| | Human | Bot |
+| --- | --- | --- |
+| Facing RIGHT | 83 % of units | 56 % |
+| Facing DOWN / UP / LEFT | 9 / 3 / 4 % | 26 / 12 / 6 % |
+| Columns used | packed into 5–8 (83 of 95 units) | spread out: 15 units on column 3, 37 on columns 8–9 |
+
+**What it means**
+- **The bot's facings alone cost 30 %.** Turning the human's own units to the bot's facings, on the human's tiles, drops
+  them to 70 %. A tile and its facing go together: the human facings on the bot's tiles are no better (66 %).
+- **In 18 of 77 fights the bot's layout leaves the carry with under 10 % of its human damage:** out of reach, or turned
+  away from the boss.
+  - Exusiai the New Covenant goes from 70 % of the board's damage to 0 (8471, facing DOWN).
+  - Degenbrecher goes from 44 % to 2 % (9557).
+  - Leizi goes from 17 % to 0 (0ed2, column 9).
+- **Two kinds of board:**
+  - On some the carry's tile is the whole story: putting Exusiai back brings 8471 from 28 % to 89 %.
+  - On others the carry is fine, and the damage is lost by the rest of the board, turned away or parked on column 3:
+    0b0f, 9557, 01c8.
+- **Caveat:** "RIGHT" is the way to the boss on these stages, so the rule is "face the boss's approach", not a fixed
+  direction.
+- **Open question:** the bot already rehearses candidate layouts against its planned boss, so either its candidate set
+  never contains a packed, boss-facing cluster, or the rehearsal scores it lower. Next is to read `bot.js`'s Final
+  Assault candidates (`bossCandidateOpts`, `faDamageLineups`) against these boards.
+
 ### What this says for DYYBot
 
 - **Placement is the first lever:** worth ~30 %, about as much as the difference between the best stand-in and the carry.
+  It is mostly facing and spread: pack the damage dealers together, facing the boss's approach (see above).
 - **Then buy for the Alliances,** not for a named operator. The Alliances turn a good operator into a carry-level one,
   and the Attribute adds nothing in the boss fight.
 - **The carry pool is small and known:** Logos, Ch'en the Dawnstreak, Togawa Sakiko and Goldenglow (DIY picks), plus
