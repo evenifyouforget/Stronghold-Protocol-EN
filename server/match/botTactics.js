@@ -15,7 +15,7 @@
 // belongs to one slot of RFC sganggs #816 (draft / economy / placement), so a profile can be read as that RFC's
 // per-slot choice if upstream builds it.
 import { defineBotStrategy, LEGACY_BOT } from './botStrategyContract.js';
-import { createBotPrepSteps, LEGACY_PREP_ACTIONS } from './bot.js';
+import { createBotPrepSteps, LEGACY_PREP_ACTIONS, legacyPrepPreamble } from './bot.js';
 
 /** A handler's "not me": the next tactic down is asked. */
 export const PASS = Symbol('tactic.pass');
@@ -155,7 +155,13 @@ export function defineProfile({ id, tactics = [] } = {}) {
     if (fn !== LEGACY_PREP_ACTIONS[point]) actions[point] = fn;
   }
   // no prep point taken: legacy's own prep hooks, not a rebuilt copy
-  if (Object.keys(actions).length) Object.assign(hooks, createBotPrepSteps(actions));
+  if (Object.keys(actions).length) {
+    const steps = createBotPrepSteps(actions);
+    // the legacy prep's own preamble first (bot.js botPrepBeginSteps), so a profile differs from legacy only where its
+    // tactics act
+    hooks.prepBegin = function* prepBegin(m, ps, options = {}) { legacyPrepPreamble(m, ps); return yield* steps.prepBegin(m, ps, options); };
+    hooks.prepEnd = steps.prepEnd;
+  }
   const strategy = defineBotStrategy({ id, ...hooks });
   const slots = { draft: [], economy: [], placement: [] };
   for (const e of entries) {

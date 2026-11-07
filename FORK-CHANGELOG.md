@@ -5,6 +5,57 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-07
+
+### Upstream merge
+
+- Merged upstream's unreleased 0.3.4 work (`dev` branch) at [`eff7d93a`](https://github.com/sganggs/Stronghold-Protocol/commit/eff7d93abbd1bd6986e2e9c2d7a1e066b1975bbc) (`4d12f915`). Fork-side decisions:
+  - Release notes open only from the title footer's button (no automatic opening: the lobby has its own update banner). Non-Chinese pages read `CHANGELOG.en.md`.
+  - The entry film plays once per browser tab session, not on every page load.
+  - The three-level deploy-fold setting is taken; it still defaults to off. P2P stays off (`SP_P2P` unset).
+  - Toska (冻河), Territoriya (国度) and Talulah (塔露拉) get English text in `tools/i18n/fallback-new-ops-en.json`, using names and terms from arknights.wiki.gg, until official EN data covers them.
+  - Not ready to deploy: upstream's new bot logic runs on the server. All bot calculation must move to the host's browser first.
+- Merged upstream 0.3.2 at [`c9d804f4`](https://github.com/sganggs/Stronghold-Protocol/commit/c9d804f470b8d7422ae04eb66faf671cef21ad52) (`a47b3db4`), through
+  [#14](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/14), thanks to @evenifyouforget. dev-0.2 had fixed the same Windows test problems itself; upstream's versions of
+  those three test files are taken.
+- Merged upstream 0.3.3 at [`f07b8965`](https://github.com/sganggs/Stronghold-Protocol/commit/f07b8965061bbc311ad7aa815879b09264a1e47d) (`d4958737`), through
+  [#22](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/22), thanks to @evenifyouforget. The fork's matchmaking, outfits, notices, maintenance and generations are kept
+  inside upstream's new lobby, room, loadout, custom-squad and briefing screens. On avatars and portraits an outfit wins
+  over an upstream skin. Upstream already had the sim side of [#18](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/18) and all of [#19](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/19) (upstream PR #862), so
+  those merged into the same code.
+- English README: `--game` also takes the install directory, as in upstream's Chinese README.
+
+### Contributions
+
+- Battle view: invulnerable units wear two spinning gold ribbons, after the original game's look. Multi-tile bosses
+  wear them three times as big ([#12](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/12), thanks to @evenifyouforget).
+- Official effects: the airstrike from Exusiai the New Covenant's talent plays its own official strike (a shell falling
+  with a smoke trail and a red-white burst). Before, it drew the procedural blast that looks like Lemuen's S3
+  ([#18](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/18), thanks to @evenifyouforget).
+- Official effects: Lemuen's S3 lock crosshair stays until her own shell lands, also where a defeated target stood.
+  Before, it vanished about 1 s after each lock ([#19](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/19), thanks to @evenifyouforget).
+- Battle view: a liftoff that only a talent grants (Kal'tsit - Esperanta, Leizi the Thunderbringer) is a low hover of
+  about a quarter tile. A skill's liftoff still flies at a flying enemy's height ([#20](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/20), thanks to @evenifyouforget).
+- Setup: `npm run assets:release-local` downloads a release's local art (`public/assets/local/` and
+  `data/local-*.json`, about 200 MB of the full package) for an install without a game client, such as a VPS. Setup's
+  hint names it ([#21](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/21), thanks to @evenifyouforget).
+- GitHub: English issue and PR templates ([#17](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/17), thanks to @evenifyouforget).
+
+### Changes
+
+- Damage meters show one metric at a time. The result screen's Damage Stats and the in-match Combat statistics panel get a Damage / DPS / Healing / HPS selector (kept until the page reloads); rows sort by it, the top value fills its bar, and the row's width goes to the bar, so operators compare at a glance. Removed the panel's title, rank numbers, four-number rows, sort label and explanation box, and the chart's per-row DPS / healing text and All Rounds tag; hover a row for all four numbers.
+- Plugin studio, script checks and match hosts: their child processes no longer open console windows that steal focus on Windows (`windowsHide`).
+- `fetch-assets` names the operators missing from the local FX index. Their per-skill sounds are then planned differently,
+  which can make the run refuse to write `data/assets.json`, and retrying the downloads never helps. The refusal now says
+  so and gives the extract command that fills the index.
+- Sound: `data/assets.json` is rebuilt on a complete FX index. 19 older-season operators get their battle voices, and
+  operators such as Glider and Ceylon get attack sounds they were missing. A server needs `node tools/fetch-assets.mjs`
+  for the new files (about 1,300 more in the manifest, 34 MB).
+- Outfits: the operators of the other official versions get theirs too (26 more, on the 19 operators only Season 1 has,
+  such as Ceylon's Holiday HD49).
+- English: Season 1 and Season 2 part 1 rooms now show English game text. Each version has its own overlay
+  (`data/versions/<slug>/i18n/en.json`, built by `tools/build-i18n.mjs --data`), 99 % translated. They stayed Chinese before.
+
 ## 2026-10-18
 
 ### Upstream merge
