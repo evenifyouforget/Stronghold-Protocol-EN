@@ -9,7 +9,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ### Upstream merge
 
-- Merged upstream's unreleased 0.3.4 work (`dev` branch) at [`eff7d93a`](https://github.com/sganggs/Stronghold-Protocol/commit/eff7d93a) (`TBD`). Fork-side decisions:
+- Merged upstream's unreleased 0.3.4 work (`dev` branch) at [`eff7d93a`](https://github.com/sganggs/Stronghold-Protocol/commit/eff7d93abbd1bd6986e2e9c2d7a1e066b1975bbc) (`4d12f915`). Fork-side decisions:
   - Release notes open only from the title footer's button (no automatic opening: the lobby has its own update banner). Non-Chinese pages read `CHANGELOG.en.md`.
   - The entry film plays once per browser tab session, not on every page load.
   - The three-level deploy-fold setting is taken; it still defaults to off. P2P stays off (`SP_P2P` unset).
@@ -43,6 +43,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ### Changes
 
+- Plugin studio, script checks and match hosts: their child processes no longer open console windows that steal focus on Windows (`windowsHide`).
 - `fetch-assets` names the operators missing from the local FX index. Their per-skill sounds are then planned differently,
   which can make the run refuse to write `data/assets.json`, and retrying the downloads never helps. The refusal now says
   so and gives the extract command that fills the index.
