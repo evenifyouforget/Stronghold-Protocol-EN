@@ -14,3 +14,4 @@ This naturally opens the door for evolutionary algorithms and mass programmatic 
 
 From there, we can try adding new sub-strategies and see if it those sub-strategies end up in the winning configurations.
 
+Before making DYYBot and others, we should make a layered tactics version of the current classical bot to compare as a baseline. We expect that the layered tactics version achieves the same or better performance, and possibly slightly better performance after auto-tuning.

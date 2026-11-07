@@ -53,6 +53,7 @@ a normal fight, and the record agrees.
 
 **Data.** 300 solo legacy-bot matches, 150 on Ultimate and 150 on Standard, each with a Strategy drawn at random so
 every Commander gets games. For each final board:
+
 - 8 mutants: one random operator swapped for a random different one, at the same elite level, with its items kept;
   the bot re-places the whole board, and the Alliance counts are the new board's;
 - every board fights every boss of the round, twice: a normal fight gives win or loss, the unkillable boss gives the
@@ -68,19 +69,20 @@ AUC is the chance that the model ranks a random won board above a random lost on
 The boss alone already reaches 0.85 over both modes, because Ultimate vs Standard decides most outcomes. So the columns
 that matter are the ones within one mode:
 
-| features (+ boss score) | win AUC within Ultimate | within Standard | damage R² within Ultimate | within Standard |
-| --- | --- | --- | --- | --- |
-| boss only | 0.52 | 0.72 | 0.06 | 0.10 |
-| tiers | 0.63 | 0.76 | 0.05 | 0.14 |
-| tiers + elite | 0.72 | 0.76 | 0.10 | 0.14 |
-| Alliances (tier + stacks) | 0.64 | 0.78 | −0.02 | 0.18 |
-| Commander only | 0.66 | 0.72 | 0.09 | 0.06 |
-| operators, elite ignored | 0.71 | 0.77 | 0.10 | 0.16 |
-| operators with elite | **0.76** | 0.78 | −0.03 | 0.17 |
-| items | 0.46 | 0.72 | 0.03 | 0.06 |
-| all of the above | 0.63 | **0.80** | −0.02 | **0.24** |
+| features (+ boss score)   | win AUC within Ultimate | within Standard | damage R² within Ultimate | within Standard |
+| ------------------------- | ----------------------- | --------------- | ------------------------- | --------------- |
+| boss only                 | 0.52                    | 0.72            | 0.06                      | 0.10            |
+| tiers                     | 0.63                    | 0.76            | 0.05                      | 0.14            |
+| tiers + elite             | 0.72                    | 0.76            | 0.10                      | 0.14            |
+| Alliances (tier + stacks) | 0.64                    | 0.78            | −0.02                     | 0.18            |
+| Commander only            | 0.66                    | 0.72            | 0.09                      | 0.06            |
+| operators, elite ignored  | 0.71                    | 0.77            | 0.10                      | 0.16            |
+| operators with elite      | **0.76**                | 0.78            | −0.03                     | 0.17            |
+| items                     | 0.46                    | 0.72            | 0.03                      | 0.06            |
+| all of the above          | 0.63                    | **0.80**        | −0.02                     | **0.24**        |
 
 **What it shows.**
+
 - **On Ultimate, elite status carries most of the information.** Counting tiers with elite (6 numbers) predicts almost
   as well as knowing every operator (0.72 against 0.76). Without elite, tiers alone fall to 0.63. The tier-6 elite is
   worth the most: +1.13 log-odds each, against +0.36 for a tier-5 elite. Unpromoted tier 1–3 operators count against.
@@ -95,6 +97,7 @@ that matter are the ones within one mode:
 Caper (E), Vina Victoria (E), Thorns the Lodestar (E), Meteor (E), Pramanix the Prerita (E), Snow Hunter (E), Reed the
 Flame Shadow (E), Exusiai the New Covenant (E), Gavial the Invincible (E). Bottom: Ptilopsis (E), Hoshiguma (E),
 Kazemaru, Warfarin (E), Swire (E), Papyrus (E), Grain Buds (E), Specter the Unchained, Bubble (E).
+
 - Healers and defenders score low: they don't win boss fights by themselves, and a board that fields many of them has
   fewer damage dealers.
 - **Your Executor the Ex Foedere worry doesn't show here:** his score is negative (−1.09 elite, −0.91 any). On bot
@@ -111,12 +114,14 @@ Victoria 2, Precision 2; Raid 1 is the best first tier. Investor stacks score lo
 the game, not in the boss fight, so its stacks only say the board spent its time on economy.
 
 **Not done yet:**
+
 - the human boards, scored separately from the synthetic data (your suggestion);
 - a check of the top and bottom operators by hand, e.g. with the carry rank below.
 
 ### Carry rank
 
 **Data.**
+
 - **Boards:** the 20 solo human Final Assault boards in the records, each against every boss of its round. The ranking
   uses only the 12 won boards: 5 Standard, 5 Ultimate, 1 Perilous, 1 Dire.
 - **Candidates:** 518 in all: every tier-6 operator with each of its skills, and every DIY pick with each skill, in a
@@ -132,23 +137,24 @@ ranking. Without its carry, a board deals 48 % of its original damage.
 
 **Top 10, leave as is** (each ± about 5 %):
 
-| # | operator (skill) | vs. the original carry |
-| --- | --- | --- |
-| 1 | Logos (DIY, tier 6) S2 | 79 % |
-| 2 | Qiubai S1 | 76 % |
-| 3 | Ch'en the Dawnstreak (DIY, tier 6) S3 | 76 % |
-| 4 | Exusiai the New Covenant S2 | 76 % |
-| 5 | Goldenglow (DIY, tier 6) S3 | 75 % |
-| 6 | Lappland the Decadenza S2 | 74 % |
-| 7 | Togawa Sakiko (DIY, tier 6) S3 | 74 % |
-| 8 | Reed the Flame Shadow S2 | 74 % |
-| 9 | Narantuya (DIY, tier 6) S3 | 72 % |
-| 10 | Astgenne the Lightchaser S3 | 70 % |
+| #   | operator (skill)                      | vs. the original carry |
+| --- | ------------------------------------- | ---------------------- |
+| 1   | Logos (DIY, tier 6) S2                | 79 %                   |
+| 2   | Qiubai S1                             | 76 %                   |
+| 3   | Ch'en the Dawnstreak (DIY, tier 6) S3 | 76 %                   |
+| 4   | Exusiai the New Covenant S2           | 76 %                   |
+| 5   | Goldenglow (DIY, tier 6) S3           | 75 %                   |
+| 6   | Lappland the Decadenza S2             | 74 %                   |
+| 7   | Togawa Sakiko (DIY, tier 6) S3        | 74 %                   |
+| 8   | Reed the Flame Shadow S2              | 74 %                   |
+| 9   | Narantuya (DIY, tier 6) S3            | 72 %                   |
+| 10  | Astgenne the Lightchaser S3           | 70 %                   |
 
 Next: Clementia, Leizi the Thunderbringer, Eyjafjalla (all DIY), Chongyue (DIY), Rosmontis. Bottom (about 50 %, the
 same as having no carry): Shining, Misery, Kal'tsit, the Reserve Operators, Thorns, Stormeye, Weedy.
 
 **By boss, the best stand-in:**
+
 - Ch'en the Dawnstreak against Helm (`boss_1`, 95 %) and Pipe (`boss_3`, 85 %);
 - Narantuya and Qiubai against Gunshatter (`boss_2`, 82 %);
 - Exusiai the New Covenant against Quintus (`boss_4`, 79 %);
@@ -156,6 +162,7 @@ same as having no carry): Shining, Misery, Kal'tsit, the Reserve Operators, Thor
 - Chongyue against Alistair (`boss_6`, 85 %).
 
 **What stands out.**
+
 - **No stand-in reaches the human's own carry.** The best average 76–79 %. The human picked the carry for that
   board: its Alliances, its items, its tile. A swap keeps all three for the carry's sake, not the candidate's.
 - **DIY picks are half of the top 15:** Logos, Ch'en the Dawnstreak, Goldenglow, Togawa Sakiko, Narantuya, Clementia,
@@ -170,6 +177,7 @@ same as having no carry): Shining, Misery, Kal'tsit, the Reserve Operators, Thor
 ## Results, continued (2026-11-07)
 
 Same data and code as above. New files in `untracked/carry-rank/`:
+
 - `copy-{none,bonds,attr,both}.jsonl`: the copy runs;
 - `wrap-*.jsonl` and `cmp-wrap.mjs`: the HP-tracking pool;
 - `replace-*.jsonl`: the bot re-placement run, now complete.
@@ -180,6 +188,7 @@ You suspected that the human carry's Alliances or its Attribute (特质) do the 
 
 **Test.** The candidate takes the carry's place, as before, but fights with the carry's Alliance membership, its
 Attribute, or both. Setup:
+
 - the 12 won boards, against every boss;
 - 35 candidates: the top of the first run plus a low control group;
 - scores are against the original carry, and the carry itself is left out.
@@ -187,12 +196,12 @@ Attribute, or both. Setup:
 **Sanity check.** The carry's own operator, swapped out and back in, scores exactly 100 % in all four variants, both
 as its exact unit and through the candidate path at default settings.
 
-| What the candidate copies | Average stand-in | Best stand-ins | Board × boss pairs at 100 % or more |
-| --- | --- | --- | --- |
-| nothing | 67 % | Logos 80, Ch'en the Dawnstreak 78, Qiubai 77 | 18 % |
-| Alliances | **74 %** | Togawa Sakiko 100, Logos 92, Exusiai the New Covenant 88, Lappland the Decadenza 88 | 29 % |
-| Attribute | 67 % | the same as nothing | 18 % |
-| both | 74 % | the same as Alliances | 28 % |
+| What the candidate copies | Average stand-in | Best stand-ins                                                                      | Board × boss pairs at 100 % or more |
+| ------------------------- | ---------------- | ----------------------------------------------------------------------------------- | ----------------------------------- |
+| nothing                   | 67 %             | Logos 80, Ch'en the Dawnstreak 78, Qiubai 77                                        | 18 %                                |
+| Alliances                 | **74 %**         | Togawa Sakiko 100, Logos 92, Exusiai the New Covenant 88, Lappland the Decadenza 88 | 29 %                                |
+| Attribute                 | 67 %             | the same as nothing                                                                 | 18 %                                |
+| both                      | 74 %             | the same as Alliances                                                               | 28 %                                |
 
 - **The Alliances are worth about 7 points on average,** and up to 12–24 points for the best stand-ins. With them,
   Togawa Sakiko matches the carry and Logos comes close.
@@ -205,6 +214,7 @@ as its exact unit and through the candidate path at default settings.
 ### The boss's HP never fell: what that hid (your question about Arcane)
 
 **The problem.** The unkillable pool above kept the boss at 100 % HP, so nothing that reads the boss's HP ever fired:
+
 - Arcane tier 2's ×1.4 against targets under 50 % HP;
 - execute effects;
 - boss phases.
@@ -224,16 +234,16 @@ every boss × 41 candidates, plus Logos S1 and S3.
 - **The carry ranking barely moves.** Every candidate is compared with the carry on the same board and boss, so most of
   the error cancels:
 
-| Stand-in | Old pool | Time to kill |
-| --- | --- | --- |
-| Logos (DIY t6) S2 | 80 % | 82 % |
-| Ch'en the Dawnstreak (DIY t6) S3 | 78 % | 81 % |
-| Astgenne the Lightchaser S3 | 72 % | 79 % |
-| Togawa Sakiko (DIY t6) S3 | 76 % | 78 % |
-| Qiubai S1 | 77 % | 77 % |
-| Exusiai the New Covenant S2 | 78 % | 77 % |
-| Logos (DIY t6) S1 | 75 % | 75 % |
-| Chongyue (DIY t6) S3 | 70 % | 61 % |
+| Stand-in                         | Old pool | Time to kill |
+| -------------------------------- | -------- | ------------ |
+| Logos (DIY t6) S2                | 80 %     | 82 %         |
+| Ch'en the Dawnstreak (DIY t6) S3 | 78 %     | 81 %         |
+| Astgenne the Lightchaser S3      | 72 %     | 79 %         |
+| Togawa Sakiko (DIY t6) S3        | 76 %     | 78 %         |
+| Qiubai S1                        | 77 %     | 77 %         |
+| Exusiai the New Covenant S2      | 78 %     | 77 %         |
+| Logos (DIY t6) S1                | 75 %     | 75 %         |
+| Chongyue (DIY t6) S3             | 70 %     | 61 %         |
 
 - **Damage numbers across boards or bosses** in this file and in the predictive models' R² are inflated for those three
   bosses. Their win and loss results come from real fights and stand.
@@ -247,6 +257,7 @@ In "the bot re-places the board", the bot first arranges the human's own board, 
 about 30 %, apart from which operators it picks.
 
 The full re-placement carry rank (186 operators, 518 candidates) agrees with "leave as is":
+
 - **Board without its carry:** 43 % of the original's damage.
 - **Top stand-ins:** Tragodia (DIY t5) 68 %, Exusiai the New Covenant 66 %, Reed the Flame Shadow 66 %, Ch'en the
   Dawnstreak (DIY t6) 66 %, Logos (DIY t5) 65 %, Qiubai 64 %, Narantuya (DIY t6) 64 %, Pramanix the Prerita 64 %.
@@ -257,19 +268,20 @@ All of these are against the human-placed original, so the ~70 % placement gap i
 ### Where the placement gap comes from (2026-11-07)
 
 **Test.** `untracked/carry-rank/placement.mjs`, analysed with `analyze-placement.mjs`. Setup:
+
 - **Boards:** the same 12 won human boards. One (fe12) is left out because the bot couldn't be given its DIY pick, which
   leaves 77 board × boss pairs.
 - **Re-placement:** the bot re-places each board's own units (`arrange` final, on a replay of the match to its boss
   prep).
 - **Pool:** the HP-tracking one, with the human layout as 100 %.
 
-| Layout | Damage at 120 s | Kill speed |
-| --- | --- | --- |
-| the bot's layout | 74 % | 74 % |
-| the bot's layout, with the carry put back on its human tile and facing | 82 % | 85 % |
-| the human layout, with the carry moved to the bot's tile and facing for it | 76 % | 82 % |
-| the bot's tiles, each unit with its human facing | 66 % | 72 % |
-| the human tiles, each unit with the bot's facing | **70 %** | 66 % |
+| Layout                                                                     | Damage at 120 s | Kill speed |
+| -------------------------------------------------------------------------- | --------------- | ---------- |
+| the bot's layout                                                           | 74 %            | 74 %       |
+| the bot's layout, with the carry put back on its human tile and facing     | 82 %            | 85 %       |
+| the human layout, with the carry moved to the bot's tile and facing for it | 76 %            | 82 %       |
+| the bot's tiles, each unit with its human facing                           | 66 %            | 72 %       |
+| the human tiles, each unit with the bot's facing                           | **70 %**        | 66 %       |
 
 **Against the boss the human actually placed for** (the recorded one), the bot's layout reaches only **66 %** and beats
 the human on 1 board of 11. Against the other bosses it beats the human layout in 19 of 66 pairs: there the human
@@ -277,13 +289,14 @@ layout wasn't made for that boss either.
 
 **What the bot does differently**
 
-| | Human | Bot |
-| --- | --- | --- |
-| Facing RIGHT | 83 % of units | 56 % |
-| Facing DOWN / UP / LEFT | 9 / 3 / 4 % | 26 / 12 / 6 % |
-| Columns used | packed into 5–8 (83 of 95 units) | spread out: 15 units on column 3, 37 on columns 8–9 |
+|                         | Human                            | Bot                                                 |
+| ----------------------- | -------------------------------- | --------------------------------------------------- |
+| Facing RIGHT            | 83 % of units                    | 56 %                                                |
+| Facing DOWN / UP / LEFT | 9 / 3 / 4 %                      | 26 / 12 / 6 %                                       |
+| Columns used            | packed into 5–8 (83 of 95 units) | spread out: 15 units on column 3, 37 on columns 8–9 |
 
 **What it means**
+
 - **The bot's facings alone cost 30 %.** Turning the human's own units to the bot's facings, on the human's tiles, drops
   them to 70 %. A tile and its facing go together: the human facings on the bot's tiles are no better (66 %).
 - **In 18 of 77 fights the bot's layout leaves the carry with under 10 % of its human damage:** out of reach, or turned
@@ -301,10 +314,32 @@ layout wasn't made for that boss either.
   never contains a packed, boss-facing cluster, or the rehearsal scores it lower. Next is to read `bot.js`'s Final
   Assault candidates (`bossCandidateOpts`, `faDamageLineups`) against these boards.
 
+### Facing everyone RIGHT: tiles first, then facing (2026-11-08)
+
+**Test.** The same script and boards, now with all 12 boards (84 pairs, fe12 included, so the bot and the human-facing
+rows differ a little from the table above), and two more layouts: every unit turned RIGHT, on the bot's tiles and on
+the human's tiles (`untracked/carry-rank/placement2.jsonl`).
+
+| Layout (84 pairs)                        | Kill speed, geometric mean | Median |
+| ---------------------------------------- | -------------------------- | ------ |
+| the bot's layout                         | 70 %                       | 69 %   |
+| the bot's tiles, all facing RIGHT        | 71 %                       | 73 %   |
+| the human tiles, with the bot's facings  | 69 %                       | 88 %   |
+| the human tiles, all facing RIGHT        | **97 %**                   | 100 %  |
+
+- **On the bot's tiles, facing doesn't matter:** turning everyone RIGHT gains about 1 point. The bot's tiles are the
+  real problem; units on column 3 or 8–9 don't reach the boss whichever way they face.
+- **On the human's tiles, "everyone faces RIGHT" is almost as good as the human's own facings** (97 %). The human's
+  few non-RIGHT units are worth about 3 %. The bot's facings on those same tiles cost 30 %.
+- **So the order for DYYBot is: tiles first (packed into the middle columns), then a plain "face the boss's
+  approach".** A cheap, fixed facing rule gives nearly all of the facing value, and needs no rehearsal: it suits bots
+  that run in the player's browser.
+
 ### What this says for DYYBot
 
 - **Placement is the first lever:** worth ~30 %, about as much as the difference between the best stand-in and the carry.
-  It is mostly facing and spread: pack the damage dealers together, facing the boss's approach (see above).
+  It is mostly the tiles: pack the damage dealers into the middle columns, then face them all the boss's approach,
+  which is nearly as good as the human's own facings (see above).
 - **Then buy for the Alliances,** not for a named operator. The Alliances turn a good operator into a carry-level one,
   and the Attribute adds nothing in the boss fight.
 - **The carry pool is small and known:** Logos, Ch'en the Dawnstreak, Togawa Sakiko and Goldenglow (DIY picks), plus
@@ -320,8 +355,11 @@ rules (`lobbyRules`). It has done so since the Yuri 0.3.1 sync (#39) split the t
 
 **Fix:** #126, with a test that Lockout 1 changes a won seed. The sweep restarted with it on 2026-11-07 at 09:14 and
 needs about 10 h.
+
 - **Baseline (valid, no tag):** 37 of 80 wins (46 %), 13.2 rounds passed.
 - **Setup:** 4 legacy bots on Ultimate, seeds 1–80 for every config, 10 threads.
 - **Files:** `untracked/tag-sweep/`. `analyze-sweep.mjs` makes the table: the paired win-rate change, the seeds lost and
   gained with a sign test, and the change per Risk point.
 - **Caveat:** the bot doesn't know the tags exist, so this measures what a tag costs a player who doesn't adapt.
+
+Should do a small run first, as a sanity check and to prevent similar bugs from silently ruining a multiple-hour long run.
