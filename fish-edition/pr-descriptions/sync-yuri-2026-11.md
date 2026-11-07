@@ -65,9 +65,20 @@ The repo squashes, so neither upstream nor Yuri shares a usable merge base with 
 
 ## Tests
 
-- Lint: 0 errors. Typecheck: OK.
-- Full suite: TEST_RESULT
-- Failures that are not from this PR:
-  - the two HTTP version tests (this machine's environment) and the `voiceJp` count test, which fail on `main` too;
-  - three asset tests that need every manifest file on disk. My local `public/assets` predates the new operators.
-    CI has no art and skips them.
+- Lint: 0 errors. Typecheck: OK. `golden.mjs --check`: all scenarios match.
+- Full suite on a fresh `npm ci`: all pass except these environment failures, none of them caused by this PR:
+  - the two HTTP version tests, which fail on `main` too on this machine;
+  - the dual-stack bind test, because this container has no IPv6;
+  - four checks that need every manifest file on disk: the 自选 assets, "every manifest path exists", the Spine
+    loads and the `voiceJp` files. My local `public/assets` predates the new operators. CI has no art and skips
+    them.
+- One plugin-studio trial timed out while a bot benchmark was using the CPU. It passes when run alone.
+- Counts updated for the merged manifest: `voiceJp` has 215 operators and 3,009 files (as Yuri's), and the audio
+  pools have 1,042 refs and 1,046 pools (ours 1,028 / 1,032, Yuri's 1,040 / 1,044, two shared).
+
+When squashing, end the commit message with:
+
+```
+Upstream-Sync: sganggs dev eff7d93abbd1bd6986e2e9c2d7a1e066b1975bbc
+Upstream-Sync: yuri dev-0.2 e2fd04b36678ce5f3152096a7e1e3ac0ec75ed1f
+```
