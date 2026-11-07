@@ -1,8 +1,10 @@
 # Next standard loop: first (Fish, 2026-11-07)
 
-- [ ] **Sync PR sganggs → Yuri: Yuri asked for it; top priority.** Our open one is Yuri#22 ("Sync dev-0.2 with sganggs
-  0.3.3"): bring it up to sganggs's latest and refresh its description, or replace it. The token can't write to Yuri's
-  repo, so the branch is ours and Yuri merges.
+- [x] **Sync PR sganggs → Yuri** (Yuri asked, 2026-11-07): Yuri merged Yuri#22 ("Sync dev-0.2 with sganggs 0.3.3")
+  on 2026-11-07 and then merged sganggs `dev` (to eff7d93a, 11-06) themselves. As of 2026-11-08, `yuri/dev-0.2` has
+  every commit of sganggs `master` and `dev`; nothing to sync until sganggs moves.
+- [ ] **Sync Yuri → our main:** `yuri/dev-0.2` (e2fd04b3, 11-07: damage meters, season 1 data, 0.3.2 PRs, sganggs dev
+  to 11-06) is not in `origin/main`.
 - [ ] #126 botbench `--rules` now applies the SPA-CC tags (it didn't since #39): review and merge. The #31 tag sweep is
   re-running with the fix (`untracked/tag-sweep/`, about 10 h from 2026-11-07 09:14).
 
