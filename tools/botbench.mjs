@@ -96,7 +96,7 @@ async function runOne(cfg, seed) {
   const errors = [];
   const log = { info() {}, debug() {}, warn() {}, error: (...a) => errors.push(a.map(String).join(' ')) };
   const m = new Match({
-    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal, rules,
+    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal, rules, lobbyRules: rules,
     botStrategy: opt.bot || 'legacy', botStrategySeats: {},
     send: () => true, broadcast: () => {}, onEnd: (s) => { summary = s; },
   });
