@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Modal, Button } from './components.js';
 import { createStore, useStore, selectRoute } from '../store.js';
 import { APP_VERSION } from '../../../shared/constants.js';
-import { t } from '../../../shared/i18n.js';
-import { RELEASE_SEEN_PREFIX, releaseSections, releaseLink } from './releaseNotesModel.js';
+import { t, getLang } from '../../../shared/i18n.js';
+import { genUrl } from '../gen.js';
+import { changelogPath, releaseSections, releaseLink } from './releaseNotesModel.js';
 
 const request = createStore({ serial: 0 });
 export function ReleaseNotesButton() {
@@ -53,17 +54,15 @@ export function ReleaseNotesHost() {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
   const [failed, setFailed] = useState(false);
-  const attempted = useRef(false);
   const handled = useRef(0);
   useEffect(() => {
     if (!safe) return undefined;
+    // (fork) only the title screen's button opens it: this fork's lobby has its own update banner (ui/matchSearch.js UpdateNews),
+    // so upstream's once-per-version automatic opening is left out
     const manual = serial !== handled.current;
-    if (!manual && attempted.current) return undefined;
-    let seen = false;
-    try { seen = localStorage.getItem(RELEASE_SEEN_PREFIX + APP_VERSION) === '1'; } catch { /* private mode: once per page */ }
-    if (!manual && seen) return undefined;
+    if (!manual) return undefined;
     let cancelled = false;
-    fetch('/CHANGELOG.md', { cache: 'no-cache' }).then((res) => {
+    fetch(genUrl(changelogPath(getLang())), { cache: 'no-cache' }).then((res) => {
       if (!res.ok) throw new Error(`CHANGELOG: ${res.status}`);
       return res.text();
     }).then((text) => {
@@ -71,20 +70,15 @@ export function ReleaseNotesHost() {
       if (!entries.length) throw new Error('Missing current release');
       if (cancelled) return;
       setSections(entries); setIndex(0); setFailed(false); setOpen(true);
-      attempted.current = true; handled.current = serial;
+      handled.current = serial;
     }).catch(() => {
       if (cancelled) return;
-      attempted.current = true; handled.current = serial;
+      handled.current = serial;
       if (manual) { setFailed(true); setOpen(true); }
     });
     return () => { cancelled = true; };
   }, [safe, serial]);
-  const close = () => {
-    if (!failed && sections.length) {
-      try { localStorage.setItem(RELEASE_SEEN_PREFIX + APP_VERSION, '1'); } catch { /* private mode */ }
-    }
-    setOpen(false);
-  };
+  const close = () => setOpen(false);
   return html`<${Modal} open=${safe && open} title=${t('更新说明')} micro=${failed ? '' : sections[index]?.title}
     class="release-notes" width="min(10rem, 94vw)" onClose=${close}
     actions=${html`<${Button} disabled=${failed || index === 0} onClick=${() => setIndex(index - 1)}>${t('更新版本')}<//>

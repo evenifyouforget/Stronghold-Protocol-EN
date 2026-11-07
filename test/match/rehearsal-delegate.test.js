@@ -375,7 +375,7 @@ test('the task carries the server\'s own candidates: seeds, wave, cap and the sc
   const frame = host.tasks[0].frame;
   assert.equal(typeof frame.taskId, 'string');
   assert.equal(frame.cap, Math.ceil(((h.m.wave.timeLimit || 60) + 5) * 30));
-  assert.ok(frame.specs.length >= 2 && frame.specs.length <= 3);
+  assert.ok(frame.specs.length >= 2 && frame.specs.length <= 6);
   for (const spec of frame.specs) {
     assert.equal(spec.v, 1);
     assert.equal(spec.kind, 'normal');

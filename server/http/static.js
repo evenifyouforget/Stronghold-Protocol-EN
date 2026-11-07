@@ -211,11 +211,12 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       return;
     }
     // #603: serve only this root document, including after an update-zip overlay; never mount the repo root.
-    if (decoded === '/CHANGELOG.md') {
-      const abs = path.resolve(publicDir, '..', 'CHANGELOG.md');
+    // (fork) also its English translation, for the release notes of a non-Chinese page
+    if (decoded === '/CHANGELOG.md' || decoded === '/CHANGELOG.en.md') {
+      const abs = path.resolve(publicDir, '..', decoded.slice(1));
       const st = await fsp.stat(abs).catch(() => null);
       if (!st?.isFile()) { sendError(req, res, 404, '页面不存在 · Not found'); return; }
-      await serveFile(req, res, abs, st, 'release', ['CHANGELOG.md'], query, gzipCache, log, {
+      await serveFile(req, res, abs, st, 'release', [decoded.slice(1)], query, gzipCache, log, {
         cacheControl: 'no-cache', headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
       return;

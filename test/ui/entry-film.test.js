@@ -313,3 +313,20 @@ test('a phone in portrait when the title is entered does not start the film afte
     globalThis.innerHeight = prevH;
   }
 });
+
+test('(fork) once per tab session: a film that played is not played again after a reload', async () => {
+  const session = new Map();
+  globalThis.sessionStorage = { getItem: (k) => (session.has(k) ? session.get(k) : null), setItem: (k, v) => session.set(k, String(v)) };
+  try {
+    session.set('sp.entryFilm.played', '1');
+    const spy = sceneSpy();
+    await playEntryFilm({ mount: spy.mount });
+    assert.equal(overlay(), null, 'the title stays uncovered');
+    assert.equal(spy.mounted, 0);
+    session.clear();
+    await playEntryFilm({ mount: spy.mount, skip: () => true });
+    assert.equal(session.has('sp.entryFilm.played'), false, 'a film that did not play leaves the session free to play it');
+  } finally {
+    delete globalThis.sessionStorage;
+  }
+});

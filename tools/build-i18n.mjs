@@ -773,15 +773,20 @@ async function main() {
   try { version = versionFile ? (await readFile(versionFile, 'utf8')).trim() : null; } catch { /* optional */ }
   const data = {};
   for (const f of DATA_FILES) {
-    const abs = join(opts.data, `${f}.json`);
+    // (fork) a version's directory has no emotes / outfits / terms, and its rooms take no default-id overlay: its own
+    // overlay covers the default files it shares (--data data/versions/<slug>)
+    const own = join(opts.data, `${f}.json`);
+    const shared = dirname(opts.data) === join(ROOT, 'data', 'versions') ? join(ROOT, 'data', `${f}.json`) : own;
+    const abs = existsSync(own) ? own : shared;
     if (existsSync(abs)) data[f] = JSON.parse(await readFile(abs, 'utf8'));
   }
   const readDict = async (abs) => (existsSync(abs) ? JSON.parse(await readFile(abs, 'utf8')) : {});
   // the remake's own strings and PR #70's are English; another language falls back to its own optional
   // tools/i18n/fallback-remake.<code>.json (texts its client lacks, e.g. newer status keywords), then its pack's UI strings
   const fallback = opts.lang === 'en' ? {
-    // fork: + the English names of the CN-only outfits (arknights.wiki.gg; docs/OUTFITS.md), counted as 'remake'
-    remake: { ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-outfits-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-remake.json')) },
+    // fork: + the English names of the CN-only outfits (arknights.wiki.gg; docs/OUTFITS.md) and the texts of the CN-only
+    // operators (fallback-new-ops-en.json), counted as 'remake'
+    remake: { ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-outfits-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-new-ops-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-remake.json')) },
     pr70: await readDict(join(ROOT, 'tools', 'i18n', 'fallback-pr70.json')),
     ui: await readDict(join(ROOT, 'public', 'i18n', 'en.json')),
   } : {

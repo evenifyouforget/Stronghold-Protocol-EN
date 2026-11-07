@@ -1,5 +1,7 @@
 // #603: the shipped CHANGELOG is the source; unreleased/future sections are never shown for an older binary.
-export const RELEASE_SEEN_PREFIX = 'sp.pref.release-seen.';
+
+/** (fork) The changelog a language reads: the Chinese original for Chinese, its English translation for the rest. */
+export const changelogPath = (lang) => (/^zh/.test(String(lang)) ? '/CHANGELOG.md' : '/CHANGELOG.en.md');
 
 export function releaseSections(markdown, version) {
   const sections = [];

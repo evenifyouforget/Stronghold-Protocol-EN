@@ -247,8 +247,14 @@ function run(allowed, mount) {
   });
 }
 
+// (fork) once per browser tab session, not once per page load: a refresh or a deploy's reload does not ask for the tap
+// again. sessionStorage: private mode without it plays once per page load, as upstream does.
+const FILM_PLAYED_KEY = 'sp.entryFilm.played';
+const filmPlayed = () => { try { return globalThis.sessionStorage?.getItem(FILM_PLAYED_KEY) === '1'; } catch { return false; } };
+const markFilmPlayed = () => { try { globalThis.sessionStorage?.setItem(FILM_PLAYED_KEY, '1'); } catch { /* private mode */ } };
+
 /**
- * Play the film once per page load, before the title screen — also when a reload lands in the lobby; never over a
+ * Play the film once per tab session (fork), before the title screen — also when a reload lands in the lobby; never over a
  * room or a match, never under reduced motion, and never unless every sprite actually loads. A phone that is
  * portrait when this is called does not play it later, after a rotation.
  * @param {{ skip?: () => boolean, mount?: typeof mountAllianceIntro }} [opts]  skip() → true when it must not (or no
@@ -256,7 +262,7 @@ function run(allowed, mount) {
  */
 export async function playEntryFilm(opts = {}) {
   const { skip = () => false, mount = mountAllianceIntro } = opts;
-  if (reducedMotion()) return;
+  if (filmPlayed() || reducedMotion()) return;
   // once, as the title is entered — a later rotation does not get a second look
   if (touchDevice() && !phoneReady()) return;
   try { await data.load('assets'); } catch { return; }
@@ -267,5 +273,6 @@ export async function playEntryFilm(opts = {}) {
   let pictures;
   try { pictures = await preloadSprites(undefined, 1200); } catch { return; }
   if (pictures !== true || !allowed()) return;
+  markFilmPlayed();
   run(allowed, mount);
 }
