@@ -59,6 +59,9 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ### Changes
 
+- English text: the Rampage damage name and the Elemental Injury description now show five elements, several operators' potential-locked texts are translated, the 0.2.6 changelog and missing Playing Guide sections are in English, and the host rehearsal docs match the code.
+- Skill cast sounds follow the equipped skill. 23 operators get a cast sound they never played, such as Ch'en S2, SilverAsh S2 and Toska S3, because it wasn't on their primary skill. On 54 operators the primary skill's sound no longer rings on a skill that has no cast sound of its own, such as Exusiai the New Covenant S1 and S3; those skills now cast silently, as the official bank table says. A server needs 9 new files in `audio/sfx`.
+- Room screen: the Find Teammates switch shows its text again. The room layout from upstream 0.3.3 painted its background over it, leaving only its track visible. It now sits directly above the big button, which uses the Start Simulation look (amber with dark text while searching), and its description line is gone so the centre stays clear. On phones the switch, Add AI Teammate, the settings popup and the version tag are larger, and a seat's Preparing state can be read over light art.
 - Lobby: the update news panel uses its full width and scrolls inside itself when space is short, so it no longer pushes Achievements, Join with Key and Combat Tips off the screen. The mode buttons sit together as one group of equal cards (the long descriptions used to spread them apart): each description now wraps above its card, who plays first, the rest under it. "Solo Matchmaking" is no longer cut off.
 - Damage meters show one metric at a time. The result screen's Damage Stats and the in-match Combat statistics panel get a Damage / DPS / Healing / HPS selector (kept until the page reloads); rows sort by it, the top value fills its bar, and the row's width goes to the bar, so operators compare at a glance. Removed the panel's title, rank numbers, four-number rows, sort label and explanation box, and the chart's per-row DPS / healing text and All Rounds tag; hover a row for all four numbers.
 - Plugin studio, script checks and match hosts: their child processes no longer open console windows that steal focus on Windows (`windowsHide`).
@@ -77,7 +80,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ### Upstream merge
 
-- Merged upstream 0.3.1 at [`d905c146`](https://github.com/sganggs/Stronghold-Protocol/commit/d905c1464f762a03d236c7ad6bc3ba31a74f4494) (`TBD`).
+- Merged upstream 0.3.1 at [`d905c146`](https://github.com/sganggs/Stronghold-Protocol/commit/d905c1464f762a03d236c7ad6bc3ba31a74f4494) (`99bcb678`).
   Upstream's plugin skins (`room.skins`, 显示其他玩家的皮肤) are merged but dormant next to the fork's outfits
   (`room.outfits`), which stay the skin system players use; no skin plugin is installed.
 - Damage meter: the fork's damage meter (`ui/damageChart.js`, `damageLog.js`) is replaced by upstream's Combat
