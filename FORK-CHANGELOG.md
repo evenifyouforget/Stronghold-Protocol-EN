@@ -23,12 +23,22 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Across regions, all of this works as before: own server first, the other after 15 s (`SP_CROSS_AFTER_MS`). Only game versions both servers enable are matched across, and a moved Grand Alliance player arrives in the squad the server held for them.
 - Test rooms no longer search (they're joined by key only).
 
+### UI Size
+
+- The profile icon picker's grid in landscape on a phone, the match chat's Text bar and the space for its letter counter now shrink with the UI Size setting, like the rest of the interface. They had fixed pixel minimums, which failed the `ui-size` guard. The Text bar keeps a 32 px minimum, as touch targets do. The chat bubble only has a minimum font size, and font sizes never scale.
+
+### Update news
+
+- The lobby banner now announces Update 0.3.4. Four lines in the highlight style name Toska, Territoriya and Talulah, match chat, Grand Alliance (up to 8 Doctors in two squads) and the US East server. The points below cover SilverAsh the Reignfrost's S3 effects and the attack clips, full skill clips for skills that replace an attack, 7 new outfits, skill cast sounds, the damage meter's modes, four new Modules and smarter bots. It has a new dismiss key, `news.0.3.4`, so it shows again for players who closed 0.3.0's, and the 0.3.0 lines are gone from the en, ja, ko and zh-TW packs.
+- The lobby's Combat Tips box is always as tall as its longest tip, so a rotating tip no longer moves the update banner above it up and down. Its count and arrows stay on the title's row: the small TACTICAL TIPS label hides itself when it doesn't fit, instead of pushing them onto an empty row of their own.
+
 ### Profile icons
 
 - Doctors can pick a profile icon from a new profile chip in the lobby's top bar or from the icon on their own seat card in a room. The picker has two tabs. Operators lists every operator a seat card can show, with search and rarity tabs, worn in the player's outfit; its first tile, Assistant Operator, follows the room card's operator. Icons holds the game's 200 official profile icons, grouped as the game groups them (Dynamic Icon, Unique unlock, Event Icon, Default Icon). The pick is saved in the browser (`sp.pref.profile.avatar`) and comes back on the next visit, like the room's portrait operator (`sp.pref.room.card`, already saved).
 - Everyone sees the icon on the room's seat cards, the team panel, the strategy draft and the results. It travels in `hello.avatar`, and the server keeps only an id of `data/avatars.json`. A player without one (or on an older client) shows the official default icon. An operator icon is checked against the room's seat-card operators, like the room card. AI teammates now show their operator's avatar everywhere (the strategy screen, the team panel, the results), as their room seat card already did, instead of the robot icon. The band icon becomes a corner badge on a player's icon once a band is picked.
 - The icon names are the official English ones. Eight icons the English data doesn't have yet use the English server's names from the wiki. 31 CN-only icons use our own translations, marked "Unofficial translation" in the picker.
 - New: `tools/build-avatars.mjs` (writes `data/avatars.json`) and `tools/i18n/fallback-avatars-en.json`. `tools/build-i18n.mjs` now reads the icon table, and the data texts of every language were rebuilt. The art is extracted from the CN client as WebP (1.8 MB, local art group `avatar`, `extract.py --only avatar`), so a server needs that folder and an updated `data/local-assets.json`, and the preload zip picks it up. Without the art the chip shows the name's first letter and the picker stays closed.
+- The match screen now waits for the icon data (`avatars` joins `GAME_FILES` in `ui/gameComponents.js`), and it's downloaded with the other match data as soon as you're in a room. Icons on the team panel, the draft and the results no longer appear late. Older-season rooms use the same file, since icons aren't season content.
 
 ### Grand Alliance: 8-player rooms
 
@@ -112,7 +122,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ### Outfits
 
-- Added the seven outfits CN released since our last outfit refresh: SilverAsh the Reignfrost's Snowfall Over Londinium, Swire the Elegant Wit's A Prosperous Visage, Blaze the Igniting Spark's Nocturnal Firelight, Shu's Everflowing Waters, Horn's The First Gleam, Vina Victoria's Votive Offering and Catherine's Cozy Bakery. Their skill effects come along through the outfit effect twins. The server and the preload zip need the new art.
+- Added the seven outfits CN released since our last outfit refresh: SilverAsh the Reignfrost's Snowfall Over Londinium, Swire the Elegant Wit's A Prosperous Visage, Blaze the Igniting Spark's Nocturnal Firelight, Shu's Everflowing Waters, Horn's The First Gleam, Viviana's Votive Offering and Catherine's Cozy Bakery. Their skill effects come along through the outfit effect twins. The server and the preload zip need the new art.
 
 ### Upstream merge
 
