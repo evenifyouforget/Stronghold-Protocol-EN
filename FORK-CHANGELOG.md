@@ -19,6 +19,13 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 - The teammate-loadout test now expects a teammate's operator card to show ATK with the default Elite 2 Lv.60 bonus (×1.1), as the game has shown it since 0.2.2 and the other loadout tests already expect. The plugins test now accepts that the room loads the asset store together with the battlefield code it prepares for the match. No game change.
 
+### Operator Loadout fits every UI size and text size
+
+- At the Extra Large text size on a 640×360 phone, each card's level pill ended 4 px below the card. The branch icon above it now shrinks to make room when the rail is too short; every other size looks as before.
+- The card view's own spacing (the Owned button, the Export / Import parts list, the card's meta and alliance column, the Custom Squad card) now follows the UI size setting like the rest of the interface. The top-bar tray keeps the 32 px touch minimum every other control uses (it had 36 px, which only showed at UI sizes 75–80 % on small screens).
+- The Export / Import dialog highlights a ticked part without the CSS `:has()` selector, so it also works on Firefox ESR 115 and Safari before 15.4. It looks the same.
+- Tests brought up to date with the card view: the bottom switch has three buttons (Compact / Expanded / Outfits), the drawer lies over the deck without moving it, module tiles accept the downloaded type icons when the local game art is missing, and a leftover list-view helper is gone from the loadout rows test.
+
 ### Update news
 
 - The Update 0.3.4 banner in the lobby adds "New Operator Loadout" to its highlight lines. Its points now start with "Profile Icon added" and include "Fixed Viviana VFX". The damage meter and four new Modules lines are gone from the banner and from the en, ja, ko and zh-TW packs. The dismiss key stays `news.0.3.4`: the live server still shows 0.3.0's banner, so no player has closed this one yet.
