@@ -115,6 +115,7 @@ function scoped(t, fn) {
   return function* (...a) {
     const it = withLegacyTunables(t, () => fn(...a));
     let r = withLegacyTunables(t, () => it.next());
+    // loop-cap: one pass per step of the wrapped generator, which bounds its own steps
     while (!r.done) {
       const v = yield r.value;
       r = withLegacyTunables(t, () => it.next(v));
