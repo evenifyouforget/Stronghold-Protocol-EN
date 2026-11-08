@@ -16,6 +16,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Browsers pick the faster server by ping, with an Auto / Singapore / US East choice in Settings, and the server's name appears beside the ping. A page that loses another server falls back to the main one.
 - The online count covers every server. `scripts/deploy-regions.mjs` deploys one build to every server in two steps, so nobody is sent to a build that isn't ready, and old generations stay up while a match on the other server still needs them.
 
+### Browser tests
+
+- `board3d` and `fieldview` browser tests asked for Metal on every platform, which on Windows dropped them to a software driver: Chrome used about 7.5 cores and most of their checks failed. They now start through `gpuArgs()` in `tools/perfbench.mjs`, which uses the real GPU, keeps WebGL on a machine with no GPU and can be forced to software with `SP_E2E_SOFTWARE_GL=1`. `test/render/gpu-renderer.browser.test.js` logs the renderer in use.
+
 ## 2026-11-07
 
 ### First-visit loading
