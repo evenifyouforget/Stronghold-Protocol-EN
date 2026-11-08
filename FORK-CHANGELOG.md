@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-08
 
+### UI Size
+
+- The profile icon picker's grid in landscape on a phone, the match chat's Text bar and the space for its letter counter now shrink with the UI Size setting, like the rest of the interface. They had fixed pixel minimums, which failed the `ui-size` guard. The Text bar keeps a 32 px minimum, as touch targets do. The chat bubble only has a minimum font size, and font sizes never scale.
+
 ### Update news
 
 - The lobby banner now announces Update 0.3.4. Four lines in the highlight style name Toska, Territoriya and Talulah, match chat, Grand Alliance (up to 8 Doctors in two squads) and the US East server. The points below cover SilverAsh the Reignfrost's S3 effects and the attack clips, full skill clips for skills that replace an attack, 7 new outfits, skill cast sounds, the damage meter's modes, four new Modules and smarter bots. It has a new dismiss key, `news.0.3.4`, so it shows again for players who closed 0.3.0's, and the 0.3.0 lines are gone from the en, ja, ko and zh-TW packs.
