@@ -345,21 +345,68 @@ the human's tiles (`untracked/carry-rank/placement2.jsonl`).
 - **The carry pool is small and known:** Logos, Ch'en the Dawnstreak, Togawa Sakiko and Goldenglow (DIY picks), plus
   Exusiai the New Covenant, Qiubai and Lappland the Decadenza.
 
-### Each SPA-CC tag version on 4-bot Ultimate (#31): running again
+### Each SPA-CC tag version on 4-bot Ultimate (#31): results (2026-11-08)
 
-The first run (2026-11-05 → 07) is invalid: all 41 tag versions gave exactly the baseline's results, seed for seed.
+**Setup:**
+- 4 legacy bots on Ultimate, with botbench `--rules` fixed (#126).
+- Each of the 41 tag versions alone, on the same 80 seeds as the baseline, paired by seed.
+- The first run (2026-11-05 → 07) was invalid: before the fix, every tag played exactly like the baseline.
+- Files: `untracked/tag-sweep/`. The full table is `table-2026-11-08.md` (`analyze-sweep.mjs`).
 
-**Cause.** `botbench --rules` handed the tags to the match as upstream's room switches (`rules`), not as our lobby
-rules (`lobbyRules`). It has done so since the Yuri 0.3.1 sync (#39) split the two. The 10-21 tag table in
-01-findings-2026-10.md predates the sync and stands.
+**Baseline:** 37 of 80 wins (46 %), 13.2 rounds passed.
 
-**Fix:** #126, with a test that Lockout 1 changes a won seed. The sweep restarted with it on 2026-11-07 at 09:14 and
-needs about 10 h.
+**Caveat first:** the bot doesn't know the tags exist. This is what a tag costs a player who doesn't adapt, and that
+player is the legacy bot.
 
-- **Baseline (valid, no tag):** 37 of 80 wins (46 %), 13.2 rounds passed.
-- **Setup:** 4 legacy bots on Ultimate, seeds 1–80 for every config, 10 threads.
-- **Files:** `untracked/tag-sweep/`. `analyze-sweep.mjs` makes the table: the paired win-rate change, the seeds lost and
-  gained with a sign test, and the change per Risk point.
-- **Caveat:** the bot doesn't know the tags exist, so this measures what a tag costs a player who doesn't adapt.
+| Group | Tag versions (wins of 80; change in points) |
+| --- | --- |
+| **Ends every win** | Lockout 1, 2 and 3 (0; −46), Activation 3 (0; −46), Elements 2 (2; −44) |
+| **Costs 30 points or more** | Patriot 1–3 (10 / 5 / 4), Activation 2 (7), Famiglia: Seasonal 2–3 (7 / 6), Suffocation 3 (7) |
+| **Costs 15–26 points** | Famiglia: Unending 2–3, Delegation 1–3, Suffocation 2, Elements 1, Intern, Activation 1 |
+| **Costs about 10** | Suffocation 1 (−13), Last Line of Defense (−10, p 0.10), Junk 1–2, Famiglia: Cleaner 1, Vengeance 3 |
+| **About free (within ±5, not significant)** | Investor 1–2, Barge 1–2, Foresight, Swift, Strategy 1–2, Originium Zone Arts and Physical, Deep Infiltration, Low Efficiency, Vengeance 1–2 |
+
+All rows down to Suffocation 1 have p < 0.05 (exact sign test on the seeds that changed outcome).
+
+**What it shows**
+
+- **The bots' Final Assault wins are all narrow.**
+  - Lockout 1 makes the boss invulnerable for 10 s each time it loses 68 % of its HP. Activation 3 gives it +400 %
+    HP.
+  - Under either one, the 80 matches play exactly like the baseline up to round 13, and every one of the 37 wins then
+    becomes a loss at the boss.
+  - So any boss-side tag works like a threshold for the bot. These rows say more about the bot's margin than about the
+    tag, and a human board with more damage (`untracked/carry-rank/`) would lose much less to them.
+- **The same Risk buys very different difficulty.** At Risk 1:
+  - Lockout 1: −46;
+  - Patriot 1: −34;
+  - Elements 1 and Delegation 1: −19;
+  - Intern and Activation 1: −16;
+  - Investor 1, Swift, Strategy 1, Foresight, Barge 1, both Originium Zones, Deep Infiltration, Low Efficiency and
+    Vengeance 1: 0 ± 5.
+  
+  For the bot, half of the Risk-1 tags are free points.
+- **"Free" can mean two things:**
+  - Swift, Deep Infiltration and Vengeance 1 change most of the bots' matches (0–7 of the 37 won seeds play
+    identically), but not their outcome.
+  - Investor 1 and Originium Zone: Arts barely touch them (32 and 30 of 37 identical): what they change, the bot
+    doesn't use.
+- **Levels mostly scale as expected,** each level costing more. The exceptions are Lockout, whose level 1 already ends
+  every win, and Investor and Barge, free at every level.
+
+**For the final SPA-CC balance update** (Fish, 2026-11-07; nothing changes piecemeal):
+
+- **Candidates for more Risk,** or a weaker level 1: Lockout, Patriot, Elements and Delegation. Their level 1 costs
+  the bot as much as other tags' level 3.
+- **Candidates for less Risk:** Investor, Barge, Foresight, Swift, Strategy 1, Originium Zone, Deep Infiltration, Low
+  Efficiency and Vengeance 1–2. At least for a non-adapting player, they're free.
+- **Check against humans** before changing anything:
+  - the boss-side tags measure the bot's narrow margin;
+  - a human adapts to economy tags such as Investor (banking).
+  
+  The match records with tags (#32) and the pro player's feedback are the evidence for that.
 
 Should do a small run first, as a sanity check and to prevent similar bugs from silently ruining a multiple-hour long run.
+
+(Claude: agreed, and done from now on, together with a check that the treatment changes anything at all. Since
+2026-11-08 the sweep also runs in 10-seed chunks that each save as they finish.)
