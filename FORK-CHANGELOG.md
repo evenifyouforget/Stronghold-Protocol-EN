@@ -7,6 +7,30 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-08
 
+### Grand Alliance: 8-player rooms
+
+- New Grand Alliance: a co-op room with 8 seats, for humans only. It's off unless the server sets `SP_LARGE_ROOMS=1`.
+  Team Simulation then has a Grand Alliance card that opens a full-screen room browser of the open rooms, with Open and
+  Locked filters, and a button that creates one. Matchmaking never fills them, and they take no AI teammates.
+- The host can lock the room with a 4-letter password from the lock button beside the alliance key. Only the host sees
+  that button and the password. Locked rooms still show in the browser with a lock, and joining from the browser, by key
+  or by invite link asks for the password. Wrong guesses are limited to 6 a minute.
+- Seats 1–4 are squad A and 5–8 squad B. Players pick their seat or move to an empty one, and the host can swap two seats;
+  nobody balances them. Everyone in one squad plays the normal rules.
+- With players in both squads: each squad drafts strategies and 机变 cards on its own, both at once, with its own 6 cards.
+  The whole room fights over one operator and equipment pool, which grows with the room (×2 at 8). Defence relays across
+  the room: what still gets through goes to the next 2 perfect players, for at most 2 rounds. Everyone fights one shared
+  Enemy Leader in random pairs, as before. The Hidden Core threshold and the leader fight's overtime drain scale with the
+  room too.
+- A dropped player's board goes to the AI at once and back when they return, and a player who leaves keeps their board in
+  the match under the AI. That AI always runs in a browser, a squadmate's first, never on the server. A player idle for
+  3 prep rounds in a row is removed, with a warning after the 2nd.
+- An old server version that is still running an 8-player match now keeps running for 105 minutes after a deploy instead
+  of 60, so a long match isn't cut off. Every other old version still stops after 60.
+- Design: DESIGN §91 (`docs/design/large-rooms.md`). Squad, draft and relay ideas follow the GPL-3.0 forks
+  [LongQianChen/Stronghold-Protocol](https://github.com/LongQianChen/Stronghold-Protocol) and
+  [zhewang448/Stronghold-Protocol](https://github.com/zhewang448/Stronghold-Protocol), adapted to this code.
+
 ### Several servers, one game
 
 - The game can now run on more than one server, so players connect to the nearest one with better ping. It's off unless the operator sets `SP_REGIONS`, and a single server behaves as before (`docs/DEPLOY.en.md` §2.7).
