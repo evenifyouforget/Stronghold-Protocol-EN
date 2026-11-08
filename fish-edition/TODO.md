@@ -6,7 +6,9 @@
 - [x] **Sync Yuri → our main: #127**, merged 2026-11-07 (e9fda427): sganggs dev eff7d93a + Yuri dev-0.2 e2fd04b3.
   `pr-descriptions/sync-yuri-2026-11.md` stays as the template for the next sync (custom merge bases). Upstream's new
   bot logic runs on the server; Yuri isn't deploying it until bots move to the browser.
-- [x] #126 botbench `--rules` now applies the SPA-CC tags (it didn't since #39): merged. The #31 tag sweep is
+- [x] #126 botbench `--rules` now applies the SPA-CC tags (it didn't since #39): merged.
+- [ ] **#129 the layered legacy bot** (`legacy-layered`, Fish's `ai-players/02` baseline): review and merge. Next: a
+  tuning run of its 35 parameters (botbench `--profile`, small saved chunks, held-back seeds), then DYYBot above it. The #31 tag sweep is
   re-running with the fix (`untracked/tag-sweep/`, about 10 h from 2026-11-07 09:14).
 
 # GitHub issues (open, 2026-11-05; #27, #98, #99, #100 close when `mini/0.3.1-4` reaches main)
