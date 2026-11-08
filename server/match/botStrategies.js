@@ -3,15 +3,14 @@
 import { createBotRegistry, defineBotStrategy } from './botStrategyContract.js';
 import { EXTERNAL_BOT, llmIntegrationEnabledNow } from './llmGate.js';
 
-import { ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT } from './botAdaptive.js';
-import { IOLETA_BOT } from './botIoleta.js';
-import { BASIC_TACTICS, FISH_PROFILES } from './botTacticsBasic.js'; // (fork) tactics profiles (botTactics.js)
-import { LEGACY_LAYERED, LEGACY_TACTICS } from './botTacticsLegacy.js'; // (fork) the layered legacy bot
+import { BUILTIN_BOTS } from './botStrategyList.js';
+import { BASIC_TACTICS } from './botTacticsBasic.js'; // (fork) tactics (botTactics.js)
+import { LEGACY_TACTICS } from './botTacticsLegacy.js'; // (fork) the layered legacy bot's tactics
 import { defineProfile } from './botTactics.js';
 
 // Registration does not enable external IO or select an opt-in strategy.
 export const BOT_STRATEGIES = createBotRegistry([...(llmIntegrationEnabledNow && EXTERNAL_BOT ? [EXTERNAL_BOT] : []),
-  IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, LEGACY_LAYERED]);
+  ...BUILTIN_BOTS]);
 
 /** (fork) Every defined tactic by id: profiles given as data name their tactics by these. */
 export const TACTICS = Object.freeze(Object.fromEntries([...BASIC_TACTICS, ...LEGACY_TACTICS].map((t) => [t.id, t])));

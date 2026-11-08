@@ -2,7 +2,7 @@
 
 import { isObj, sortedPlayers } from './shared.js';
 import { isCombatPhase } from './phases.js';
-import { t } from '../../../../shared/i18n.js';
+import { t, shownName } from '../../../../shared/i18n.js';
 
 
 /** Own normal field id (DESIGN §8.3). */
@@ -77,7 +77,7 @@ export function switcherLabel(pub, watching, myId, spectating = false) {
   const cur = fields.find((f) => f.fieldId === watching);
   if (cur) return fieldLabel(cur, pub, myId);
   if (typeof watching === 'string' && watching.startsWith('n:') && watching !== ownFieldId(myId)) {
-    return sortedPlayers(pub).find((p) => p.playerId === watching.slice(2))?.name || t('队友');
+    return shownName(sortedPlayers(pub).find((p) => p.playerId === watching.slice(2)), t('队友'));
   }
   return spectating ? t('观战') : t('自己');
 }
@@ -90,7 +90,7 @@ export function switcherLabel(pub, watching, myId, spectating = false) {
  */
 export function fieldLabel(field, pub, myId) {
   if (!isObj(field)) return '—';
-  const names = new Map(sortedPlayers(pub).map((p) => [p.playerId, p.name || t('博士')]));
+  const names = new Map(sortedPlayers(pub).map((p) => [p.playerId, shownName(p, t('博士'))]));
   const ps = Array.isArray(field.players) ? field.players : [];
   if (field.kind === 'unite') return ps.includes(myId) ? t('联防（自己）') : t('联防阵地');
   if (field.kind === 'boss' || field.kind === 'hidden') {
@@ -109,11 +109,18 @@ export function fieldLabel(field, pub, myId) {
  * @param {number} [ttl]
  */
 export function activeBubbles(emotes, now, ttl = 3000) {
-  const out = new Map();
+  // each player's newest bubble only: a long text line must not come back when a newer, shorter-lived emote has gone
+  const newest = new Map();
   for (const e of Array.isArray(emotes) ? emotes : []) {
-    if (!isObj(e) || !(now - e.at < ttl) || e.at > now + 1000) continue;
-    const cur = out.get(e.playerId);
-    if (!cur || cur.seq < e.seq) out.set(e.playerId, { id: e.id, seq: e.seq, at: e.at });
+    if (!isObj(e) || e.at > now + 1000) continue;
+    const cur = newest.get(e.playerId);
+    if (!cur || cur.seq < e.seq) newest.set(e.playerId, e);
+  }
+  const out = new Map();
+  for (const [playerId, e] of newest) {
+    const life = Number.isFinite(e.ttl) ? e.ttl : ttl; // a chat line's own time on screen (chatState.js chatEntry)
+    if (!(now - e.at < life)) continue;
+    out.set(playerId, typeof e.text === 'string' ? { seq: e.seq, at: e.at, text: e.text, ttl: life } : { id: e.id, seq: e.seq, at: e.at });
   }
   return out;
 }

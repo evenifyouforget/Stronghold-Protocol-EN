@@ -52,7 +52,9 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
   vertex for 21 skinned renderers of the used set (铃兰 S3's ninth tail, 琴柳's flags …), no bone data at all for 41
   (伊芙利特 S3's flame tongues, eight of 铃兰's tails …) —, so a reader can infer the count from `boneIndices.length /
   vertexCount` and must extract again for the second kind. (2) index.json projectiles (§33.12): `main` and `lifeTime`
-  are the projectile class's own (SimpleProjectile, HarpoonProjectile, …); earlier runs took the last behaviour's
+  are the projectile class's own (SimpleProjectile, HarpoonProjectile, …; fork: also the ones only an operator's buff
+  template graph fires, `_projectileKey` — 塔露拉 S3's 簇火, oxi_s_3_wave — or a graph's blackboard default `projectile`
+  — 凛御银灰 S3's birds, svash2_s_3[bird_on_self], drawn through skills.js FX_ATTACK_LINES); earlier runs took the last behaviour's
   `_mainEffect` — 30 projectiles named their chain or rope line and lost the flying effect and the life (their
   `behaviours` give both) —; the new `link` names that line (a ChainLightningEffectBehaviour's or a HarpoonRenderer's:
   `behaviours` say which, and how it is drawn — §33.12 Projectile).
@@ -884,7 +886,7 @@ into `emitters`). The rows a subclass keeps in groups join the lists with the gr
   UberAnimationEffectEmitter.LoopType, written as `loopTypeName`): 0 LOOP — the attack plays the group animations in
   turn instead of `sourceAnimKey` —, 1 RANDOM — a random one per attack (version 2 of this text assumed 1 meant in
   turn); **assumed**: a row with `anim` plays when the attack plays that animation, the rows without `anim` on every
-  attack.
+  attack. The attack's clip follows the same pick (`FxWiring.attackClip`, for the operators in `ATTACK_CLIPS`).
 * another list of rows keeps its field name (`field`, e.g. `VigilWolfEffectEmitter._vigilWolfCastEffects`, whose rows
   carry the `buffKey` the owner must have).
 

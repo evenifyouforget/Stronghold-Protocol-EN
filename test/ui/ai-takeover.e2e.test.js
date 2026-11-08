@@ -5,7 +5,7 @@ import {existsSync} from 'node:fs';
 const chrome=process.env.CHROME_PATH;
 test('a spectator requests an AI in the browser, receives majority approval and reloads into the inherited seat', {skip:process.env.SP_E2E!=='1'||!chrome||!existsSync(chrome),timeout:120000},async()=>{
   const {startServer}=await import('../../server/index.js'),{TestClient}=await import('../helpers/wsClient.js'),puppeteer=(await import('puppeteer-core')).default;
-  const srv=await startServer({port:0,host:'127.0.0.1',quiet:true,botRehearsal:0}),clients=[],browser=await puppeteer.launch({executablePath:chrome,headless:true,args:['--no-sandbox','--no-proxy-server',`--explicitly-allowed-ports=${srv.port}`]});
+  const srv=await startServer({port:0,host:'127.0.0.1',quiet:true,botRehearsal:0}),clients=[],browser=await puppeteer.launch({executablePath:chrome,headless:true,args:['--mute-audio', '--no-sandbox','--no-proxy-server',`--explicitly-allowed-ports=${srv.port}`]});
   try{
     const player=async name=>{const c=await TestClient.connect(srv.url.replace('http','ws')+'/ws');clients.push(c);c.id=(await c.hello(name)).playerId;return c;};
     const host=await player('Host');await host.request({t:'room.create',mode:'coop',difficulty:'NORMAL'});const room=[...srv.lobby.rooms.values()][0];
@@ -13,7 +13,7 @@ test('a spectator requests an AI in the browser, receives majority approval and 
     const mate=await player('Mate');await mate.request({t:'room.join',code:room.code});await mate.request({t:'room.ready',ready:true});for(let i=0;i<2;i++)await host.request({t:'room.addBot'});await host.request({t:'room.start'});
     const m=room.match;m.startRound(1);m.phase='PREP';m.setDeadline(0);for(const p of m.order)p._botPrepToken=(p._botPrepToken||0)+1;m.flush(true);const bot=m.order[2];bot.funds=71;bot.acquireChess('chess_char_1_01_a',{fromPool:false});bot.dirty();m.flush(true);
     const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setViewport({width:1440,height:900});
-    await page.evaluateOnNewDocument(()=>{localStorage.setItem('sp.name','Late');sessionStorage.setItem('sp.entered','1');});await seedReleaseRead(page); await page.goto(srv.url+'/');
+    await page.evaluateOnNewDocument(()=>{localStorage.setItem('sp.name','Late');sessionStorage.setItem('sp.entered','1');localStorage.setItem('sp.pref.lang',JSON.stringify('zh'));});await seedReleaseRead(page); await page.goto(srv.url+'/');
     await page.waitForFunction(async()=>{const {net}=await import('/js/net.js');return net.status==='online';});
     await page.evaluate(async code=>{const {net}=await import('/js/net.js');await net.request('room.spectate',{code});},room.code);
     await page.waitForSelector('.gm__corner .ai-participation-entry');await page.click('.gm__corner .ai-participation-entry');
@@ -38,7 +38,7 @@ test('the host can enable the default-off takeover setting through the room UI',
   const { default: puppeteer } = await import('puppeteer-core');
   const srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true, botRehearsal: 0 });
   t.after(() => srv.close());
-  const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ['--no-sandbox', `--explicitly-allowed-ports=${srv.port}`] });
+  const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ['--mute-audio', '--no-sandbox', `--explicitly-allowed-ports=${srv.port}`] });
   t.after(() => browser.close());
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });

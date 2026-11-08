@@ -82,10 +82,12 @@
 // ground point, i.e. on the pointer (render/app.js).
 
 import { progressLabel } from '../itemProgress.js';
+import { needNow } from '../loadLater.js';
 import { MoteRing } from './motes.js';
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
 import { skillAttackMode } from './skillAttack.js';
+import { ATTACK_CLIPS } from './vfx/wiring.js';
 import { MANIFOLD, isManifold, manifoldCopyForm, manifoldAttackForm } from './manifold.js';
 import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, cursedFlameTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed, statusValueLabel } from './style.js';
@@ -1069,7 +1071,7 @@ export class UnitView {
     this._spineBusy = true;
     this._spineHidden = !!globalThis.document?.hidden;
     this._stuckAt = 0;
-    a.spine.acquire(entry, retry ? { retry: true } : undefined).then((data) => {
+    needNow(a.spine.acquire(entry, retry ? { retry: true } : undefined)).then((data) => {
       if (req === this._spineReq) { this._spineBusy = false; this._stuckAt = 0; }
       if (this.destroyed || req !== this._spineReq) { this._releaseEntry(entry); return; }
       this._spineTries = 0;
@@ -2675,6 +2677,10 @@ export class UnitView {
         }
       }
       if (!anims.die && a.has('Die')) out.set('Die', false);
+      // (fork) the clips the official pick plays beside the roles' (vfx/wiring.js ATTACK_CLIPS)
+      for (const n of ATTACK_CLIPS[this.info.diy?.charId || this.info.spine || this.info.defId]?.clips || []) {
+        if (a.has(n) && !out.has(n)) out.set(n, false);
+      }
     }
     this._clipsOf = a;
     this._clips = out;

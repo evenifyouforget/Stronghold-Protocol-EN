@@ -11,6 +11,20 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
 import { LEGACY_BOT } from '../botStrategyContract.js';
 
+/**
+ * What a bot seat drafts. A co-op seat gone before its pick has no game of its own to play: whatever strategy plays the AI seats,
+ * it drafts by the team's rule (botPickBand's departedWeight: Touch while nobody else holds it, never 歌利亚; §37.65). A strategy a
+ * teammate already took is not selectable (队友已选): the bot re-draws, else the first free one.
+ * Runs on the match, or on the copy in the host's Worker (docs/host-browser-bots.md B10).
+ */
+export function chooseBotBand(m, ps) {
+  const bot = !m.isSolo && ps.alive === false ? LEGACY_BOT : m.botFor(ps);
+  let id = bot.pickBand(m, ps);
+  for (let k = 0; k < 8 && m.bandTaken(id, ps.playerId); k++) id = bot.pickBand(m, ps);
+  if (m.bandTaken(id, ps.playerId)) id = m.gd.bandIds().find((b) => !m.bandTaken(b, ps.playerId)) || id;
+  return id;
+}
+
 export class MatchPhases {
   enterInfoCheck() {
     this.phase = PHASE.INFO_CHECK;
@@ -43,6 +57,8 @@ export class MatchPhases {
    */
   enterBandDraft() {
     if (this.phase !== PHASE.INFO_CHECK) return;
+    // (fork) a large room with two squads: one draft per squad, both at once (match/largeRoom.js)
+    if (this.squads) { this._enterBandDraftLanes(); return; }
     this.phase = PHASE.BAND_DRAFT;
     // The opening is settled, so no reroll cooldown outlives this phase.
     this._rerollStartAt.clear();
@@ -77,17 +93,21 @@ export class MatchPhases {
     return [...order.filter((pid) => !bot(pid)), ...order.filter(bot)];
   }
 
-  draftTurn() {
+  /** @param {string|null} [playerId] (fork) with squads: the turn of that player's squad draft (match/largeRoom.js) */
+  draftTurn(playerId = null) {
     const d = this.draft;
     if (!d) return null;
+    if (d.lanes) return this._laneTurn(playerId ? this._laneOf(d, playerId) : d.lanes[0]);
     return d.order[d.idx] ?? null;
   }
 
   /** Real ms of one strategy-draft turn (BAND_TURN_SECONDS × timerScale). */
   bandTurnMs() { return this.scaled(BAND_TURN_SECONDS * 1000); }
 
-  startDraftTurn() {
+  /** @param {string|null} [playerId] (fork) with squads: restart that player's squad draft (every one without) */
+  startDraftTurn(playerId = null) {
     const d = this.draft;
+    if (d?.lanes) { for (const l of d.lanes) if (!playerId || l.order.includes(playerId)) this._startBandLane(l); return; }
     this.cancel(this._turnTimer);
     this._turnTimer = null;
     if (this.test) this.setDeadline(0);
@@ -121,24 +141,21 @@ export class MatchPhases {
   }
 
   /** An AI seat's (or an AI 托管 seat's) turn: it picks at once (user playtest #4 item 4 — nobody waits on the AI). */
-  scheduleBandBot() {
+  scheduleBandBot(playerId = null) {
+    if (this.draft?.lanes) { this.startDraftTurn(playerId); return; } // (fork) a lane picks for the AI itself
     const token = this._turnToken;
     this.later(0, () => {
       if (this.phase !== PHASE.BAND_DRAFT || token !== this._turnToken) return;
       const ps = this.players.get(this.draftTurn());
       if (!ps || !ps.botControlled) return;
-      // a co-op seat gone before its pick has no game of its own to play: whatever strategy plays the AI seats, it drafts
-      // by the team's rule (botPickBand's departedWeight: Touch while nobody else holds it, never 歌利亚; §37.65)
+      const valid = () => this.phase === PHASE.BAND_DRAFT && token === this._turnToken;
+      // (fork) host mode: the pick is the Worker's (match/botTasks.js); with nobody to ask it is the rule's, as when a turn runs out
+      const fallback = this.botExecution === 'host'
+        ? () => this._startBotPick(ps, 'band', () => valid() && !this.draft?.picks[ps.playerId], () => this._applyBand(ps, this.timeoutBand(ps.playerId)))
+        : () => this._onBotSeat(ps, () => this._applyBand(ps, chooseBotBand(this, ps), { dedupe: true }));
+      // a departed co-op seat drafts by the team's rule (chooseBotBand): never asked of the seat's strategy, as on dev-0.2
       const bot = !this.isSolo && ps.alive === false ? LEGACY_BOT : this.botFor(ps);
-      const fallback = () => {
-        // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one
-        let id = bot.pickBand(this, ps);
-        for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = bot.pickBand(this, ps);
-        if (this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
-        this._applyBand(ps, id, { dedupe: true });
-      };
-      if (bot.decide?.(this, ps, { kind: 'band',
-        valid: () => this.phase === PHASE.BAND_DRAFT && token === this._turnToken,
+      if (bot.decide?.(this, ps, { kind: 'band', valid,
         complete: () => token !== this._turnToken || !!this.draft?.picks[ps.playerId], fallback })) return;
       fallback();
     });
@@ -152,7 +169,9 @@ export class MatchPhases {
    */
   bandTaken(bandId, playerId) {
     const picks = this.draft?.picks || {};
-    for (const [pid, id] of Object.entries(picks)) if (pid !== playerId && id === bandId) return true;
+    // (fork) with squads 队友已选 is the squad's: the other squad may hold the same strategy
+    const lane = this.draft?.lanes ? this._laneOf(this.draft, playerId) : null;
+    for (const [pid, id] of Object.entries(picks)) if (pid !== playerId && id === bandId && (!lane || lane.order.includes(pid))) return true;
     return false;
   }
 
@@ -200,7 +219,7 @@ export class MatchPhases {
   pickBand(ps, bandId) {
     if (this.phase !== PHASE.BAND_DRAFT || !this.draft) return fail(ERR.WRONG_PHASE);
     if (this.draft.picks[ps.playerId]) return fail(ERR.ALREADY);
-    if (this.draftTurn() !== ps.playerId) return fail(ERR.NOT_YOUR_TURN);
+    if (this.draftTurn(ps.playerId) !== ps.playerId) return fail(ERR.NOT_YOUR_TURN);
     if (typeof bandId !== 'string' || !this.gd.bandAllowed(bandId)) return fail(ERR.BAD_TARGET);
     if (this.bandTaken(bandId, ps.playerId)) return fail(ERR.BAD_TARGET, '队友已选'); // i18n-ignore: developer detail (players see ERR_TEXT)
     this._applyBand(ps, bandId);
@@ -219,7 +238,7 @@ export class MatchPhases {
     if (ps.alive) ps.lp = this.startLp(id);
     this.markPrivate(ps);
     this.markPublic();
-    this.startDraftTurn();
+    this.startDraftTurn(ps.playerId);
   }
 
   skipBand(ps) {
@@ -227,7 +246,11 @@ export class MatchPhases {
     const d = this.draft;
     if (this.isSolo) return fail(ERR.WRONG_PHASE, 'no skip in solo');
     if (d.picks[ps.playerId]) return fail(ERR.ALREADY);
-    if (this.draftTurn() !== ps.playerId) return fail(ERR.NOT_YOUR_TURN);
+    if (this.draftTurn(ps.playerId) !== ps.playerId) return fail(ERR.NOT_YOUR_TURN);
+    if (d.lanes) {
+      const why = this._skipBandLane(ps, this._laneOf(d, ps.playerId));
+      return why === 'none' ? fail(ERR.ALREADY, 'no skip left') : why === 'alone' ? fail(ERR.BAD_TARGET, 'nobody to pass to') : OK;
+    }
     if (!(d.skipsLeft[ps.playerId] > 0)) return fail(ERR.ALREADY, 'no skip left');
     if (d.order.length - d.idx <= 1) return fail(ERR.BAD_TARGET, 'nobody to pass to');
     d.skipsLeft[ps.playerId]--;
@@ -250,6 +273,7 @@ export class MatchPhases {
     if (this.phase !== PHASE.BAND_DRAFT) return;
     this.cancel(this._turnTimer);
     this._turnTimer = null;
+    this._clearLaneTimers(this.draft);
     for (const ps of this.order) {
       if (!this.draft.picks[ps.playerId]) {
         // one after another in seat order, so each default sees the ones assigned before it (no duplicates)
