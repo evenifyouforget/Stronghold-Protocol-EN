@@ -10,7 +10,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 ### Grand Alliance: 8-player rooms
 
 - New Grand Alliance: a co-op room with 8 seats, for humans only. It's off unless the server sets `SP_LARGE_ROOMS=1`.
-  Team Simulation then has a Grand Alliance card that opens a full-screen room browser of the open rooms, with Open and
+  The lobby then has a Grand Alliance mode, and Team Simulation a Grand Alliance card; both open a full-screen room browser of the open rooms, with Open and
   Locked filters, and a button that creates one. Matchmaking never fills them, and they take no AI teammates.
 - The host can lock the room with a 4-letter password from the lock button beside the alliance key. Only the host sees
   that button and the password. Locked rooms still show in the browser with a lock, and joining from the browser, by key
