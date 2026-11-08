@@ -31,10 +31,25 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
   [LongQianChen/Stronghold-Protocol](https://github.com/LongQianChen/Stronghold-Protocol) and
   [zhewang448/Stronghold-Protocol](https://github.com/zhewang448/Stronghold-Protocol), adapted to this code.
 
+### S.W.E.E.P. Report
+
+- An operator in an alliance's Operators list now opens Operator Loadout at that operator, selected and scrolled into view, with its detail open. A filter that would hide it is cleared. Back (or Esc) there returns to the report as it was left: same tab, alliance, scroll position, and focus on that operator. Opened the usual way, Back works as before. The report and the loadout always show the same season version, so every operator listed has a row.
+
 ### Trait text
 
 - Blemishine's and Degenbrecher's deploy traits (`garrison_106_a/b`, `garrison_155_a/b`) now read "On deployment … (up to N stacks per battle)", as the Chinese and the game code have it. The official English added an "on skill activation" trigger that doesn't exist and gave the cap as "Can stack up to Nx". The fix is in `tools/i18n/corrections-en.json`.
 - 23 more traits gave their cap as "Can stack up to Nx", which reads like a number of triggers. They now say what the Chinese and the code cap: "up to N stacks per battle" ("per round" for Aroma and Angelina, "each" where two alliances each have their own cap). Executor's bullet trait now reads "up to 7 times per battle", and its Foresight part adds stacks, not "Alliances". The traits belong to Executor the Ex Foedere, Warfarin, Kroos the Keen Glint, Virtuosa, Surtr, Fartooth, Aroma, Titi and Angelina, plus the traits Warfarin, Kroos and Fartooth hand out.
+- Season 1 and Season 2 part 1 rooms get the same trait fixes. Their English texts (`data/versions/<slug>/i18n/en.json`) were rebuilt, and 7 Season 1 traits with Season 1's own caps (10 / 20 stacks) got their own corrections. The rebuild also brings in what the older-season texts were missing since the last build: 7 outfit names, the Rampage, Arcane Surge and Trigger effect keywords, and Rampage in the Elemental Injury list.
+- The traits Warfarin and Kroos the Keen Glint hand out at Elite (`garrison_95_b`, `garrison_96_b`) now state their per-battle cap, which the game code has always applied but neither the Chinese nor the English text gave. Each season shows its own number: Warfarin's is 14 stacks now, 24 in Season 2 part 1 and 20 in Season 1; Kroos's is 20 in every season. Older seasons read their numbers from their own `tools/i18n/corrections-en.<slug>.json`, which `tools/build-i18n.mjs` now tries before the shared corrections.
+
+### Room screen
+
+- The AI teammates' avatars in the room now come from the small URL helpers (`ui/assetUrls.js`) instead of `assets.js`, so a vanilla page no longer loads the asset store at start, as `test/ui/plugins-client.test.js` requires. `test/ui/playtest6-unite.test.js` now expects the team panel's leak tag to name a teammate through `shownName()`, which is how AI teammates show their operator's name.
+- `test/ui/text-scale.test.js` now lists the match chat's bubble (`.cbubble`) as in-match HUD text that the Text Size setting leaves alone, like the emote bubble and the chat panel it sits with.
+
+### Browser tests are silent
+
+- Every headless Chrome the tests and tools start is muted (`--mute-audio`): in `gpuArgs()` (`tools/perfbench.mjs`, the software mode included) and in each test file that launches its own browser. Game audio no longer plays on the machine running a browser suite. `test/perfbench.test.js` checks both, and AGENTS.md says sounds are checked through requests or play-call logs, never by listening.
 
 ### Several servers, one game
 
