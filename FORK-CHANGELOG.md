@@ -7,6 +7,22 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-08
 
+### Grand Alliance: Public and Private
+
+- The lock is now called Private. Beside the alliance key, the host has a Public | Private switch that applies at once: Private gives the room a random 4-letter password, shown next to the switch; the host changes it by typing into it there. Everyone else sees whether the room is Public or Private. The room browser's filters and badges say Public and Private, and joining a Private room asks for its password as before.
+- Create Grand Alliance first opens the protocol screen: pick the difficulty and Public or Private (with the password) before the room exists, instead of creating a room and changing it afterwards (`room.create { capacity: 8, password }`).
+- A Grand Alliance's Find Teammates switch is remembered apart from a normal room's and starts on.
+- Solo Matchmaking's card now reads "Join automatically when a room is found.", and its protocol screen no longer shows the "starts as soon as 4 Doctors are found" line.
+
+### Matchmaking: game versions and Grand Alliances
+
+- Matchmaking now matches by game version. Rooms of any game version can use Find Teammates, and they only merge with rooms of the same version and difficulty. Before, rooms of different versions could merge, and a host who switched version while searching could pull strangers into another version.
+- Solo Matchmaking shows on every lobby version. Its protocol screen has a tick for each game version the server offers (the lobby's ticked by default), so a Doctor can queue for several. A new room plays the first version, in the official order, that 4 of them share.
+- A matchmade room of another version now waits until every player's page has loaded that version's data before it starts. Before, an automatic start skipped that check. A page that can't load it, or is still not ready after 60 s, leaves the room, and the room searches on.
+- Grand Alliances, locked ones included, get the Find Teammates switch. They're filled only by Doctors who tick "Also join Grand Alliances" in Solo Matchmaking and by other searching Grand Alliances whose squads fit whole into one of theirs; a 4-player room never merges in. Matchmade Doctors skip the password. A Grand Alliance that has searched 10 s also takes opted-in Doctors who waited 10 s, who then wait in its room until it fills. It starts by itself at 8. No AI seats are added.
+- Across regions, all of this works as before: own server first, the other after 15 s (`SP_CROSS_AFTER_MS`). Only game versions both servers enable are matched across, and a moved Grand Alliance player arrives in the squad the server held for them.
+- Test rooms no longer search (they're joined by key only).
+
 ### Profile icons
 
 - Doctors can pick a profile icon from a new profile chip in the lobby's top bar or from the icon on their own seat card in a room. The picker has two tabs. Operators lists every operator a seat card can show, with search and rarity tabs, worn in the player's outfit; its first tile, Assistant Operator, follows the room card's operator. Icons holds the game's 200 official profile icons, grouped as the game groups them (Dynamic Icon, Unique unlock, Event Icon, Default Icon). The pick is saved in the browser (`sp.pref.profile.avatar`) and comes back on the next visit, like the room's portrait operator (`sp.pref.room.card`, already saved).
