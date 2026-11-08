@@ -5,11 +5,32 @@ import { EXTERNAL_BOT, llmIntegrationEnabledNow } from './llmGate.js';
 
 import { ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT } from './botAdaptive.js';
 import { IOLETA_BOT } from './botIoleta.js';
-import { FISH_PROFILES } from './botTacticsBasic.js'; // (fork) tactics profiles (botTactics.js)
+import { BASIC_TACTICS, FISH_PROFILES } from './botTacticsBasic.js'; // (fork) tactics profiles (botTactics.js)
+import { LEGACY_LAYERED, LEGACY_TACTICS } from './botTacticsLegacy.js'; // (fork) the layered legacy bot
+import { defineProfile } from './botTactics.js';
 
 // Registration does not enable external IO or select an opt-in strategy.
 export const BOT_STRATEGIES = createBotRegistry([...(llmIntegrationEnabledNow && EXTERNAL_BOT ? [EXTERNAL_BOT] : []),
-  IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES]);
+  IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, LEGACY_LAYERED]);
+
+/** (fork) Every defined tactic by id: profiles given as data name their tactics by these. */
+export const TACTICS = Object.freeze(Object.fromEntries([...BASIC_TACTICS, ...LEGACY_TACTICS].map((t) => [t.id, t])));
+
+/**
+ * (fork) A profile from data, e.g. a tuning run's JSON (tools/botbench.mjs --profile): `{ id?, tactics: [{ tactic:
+ * 'legacy-buy', params?: { mergeHit: 40 } }, …] }`, top first, legacy implied below. Unknown tactics or parameters,
+ * and values outside a parameter's bounds, are refused.
+ * @param {{ id?: string, tactics: Array<string | { tactic: string, params?: object }> }} def
+ */
+export function profileFromData(def) {
+  if (!def || typeof def !== 'object' || !Array.isArray(def.tactics)) throw new TypeError('Profile data: { tactics: [...] } required');
+  const tactics = def.tactics.map((e, i) => {
+    const id = typeof e === 'string' ? e : e?.tactic;
+    if (!Object.hasOwn(TACTICS, id)) throw new TypeError(`Profile data: entry ${i}: unknown tactic ${JSON.stringify(id)}; known: ${Object.keys(TACTICS).join(', ')}`);
+    return { tactic: TACTICS[id], params: typeof e === 'string' ? undefined : e.params };
+  });
+  return defineProfile({ id: def.id ?? 'data-profile', tactics });
+}
 
 /** @param {string | import('./botStrategyContract.js').BotStrategyDefinition} [selection] */
 export function getBotStrategy(selection = 'legacy', registry = BOT_STRATEGIES) {
