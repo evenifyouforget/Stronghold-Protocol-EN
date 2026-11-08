@@ -7,6 +7,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-08
 
+### Units draw in the official order
+
+- Units now draw in the order the official game uses: farthest first by the depth of each model's flat plane along the camera's view (the client's battle camera sorts see-through renderers orthographically, and no battle code sets a sorting order). Every model faces the camera head-on, so its height, size and leaps don't change the order. An operator's model sits 0.100 in front of her feet and most enemies' 0.152, read from each unit's official skin. So an enemy in an operator's row now draws over her, as in the official close-ups of Viviana's normal attack (the robot covers her reindeer's antlers). Raised blocks still hide the units behind them (`units.js` `skinPlaneDepth`, `PLANE_DEPTH`).
+- This replaces the earlier same-day rule that put operators over every enemy in their row. In the official footage of Viviana's S2, she turns see-through and vanishes into the dash, and the slash effects (which have their own sorting order) cover the enemies; her body is never lifted over them.
+- The `vfx-talents` "group choice (select)" test asked for successive picks with one attack count; it now uses one count per attack, as the attack clip picks have since the clip change earlier today.
+
 ### Dev sandbox: floating cards, unit card, modules and starting SP
 
 - The sandbox panel is a floating card over the field: the field always fills the window, and opening or hiding a card never moves the camera. Its top keeps adding an operator, Start combat, speed and the frame step; Core bond, Map and enemies, Edit wave, Bonds & stacks, View options and Help fold into sections. The list of placed units and the add box's skill and outfit selects are gone.
@@ -81,6 +87,15 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 ### S.W.E.E.P. Report
 
 - An operator in an alliance's Operators list now opens Operator Loadout at that operator, selected and scrolled into view, with its detail open. A filter that would hide it is cleared. Back (or Esc) there returns to the report as it was left: same tab, alliance, scroll position, and focus on that operator. Opened the usual way, Back works as before. The report and the loadout always show the same season version, so every operator listed has a row.
+
+### Viviana's skills
+
+- S3 now looks like the official game in every outfit. Her first cast of a battle plays the "A" clip set (Idle and a 2-hit attack) with its own effects and aura; every later cast plays the "B" set with the 3-hit attack and its two auras. Later casts start with the B Begin clip and no cast plays an End clip, as the official skill data has it. Before, none of S3's effects played and only one of its clips did.
+- S1: a plain cast is her normal attack swing with the 2-hit effects. It no longer flashes the charged-stance clips and aura for a moment. With both charges stored she takes the charged stance (its idle and aura), and the cast that spends them swings `Skill_1_Attack` with the 3-hit effects.
+- S2 shows the second hit's effect whenever the battle rolls her double hit, instead of guessing single or double on its own.
+- Votive Offering's S2 staircase of glowing planks now spirals right beside her, rising on her left and fading as it turns behind her, as in the official game. It had been drawn as a ring over five tiles wide, spinning across the board the other way. It now follows the game engine's own rules, read from the client's `UnityPlayer.dll`: the mesh pivot runs along each step's length and scales with its size, rotation is not mirrored, and prewarm fills the whole staircase before S2 starts. Its mountain is drawn at its node's scale on each axis, as the engine does for a locally aligned billboard. Hand-fitted values replaced.
+- Her talent shield (the melee-blocking layer she gets from hitting elites and leaders) now shows its official effect, in each outfit's own version, while she has a layer. Before, nothing official ever played for it: the battle keeps that shield in the talent's own data, which the client never saw.
+- Outfit effect swaps are kept per outfit. Operators can share an outfit tag, so Horn's The First Gleam and Bagpipe's Echo of Bagpipes played Viviana's deploy effect, and every `epoque#40` wearer swapped a heal hit and a burning effect for other operators' versions. The fx index gained a `skinPairs` map (`tools/local-extract/fx.py`); older clients still read `skinFx`.
 
 ### Trait text
 
