@@ -60,8 +60,11 @@ test('every generated attack/hit reference resolves to a valid pool and its sele
   // NOTE_SFX_CHARS); + 17 pools: those two, her S1 / S2 / S3 sting banks (plan.mjs STING_BANKS) and her note born / hit
   // banks (plan.mjs NOTE_SFX_LOOKS: 5 born + 7 hit; attack and S1 have no born bank)
   // (Fish Edition) + 2 references and + 2 pools: 爱国者 (enemy_1506_patrt, the SPA-CC Patriot) attack and hit
+  // (fork) + 37 references: the manifest built on a local fx index that lists all 230 operators gives the older-season
+  // operators their slots and files (the 5 pool-only attack sounds among them)
+  // (fork) + 3 pools: 塔露拉 S3's launch, impact and overload banks (tools/assets/plan.mjs FX_SOUND_BANKS)
   assert.equal(refs, 1042);
-  assert.equal(Object.keys(pools).length, 1046);
+  assert.equal(Object.keys(pools).length, 1049);
   const p = pools[units.char_4064_mlynar.attackPools[2]];
   assert.equal(p.sounds['player/p_imp/p_imp_loyalsword_h.mp3'].delay, 0.1);
 });

@@ -238,16 +238,19 @@
 
 import { aiTakeover, resetAiTakeover, reconcileAiTakeover } from './aiTakeover.js';
 import { randomBytes, randomInt } from 'node:crypto';
-import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, normalizeRules } from '../shared/constants.js';
+import { CODE_ALPHABET, DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor, normalizeRules } from '../shared/constants.js';
 import { anyRule, sameRuleValue } from '../shared/rules.js';
+import { LARGE_ROOM_SEATS, IDLE_PREP_ROUNDS, SQUAD_SEATS, ROOM_PASSWORD_RE, ROOM_PASSWORD_TRIES, ROOM_PASSWORD_WINDOW_MS } from '../shared/largeRoom.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges, checkSkinSelection, operatorCharIds } from '../shared/protocol.js';
 import { cleanOutfits } from '../shared/outfits.js';
+import { knownAvatar } from '../shared/avatars.js';
 import { encode, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
 import { Match as DefaultMatch } from './match/Match.js';
 import { altArtChance } from './match/results.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
-import { Matchmaker, groupReady, roomSize } from './matchmaker.js';
+import { Matchmaker, groupReady, isMatchable, roomSize } from './matchmaker.js';
+import { countPresence } from './presence.js';
 import { SoloQueue, planSolos } from './soloQueue.js';
 import { PeerRelay } from './peerRelay.js';
 
@@ -259,8 +262,7 @@ import { DEFAULT_VERSION } from '../shared/versions.js';
 import { DEFAULT_ROOM_BOT, FILL_PRESETS, isRoomBot } from '../shared/botProfiles.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 
-/** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
-export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+export { CODE_ALPHABET };
 
 /** Tunables. */
 export const LOBBY_DEFAULTS = Object.freeze({
@@ -274,6 +276,8 @@ export const LOBBY_DEFAULTS = Object.freeze({
   versionRetryMs: 5_000,  // no new version proposal this long after a declined or expired vote [ASSUMED]
   versionProposeGapMs: 300, // nor this soon after the last proposal (重刷's debounce)
   roomCode: null,         // --room-code / roomCode: a fixed alliance key for every new room (null = random per room)
+  largeRooms: null,       // (fork) 8-seat rooms (shared/largeRoom.js): null = the env SP_LARGE_ROOMS=1
+  roomListGapMs: 500,     // (fork) rooms.list is sent at most this often to the pages watching it
 });
 
 /** The stamp of a setting a version room's page sent before it reported the room's content ready (header). */
@@ -468,6 +472,12 @@ export class Room {
     this.soloUnlimited = false;
     /** @type {string | null} */
     this.hostId = null;
+    /** (fork) seats of the room: MAX_SEATS, or LARGE_ROOM_SEATS for a large room (shared/largeRoom.js), fixed at create */
+    this.capacity = MAX_SEATS;
+    /** (fork) a locked Grand Alliance room (room.setLock): joining or watching needs `password` (4 letters, upper case) */
+    this.locked = false;
+    /** @type {string | null} */
+    this.password = null;
     /** @type {(Seat | null)[]} */
     this.seats = new Array(MAX_SEATS).fill(null);
     /** @type {{ playerId: string, name: string, connected: boolean }[]} spectator seats, ≤ MAX_SPECTATORS (header) */
@@ -512,6 +522,9 @@ export class Room {
     this.queue = { pending: 0, tail: Promise.resolve() };
   }
 
+  /** (fork) An 8-seat room (shared/largeRoom.js): humans only, no matchmaking. */
+  get large() { return this.capacity > MAX_SEATS; }
+
   /** Does the room play a content set with gameplay plugins (its own cs; header "Gameplay plugins")? */
   get modded() { return !!this.content && this.content.vanilla === false; }
 
@@ -531,7 +544,16 @@ export class Room {
   spectatorOf(playerId) { return this.spectators.find((s) => s.playerId === playerId) || null; }
 
   /** Lowest free seat index, or -1. */
-  freeSeat() { return this.seats.indexOf(null); }
+  /**
+   * The first free seat, or -1. (fork) Seats held for a group on its way from another server (DESIGN §90.2) are free only
+   * to that group's ticket. @param {boolean} [ticket]
+   */
+  freeSeat(ticket = false) {
+    const idx = this.seats.indexOf(null);
+    if (idx < 0 || ticket || !this.reservations?.length) return idx;
+    const open = this.seats.filter((s) => s === null).length;
+    return open > this.reservations.reduce((n, r) => n + r.seats, 0) ? idx : -1;
+  }
 
   /** Humans that have not departed, in seat order. @returns {Seat[]} */
   activeHumans() { return this.seats.filter((s) => s && !s.isBot && !s.left); }
@@ -540,7 +562,8 @@ export class Room {
    * `room.state` frame (DESIGN §8.1) plus `inMatch`.
    * @param {number} [now] the lobby's clock (an open version vote's remainingMs)
    */
-  toState(now = Date.now()) {
+  /** @param {string | null} [viewerId] (fork) who gets this copy: only the host's carries a locked room's password */
+  toState(now = Date.now(), viewerId = null) {
     return {
       t: 'room.state',
       ...(this.aiTakeoverEnabled ? { aiTakeoverEnabled: true, aiTakeoverVotes: this.aiTakeoverVotes || [] } : {}),
@@ -550,6 +573,9 @@ export class Room {
       difficulty: this.difficulty,
       aiPicksLast: this.aiPicksLast,
       rules: { ...this.rules },
+      // (fork) a Grand Alliance room's capacity and lock; the password only in the host's copy (the owner's rule: only the
+      // host sees the lock settings). Omitted otherwise, so a normal room.state stays identical
+      ...(this.large ? { capacity: this.capacity, locked: this.locked, ...(this.locked && viewerId != null && viewerId === this.hostId ? { password: this.password } : {}) } : {}),
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left,
@@ -563,6 +589,8 @@ export class Room {
           ...(s.matched ? { matched: true } : {}),
           // 名片干员 (room.card): only a human seat with a card carries the key
           ...(!s.isBot && s.card ? { card: s.card } : {}),
+          // (fork) the profile icon (hello.avatar, shared/avatars.js): only a human seat with a known pick carries the key
+          ...(!s.isBot && s.avatar ? { avatar: s.avatar } : {}),
           // 干员皮肤 (room.skins, PUBLIC like Match.publicView().players[].skins): the seat card's outfit (header);
           // only a human seat with a non-empty map carries the key
           ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}) }
@@ -695,6 +723,12 @@ export class Lobby {
      */
     this.autoApplyPlugins = null;
     this.offContentStale = plugins?.onContentStale?.((cs, ids) => this.pluginsChanged(cs, ids, 'content')) || null;
+    /** (fork) 8-seat rooms allowed (shared/largeRoom.js; option largeRooms, else the env SP_LARGE_ROOMS=1) */
+    this.largeRooms = this.opts.largeRooms ?? (typeof process !== 'undefined' && process.env?.SP_LARGE_ROOMS === '1');
+    /** @type {Set<any>} (fork) sessions watching the Large rooms list (rooms.watch) */
+    this.roomWatchers = new Set();
+    this._roomListTimer = null;
+    this._roomListAt = -Infinity;
   }
 
   /**
@@ -799,14 +833,17 @@ export class Lobby {
     let humans = 0;
     let bots = 0;
     let spectators = 0;
+    let largeMatches = 0;
     for (const r of this.rooms.values()) {
       if (r.match) matches++;
+      // (fork) a large room's match a human still plays: a retiring generation keeps it up to LARGE_MAX_AGE_MS (scripts/generations.mjs)
+      if (r.large && r.match && r.seats.some((s) => s && !s.left && !s.isBot)) largeMatches++;
       // a match a human still plays (scripts/generations.mjs reap: a retiring generation stops at 0)
       if (r.match && r.seats.some((s) => s && !s.left && !s.isBot)) humanMatches++;
       for (const s of r.seats) if (s && !s.left) (s.isBot ? bots++ : humans++);
       spectators += r.spectators.length;
     }
-    return { rooms: this.rooms.size, matches, humanMatches, humans, bots, spectators };
+    return { rooms: this.rooms.size, matches, humanMatches, humans, bots, spectators, ...(this.largeRooms === true ? { largeMatches } : {}) };
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -842,6 +879,9 @@ export class Lobby {
     let changed = !seat.connected;
     seat.connected = true;
     if (!room.match && seat.name !== session.name) { seat.name = session.name; changed = true; }
+    // (fork) a new profile icon (a repeated hello from the picker) shows on the seat card at once
+    const avatar = this.avatarOf(session, room);
+    if (!room.match && (seat.avatar ?? null) !== avatar) { seat.avatar = avatar; changed = true; }
     if (!room.hostId) { this.migrateHost(room); changed = true; }
     if (changed) this.broadcastState(room);
     else this.sendState(room, session);
@@ -954,6 +994,10 @@ export class Lobby {
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
       case 'room.search': return this.search(session, msg);
+      case 'room.moveSeat': return this.moveSeat(session, msg);
+      case 'room.swapSeats': return this.swapSeats(session, msg);
+      case 'room.setLock': return this.setLock(session, msg);
+      case 'rooms.watch': return this.watchRooms(session, msg);
       case 'queue.join': return this.queueJoin(session, msg);
       case 'queue.leave': return this.queueLeave(session);
       case 'queue.ai': return this.queueAi(session, msg);
@@ -993,6 +1037,7 @@ export class Lobby {
     this.peerRelay.disconnect(session);
     this.clearResync(session.playerId); // the next resume resyncs immediately
     this.soloQueue.remove(session.playerId); // 单人匹配: a lost connection leaves the queue (the client says so)
+    this.roomWatchers.delete(session); // (fork) a page that comes back asks for the list again
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
     session.resumeWindowMs = room && room.match && room.mode === 'solo' ? this.soloResumeWindowMs(room) : null;
@@ -1058,9 +1103,13 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited } = {}) {
+  create(session, { mode, difficulty: asked, test, version: askedVersion, soloUnlimited, capacity } = {}) {
     // A test room exists only when the process switch allowed it. The check runs before the room is built.
     if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
+    // (fork) an 8-seat room (shared/largeRoom.js): co-op on the default version, only while the server allows them
+    const large = capacity === LARGE_ROOM_SEATS;
+    if (large && this.largeRooms !== true) return fail(ERR.BAD_MSG, 'large rooms are off on this server');
+    if (large && (mode !== 'coop' || (askedVersion != null && askedVersion !== DEFAULT_VERSION))) return fail(ERR.BAD_MSG, 'a large room is a co-op room of the default version');
     // the official version (header "Official versions"): left out, the server's default
     const version = askedVersion ?? this.defaultVersion();
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
@@ -1118,6 +1167,7 @@ export class Lobby {
     this.unqueue(session);
     const room = new Room(code, mode, difficulty, this.now(), version);
     room.test = test === true;
+    if (large) { room.capacity = LARGE_ROOM_SEATS; room.seats = new Array(LARGE_ROOM_SEATS).fill(null); }
     // 「不限时」 only on a solo room of a version whose solo is timed (header). Anywhere else the key is ignored, so a
     // stray true cannot change a default or co-op create.
     if (mode === 'solo' && soloUnlimited === true && this.versionSoloTimed(version)) room.soloUnlimited = true;
@@ -1130,15 +1180,18 @@ export class Lobby {
     session.roomCode = code;
     session.notice = null;
     session.pendingResult = null;
-    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}${version !== DEFAULT_VERSION ? `, ${version}` : ''}${room.test ? ', test' : ''}) by ${session.name}`);
+    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}${version !== DEFAULT_VERSION ? `, ${version}` : ''}${room.test ? ', test' : ''}${large ? ', large' : ''}) by ${session.name}`);
     this.broadcastState(room);
     return OK;
   }
 
-  join(session, { code, testAck }) {
+  join(session, { code, testAck, ticket, password }) {
     const norm = String(code).trim().toUpperCase();
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
+    // (fork) a group matchmaking moved here from another server (DESIGN §90.2)
+    const held = ticket ? this.heldFor(room, ticket) : null;
+    if (ticket && !held) return fail(ERR.ROOM_FULL, 'ticket not valid');
     if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     const cur = this.roomOf(session);
     // idempotent for members; a spectator of this room goes on below: it may take a free player seat (header)
@@ -1146,7 +1199,9 @@ export class Lobby {
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
-    const idx = room.freeSeat();
+    // (fork) a locked Grand Alliance room: its password, unless this spectator already gave it
+    if (room.locked && !held && !room.spectatorOf(session.playerId)) { const no = this.lockRefusal(session, room, password); if (no) return no; }
+    const idx = room.freeSeat(!!held);
     if (idx < 0) return fail(ERR.ROOM_FULL);
     // a human takes a player seat: the version vote is void (header "Official versions") — before the seat is taken, so
     // its toast reaches the members who saw the vote (a spectator sitting down too), never a joiner who did not
@@ -1158,7 +1213,9 @@ export class Lobby {
     session.notice = null;
     session.pendingResult = null;
     if (!room.hostId) room.hostId = session.playerId;
+    if (held) this.seatHeld(room, room.seats[idx], held);
     this.broadcastState(room);
+    if (held) this.afterReservation(room);
     return OK;
   }
 
@@ -1173,7 +1230,7 @@ export class Lobby {
    * room.spectate: one of a co-op room's MAX_SPECTATORS spectator seats, in its lobby or during its match (header). In a
    * running match the match registers the spectator and resends what it may see (Match.addSpectator).
    */
-  spectate(session, { code, testAck }) {
+  spectate(session, { code, testAck, password }) {
     const norm = String(code).trim().toUpperCase();
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
@@ -1187,6 +1244,8 @@ export class Lobby {
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     if (room.spectators.length >= MAX_SPECTATORS) return fail(ERR.ROOM_FULL, 'no free spectator seat');
+    // (fork) a locked Grand Alliance room: its password
+    if (room.locked) { const no = this.lockRefusal(session, room, password); if (no) return no; }
     if (cur) this.removeMember(cur, session.playerId);
     this.unqueue(session);
     room.spectators.push({ playerId: session.playerId, name: session.name, connected: session.connected });
@@ -1257,7 +1316,7 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
-    if (room.mode === 'solo' || (on && (room.modded || room.version !== DEFAULT_VERSION))) return fail(ERR.BAD_TARGET);
+    if (room.mode === 'solo' || (on && (room.modded || room.version !== DEFAULT_VERSION || room.large))) return fail(ERR.BAD_TARGET);
     if (room.aiTakeoverEnabled !== on) {
       this.dropReplay(room, session.playerId);
       room.aiTakeoverEnabled = on;
@@ -1440,6 +1499,7 @@ export class Lobby {
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.versionVote) return fail(ERR.VERSION_VOTE);
     const official = DIFFICULTIES.find((d) => modeIdFor(room.mode, d) === modeId);
+    if (room.large && !official) return fail(ERR.BAD_TARGET, 'large rooms play the official modes'); // (fork) shared/largeRoom.js
     let difficulty = room.difficulty;
     let content = room.content;
     if (official) {
@@ -1584,6 +1644,7 @@ export class Lobby {
     if (room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
+    if (room.large) return fail(ERR.BAD_TARGET, 'large rooms play the default version'); // (fork) shared/largeRoom.js
     if (!this.versionEnabled(version)) return fail(ERR.VERSION_UNKNOWN);
     if (!this.offered(version, room.mode).length) return fail(ERR.VERSION_UNSUPPORTED, `${version} has no ${room.mode} rooms`);
     if (room.modded && version !== DEFAULT_VERSION) return fail(ERR.VERSION_UNSUPPORTED, 'gameplay plugins play the default version (act2autochess) only');
@@ -1739,6 +1800,7 @@ export class Lobby {
     if (room.match) return fail(ERR.ROOM_STARTED);
     this.dropReplay(room, session.playerId);
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo rooms cannot have AI teammates');
+    if (room.large) return fail(ERR.BAD_TARGET, 'large rooms are for humans only');
     const idx = room.freeSeat();
     if (idx < 0) return fail(ERR.ROOM_FULL);
     seatBot(room, idx, msg.lang, msg.bot);
@@ -1769,6 +1831,7 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo rooms cannot have AI teammates');
+    if (room.large) return fail(ERR.BAD_TARGET, 'large rooms are for humans only');
     const p = FILL_PRESETS.find((x) => x.id === preset);
     if (!p) return fail(ERR.BAD_MSG, 'unknown preset');
     const free = room.seats.flatMap((s, i) => (s ? [] : [i]));
@@ -1785,6 +1848,7 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
+    if (seat >= room.capacity) return fail(ERR.BAD_MSG, 'no such seat'); // (fork) the protocol allows 8 for a large room
     this.dropReplay(room, session.playerId);
     const target = room.seats[seat];
     if (!target || !target.isBot) return fail(ERR.BAD_TARGET, 'seat does not hold an AI');
@@ -1799,6 +1863,7 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
+    if (seat >= room.capacity) return fail(ERR.BAD_MSG, 'no such seat'); // (fork) the protocol allows 8 for a large room
     this.dropReplay(room, session.playerId);
     const target = room.seats[seat];
     if (!target || target.left) return fail(ERR.BAD_TARGET, 'seat holds no player');
@@ -1815,6 +1880,135 @@ export class Lobby {
     }
     this.log.info(`[lobby] ${room.code} ${target.name} removed by the host`);
     return OK;
+  }
+
+  /** (fork) room.moveSeat: a member moves to an empty seat of a large room before the match (shared/largeRoom.js). */
+  moveSeat(session, { seat }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (!room.large) return fail(ERR.BAD_TARGET, 'only large rooms have squads');
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    const mine = room.seatOf(session.playerId);
+    if (!mine) return fail(ERR.SPECTATOR);
+    if (!Number.isInteger(seat) || seat < 0 || seat >= room.capacity || room.seats[seat]) return fail(ERR.BAD_TARGET, 'seat is not free');
+    if (room.reservations?.length) return fail(ERR.BAD_TARGET, 'seats are held');
+    this.dropReplay(room, session.playerId);
+    room.seats[mine.seat] = null;
+    mine.seat = seat;
+    room.seats[seat] = mine;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /** (fork) room.swapSeats: the host swaps two seats of a large room before the match (either may be empty). */
+  swapSeats(session, { a, b }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (!room.large) return fail(ERR.BAD_TARGET, 'only large rooms have squads');
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (a === b || a >= room.capacity || b >= room.capacity) return fail(ERR.BAD_TARGET);
+    if (room.reservations?.length) return fail(ERR.BAD_TARGET, 'seats are held');
+    this.dropReplay(room, session.playerId);
+    const sa = room.seats[a], sb = room.seats[b];
+    room.seats[a] = sb;
+    room.seats[b] = sa;
+    if (sb) sb.seat = a;
+    if (sa) sa.seat = b;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /**
+   * (fork) room.setLock { on, password? }: the host locks the Grand Alliance room with a 4-letter password (a new one
+   * replaces the old) or unlocks it. A locked room still shows in the room browser, marked; joining or watching it needs
+   * the password, its members are not asked again.
+   */
+  setLock(session, { on, password }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (!room.large) return fail(ERR.BAD_TARGET, 'only Grand Alliance rooms lock');
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (on && !(typeof password === 'string' && ROOM_PASSWORD_RE.test(password))) return fail(ERR.BAD_MSG, 'a password of 4 letters');
+    room.locked = on;
+    room.password = on ? password.toUpperCase() : null;
+    this.broadcastState(room);
+    return OK;
+  }
+
+  /**
+   * (fork) A join or watch of a locked room: null when `password` is right, else ROOM_LOCKED — or RATE after
+   * ROOM_PASSWORD_TRIES wrong ones within ROOM_PASSWORD_WINDOW_MS from this session (no guessing the 4 letters).
+   */
+  lockRefusal(session, room, password) {
+    const now = this.now();
+    const tries = (session.lockTries || []).filter((t) => now - t < ROOM_PASSWORD_WINDOW_MS);
+    session.lockTries = tries;
+    if (tries.length >= ROOM_PASSWORD_TRIES) return fail(ERR.RATE, 'too many wrong passwords');
+    if (typeof password === 'string' && password.toUpperCase() === room.password) return null;
+    if (password != null) tries.push(now);
+    return fail(ERR.ROOM_LOCKED, password == null ? 'password required' : 'wrong password');
+  }
+
+  /**
+   * (fork) The room browser: the open (not started, not full) Grand Alliance rooms of this server, locked ones marked, the
+   * longest-waiting first, at most 50. No test rooms.
+   */
+  roomList() {
+    const out = [];
+    for (const room of this.rooms.values()) {
+      if (!room.large || room.match || room.disposed || room.test) continue;
+      const seats = room.seats.filter(Boolean).length;
+      if (seats >= room.capacity) continue;
+      const host = room.seatOf(room.hostId);
+      const squads = [0, 1].map((sq) => room.seats.slice(sq * SQUAD_SEATS, (sq + 1) * SQUAD_SEATS).filter(Boolean).length);
+      out.push({ room, row: { code: room.code, host: host ? host.name : '', seats, capacity: room.capacity, difficulty: room.difficulty, squads,
+        ...(room.locked ? { locked: true } : {}) } });
+    }
+    out.sort((x, y) => x.room.createdAt - y.room.createdAt);
+    return out.slice(0, 50).map((x) => x.row);
+  }
+
+  /** (fork) rooms.watch { on }: a page opens or closes the Large rooms list. On: the list now and on every change. */
+  watchRooms(session, { on }) {
+    if (!on) { this.roomWatchers.delete(session); return OK; }
+    if (this.largeRooms !== true) return fail(ERR.BAD_TARGET, 'large rooms are off on this server');
+    this.roomWatchers.add(session);
+    sendSession(session, { t: 'rooms.list', rooms: this.roomList() });
+    return OK;
+  }
+
+  /** (fork) A large room changed: the watchers get the list again, at most every roomListGapMs. */
+  roomListChanged() {
+    if (!this.roomWatchers.size || this._roomListTimer) return;
+    const send = () => {
+      this._roomListTimer = null;
+      this._roomListAt = this.now();
+      const msg = { t: 'rooms.list', rooms: this.roomList() };
+      for (const session of this.roomWatchers) {
+        if (!session.connected) { this.roomWatchers.delete(session); continue; }
+        sendSession(session, msg);
+      }
+    };
+    const wait = Math.max(0, this._roomListAt + this.opts.roomListGapMs - this.now());
+    this._roomListTimer = setTimeout(send, wait);
+    this._roomListTimer.unref?.();
+  }
+
+  /**
+   * (fork) A large room's match removed an idle seat (IDLE_PREP_ROUNDS idle prep rounds, shared/largeRoom.js): it leaves
+   * like a kicked player and its page is told why. The match keeps its board under the AI.
+   */
+  idleKick(room, ctx, playerId) {
+    if (room.matchCtx !== ctx || room.disposed) return;
+    const session = this.registry.byId(playerId);
+    const wasHere = !!session && session.roomCode === room.code;
+    this.removeMember(room, playerId);
+    if (wasHere) {
+      if (session.connected) sendSession(session, { t: 'room.closed', reason: 'idle' });
+      else session.notice = 'idle';
+    }
+    this.log.info(`[lobby] ${room.code} a seat was removed after ${IDLE_PREP_ROUNDS} idle prep rounds`);
   }
 
   start(session) {
@@ -1985,6 +2179,18 @@ export class Lobby {
    * chess.json (the server's outside a room), '' for none. Kept on the session and the seat; a change is broadcast to the room.
    * Cosmetic: accepted in any phase, never touches a match.
    */
+  /**
+   * (fork) The session's profile icon when it is known (shared/avatars.js), else null — drawn as the default icon: an
+   * icon of the server's own data/avatars.json, whatever the room's content (the icons are not game content), or an
+   * operator a seat card of the room may show (cardCharIds, room.card's whitelist).
+   * @param {{ avatar?: unknown }} session
+   * @param {Room | null} [room]
+   * @returns {string | null}
+   */
+  avatarOf(session, room = null) {
+    return knownAvatar(session?.avatar, this.safeData()?.avatars, cardCharIds(this.dataFor(room)));
+  }
+
   card(session, { charId }) {
     const room = this.roomOf(session);
     if (charId && !cardCharIds(this.dataFor(room)).has(charId)) return fail(ERR.BAD_MSG, 'unknown operator');
@@ -2153,6 +2359,8 @@ export class Lobby {
     if (versions) info.versions = versions;
     // Omitted when the switch is off, so a welcome from a normal server stays identical.
     if (this.testEnabled === true) info.testMode = true;
+    // (fork) 8-seat rooms (shared/largeRoom.js): omitted while they are off
+    if (this.largeRooms === true) info.largeRooms = true;
     return info;
   }
 
@@ -2178,6 +2386,8 @@ export class Lobby {
       this.log.error(`[lobby] ${room.code} has no match host for ${room.version}`);
       return fail(ERR.INTERNAL, 'no match host for this version');
     }
+    // (fork) a large room plays the official modes of the default version (shared/largeRoom.js)
+    if (room.large && (room.modded || versioned)) return fail(ERR.BAD_TARGET, 'large rooms play the official game without gameplay plugins');
     // (room.start refuses during a vote; a start from elsewhere voids it)
     if (room.versionVote) this.voidVersionVote(room, 'members');
     const host = room.seatOf(room.hostId);
@@ -2189,6 +2399,8 @@ export class Lobby {
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
         seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected,
+        // (fork) the profile icon (PUBLIC: m.public players[].avatar)
+        avatar: s.isBot ? null : s.avatar || null,
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
         ops: own ? own.ops : null,
@@ -2226,6 +2438,12 @@ export class Lobby {
         // the room's host: the current executor of a delegated bot layout rehearsal (DESIGN §14; setHost follows a
         // migration while the match runs)
         hostId: room.hostId,
+        // (fork) bots run in a human's browser (docs/host-browser-bots.md); `SP_BOT_BATTLES=server` keeps their battles here
+        ...(String(process.env.SP_BOT_EXECUTION ?? '').trim().toLowerCase() === 'host'
+          ? { botExecution: 'host', botBattles: String(process.env.SP_BOT_BATTLES ?? '').trim().toLowerCase() === 'server' ? 'server' : 'host' } : {}),
+        // (fork) a large room (shared/largeRoom.js): squads, one scaled pool, relay 联防; an absent player's board is played
+        // by the AI in a browser, never here, whatever SP_BOT_EXECUTION / SP_BOT_BATTLES say (the owner's rule, 2026-11-08)
+        ...(room.large ? { largeRoom: true, botExecution: 'host', botBattles: 'host', onIdle: (playerId) => this.idleKick(room, ctx, playerId) } : {}),
         // only a room created as a test room; a normal match opts object does not grow a test key
         ...(room.test === true ? { test: true } : {}),
         // (fork) the anonymous match record (server/records.js, SP_RECORDS); a test room's match is never recorded
@@ -2255,7 +2473,7 @@ export class Lobby {
         // one: null keeps every rehearsal on this thread, exactly as before (Match.simPool / MatchRehearsal.poolRehearsal)
         ...(!modded && !versioned && this.simPool ? { simPool: this.simPool } : {}),
         send: (playerId, msg, encoded) => (ctx.live ? this.matchSend(room, ctx, playerId, msg, encoded) : false),
-        broadcast: (msg, encoded) => { if (ctx.live) this.matchBroadcast(room, ctx, msg, encoded); },
+        broadcast: (msg, encoded, except) => { if (ctx.live) this.matchBroadcast(room, ctx, msg, encoded, except); },
         onEnd: (summary) => this.onMatchEnd(room, ctx, summary),
       };
       // a room with gameplay plugins plays in its content set's match host, a room of another official version in that
@@ -2345,9 +2563,9 @@ export class Lobby {
   }
 
   /** Match broadcast; the latest m.public and a broadcast m.result are also kept for the replay. */
-  matchBroadcast(room, ctx, msg, encoded = null) {
+  matchBroadcast(room, ctx, msg, encoded = null, except = null) {
     if (msg.t === 'm.public' && reconcileAiTakeover(this, room)) this.broadcastState(room);
-    const data = this.broadcastRoom(room, msg, encoded);
+    const data = this.broadcastRoom(room, msg, encoded, except);
     if (data == null) return;
     if (msg.t === 'm.public') ctx.lastPublic = data;
     else if (msg.t === 'm.result') ctx.sharedResult = data;
@@ -2560,6 +2778,8 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (on && this.closedForMaintenance()) return fail(ERR.MAINTENANCE);
+    // (fork) matchmaking never fills a large room (shared/largeRoom.js): the lobby's room list does
+    if (on && room.large) return fail(ERR.BAD_TARGET, 'large rooms are found in the room list');
     this.dropReplay(room, session.playerId);
     if (!on) {
       if (room.searching) { room.searching = false; room.searchSince = null; this.broadcastState(room); }
@@ -2642,6 +2862,176 @@ export class Lobby {
     }
     this.log.info(`[lobby] ${room.code} full: starting`);
     return !this.startMatch(room, this.registry.byId(room.hostId)?.limitKey || null).error;
+  }
+
+  // ---- (fork) matchmaking across regions (DESIGN §90.2; server/crossMatch.js decides, these carry it out) ----------------
+
+  /** Who waits here, for the arbiter: searches and queued Doctors of the default official version, without their names. */
+  crossDigest() {
+    if (this.retiring) return null;
+    const now = this.now();
+    const rooms = [];
+    for (const r of this.rooms.values()) {
+      if (!isMatchable(r) || r.test || r.version !== DEFAULT_VERSION || !this.matchAllowed(r)) continue;
+      const humans = r.seats.filter((s) => s && !s.left && !s.isBot).length;
+      rooms.push({ code: r.code, humans, bots: roomSize(r) - humans, difficulty: r.difficulty, wait: now - (r.searchSince ?? now) });
+    }
+    const solos = [];
+    for (const e of this.soloQueue.list()) {
+      const s = this.registry.byId(e.playerId);
+      if (s?.connected && !this.roomOf(s)) solos.push({ id: e.playerId, difficulty: e.difficulty, wait: now - e.since });
+    }
+    return { rooms, solos };
+  }
+
+  /** The searching counts of sys.online, this server's own. */
+  presenceCounts() { return countPresence({ connectionCount: 0 }, this); }
+
+  /** Queued sessions still placeable, or null if any is not. @param {string[]} ids @param {string} difficulty */
+  crossSolos(ids, difficulty) {
+    const out = [];
+    for (const id of ids || []) {
+      const e = this.soloQueue.get(id);
+      const s = e && e.difficulty === difficulty ? this.registry.byId(id) : null;
+      if (!s?.connected || this.roomOf(s)) return null;
+      out.push(s);
+    }
+    return out;
+  }
+
+  /**
+   * The target of a cross-region match: gather this server's members in one room and hold seats for the rest. All or
+   * nothing: a member that stopped waiting refuses the whole plan before anything moves.
+   * @param {{ difficulty: string, rooms: string[], solos: string[], humans: number, bots: number, ttlMs: number }} cmd
+   */
+  crossReserve({ difficulty, rooms: codes = [], solos: ids = [], humans, bots, ttlMs }) {
+    if (this.retiring || this.closedForMaintenance() || !this.crossTicket) return { ok: false };
+    const rooms = codes.map((c) => this.rooms.get(c));
+    if (!rooms.every((r) => isMatchable(r) && r.difficulty === difficulty && !r.test && this.matchAllowed(r))) return { ok: false };
+    const sessions = this.crossSolos(ids, difficulty);
+    if (!sessions) return { ok: false };
+    const here = rooms.reduce((n, r) => n + roomSize(r), 0) + sessions.length;
+    if (here + humans + bots !== MAX_SEATS || humans < 1) return { ok: false };
+    let target = rooms[0] || null;
+    if (target) {
+      if (rooms.length > 1 && !this.mergeRooms(target, rooms.slice(1))) return { ok: false };
+      if (sessions.length) this.seatSolos(target, sessions);
+    } else {
+      if (!sessions.length || this.matchLimited(sessions[0].limitKey || null)) return { ok: false };
+      target = this.soloRoom(difficulty, sessions);
+      if (!target) return { ok: false };
+      target.searching = true;
+      target.searchSince = this.now();
+    }
+    for (const s of sessions) this.sendQueue(s, { placed: true });
+    const rid = randomBytes(6).toString('hex');
+    const exp = this.now() + ttlMs;
+    const addedBots = [];
+    for (let i = 0; i < bots; i++) {
+      const idx = target.freeSeat(true);
+      const used = new Set(target.seats.filter((s) => s && s.isBot).map((s) => s.name));
+      const playerId = `ai_${randomBytes(4).toString('hex')}`;
+      target.seats[idx] = { seat: idx, playerId, name: BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`, isBot: true, ready: true, connected: true, left: false };
+      addedBots.push(playerId);
+    }
+    (target.reservations ||= []).push({ id: rid, seats: humans, total: humans, bots: addedBots, exp });
+    this.broadcastState(target);
+    this.log.info(`[cross] ${target.code} holds ${humans} seat(s) for a group from another server`);
+    return { ok: true, code: target.code, rid, ticket: this.crossTicket({ rid, code: target.code, exp }) };
+  }
+
+  /**
+   * A source of a cross-region match: everyone in these rooms and this queue goes to the target. A spectator stays behind,
+   * as one that does not fit a local merge does. All or nothing.
+   * @param {{ member?: string, region: string, code: string, ticket: string, rooms: string[], solos: string[], humans?: number, bots?: number }} cmd
+   */
+  crossMove({ member, region, code, ticket, rooms: codes = [], solos: ids = [], humans = null, bots = null }) {
+    const rooms = codes.map((c) => this.rooms.get(c));
+    if (this.retiring || !rooms.every((r) => isMatchable(r))) return { ok: false, member };
+    const difficulty = rooms[0]?.difficulty ?? this.soloQueue.get(ids[0])?.difficulty;
+    const sessions = this.crossSolos(ids, difficulty);
+    if (!sessions) return { ok: false, member };
+    // the target holds exactly the seats this plan counted: a Doctor who joined since would find no seat and no room
+    const humansHere = rooms.reduce((n, r) => n + r.seats.filter((s) => s && !s.left && !s.isBot).length, 0) + sessions.length;
+    const botsHere = rooms.reduce((n, r) => n + r.seats.filter((s) => s && !s.left && s.isBot).length, 0);
+    if ((humans != null && humans !== humansHere) || (bots != null && bots !== botsHere)) return { ok: false, member };
+    const frame = { t: 'room.move', region, code, ticket };
+    for (const r of rooms) {
+      for (const s of r.seats) {
+        if (!s || s.isBot || s.left) continue;
+        const session = this.registry.byId(s.playerId);
+        if (session) sendSession(session, frame);
+      }
+      this.log.info(`[cross] ${r.code} moves to ${code} on ${region}`);
+      this.disposeRoom(r, 'moved');
+    }
+    for (const s of sessions) {
+      this.soloQueue.remove(s.playerId);
+      this.sendQueue(s, { placed: true });
+      sendSession(s, frame);
+    }
+    return { ok: true, member };
+  }
+
+  /** A source's group is not coming after all: reopen its seats. @param {{ code: string, rid: string, humans: number }} cmd */
+  crossRelease({ code, rid, humans }) {
+    const room = this.rooms.get(code);
+    const held = room?.reservations?.find((r) => r.id === rid);
+    if (!held) return { ok: true };
+    held.seats = Math.max(0, held.seats - humans);
+    held.total = Math.max(0, held.total - humans);
+    if (held.seats === 0) this.endReservation(room, held);
+    return { ok: true };
+  }
+
+  /** The room's reservation a ticket names, with seats left. */
+  heldFor(room, ticket) {
+    const p = this.crossVerify?.(ticket);
+    if (!p || p.code !== room.code) return null;
+    return room.reservations?.find((r) => r.id === p.rid && r.seats > 0) ?? null;
+  }
+
+  /** A moved Doctor sits down, ready, as one a local merge moved. */
+  seatHeld(room, seat, held) {
+    seat.ready = true;
+    seat.matched = true;
+    held.seats--;
+    if (held.seats === 0) room.reservations = room.reservations.filter((r) => r !== held);
+    if (!room.reservations.length) room.reservations = null;
+  }
+
+  /** Everyone expected is here, or will not come: start when full, else the room searches on. */
+  afterReservation(room) {
+    if (room.reservations?.length || room.disposed || room.match) return;
+    if (roomSize(room) >= MAX_SEATS && groupReady(room)) this.autoStart(room);
+    else this.matchmaker.poke();
+  }
+
+  /** Close a reservation; its AI seats leave with it when none of its Doctors came. */
+  endReservation(room, held) {
+    room.reservations = room.reservations.filter((r) => r !== held);
+    if (!room.reservations.length) room.reservations = null;
+    if (held.seats === held.total || held.total === 0) {
+      for (const id of held.bots) {
+        const i = room.seats.findIndex((s) => s?.playerId === id);
+        if (i >= 0) room.seats[i] = null;
+      }
+    }
+    this.broadcastState(room);
+    this.afterReservation(room);
+  }
+
+  /** Matchmaker pass: seats nobody claimed in time reopen. */
+  expireReservations() {
+    const now = this.now();
+    for (const room of this.rooms.values()) {
+      for (const held of room.reservations || []) {
+        if (now < held.exp) continue;
+        this.log.info(`[cross] ${room.code}: ${held.seats} held seat(s) expired`);
+        held.seats = held.seats === held.total ? held.seats : 0;
+        this.endReservation(room, held);
+      }
+    }
   }
 
   /** maxMatchesPerAddr for the host's network. */
@@ -2813,6 +3203,8 @@ export class Lobby {
       skins: session.skins || null,
       // 名片干员 (room.card): the operator on this player's seat card (PUBLIC: room.state seats[].card)
       card,
+      // (fork) the profile icon (PUBLIC: room.state seats[].avatar)
+      avatar: this.avatarOf(session, room),
       // the content each was checked for (header "Gameplay plugins": filtered at the match start when it is another)
       loadoutCs: session.loadoutCs ?? null,
       notOwnedCs: session.notOwnedCs ?? null,
@@ -2910,6 +3302,7 @@ export class Lobby {
     if (room.disposed) return;
     this.peerRelay.clear(room);
     room.disposed = true;
+    if (room.large) this.roomListChanged();
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState(this.now())}); this.rooms.delete(room.code); }
     // an open version vote ends with the room (its timer)
     if (room.versionVote) { clearTimeout(room.versionVote.timer); room.versionVote = null; }
@@ -2949,8 +3342,10 @@ export class Lobby {
     const fixed = this.opts.roomCode || null;
     if (fixed) return this.rooms.has(fixed) && this.rooms.get(fixed) !== yieldingRoom ? null : fixed;
     for (let attempt = 0; attempt < 1000; attempt++) {
-      let code = '';
-      for (let i = 0; i < ROOM_CODE_LEN; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+      // (fork) a region's keys start with its own letters (shared/regions.js): the key names the server
+      const first = this.opts.codeLetters || CODE_ALPHABET;
+      let code = first[randomInt(first.length)];
+      for (let i = 1; i < ROOM_CODE_LEN; i++) code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
       if (!this.rooms.has(code)) return code;
     }
     return null;
@@ -2985,13 +3380,16 @@ export class Lobby {
     }
     this.peerRelay.sync(room, [...this.memberSessions(room)]);
     const data = encode(room.toState(this.now()));
-    for (const session of this.memberSessions(room)) sendRaw(session.ws, data);
+    // (fork) a locked Grand Alliance room: the host's copy carries the password, everyone else's not
+    const own = room.large && room.locked ? encode(room.toState(this.now(), room.hostId)) : null;
+    for (const session of this.memberSessions(room)) sendRaw(session.ws, own && session.playerId === room.hostId ? own : data);
     if (room.searching) this.matchmaker.poke();
+    if (room.large) this.roomListChanged();
   }
 
   sendState(room, session) {
     this.peerRelay.sync(room, [...this.memberSessions(room)], session);
-    sendSession(session, room.toState(this.now()));
+    sendSession(session, room.toState(this.now(), session.playerId));
   }
 
   /** The room's delivery stream: one order shared by the WebSocket and the peer path. */
@@ -3035,8 +3433,11 @@ export class Lobby {
     return { msg: { ...msg, deliveryEpoch: stream.epoch, deliverySeq }, bytes };
   }
 
-  /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
-  broadcastRoom(room, msg, encoded = null) {
+  /**
+   * Match broadcast: encode once, send to every connected member but `except` (a playerId, or null).
+   * @returns {string | null} the encoded frame
+   */
+  broadcastRoom(room, msg, encoded = null, except = null) {
     if (room.disposed) return null;
     let data = encoded ?? encode(msg);
     if (data == null) { this.log.error(`[lobby] ${room.code} unserializable broadcast ${msg && msg.t}`); return null; }
@@ -3051,7 +3452,7 @@ export class Lobby {
     // per connection: sendSession runs the state transport, which owns each socket's delta baseline (and the
     // droppable/backpressure rules) - one shared byte string in, one frame per member out
     for (const session of members) {
-      if (routed?.has(session)) continue;
+      if (routed?.has(session) || session.playerId === except) continue;
       sendSession(session, msg, data);
     }
     return data;

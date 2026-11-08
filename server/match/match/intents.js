@@ -10,9 +10,20 @@ import { deriveSeed } from '../../sim/rng.js';
 import { OK, fail } from './common.js';
 import { setBondCall } from '../bondCall.js';
 import { onHumanEmote } from '../botEmotes.js';
+import { sendChat } from '../chatWallet.js';
+
+/**
+ * (fork) The intents that show a player is at the keyboard and reset a large room's idle count (match/largeRoom.js): the
+ * prep and draft actions, emotes, chat, pause and AI 托管. Never what a page sends by itself — battle reports, bot work for others
+ * (b.*), unit stats or a watch change — so a player away from the keyboard is still counted idle while the page runs.
+ */
+const IDLE_RESET = new Set(['g.infoReady', 'g.bondCall', 'g.rerollVote', 'g.band', 'g.bandSkip', 'g.bandFocus', 'g.buy', 'g.refresh', 'g.freeze',
+  'g.levelUp', 'g.sell', 'g.move', 'g.equip', 'g.art', 'g.destroy', 'g.unequip', 'g.reward', 'g.choice', 'g.offer', 'g.offerRefresh', 'g.ready',
+  'g.emote', 'g.chat', 'g.pause', 'g.autoplay']);
 
 export class MatchIntents {
   _handle(ps, msg) {
+    if (ps.idlePreps && IDLE_RESET.has(msg.t)) ps.idlePreps = 0; // (fork) a large room's idle count (match/largeRoom.js)
     switch (msg.t) {
       case 'g.infoReady':
         if (this.phase !== PHASE.INFO_CHECK) return fail(ERR.WRONG_PHASE);
@@ -48,6 +59,7 @@ export class MatchIntents {
       case 'g.offerRefresh': return this.requestOfferRefresh(ps, msg.offerId, msg.idx, msg);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
+      case 'g.chat': return sendChat(this, ps, msg.x);
       // playerId: the player tapped (a shared field names two) — the watch preference (item 56)
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
@@ -61,6 +73,12 @@ export class MatchIntents {
       // the host's answer to a delegated bot layout rehearsal (DESIGN §14): a report, never an error — an unknown,
       // expired or foreign task is ignored (MatchRehearsal._onRehearsalResult)
       case 'b.rehearsalResult': this._onRehearsalResult(ps, msg); return OK;
+      // (fork) a bot field's battle run in this browser: a report too (match/botBattles.js)
+      case 'b.botBattleResult': this._onBotBattleResult(ps, msg); return OK;
+      // (fork) a bot seat's prep played in this browser (match/botTasks.js): reports too
+      case 'b.botReceived': return this._onBotReceived(ps, msg);
+      case 'b.botMoves': return this._onBotMoves(ps, msg);
+      case 'b.botHidden': return this._onBotHidden(ps, msg);
       default: return fail(ERR.BAD_MSG);
     }
   }
@@ -81,6 +99,7 @@ export class MatchIntents {
     ps.autoplay = on;
     this.markPublic();
     if (on) this.kickBot(ps);
+    else this.cancelBotTasks(ps.playerId); // (fork) the human took the seat back: a bot task for it must not hold the queue
     return OK;
   }
 
@@ -89,8 +108,8 @@ export class MatchIntents {
     if (!ps.botControlled || this.ended) return;
     this.offersChanged();
     if (this.phase === PHASE.INFO_CHECK && !ps.infoReady) { ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
-    else if (this.phase === PHASE.BAND_DRAFT && this.draftTurn() === ps.playerId) this.scheduleBandBot();
-    else if (this.phase === PHASE.SP_DRAFT && this.spTurn() === ps.playerId) this.scheduleSpBot();
+    else if (this.phase === PHASE.BAND_DRAFT && this.draftTurn(ps.playerId) === ps.playerId) this.scheduleBandBot(ps.playerId);
+    else if (this.phase === PHASE.SP_DRAFT && this.spTurn(ps.playerId) === ps.playerId) this.scheduleSpBot(ps.playerId);
     else if (this.phase === PHASE.PREP && ps.alive && !ps.ready) this.scheduleBotPrep(ps, 0);
   }
 

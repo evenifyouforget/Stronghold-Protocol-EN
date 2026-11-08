@@ -8,6 +8,7 @@
 import { PHASE, GEO } from '../../../shared/constants.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
 import { creditedKillsOf } from '../../sim/spec.js';
+import { noteChatKills, settleChatWallet } from '../chatWallet.js';
 import { buildBossWave, bountySpawns } from '../waves.js';
 import { pairPlayers, bossPairSalt, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
 import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_TICKS_PER_INTERVAL } from '../fields.js';
@@ -65,7 +66,7 @@ export class MatchBoss {
         BOSS_HIT_STEPS.forEach((s, i) => { if (share >= s) reached = Math.max(reached, i + 1); });
         if (reached > done) {
           hitSteps.set(pid, reached);
-          this.tickerFor('BOSS_HIT', [ps.name], { playerId: pid, param: String(BOSS_HIT_STEPS[reached - 1]) });
+          this.tickerFor('BOSS_HIT', [ps.name], { bot: ps.isBot, playerId: pid, param: String(BOSS_HIT_STEPS[reached - 1]) });
         }
       },
     });
@@ -165,7 +166,8 @@ export class MatchBoss {
     this._finalEnding = null;
     this._bossStartAt = this.sched.now();
     this.watchers.clear();
-    if (!recs.some((f) => this._authorityFor(f))) {
+    // (fork) with bot battles on a browser the server never runs these fields (match/botBattles.js)
+    if (!recs.some((f) => this._authorityFor(f) || this._botBattleOnHost(f))) {
       // nobody to simulate on a client: the server runs every boss field (FieldRunner, no streaming)
       this.fields = recs;
       for (const f of recs) {
@@ -338,6 +340,7 @@ export class MatchBoss {
    */
   _bossHandover(f, why, { demote = false } = {}) {
     if (f.done || f.mode !== 'client' || f.heldResult) return; // a held 'cleared' result is in: nothing left to run
+    if (f.botHost) { this._botBossHandover(f, why); return; } // (fork) match/botBattles.js
     const prev = f.authority;
     if (demote && prev) f.demoted.add(prev);
     const next = this._authorityFor(f, prev);
@@ -348,6 +351,8 @@ export class MatchBoss {
       this._sendStart(next, f);
       return;
     }
+    // (fork) match/botBattles.js: no connected human left on it (left or disconnected): a browser runs it live from the field's clock
+    if (this._botBattleOnHost(f)) { this._botBossHandover(f, why); return; }
     this._runOnServer(f, why);
   }
 
@@ -397,6 +402,8 @@ export class MatchBoss {
         continue; // _fieldDone below (after every field was told)
       }
       for (const pid of this._humansShowing(f)) this.sendTo(pid, { t: 'b.end', battleId: f.battleId, fieldId: f.fieldId, reason });
+      // (fork) a bot field's executor is not one of its players, unless it is also watching
+      if (f.botHost && f.authority && !this._humansShowing(f).includes(f.authority)) this.sendTo(f.authority, { t: 'b.end', battleId: f.battleId, fieldId: f.fieldId, reason });
       if (f.heldResult) {
         // its authority already reported 'cleared' (_onResult): that result completes the field
         f.result = f.heldResult;
@@ -523,7 +530,9 @@ export class MatchBoss {
    * (bossTurnHpReduceTime, gamedata.js bossOvertimeDue).
    */
   _applyOvertime(gt) {
-    const due = this.gd.bossOvertimeDue(gt, this.bossOvertimeStartReal);
+    // (fork) a large room drains × players ÷ 4 (shared/largeRoom.js: 2 LP a second at 8) [ASSUMED]
+    const raw = this.gd.bossOvertimeDue(gt, this.bossOvertimeStartReal);
+    const due = this.roomScale > 1 ? Math.floor(raw * this.roomScale) : raw;
     if (due > this.overtimeApplied) {
       const loss = due - this.overtimeApplied;
       this.overtimeApplied = due;
@@ -554,9 +563,11 @@ export class MatchBoss {
       const res = resultOf(f);
       this._collectSimErrors(f, res);
       f.live = false;
+      noteChatKills(this, f, res);
       for (const pid of f.players) {
         const pp = res.perPlayer && res.perPlayer[pid];
         const ps = this.players.get(pid);
+        if (ps) settleChatWallet(ps, this.round);
         if (pp) this.lastResults.set(pid, pp);
         if (pp && ps) {
           ps.stats.dmgDealt += Number(pp.damageDealt) || 0;
@@ -582,7 +593,7 @@ export class MatchBoss {
     this.markPublic();
     this.runner = null;
     if (!hidden) {
-      const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp });
+      const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum, teamLp: this.teamLp, scale: this.roomScale });
       this.later(this.scaled(DELAYS.SETTLE), () => {
         if (eligible) {
           this.hiddenReached = true;

@@ -565,9 +565,21 @@
 .team__ai { position: absolute; right: -.04rem; bottom: -.04rem; font-family: var(--font-num); font-size: .11rem; font-weight: 700; padding: 0 .04rem; background: #a9c3d8; color: #0b1520; }
 .team__you { position: absolute; right: -.08rem; top: -.08rem; width: .22rem; height: .22rem; display: grid; place-items: center; background: var(--mint-500); color: var(--text-on-mint); clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); }
 .team__you .icon { width: .14rem; height: .14rem; }
+/* (fork) a large room's team panel (shared/largeRoom.js): 8 rows packed tighter, a squad badge on each avatar */
+.team--large { gap: .04rem; }
+.team--large .team__btn { transform: scale(.86); transform-origin: left center; }
+.team__squad { position: absolute; left: -.02rem; bottom: -.04rem; font-family: var(--font-num); font-size: .11rem; font-weight: 700; padding: 0 .04rem; background: #cfd8d4; color: #0b1520; }
+.team__squad.is-b { background: #9fd3ff; }
 .team__info { display: flex; flex-direction: column; gap: .02rem; min-width: 0; padding: .04rem .12rem .04rem .06rem; background: linear-gradient(90deg, rgba(8, 11, 10, .82), rgba(8, 11, 10, 0)); }
 .team__name { font-size: .15rem; font-weight: 500; color: var(--text-md); max-width: 1.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px #000; }
 .team__line { display: flex; align-items: center; gap: .1rem; }
+.team__mute {
+  width: .26rem; height: .26rem; padding: 0; display: grid; place-items: center; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .5);
+  color: var(--text-lo); cursor: pointer; pointer-events: auto;
+}
+.team__mute .icon { width: .18rem; height: .18rem; }
+.team__mute:hover { color: var(--mint-400); border-color: var(--mint-700); }
+.team__mute.is-on { color: #e08a8a; border-color: #6b2a2a; }
 .team__status { width: .26rem; height: .26rem; display: grid; place-items: center; border: 1px solid currentColor; background: rgba(0, 0, 0, .5); }
 /* the shared 机变 draft's pick order on the portrait (ui/choiceOverlay.js spMarks): ✓ picked, ••• deciding */
 .team__spmark { position: absolute; right: -.07rem; bottom: -.05rem; z-index: 2; display: grid; place-items: center; width: .24rem; height: .24rem; border-radius: 50%;
@@ -623,6 +635,13 @@
 .pavatar__glyph { font-weight: 900; font-size: calc(var(--pa) * .5); color: hsl(var(--seat-hue) 70% 72%); }
 .pavatar__bot { width: 56%; height: 56%; color: #a9c3d8; }
 .pavatar.is-dead .pavatar__img, .pavatar.is-left .pavatar__img, .pavatar.is-offline .pavatar__img { filter: grayscale(1) brightness(.4); }
+/* (fork) the band icon as a corner badge over the profile icon (ui/avatars.js) */
+.pavatar__band {
+  position: absolute; right: -.04rem; bottom: -.04rem; width: 46%; height: 46%; overflow: hidden;
+  background: #101418; border: 1px solid var(--line-2); box-shadow: 0 0 .04rem #000;
+}
+.pavatar__band img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pavatar--sm .pavatar__band { display: none; }
 .pavatar__x, .pavatar__door { position: absolute; inset: 0; display: grid; place-items: center; color: var(--red-premium); }
 .pavatar__x .icon, .pavatar__door .icon { width: 60%; height: 60%; filter: drop-shadow(0 0 4px #000); }
 

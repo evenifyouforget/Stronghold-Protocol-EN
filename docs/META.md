@@ -439,13 +439,15 @@ the same inputs when its turn comes, inside the slice budget. A single build can
 first drops the job (the default layout stays). Virtual time runs it in one go (same decisions). Tests default
 rehearsal to 0 (`test/match/harness.js`); `tools/matchrun.mjs --rehearsal N` sets it.
 
-**Host rehearsal (optional, `Match.botRehearsalDelegate` / `SP_BOT_REHEARSAL=host`, off unless that exact value):**
-the room host's browser can test AI teammates' layouts. The server still handles the shop, builds the candidate list
-from the preview inputs above (same seed, same scoring) and applies the chosen layout. Both sides use
-`server/sim/rehearsal.js`. The host returns only a candidate index; an accepted choice is applied once, without
-another simulation. Actual battles and human seats under AI 托管 are unchanged. A gameplay-plugin room
-(`requireCs`) never delegates: the match runs on that content set, and the browser must not load its scripts or
-spend a different budget. The server rehearses those rooms itself.
+**Host rehearsal (upstream's, off by default: `Match.botRehearsalDelegate`, `SP_BOT_REHEARSAL=host`; (fork) `SP_BOT_EXECUTION=host`
+replaces it, see `docs/host-browser-bots.md`):** the room host's browser simulates the candidate layouts of AI teammates
+during prep, and only that. The server still plays the bot's economy, its picks and the building and scoring of the
+candidate list (from the preview inputs above, same seed), and applies the chosen layout. The server rehearses
+itself when the work is not delegated or falls back (no connected host, no answer within 3 s, a bad answer).
+Both sides use `server/sim/rehearsal.js`. The host returns only a candidate index; an accepted choice is applied once,
+without another simulation. Actual battles and human seats under AI 托管 (rehearsed by the server) are unchanged. A
+gameplay-plugin room (`requireCs`) never delegates, because this Worker is handed only the official data. The server rehearses
+those rooms itself. That is a limit of this Worker, not of browsers: host mode's bot Worker loads a room's data and scripts.
 
 The interface a later local or external compute can plug into — this version makes no external network call — is:
 the server offers one task (`b.rehearsal`: task id, the AI seat, the tick cap, the candidate specs); the executor
@@ -1080,10 +1082,12 @@ trophies, reward }] }`. Trophies and 卫戍认证 follow each row's OWN rounds p
 Hidden-Core trophy row only for the players still in when it was cleared — a teammate eliminated or departed earlier
 gets the table value of its own rounds. `onEnd(summary)` receives the same object (without `t`, plus `errors`).
 
+`m.chat { p, x }` / `g.chat { x }`: the fork's match chat, DESIGN "Match chat" (docs/design/network.md), `server/match/chatWallet.js`.
+
 `m.emote { playerId, id }`: `id` must be one of `shared/constants.js EMOTES` (`BAD_MSG` otherwise, also when `handle()`
 is called without protocol validation); 1 per second per player (`RATE`).
 
-Tickers (`m.ticker { text, id, type, priority, playerId }`) from `config.broadcasts`: SHOP_LEVEL, GOLDEN_CHAR,
+Tickers (`m.ticker { text, id, type, priority, playerId, arg0Bot? }`; `arg0Bot`: `args[0]` is an AI seat's name, which each client shows in its language) from `config.broadcasts`: SHOP_LEVEL, GOLDEN_CHAR,
 CHAR_DAMAGE (per board unit per battle, highest threshold; summons created in battle once per unit type — a client
 result may only name the unit types its lineup can field, fields.js validateClientResult), BOSS_HIT (20/50/80 % of the
 current leader per player, each threshold once per boss round: the player's damage to that round's shared pool,

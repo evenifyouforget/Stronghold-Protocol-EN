@@ -20,6 +20,11 @@ export const PLUGIN_API = Object.freeze({ current: 2, min: 1 });
 
 export const MAX_SEATS = 4;
 /**
+ * The operators behind the AI seats' names (server/lobby.js BOT_NAMES), for the room's seat icons. Only for a seat that
+ * isBot: a human may have the same name.
+ */
+export const BOT_OPERATORS = Object.freeze({ 华法琳: 'char_171_bldsk', 阿米娅: 'char_002_amiya', 惊蛰: 'char_306_leizi', 杜宾: 'char_130_doberm', 凯尔希: 'char_003_kalts', 可露希尔: 'char_4228_closur' }); // i18n-ignore: keys of a table
+/**
  * Spectator seats of a co-op room (community report #26, owner's decision 2026-10-04) — a remake feature: the official
  * room has 1–4 players and no spectator seat (there only eliminated players and 联防 bystanders watch, research 09 §3.1).
  * A spectator never counts as a player, may not act, and watches like an eliminated player (server/lobby.js spectate,
@@ -38,6 +43,8 @@ export const REHEARSAL_MAX_CANDIDATES = 16;
  */
 export const SETUP_REROLL_COOLDOWN_MS = 30_000;
 export const ROOM_CODE_LEN = 4;
+/** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
+export const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const NAME_MAX_LEN = 12;
 
 export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
@@ -181,6 +188,8 @@ export const ERR = Object.freeze({
   NOT_IN_ROOM: 'NOT_IN_ROOM',
   ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
   ROOM_FULL: 'ROOM_FULL',
+  // (fork) a locked Grand Alliance room (shared/largeRoom.js): a join without its password, or a wrong one
+  ROOM_LOCKED: 'ROOM_LOCKED',
   SERVER_FULL: 'SERVER_FULL',     // the online cap (SP_MAX_ONLINE) has no seat for a new player
   ROOM_STARTED: 'ROOM_STARTED',
   // a fixed alliance key (--room-code): one room at a time can hold it
@@ -243,7 +252,9 @@ export const ERR = Object.freeze({
 export const ERR_TEXT = {
   SESSION_IN_USE: N_('此对局仍在其他窗口中，或当前浏览器无法安全恢复。请关闭原窗口后重试。'),
   BAD_MSG: N_('无效的请求'), RATE: N_('操作过于频繁'), NOT_IN_ROOM: N_('你不在房间中'), ROOM_NOT_FOUND: N_('未找到该同盟密钥对应的房间'),
-  ROOM_FULL: N_('房间已满'), SERVER_FULL: N_('服务器已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
+  ROOM_FULL: N_('房间已满'),
+  ROOM_LOCKED: N_('该房间已上锁，请输入正确的密码'), // en: "This room is locked. Enter its password."
+  SERVER_FULL: N_('服务器已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
   ROOM_CODE_TAKEN: N_('固定同盟密钥已被另一个房间占用，请先关闭那个房间'),
   WRONG_PHASE: N_('当前阶段无法进行该操作'), NO_FUNDS: N_('资金不足'), HAND_FULL: N_('整备区已满'), BOARD_FULL: N_('已达到部署上限'),
   BAD_TILE: N_('无法部署在该位置'), BAD_TARGET: N_('无效的目标'), SOLD_OUT: N_('已售出'), MAX_LEVEL: N_('调度中心已达最高等级'),
@@ -352,3 +363,10 @@ export const emoteArtGroup = (id) => { const e = emoteInfo(id); return e ? `emot
 export const emoteArtPath = (id) => { const e = emoteInfo(id); return e ? `/assets/local/emoticon/${e.dir}/${e.picId}.png` : null; };
 export const EMOTE_COOLDOWN_MS = 1000; // activity_table autoChessData.constData.chatCD (s)
 export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bubble stays up
+// (fork) match chat, a remake feature: the kill wallet (server/match/chatWallet.js). What a player can spend is decided by
+// the server; the browser only mirrors it.
+export const CHAT_COOLDOWN_MS = 3000;  // [ASSUMED] one bubble's chatTime, so a message is not replaced before it is read
+export const CHAT_COOLDOWN_GRACE_MS = 500; // the server allows this much less, so network jitter never eats a line the page let through
+export const CHAT_MAX_LETTERS = 200;   // [ASSUMED] a safety ceiling for plugin waves; the official waves stay well under it
+/** [ASSUMED] A text bubble's time on screen: an emote's 3 s plus 100 ms a letter, so a long line can be read. */
+export const chatBubbleMs = (letters) => EMOTE_BUBBLE_MS + 100 * Math.max(0, letters);

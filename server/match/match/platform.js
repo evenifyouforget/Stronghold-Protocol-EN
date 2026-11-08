@@ -8,7 +8,7 @@ import { C2S } from '../../../shared/protocol.js';
 import { PHASE, ERR } from '../../../shared/constants.js';
 import { syntheticResult } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
-import { msg } from '../../../shared/i18n.js';
+import { msg, playerParam } from '../../../shared/i18n.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 
 const GAME_TYPES = new Set(Object.keys(C2S).filter((t) => Object.hasOwn(C2S, t) && (t.startsWith('g.') || t.startsWith('b.'))));
@@ -26,6 +26,7 @@ export class MatchPlatform {
         return;
       }
       this.enterInfoCheck();
+      this._botWarm(); // (fork) match/botTasks.js
     });
   }
 
@@ -57,7 +58,7 @@ export class MatchPlatform {
     if (this.disposed || this.ended) {
       // A report that crossed the match end (the last b.progress of a field, a delegated rehearsal's answer) is stale:
       // ignored, never an error (DESIGN §14 — an error frame without a rid would surface as a toast in the browser).
-      if (msg && msg.t === 'b.rehearsalResult') return OK;
+      if (msg && (msg.t === 'b.rehearsalResult' || msg.t === 'b.botBattleResult' || msg.t === 'b.botReceived' || msg.t === 'b.botMoves' || msg.t === 'b.botHidden')) return OK;
       return this.clientCombat && msg && (msg.t === 'b.progress' || msg.t === 'b.result') ? OK : fail(ERR.WRONG_PHASE);
     }
     if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string' || !GAME_TYPES.has(msg.t)) return fail(ERR.BAD_MSG);
@@ -146,6 +147,10 @@ export class MatchPlatform {
       if (this.clientCombat) this._authorityLost(ps, 'disconnect');
       // a rehearsal this host was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();
+      // (fork) match/botTasks.js: a page that reconnects reports its tab again
+      this._botHostHidden.delete(ps.playerId);
+      this._botTaskHostLost(ps);
+      this._largeDisconnect(ps); // (fork) a large room: the AI plays the board until the player is back (match/largeRoom.js)
       this.markPublic();
     });
   }
@@ -156,6 +161,7 @@ export class MatchPlatform {
     this.guard(() => {
       const was = ps.connected;
       ps.connected = true;
+      this._largeReconnect(ps); // (fork) match/largeRoom.js: the board back from the AI
       this._resync(ps);
       if (!was) this.markPublic();
     });
@@ -202,11 +208,14 @@ export class MatchPlatform {
       if (this.clientCombat) this._authorityLost(ps, 'left');
       // a rehearsal the departed seat was running falls back to the server (DESIGN §14; a no-op without tasks)
       this._rehearsalHostChanged();
+      this._botTaskHostLost(ps); // (fork) match/botTasks.js
       this.markPublic();
       if (!this.order.some((p) => !p.isBot && !p.left)) {
         this.finish({ victory: false, reason: 'abandoned' });
         return;
       }
+      // (fork) a large room: a departed player's board stays in the match under the AI (match/largeRoom.js) [ASSUMED]
+      if (this.largeRoom && ps.alive) { this.kickBot(ps); return; }
       this._quit(ps);
     });
   }
@@ -236,7 +245,7 @@ export class MatchPlatform {
     ps.lp = 0;
     ps.eliminate(passedRound);
     this.offersChanged();
-    this.tickerText(msg('{name}博士中途退出了模拟', { name: ps.name }), FLOW_TICKER_PRIORITY);
+    this.tickerText(msg('{name}博士中途退出了模拟', { name: playerParam(ps) }), FLOW_TICKER_PRIORITY);
     if (this.bossWaves && (phase === PHASE.ROUND_START || phase === PHASE.SP_DRAFT || phase === PHASE.PREP)) {
       // before the boss fight: pair the players left again (the prep preview shows the new partner / template); a
       // player moved to the other half re-checks its board there at once (recompute → deployMap, marks it private)
@@ -252,11 +261,11 @@ export class MatchPlatform {
       this.finish({ victory: false, reason: 'eliminated' });
       return;
     }
-    if (phase === PHASE.SP_DRAFT && this.sp && this.spTurn() === ps.playerId) this.startSpTurn();
+    if (phase === PHASE.SP_DRAFT && this.sp && this.spTurn(ps.playerId) === ps.playerId) this.startSpTurn(ps.playerId);
     // a seat leaving during the strategy draft keeps its place in the order, like one gone before it: at its turn the AI
     // drafts for it (botControlled → scheduleBandBot; botPickBand's departedWeight: Touch while nobody else holds it,
     // never 歌利亚) and it keeps the 0 LP it left with (_applyBand; §37.65)
-    else if (phase === PHASE.BAND_DRAFT && this.draft && this.draftTurn() === ps.playerId) this.startDraftTurn();
+    else if (phase === PHASE.BAND_DRAFT && this.draft && this.draftTurn(ps.playerId) === ps.playerId) this.startDraftTurn(ps.playerId);
     else if (phase === PHASE.PREP) this.maybeEndPrep();
   }
 

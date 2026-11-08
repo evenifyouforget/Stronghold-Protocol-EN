@@ -155,9 +155,11 @@ test('onHealth: told every /healthz body a check reads — what else the page re
   let state = { installedPlugins: 0, installedNotices: false };
   let writes = 0;
   // Execute the actual callback with a small store; changes in formatting do not change this contract.
-  const onHealth = new Function('pluginCount', 'store', `return (${callback});`)(
+  // (fork) the callback also tells net.js regions which servers there are: a stand-in here
+  const onHealth = new Function('pluginCount', 'store', 'regions', `return (${callback});`)(
     (content) => Number.isInteger(content?.plugins) && content.plugins > 0 ? content.plugins : 0,
     { get: () => state, set: (patch) => { state = { ...state, ...patch }; writes++; } },
+    { onHealth: () => {} },
   );
   onHealth({ content: { plugins: 2, notices: true } });
   assert.deepEqual(state, { installedPlugins: 2, installedNotices: true });

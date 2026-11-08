@@ -8,7 +8,7 @@
 
 /* ---- hub backdrop ------------------------------------------------------------------------------------- */
 /* the entries' width follows 文字大小 (2.3rem at 小; §35.18 review: at a fixed 2.3rem the names had to stop at 小's size) */
-.lobby-hub { --hub-entry-w: calc(2.3 * var(--t)); --hub-gap: .14rem; background: #050807; }
+.lobby-hub { --hub-entry-w: calc(2.3 * var(--t)); --hub-card-w: calc(2.55 * var(--t)); --hub-gap: .14rem; background: #050807; }
 /* Korean breaks between words, not between the syllables of one (§35.18 review: 「독립 시뮬레이|션」 at 小); a word too
    long for its box still breaks rather than running out of it. The hub's own stage only: 选择模拟协议's button keeps its
    two lines (「독립 시뮬레이션 시작」 took three at 特大 in a 1024×600 window by words) */
@@ -261,6 +261,8 @@
 
 /* ---- left column: 成就统计, 密钥加入, 作战提示 ------------------------------------------------------------ */
 .hub-side { grid-area: side; position: relative; z-index: 1; display: flex; flex-direction: column; gap: .14rem; min-width: 0; padding-top: .3rem; }
+/* (fork) only the update announcement gives way when the column is short (.search-news) */
+.hub-side > :not(.search-news) { flex: none; }
 /* 成就统计 (#643's top-left card, from the event video): a dusk scene with the emblem and the trophy medal, the label strip
    with the LV under it */
 .hub-ach {
@@ -414,20 +416,26 @@
 /* ---- entries (独立模拟 / 同盟模拟), bottom right ----------------------------------------------------------- */
 /* (the card, the line above it, the tips' head and the 成就统计 card's label grow or wrap rather than cut their text at
    大 / 特大 in a small window — §35.18 review; the trophy count under the medal stops at .15rem, 大's size [ASSUMED]) */
-/* (the two cards share a height: the taller one's, their text at the bottom) */
+/* (the cards share a height: the taller one's, their text at the bottom) */
+/* (fork) each entry is exactly as wide as its card: its description wraps inside that width instead of pushing the cards
+   apart (on one line it spread them over the whole row). Where subgrid exists the descriptions share one row and the
+   cards the next, so the tops line up whichever description is longest; without it the cards still share a height, their
+   tops following their descriptions. The queue panel takes the entries' place at its own width (.hub-queue) */
 .hub-entries { grid-area: entries; position: relative; z-index: 1; display: flex; align-items: stretch; justify-content: flex-end; gap: var(--hub-gap); min-width: 0; }
-.hub-entry-wrap { display: flex; flex-direction: column; gap: .05rem; min-width: 0; animation: card-in var(--t-slow) var(--ease-out) backwards; }
+.hub-entry-wrap { flex: 0 1 var(--hub-card-w); display: flex; flex-direction: column; gap: .06rem; min-width: 0; animation: card-in var(--t-slow) var(--ease-out) backwards; }
 .hub-entry-wrap:nth-child(2) { animation-delay: 60ms; }
-.hub-entry__group { display: flex; align-items: center; gap: .06rem; min-height: .22rem; padding-left: .04rem; font-size: calc(.13 * var(--t)); color: rgba(223, 230, 226, .7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hub-entry__group .icon { flex: none; width: .16rem; height: .16rem; color: var(--mint-400); }
-.hub-entry__long { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.hub-entry__short { display: none; }
-/* Narrow desktop windows keep the full descriptions (phones have their own short labels below).
-   [ASSUMED] A shared two-line minimum keeps both cards level when only one description wraps. */
-@media (max-width: 900px) and (min-height: 521px) {
-  .hub-entry__group { min-height: 3em; white-space: normal; overflow: visible; text-overflow: clip; }
-  .hub-entry__long { white-space: normal; overflow: visible; text-overflow: clip; }
+@supports (grid-template-rows: subgrid) {
+  .hub-entries:not(.is-queued) { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, var(--hub-card-w)); grid-template-rows: auto auto; row-gap: .06rem; }
+  .hub-entries:not(.is-queued) .hub-entry-wrap { grid-row: span 2; display: grid; grid-template-rows: subgrid; }
 }
+/* the description: who plays (a little brighter, with the card's icon), then what sets the mode apart. 10 px at least: a
+   window under 1400 px wide made it 6–9 px at 小. [ASSUMED] the floor and the colours */
+.hub-entry__group { display: flex; flex-direction: column; gap: .01rem; min-width: 0; padding: 0 .02rem; font-size: max(calc(.14 * var(--t)), 10px); line-height: 1.3; color: rgba(223, 230, 226, .66); text-shadow: 0 1px .04rem rgba(0, 0, 0, .85); }
+.hub-entry__who { display: flex; align-items: center; gap: .05rem; font-weight: 700; color: rgba(238, 243, 241, .92); }
+.hub-entry__who .icon { flex: none; width: 1.15em; height: 1.15em; color: var(--mint-400); }
+.hub-entry__long { min-width: 0; }
+.hub-entry__more { text-wrap: pretty; }
+.hub-entry__short { display: none; }
 .hub-entry {
   position: relative;
   display: flex;
@@ -435,8 +443,7 @@
   justify-content: flex-end;
   align-items: flex-start;
   flex: 1 0 auto;
-  width: var(--hub-entry-w);
-  max-width: 100%;
+  width: 100%;
   min-height: calc(1.34 * var(--t));
   padding: .14rem .16rem;
   /* the icon's height kept above the text (below) */
@@ -460,9 +467,14 @@
    language, Chinese 「ALLIANCE / SIMULATION」 at 小, which never reached the icon). A short card keeps its min-height */
 .hub-entry__en { font-family: ui-monospace, Consolas, monospace; font-size: calc(.11 * var(--t)); font-weight: 700; letter-spacing: .22em; color: var(--mint-400); }
 /* the name wraps between words (§35.18 review: on one line English 「Solo Simulation」 / 「Team Simulation」 ran 25–40 px
-   past the 2.3rem card at 小 in every window and 84–100 px at 特大, the card cutting it); 「Simulation」 alone is ~6.2em,
-   and the card (2.3 × --t) keeps ~1.98 × --t inside for the .3 × --t name */
-.hub-entry__name { margin-top: .04rem; font-size: calc(.3 * var(--t)); font-weight: 900; letter-spacing: .06em; line-height: 1.1; }
+   past the 2.3rem card at 小 in every window and 84–100 px at 特大, the card cutting it); 「Simulation」 alone is ~6.2em */
+.hub-entry__name { margin-top: .04rem; font-size: calc(.3 * var(--t)); font-weight: 900; letter-spacing: .06em; line-height: 1.1; overflow-wrap: anywhere; }
+/* (fork) 「Matchmaking」 is the longest word: 7.55em at the spacing above, cut by a 2.3 × --t card. Tighter in English and a card of
+   2.55 × --t (--hub-card-w), it is ~7.1em in the ~2.2 × --t inside; a word still too long breaks rather than being cut */
+.lobby-hub:lang(en) .hub-entry__name { letter-spacing: .02em; }
+/* (fork) three cards at 大 / 特大 in a window this narrow share less than their width: the name stops where its longest word
+   still fits (at 800×600 特大 「Matchmaking」 broke inside the word). [ASSUMED] the 3vw */
+@media (max-width: 880px) and (min-height: 521px) { .hub-entry__name { font-size: min(calc(.3 * var(--t)), 3vw); } }
 .hub-entry__corner { position: absolute; right: 0; bottom: 0; width: .3rem; height: .3rem; background: linear-gradient(135deg, transparent 50%, var(--mint-500) 50%); opacity: .8; }
 /* 同盟模拟, the main way to play: bright */
 .hub-entry--coop { background: linear-gradient(160deg, var(--mint-500), #1f8f72); color: #04140f; border-color: var(--mint-400); }
@@ -1036,6 +1048,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
   .hub-center__logo { width: .9rem; }
   .hub-center__mark .emblem__svg { width: .9rem; height: 1rem; }
   .hub-center__title { max-width: none; font-size: calc(.46 * var(--t)); }
+  /* (fork) the third entry reaches under the title: Korean's wide spacing wrapped it onto the line above the entries at 特大 */
+  .lobby-hub:lang(ko) .hub-center__title { letter-spacing: .04em; }
   .hub-right { padding-top: .1rem; }
   .lobby-hub .hub-plate { min-height: max(.7rem, 32px, calc(40px * var(--sp-ui, 1))); }
   .lobby-hub .hub-plate--ach { display: flex; }
@@ -1090,12 +1104,13 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
      [ASSUMED] the caps */
   .lobby-hub .hub-plate { font-size: min(calc(.3 * var(--t)), calc(18px + var(--t-step))); }
   .hub-plate__tag { display: none; }
-  .hub-entry__group { height: auto; font-size: calc(.22 * var(--t)); }
+  .hub-entry__group { font-size: calc(.22 * var(--t)); }
+  .hub-entry__more { display: none; }
   /* 同盟模拟's line keeps only 「1–4 名博士」 here (§35.51: the whole line, nowrap, ran 81–320 px past its entry at 特大 —
      two to four lines if it wrapped; the AI teammates are the room's to show) */
   .hub-entry__long { display: none; }
   .hub-entry__short { display: inline; }
-  .hub-entry { width: calc(var(--hub-entry-w) + 7 * max(0px, var(--t-step))); }
+  .lobby-hub { --hub-card-w: calc(var(--hub-entry-w) + 14px + 7 * max(0px, var(--t-step))); --hub-gap: max(.14rem, 8px); }
   .hub-entry__en { padding-right: .44rem; font-size: min(calc(.16 * var(--t)), calc(10px + var(--t-step))); letter-spacing: .12em; }
   .hub-entry__name { font-size: min(calc(.42 * var(--t)), calc(18px + var(--t-step))); }
   .proto-title .modal__title { font-size: min(calc(.46 * var(--t)), 24px); white-space: nowrap; }
@@ -1176,6 +1191,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .pcard.is-on .pcard__ring path + path { animation-delay: 260ms; }
 
 @media (prefers-reduced-motion: reduce) {
+  .rbr { animation: none; } /* (fork) the Grand Alliance room browser */
+  .rbr-card { transition: none; }
   .hub-bg__ship, .hub-center, .hub-entry-wrap, .hub-radar__sweep, .proto__pic, .modal__box.proto, .modal__box.ally, .pcard.is-on .pcard__stamp,
   .mf-radar__sweep, .mf-radar__blip, .mf-blk.is-lit, .hub-bg__own, .lobby-hub .hub-bg, .lobby-hub > .topbar, .lobby-hub .hub-center, .lobby-hub .hub-side,
   .lobby-hub .hub-right, .hub-entries .hub-entry-wrap, .proto__bg, .proto-top, .proto-title, .proto-stage, .ally-stage, .proto-list .pcard, .proto-foot,
@@ -1195,40 +1212,42 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 /* ==== (fork) Yuri's lobby additions on the hub layout ==== */
 
 /* ---- update announcement (ui/matchSearch.js UpdateNews) -------------------------------------------------- */
+/* the first thing in the left column, and the only part of it that gives way: a long announcement scrolls inside the
+   panel rather than pushing 成就统计 / 密钥加入 / 作战提示 off the screen. The head and the text use the panel's whole width,
+   the highlight is the lead above the points. [ASSUMED] the sizes */
 .search-news {
   --bk-c: var(--mint-500);
+  flex: 0 1 auto;
+  min-height: 1.5rem;
   display: flex;
-  align-items: flex-start;
-  gap: .18rem;
-  margin-bottom: .26rem;
-  padding: .16rem .2rem .18rem;
-  background: linear-gradient(90deg, rgba(78, 216, 175, .10), rgba(8, 10, 9, .6) 60%);
+  flex-direction: column;
+  gap: .08rem;
+  padding: .1rem .14rem .14rem .16rem;
+  background: rgba(8, 14, 13, .82);
   border: 1px solid var(--mint-700);
   animation: card-in var(--t-slow) var(--ease-out) backwards;
 }
-.search-news__icon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: .5rem;
-  height: .5rem;
-  background: var(--mint-500);
-  color: var(--text-on-mint);
-  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+.search-news__head { flex: none; display: flex; align-items: center; gap: .08rem; font-size: calc(.18 * var(--t)); font-weight: 900; letter-spacing: .04em; color: var(--text-hi); }
+.search-news__head > .icon { flex: none; width: .2rem; height: .2rem; color: var(--mint-500); }
+.search-news__tag { flex: none; padding: .01rem .07rem; background: var(--amber); color: #111; font-size: calc(.11 * var(--t)); font-weight: 900; letter-spacing: .12em; }
+.search-news__title { flex: 1; min-width: 0; }
+.search-news__close { flex: none; margin: -.02rem -.04rem -.02rem 0; }
+.search-news__body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mint-700) transparent;
+  font-size: calc(.15 * var(--t));
+  line-height: 1.45;
+  color: var(--text-md);
+  text-wrap: pretty;
 }
-.search-news__icon .icon { width: .26rem; height: .26rem; }
-.search-news__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .06rem; font-size: calc(.16 * var(--t)); line-height: 1.6; color: var(--text-md); }
-.search-news__head { display: flex; align-items: center; gap: .1rem; font-size: calc(.2 * var(--t)); font-weight: 900; letter-spacing: .06em; color: var(--text-hi); }
-.search-news__tag { padding: .01rem .08rem; background: var(--amber); color: #111; font-size: calc(.12 * var(--t)); font-weight: 900; letter-spacing: .12em; }
-.search-news__close { flex: none; }
-.search-news__highlight { font-size: calc(.18 * var(--t)); font-weight: 900; color: var(--mint-400); }
-.search-news__list { margin: 0; padding-left: .22rem; display: flex; flex-direction: column; gap: .02rem; }
+.search-news__body:focus-visible { outline: 1px solid var(--mint-500); outline-offset: 2px; }
+.search-news__highlight { margin: 0 0 .07rem; padding-bottom: .07rem; font-size: calc(.16 * var(--t)); font-weight: 800; color: var(--mint-400); border-bottom: 1px solid var(--line); }
+.search-news__list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: .04rem; }
 .search-news__list li::marker { color: var(--mint-500); }
-/* short landscape phones */
-@media (max-height: 460px) {
-  .search-news { margin-bottom: .16rem; padding: .1rem .16rem; }
-  .search-news__icon { width: .4rem; height: .4rem; }
-}
 
 /* 单人匹配 wait (ui/soloQueue.js QueuePanel), in the create button's place */
 .queue-panel {
@@ -1278,6 +1297,81 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .diff-details__group th { color: var(--mint-400); font-weight: 700; padding-top: .12rem; }
 
 /* the queue panel in the hub entries' place (screens/lobby.js) */
-.hub-queue { width: min(100%, 5.6rem); margin-left: auto; }
+.hub-queue { flex: 0 1 5.6rem; min-width: 0; }
 .hub-tile:disabled { cursor: default; opacity: .5; }
 .proto-side .diff-details-btn { margin: .06rem .1rem 0 auto; }
+
+/* == (fork) Grand Alliance (ui/largeRooms.js): its card in 选择同盟方式, and the full-screen room browser == */
+.ally-grand { flex: none; gap: .12rem; padding: .14rem .16rem; border: 1px solid rgba(159, 211, 255, .35);
+  background: linear-gradient(120deg, rgba(159, 211, 255, .12), rgba(8, 11, 10, .55)); }
+.ally-grand__head { display: flex; align-items: center; gap: .12rem; }
+.ally-grand__name { display: flex; flex-direction: column; min-width: 0; }
+.ally-grand__name b { font-size: calc(.22 * var(--t)); color: #e8f4ff; }
+.ally-grand__name small { font-size: calc(.15 * var(--t)); color: #9fb3c4; }
+.ally-grand__actions { display: flex; flex-wrap: wrap; gap: .1rem; }
+.ally-grand__actions > * { flex: 1 1 0; min-width: 0; }
+
+.rbr { position: fixed; inset: 0; z-index: calc(var(--z-modal, 100) - 1); display: flex; flex-direction: column; gap: .14rem;
+  padding: max(.24rem, env(safe-area-inset-top)) max(.4rem, env(safe-area-inset-right)) .2rem max(.4rem, env(safe-area-inset-left));
+  color: #e9eeec; background: #0b0f0e; animation: rbr-in 260ms cubic-bezier(.16, .84, .3, 1); }
+@keyframes rbr-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.rbr__bg { position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse at 15% 0%, rgba(159, 211, 255, .14), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgba(79, 232, 192, .1), transparent 50%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 48px); }
+.rbr__top { flex: none; display: flex; align-items: center; gap: .18rem; }
+.rbr__back { flex: none; display: grid; place-items: center; width: max(.6rem, 32px, calc(34px * var(--sp-ui, 1))); height: max(.6rem, 32px, calc(34px * var(--sp-ui, 1))); padding: 0;
+  border: 1px solid rgba(255, 255, 255, .2); background: rgba(0, 0, 0, .35); color: #fff; cursor: pointer; }
+.rbr__back .icon { width: 55%; height: 55%; }
+.rbr__title { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.rbr__title h2 { margin: 0; font-size: calc(.34 * var(--t)); letter-spacing: .04em; }
+.rbr__micro { font-size: calc(.13 * var(--t)); letter-spacing: .2em; color: #9fd3ff; }
+.rbr__create { flex: none; }
+.rbr__intro { flex: none; margin: 0; max-width: 60em; font-size: calc(.16 * var(--t)); line-height: 1.45; color: #aab3b0; }
+.rbr__filters { flex: none; display: flex; flex-wrap: wrap; gap: .08rem; }
+.rbr__chip { display: inline-flex; align-items: center; gap: .06rem; padding: .04rem .14rem; font: inherit; font-size: calc(.15 * var(--t));
+  color: #c9d1ce; border: 1px solid rgba(255, 255, 255, .18); background: rgba(0, 0, 0, .3); cursor: pointer; }
+.rbr__chip .icon { width: 1em; height: 1em; }
+.rbr__chip .num { padding: 0 .05rem; color: #7f8a86; }
+.rbr__chip.is-on { color: #08221b; border-color: #4fe8c0; background: #4fe8c0; }
+.rbr__chip.is-on .num { color: #0d3a2d; }
+.rbr__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: .1rem; }
+.rbr__empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .16rem; text-align: center;
+  font-size: calc(.17 * var(--t)); color: #9aa4a0; }
+.rbr__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(max(4.6rem, 32px, calc(230px * var(--sp-ui, 1))), 1fr)); gap: .14rem; }
+.rbr-card { display: flex; flex-direction: column; gap: .1rem; padding: .14rem .16rem; border: 1px solid rgba(255, 255, 255, .14);
+  background: linear-gradient(160deg, rgba(31, 36, 35, .95), rgba(14, 17, 16, .95)); transition: border-color 160ms, transform 160ms; }
+.rbr-card:hover { border-color: rgba(79, 232, 192, .6); transform: translateY(-2px); }
+.rbr-card.is-locked { border-color: rgba(255, 196, 92, .35); }
+.rbr-card__head { display: flex; align-items: center; justify-content: space-between; gap: .1rem; min-width: 0; }
+.rbr-card__host { display: inline-flex; align-items: center; gap: .06rem; min-width: 0; font-size: calc(.19 * var(--t)); }
+.rbr-card__host b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rbr-card__host .icon { flex: none; width: 1em; height: 1em; color: #ffd36a; }
+.rbr-card__lock { flex: none; display: inline-flex; align-items: center; gap: .04rem; padding: .01rem .08rem; font-size: calc(.13 * var(--t));
+  color: #ffc45c; border: 1px solid rgba(255, 196, 92, .5); }
+.rbr-card__lock .icon { width: 1em; height: 1em; }
+.rbr-card__diff { display: inline-flex; align-items: center; gap: .06rem; font-size: calc(.15 * var(--t)); color: #b9c2bf; }
+.rbr-card__squads { display: flex; flex-direction: column; gap: .05rem; }
+.rbr-squad { display: flex; align-items: center; gap: .08rem; }
+.rbr-squad__k { width: 1.6em; font-size: calc(.14 * var(--t)); font-weight: 700; text-align: center; color: #0b1520; background: #cfd8d4; }
+.rbr-squad--b .rbr-squad__k { background: #9fd3ff; }
+.rbr-squad__pips { display: flex; gap: .05rem; flex: 1 1 auto; }
+.rbr-squad__pips i { flex: 1 1 0; height: max(.12rem, 7px); background: rgba(255, 255, 255, .1); }
+.rbr-squad--a .rbr-squad__pips i.is-on { background: #cfd8d4; }
+.rbr-squad--b .rbr-squad__pips i.is-on { background: #9fd3ff; }
+.rbr-card__foot { display: flex; align-items: center; gap: .1rem; margin-top: auto; }
+.rbr-card__seats { font-size: calc(.26 * var(--t)); color: #f2f4f3; }
+.rbr-card__seats small { font-size: calc(.15 * var(--t)); color: #7f8a86; }
+.rbr-card__code { flex: 1 1 auto; font-size: calc(.14 * var(--t)); letter-spacing: .1em; color: #6f7a76; }
+
+/* (fork) the profile chip (screens/lobby.js ProfileChip): one's profile icon and Doctor name, opens the icon picker */
+.lobby-me {
+  display: inline-flex; align-items: center; gap: .08rem; min-width: 0; max-width: 2.6rem; height: .4rem;
+  padding: 0 .1rem 0 .04rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35);
+}
+.lobby-me:hover:not(:disabled), .lobby-me:focus-visible { border-color: var(--mint-500); }
+.lobby-me:disabled { cursor: default; }
+.lobby-me__face { position: relative; flex: none; display: block; }
+.lobby-me__face .avatar { --av: .32rem; }
+.lobby-me__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(.15 * var(--t)); font-weight: 700; color: var(--text-hi); }
+@media (max-width: 900px) { .lobby-me__name { display: none; } .lobby-me { padding-right: .04rem; } }

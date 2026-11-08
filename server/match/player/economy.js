@@ -267,7 +267,7 @@ export class PlayerEconomy {
     this.shop.level++;
     this.shop.upgradePrice = this.upgradeBaseOf(this.shop.level);
     this._openLevelSlots();
-    this.m.tickerFor('SHOP_LEVEL', [this.name, String(this.shop.level)], { playerId: this.playerId, param: String(this.shop.level) });
+    this.m.tickerFor('SHOP_LEVEL', [this.name, String(this.shop.level)], { bot: this.isBot, playerId: this.playerId, param: String(this.shop.level) });
     this.m.dispatch(this, 'onLevelUp', { level: this.shop.level, price });
     this._afterSpend(price, 'levelUp');
     this.dirty();

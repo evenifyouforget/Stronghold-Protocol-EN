@@ -7,10 +7,11 @@ import { PHASE, layerGainRoom } from '../../../shared/constants.js';
 import { uniteSurvivors } from '../unite.js';
 import { buildResult } from '../results.js';
 import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
-import { msg } from '../../../shared/i18n.js';
+import { msg, playerParam } from '../../../shared/i18n.js';
 import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { finishRecord } from '../records.js';
+import { settleChatWallet } from '../chatWallet.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
@@ -60,6 +61,7 @@ export class MatchSettle {
         ps.stats.kills += Number(up.killed) || 0;
       }
       ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
+      settleChatWallet(ps, this.round);
       // perfect-payout bounties (战术特训): own phase perfect
       for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
@@ -106,7 +108,7 @@ export class MatchSettle {
     }
     for (const u of best.values()) {
       const hit = steps.find((s) => (u.dmg || 0) >= s);
-      if (hit) this.tickerFor('CHAR_DAMAGE', [ps.name, u.name || u.defId, String(hit)], { playerId: ps.playerId, param: String(hit) });
+      if (hit) this.tickerFor('CHAR_DAMAGE', [ps.name, u.name || u.defId, String(hit)], { bot: ps.isBot, playerId: ps.playerId, param: String(hit) });
     }
   }
 
@@ -121,7 +123,7 @@ export class MatchSettle {
         ps.lp = 0;
         ps.eliminate(this.round);
         this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
-        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY);
+        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: playerParam(ps) }), FLOW_TICKER_PRIORITY);
       }
     }
   }

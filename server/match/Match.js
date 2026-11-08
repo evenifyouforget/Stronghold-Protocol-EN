@@ -135,7 +135,7 @@
 // this mode; g.watch hands out specs. battleIds are `<seed36>[-<matchNo36>].<round>.<seq>[.<fieldId>]` (≤ 64 chars):
 // unique across the matches of a room, so a report that crossed into the next match is ignored like any stale one; a
 // duplicate b.result (a browser re-sending one it believes lost) is answered ok and changes nothing.
-// Bot layout rehearsals (opts.botRehearsalDelegate, (fork) on by default): a bot prep's candidate layouts go to the current
+// Bot layout rehearsals (opts.botRehearsalDelegate, off by default; host mode replaces them): a bot prep's candidate layouts go to the current
 // host's browser as one b.rehearsal frame — its module Worker simulates them off the page's main thread with the same
 // sim, seeds and scoring and answers b.rehearsalResult with the index of its pick (server/sim/rehearsal.js). A timeout,
 // a host that changed / disconnected / left or a task this client cannot run makes the server simulate the very same
@@ -172,11 +172,14 @@
 //                      SP_BOT_STRATEGY_SEATS (none); a seat not listed plays opts.botStrategy (getBotStrategySeats)
 //   opts.botSliceMs    wall-clock ms of rehearsal per scheduler callback (default 8 with a real scheduler, unbounded
 //                      with a virtual one); the rest runs in later callbacks (scheduleBotPrep)
+//   opts.seatStreams   (fork) bot seats draw from their own random streams and a reserved uid block (match/botTasks.js; default off)
+//   opts.botExecution  (fork) 'local' (default) or 'host': a bot seat's whole prep runs in a human's browser, or on opts.botExecutor
+//                      in tests (docs/host-browser-bots.md; server/lobby.js passes it for SP_BOT_EXECUTION=host)
+//   opts.botBattles    (fork) 'server' (default) or 'host' (env SP_BOT_BATTLES): a field no connected human plays runs in a human's
+//                      browser (match/botBattles.js); opts.botBattleAnswerMs is how long that browser has (default 30 s)
 //   opts.botRehearsalDelegate  offer each bot prep's layout rehearsal to the current host's browser instead (DESIGN §14;
-//                      (fork) default ON, env SP_BOT_REHEARSAL_HOST=0 turns it off; MatchRehearsal — a rehearsal the
-//                      host did not answer is simulated by the server with at most opts.botRehearsal of the same
-//                      candidates, seeds and scoring: with 0 the bot keeps its heuristic layout, no server CPU)
-//   opts.botRehearsalHost  (fork) candidate layouts a delegated rehearsal offers the host's browser (default 3, 2…8)
+//                      default off, env SP_BOT_REHEARSAL=host; MatchRehearsal — the server simulates a rehearsal the
+//                      host did not answer, with the same candidates, seeds and scoring)
 //   opts.botRehearsalDelegateMs  wall-clock ms the host has to answer a delegated rehearsal (default 3000) — never an
 //                      extension of the phase: the prep deadline stays the phase's own (MatchPrep.endPrep)
 //   opts.headlessSliceMs  wall-clock ms per callback of a server-run normal / 联防 field (client-side combat: bots,
@@ -215,6 +218,7 @@
 //   combat.js        battle construction, COMBAT (both modes), the per-field results, then 联防 or SETTLE
 //   clientCombat.js  client-side combat bookkeeping: field records, the field clock, authority, b.start, result
 //                    deadlines and releases, server runs, field completion
+//   botTasks.js      (fork) a bot seat's prep played in the host's browser: seat streams, the task queue, applying its moves
 //   rehearsal.js     the bot layout rehearsal delegated to the current host's browser: the b.rehearsal task, its answer,
 //                    its timeout and the server takeover (DESIGN §14)
 //   reports.js       b.progress / b.result (validation, held boss results), SP_VERIFY
@@ -254,6 +258,8 @@ import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
 import { MatchClientCombat } from './match/clientCombat.js';
 import { MatchRehearsal, REHEARSAL_ANSWER_MS } from './match/rehearsal.js';
+import { MatchBotTasks, guardBotStrategy } from './match/botTasks.js';
+import { MatchBotBattles, BOT_BATTLE_ANSWER_MS } from './match/botBattles.js';
 import { MatchReports } from './match/reports.js';
 import { MatchUnite } from './match/unitePhase.js';
 import { MatchBoss } from './match/bossRounds.js';
@@ -262,6 +268,7 @@ import { installTestTrace } from './testTrace.js';
 import { installRecorder } from './records.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
+import { MatchLargeRoom } from './match/largeRoom.js';
 import { createExternalAI } from './llmGate.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
@@ -273,8 +280,6 @@ export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.
  * for about a third more rehearsal time per prep. More layouts only in the Final Assault changed nothing.
  */
 const BOT_REHEARSAL_DEFAULT = 6;
-/** (fork) Layouts a delegated rehearsal offers the host's browser by default: 3, the count before upstream's 6 (README). */
-const BOT_REHEARSAL_HOST_DEFAULT = 3;
 /** Wall-clock ms of bot layout rehearsal per scheduler callback (real time; virtual time runs it in one go). */
 const BOT_SLICE_MS = 8;
 const env = (k) => (typeof process !== 'undefined' && process.env ? process.env[k] : undefined);
@@ -292,14 +297,8 @@ export function parseVerify(v) {
   const s = String(v ?? '').trim().toLowerCase();
   return s === 'all' || s === 'sample' ? s : 'off';
 }
-/**
- * (fork) Default of the bot rehearsal delegation: ON — SP_BOT_REHEARSAL_HOST=0 / off / false turns it off (DESIGN §14).
- * SP_BOT_REHEARSAL=host (upstream's spelling) still turns it on. The server's own count stays SP_BOT_REHEARSAL.
- */
-const envBotRehearsal = () => {
-  if (String(env('SP_BOT_REHEARSAL') || '').trim().toLowerCase() === 'host') return true;
-  return !/^(0|off|false|no)$/i.test(String(env('SP_BOT_REHEARSAL_HOST') ?? '').trim());
-};
+/** The bot rehearsal delegation: off unless SP_BOT_REHEARSAL=host. With SP_BOT_EXECUTION=host a bot's prep never reaches it. */
+const envBotRehearsal = () => String(env('SP_BOT_REHEARSAL') || '').trim().toLowerCase() === 'host';
 const noopLog = { info() {}, warn() {}, error() {}, debug() {} };
 
 const dsCache = new WeakMap();
@@ -396,8 +395,6 @@ export class Match {
      * off, env SP_BOT_REHEARSAL=host. The server simulates a rehearsal the host did not answer (see MatchRehearsal).
      */
     this.botRehearsalDelegate = opts.botRehearsalDelegate != null ? !!opts.botRehearsalDelegate : envBotRehearsal();
-    /** (fork) layouts a delegated rehearsal offers the host's browser (its CPU, not the server's) */
-    this.botRehearsalHost = Number.isInteger(opts.botRehearsalHost) && opts.botRehearsalHost >= 2 ? Math.min(opts.botRehearsalHost, 8) : BOT_REHEARSAL_HOST_DEFAULT;
     /** wall-clock ms the host has to answer a delegated rehearsal (engine option: tests shorten it) */
     this.botRehearsalDelegateMs = Number.isFinite(opts.botRehearsalDelegateMs) && opts.botRehearsalDelegateMs > 0 ? opts.botRehearsalDelegateMs : REHEARSAL_ANSWER_MS;
     /** the room's current host (opts.hostId; server/lobby.js room.hostId — setHost follows a migration) */
@@ -429,6 +426,43 @@ export class Match {
       /** steps taken by the timer callback now running (the journal's `steps`) */
       this._testSliceCount = 0;
     }
+    /**
+     * (fork) Bot seats draw from random streams of their own while their moves run (match/botTasks.js). Off by default, so
+     * tools, tests and golden results keep the shared streams; `botExecution: 'host'` needs it and turns it on.
+     */
+    this.botExecution = opts.botExecution === 'host' ? 'host' : 'local';
+    this.seatStreams = opts.seatStreams === true || this.botExecution === 'host';
+    // The hard rule (docs/host-browser-bots.md): in host mode no bot decision may run here, so a strategy's hooks throw.
+    if (this.botExecution === 'host') {
+      this.bot = guardBotStrategy(this.bot);
+      this.seatBots = Object.freeze(Object.fromEntries(Object.entries(this.seatBots).map(([seat, s]) => [seat, guardBotStrategy(s)])));
+    }
+    /** (fork) layouts a bot rehearses when its prep runs on the executor (every `m.botRehearsal` gate reads this on the copy) */
+    this.botTaskLayouts = Number.isInteger(opts.botTaskLayouts) && opts.botTaskLayouts >= 0 ? Math.min(opts.botTaskLayouts, 8) : BOT_REHEARSAL_DEFAULT;
+    /** (fork) who plays a bot seat's prep in host mode: submit({ taskId, playerId, world }), cancel(taskId); null = nobody */
+    this.botExecutor = opts.botExecutor ?? null;
+    /** (fork) 'host': a field no connected human plays runs in a human's browser, never here (match/botBattles.js; default 'server') */
+    this.botBattles = String(opts.botBattles ?? env('SP_BOT_BATTLES') ?? '').trim().toLowerCase() === 'host' ? 'host' : 'server';
+    this.botBattleAnswerMs = Number.isFinite(opts.botBattleAnswerMs) && opts.botBattleAnswerMs > 0 ? opts.botBattleAnswerMs : BOT_BATTLE_ANSWER_MS;
+    this.botBattleStats = { sent: 0, done: 0, rejected: 0, timeouts: 0, synthetic: 0 };
+    /** @type {Map<string, number>} timeouts per human; at BOT_HOST_STRIKES they are not asked again this match */
+    this._botHostStrikes = new Map();
+    /** @type {Set<string>} */
+    this._botHostDemoted = new Set();
+    /** @type {Set<string>} humans whose tab is hidden (b.botHidden): not asked while it stays so */
+    this._botHostHidden = new Set();
+    this.botTaskStats = { sent: 0, stale: 0, failovers: 0, timeouts: 0, errors: 0, hidden: 0, noHost: 0 };
+    /** The round every human turned Ready in (b.botHurry), and that round's bot budget (_botSeatBudgetMs). */
+    this._botHurryRound = -1;
+    this._botBudgetRound = -1;
+    this._botBudgetUntil = 0;
+    /** @type {Array<{ ps: any, token: number, round: number }>} seats waiting for the executor, one at a time */
+    this._botQueue = [];
+    /** @type {null | { entry: any, task: any, stale: number }} the seat the executor is playing */
+    this._botActive = null;
+    this._botPumpQueued = false;
+    /** @type {Map<string, number>} 'round:seat' → tasks started (a retry rolls differently from the attempt that went stale) */
+    this._botAttempts = new Map();
     /** @type {Map<string, { id: string, job: any, executor: string, timer: any }>} delegated rehearsals in flight */
     this._rehearsalTasks = new Map();
     this._rehearsalSeq = 0;
@@ -502,6 +536,8 @@ export class Match {
      * (draft order and skip, 6 机变 cards, 联防 …) stay.
      */
     this.loneHuman = this.order.filter((p) => !p.isBot).length === 1;
+    // (fork) an 8-seat room (shared/largeRoom.js, match/largeRoom.js): squads and the room scale, before the pools
+    this._initLargeRoom(opts);
 
     // per-match setup (DESIGN §6.5)
     const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.lobbyRules.stage });
@@ -514,8 +550,8 @@ export class Match {
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;
     this.bannedChess = bans.banned;
-    this.pool = new SharedPool(this.gd, { banned: bans.banned });
-    this.itemPool = new SharedItemPool(this.gd, () => this.order);
+    this.pool = new SharedPool(this.gd, { banned: bans.banned, scale: this.roomScale });
+    this.itemPool = new SharedItemPool(this.gd, () => this.order, this.roomScale);
     // 自选编队 (0.2.0): each human's slotted DIY pieces get their own stock — none for one whose bonds are all off this
     // match (player/diy.js initDiyStock); no randomness is drawn here
     const off = new Set([...bans.drawn, ...bans.staticOff]);
@@ -593,7 +629,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchBotTasks, MatchBotBattles, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchLargeRoom]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

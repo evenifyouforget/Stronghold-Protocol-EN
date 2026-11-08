@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FxWiring } from '../../public/js/render/vfx/wiring.js';
+import { FxWiring, seedOf } from '../../public/js/render/vfx/wiring.js';
+import { UF } from '../../shared/constants.js';
 import { AURA_HOLD_S } from '../../public/js/render/vfx/skillfx.js';
 import {
   ENEMY_FX_BINDINGS, ENEMY_FX_KINDS, auraTargets, enemyBindingKeys, modeLoopKeys, bindingEffects, FX_BINDINGS, FX_COVER, coverOf,
@@ -26,8 +27,8 @@ const HAS_INDEX = existsSync(INDEX);
 
 const LOOPING = new Set(['ymgtop_spin', 'enemy_nhpbr_attack_range', 'enemy_nhtank_attack_range', 'enemy_actoxi_idle', 'enemy_wintun_range', 'dsubrl_aura', 'cjhot_aura',
   'enemy_cjhot_debuff', 'horn_skill_01_hit_02_buff', 'skadi2_skill_03_buff', 'svrash_skill_02_buff', 'tinman_skill_01_range_01', 'sleach_skill_02_flag_01',
-  'sleach_skill_02_ground_01', 'sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'thumpy_skill_03_range_01']);
-const KEYS = [...LOOPING, 'mousek_skill_02_range', 'mousek_skill_02_start', 'bombd_cast', 'enemy_dsubrl_attack_hit', 'horn_skill_01_hit_02', 'g_hit', 'g_enemy', 'g_heal',
+  'sleach_skill_02_ground_01', 'sleach_skill_03_flag_01', 'sleach_skill_03_range_loop_01', 'thumpy_skill_03_range_01', 'svash2_skill_03_range_01']);
+const KEYS = [...LOOPING, 'svash2_skill_03_trail_02', 'svash2_skill_03_hit_01', 'svash2_skill_03_deploy_01', 'oxi_skill_03_trail_01', 'oxi_skill_03_hit_01', 'mousek_skill_02_range', 'mousek_skill_02_start', 'bombd_cast', 'enemy_dsubrl_attack_hit', 'horn_skill_01_hit_02', 'g_hit', 'g_enemy', 'g_heal',
   'tank_shell_hit', 'sleach_skill_03_range_start_01', 'chen2_skill_02_range_01', 'enemy_dslily_skill_02_start_l', 'enemy_dslily_skill_02_range',
   'enemy_dslily_skill_01_start'];
 const GROUND = new Set(['enemy_nhpbr_attack_range', 'enemy_nhtank_attack_range', 'enemy_actoxi_idle', 'enemy_wintun_range', 'mousek_skill_02_range']);
@@ -82,6 +83,8 @@ function makeIndex({ installed = KEYS } = {}) {
           { role: 'start', keys: ['enemy_dslily_skill_01_start'], from: 'UberEffectEmitter._castEffects', node: 'RockfallG2', ability: 'MeleeAttack', startEvent: 'ON_CAST_START', oneshot: true, list: 'cast' },
         ] },
       } }),
+      char_1045_svash2: { kind: 'char', modes: melee('g_hit'), startEffect: null, deadEffect: null, skills: { skchr_svash2_3: { rootClass: 'CastSkill', mode: null, projectiles: [], uses: [] } } },
+      char_4247_oxi: { kind: 'char', modes: melee('g_hit'), startEffect: null, deadEffect: null, skills: { skchr_oxi_3: { rootClass: 'CastSkillWithSuspendable', mode: null, projectiles: [], uses: [] } } },
       char_4039_horn: { kind: 'char', modes: melee('g_hit'), startEffect: null, deadEffect: null, skills: { skchr_horn_1: { rootClass: 'ReplacementSkillFixed', mode: null, projectiles: ['projectile_chr_horn_s1_light'], uses: [] } } },
       char_1012_skadi2: { kind: 'char', modes: melee('g_hit'), startEffect: null, deadEffect: null, skills: { skchr_skadi2_3: { rootClass: 'CastSkill', mode: null, projectiles: [], uses: [aura('skadi2_skill_03_buff')] } } },
       char_172_svrash: { kind: 'char', modes: melee('g_hit'), startEffect: null, deadEffect: null, skills: { skchr_svrash_2: { rootClass: 'ToggleSkill', mode: null, projectiles: [], uses: [
@@ -98,6 +101,7 @@ function makeIndex({ installed = KEYS } = {}) {
       projectile_enemy_nhtank_polluted: { main: null, onReached: ['enemy_nhtank_attack_range'], effects: ['enemy_nhtank_attack_range'] },
       projectile_enemy_actoxi: { main: null, onReached: ['enemy_actoxi_idle'], effects: ['enemy_actoxi_idle'] },
       projectile_enemy_wintun_range: { main: null, onReached: ['enemy_wintun_range'], effects: ['enemy_wintun_range'] },
+      projectile_chr_svash2_s3_bird_self: { main: null, lifeTime: 0.3, movement: { speed: 10 }, onHit: ['svash2_skill_03_hit_01'], effects: [] },
       projectile_chr_horn_s1_light: { main: null, onReached: ['horn_skill_01_hit_02_buff', 'horn_skill_01_hit_02'], effects: [] },
       projectile_chr_tinman_s1: { main: null, onReached: ['tinman_skill_01_range_01'], effects: [] },
     },
@@ -116,6 +120,8 @@ const RECS = {
   enemy_1521_dslily: { skills: [{ prefabKey: 'TidewaterG2', bb: {} }, { prefabKey: 'RockfallG2', bb: {} }] },
   enemy_10116_ymgtop: { talents: { bb: { 'EndRotate.rotate_duration': 5 } }, skills: [{ prefabKey: 'SwitchModeTrigger', bb: {} }] },
   char_4039_horn: opRec('skchr_horn_1'),
+  char_4247_oxi: opRec('skchr_oxi_3'),
+  char_1045_svash2: opRec('skchr_svash2_3', { durationType: 'NONE', duration: 48 }),
   char_1012_skadi2: opRec('skchr_skadi2_3', { duration: 20 }),
   char_172_svrash: opRec('skchr_svrash_2'),
   char_4151_tinman: opRec('skchr_tinman_1'),
@@ -427,6 +433,347 @@ describe("an enemy aura's tick", () => {
   });
 });
 
+describe('凛御银灰 S3: the bird of each attack', () => {
+  const casting = async (o = {}) => {
+    const t = await setup(o);
+    const s = t.view(1, 'char_1045_svash2', 5, 9, { v: o.v });
+    const a = t.view(2, 'enemy_1040_bombd', 6, 9);
+    const b = t.view(3, 'enemy_1040_bombd', 7, 9);
+    t.frame();
+    t.w.skill(s, true);
+    return { ...t, s, a, b };
+  };
+
+  test('the cast: the aura range stays for the skill, the bird lands once, no flight before an attack', async () => {
+    const { spawned, handles } = await casting();
+    assert.ok(spawned.includes('svash2_skill_03_deploy_01'));
+    assert.equal(live(handles, 'svash2_skill_03_range_01').length, 1);
+    assert.ok(!spawned.includes('svash2_skill_03_trail_02'));
+  });
+
+  test('one attack on two enemies is one flight, placed on him; nothing moves it along a line', async () => {
+    const { w, s: su, a, b, spawned, handles } = await casting();
+    w.attack(su, a, 'none', 1);
+    w.attack(su, b, 'none', 1);
+    assert.equal(spawned.filter((k) => k === 'svash2_skill_03_trail_02').length, 1);
+    const trail = handles.find((h) => h.key === 'svash2_skill_03_trail_02');
+    assert.equal(trail.place.pos[0], 5 - 10, 'from him');
+    assert.equal(w.skills.units.get(1).plan.line.artYaw, -Math.PI / 2);
+    assert.equal(w.skills.shots.size, 0);
+  });
+
+  test('an art authored off its main direction turns by artYaw: the bird heads for the target', async () => {
+    const yawOf = (toward) => {
+      const place = { yaw: 0 };
+      FxWiring.prototype._orient.call(null, { rotateType: 4 }, place, { x: 7, y: 9 }, { toward, artYaw: -Math.PI / 2 }, { dir: 'RIGHT' });
+      return place.yaw;
+    };
+    // the clip runs along the root's +Y (static_offset +90°): after the root's yaw, heading = yaw + 90°
+    assert.equal(yawOf({ x: 8, y: 9 }) + Math.PI / 2, 0, 'a target on the right: heading right');
+    assert.equal(yawOf({ x: 7, y: 10 }) + Math.PI / 2, Math.PI / 2, 'a target above: heading up');
+    assert.equal(yawOf({ x: 6, y: 9 }) + Math.PI / 2, Math.PI, 'a target on the left: heading left');
+  });
+
+  test('each hit waits for the bird: its way at the projectile speed, at most its life', async () => {
+    const { w, s: su, a, view, frame, spawned, ofx } = await casting();
+    const far = view(5, 'enemy_1040_bombd', 9, 9);
+    w.attack(su, a, 'none', 1);
+    w.attack(su, far, 'none', 1);
+    w.damage(a, 'phys', su, 1);
+    w.damage(far, 'phys', su, 1);
+    const hits = () => spawned.filter((k) => k === 'svash2_skill_03_hit_01').length;
+    assert.equal(hits(), 0, 'not at the damage');
+    ofx.time += 0.11;
+    frame();
+    assert.equal(hits(), 1, 'the near enemy, 1 tile at 10 tiles / s');
+    ofx.time += 0.2;
+    frame();
+    assert.equal(hits(), 2, 'the far one at the end of its 0.3 s life');
+  });
+
+  test('the skill off: no flight; without the extracted prefabs nothing of it plays', async () => {
+    const off = await setup();
+    const s = off.view(1, 'char_1045_svash2', 5);
+    const e = off.view(2, 'enemy_1040_bombd', 6);
+    off.frame();
+    off.w.attack(s, e, 'none', 1);
+    assert.ok(!off.spawned.includes('svash2_skill_03_trail_02'));
+    const none = await casting({ installed: KEYS.filter((k) => !k.startsWith('svash2_')) });
+    none.w.attack(none.s, none.a, 'none', 1);
+    none.w.damage(none.a, 'phys', none.s, 1);
+    assert.deepEqual(none.spawned.filter((k) => k.startsWith('svash2_')), []);
+  });
+});
+
+describe('凛御银灰: the attack clip follows the ability that fired', () => {
+  const group = {
+    name: 'Default',
+    attack: { class: 'AbilityRandomGroup', select: { method: 'random' }, abilities: [
+      { class: 'MeleeAttack', animKey: '', node: 'Modes/Default/Body/Attack/AttackA', cast: [], hit: [] },
+      { class: 'MeleeAttack', animKey: '', node: 'Modes/Default/Body/Attack/AttackB', cast: [], hit: [] },
+      { class: 'MeleeAttack', animKey: '', node: 'Modes/Default/Body/Attack/AttackC', cast: [], hit: [] },
+    ] },
+  };
+  const expected = (id, nth) => ['Attack_A', 'Attack_B', 'Attack_C'][seedOfForTest(id, nth) % 3];
+  const seedOfForTest = (id, nth) => seedOf(id, nth) >>> 0;
+
+  test('the letter of the ability the seeded pick fires, attack after attack; both clips and effects share it', async () => {
+    const { w, index, view, frame } = await setup();
+    index.units.char_1045_svash2.modes = [group];
+    const s = view(1, 'char_1045_svash2', 5);
+    const e = view(2, 'enemy_1040_bombd', 6);
+    frame();
+    for (let n = 0; n < 6; n++) {
+      assert.equal(w.attackClip(s, e, 'none'), expected(1, n), `attack ${n}`);
+      w.attackN.set(1, n + 1);
+    }
+  });
+
+  test('not while the skill is on, not for an enemy or another kind of group', async () => {
+    const { w, index, view, frame } = await setup();
+    index.units.char_1045_svash2.modes = [group];
+    const s = view(1, 'char_1045_svash2', 5);
+    const e = view(2, 'enemy_1040_bombd', 6);
+    frame();
+    assert.equal(w.attackClip(e, s, 'none'), null);
+    w.skill(s, true);
+    assert.equal(w.attackClip(s, e, 'none'), null);
+    const t = await setup();
+    const h = t.view(1, 'char_4039_horn', 5);
+    t.frame();
+    assert.equal(t.w.attackClip(h, null, 'none'), null);
+  });
+
+  test('a skill with no mode of its own: the pick only when its role is the attack\'s', async () => {
+    const { w, index, view, frame } = await setup();
+    index.units.char_1045_svash2.modes = [group];
+    const s = view(1, 'char_1045_svash2', 5);
+    const e = view(2, 'enemy_1040_bombd', 6);
+    frame();
+    w.skill(s, true);
+    s.actor = { roles: { skill: { via: 'attack' } } };
+    assert.equal(w.attackClip(s, e, 'none'), expected(1, 0));
+    s.actor = { roles: { skill: { loop: 'Skill_1_A' } } };
+    assert.equal(w.attackClip(s, e, 'none'), null);
+  });
+});
+
+describe('attack clips by the official pick (ATTACK_CLIPS)', () => {
+  const melee = (animKey, name = animKey, cast = []) => ({ class: 'MeleeAttack', animKey, node: `Modes/Default/Body/Attack/${name}`, cast, hit: [] });
+  const group = (method, abilities, extra = {}) => ({ class: 'AbilityRandomGroup', select: { method, ...extra }, abilities });
+  const emitter = (loopTypeName, replaceAnims, sourceAnimKey) => ({ class: 'UberAnimationEffectEmitter', sourceAnimKey, loopTypeName, replaceAnims });
+  const row = (effect) => [{ startEvent: 3, effects: [effect] }];
+  async function unit(key, modes, o = {}) {
+    const t = await setup();
+    t.index.units[key] = { kind: 'char', modes };
+    const s = t.view(1, key, 5, 9, o);
+    if (o.dir) s.dir = o.dir;
+    const e = t.view(2, 'enemy_1040_bombd', 6);
+    t.frame();
+    return { ...t, s, e };
+  }
+  const walk = (t, kind, n, f) => {
+    for (let i = 0; i < n; i++) {
+      f(i, t.w.attackClip(t.s, t.e, kind));
+      t.w.attackN.set(1, i + 1);
+    }
+  };
+
+  test('random, never twice: the clip, the wind-up\'s effects and the strike\'s effects are one pick', async () => {
+    const t = await unit('char_391_rosmon', [{ name: 'Default', attack: group('random', [
+      melee('Attack_A', 'Attack_A', row('fx_a')), melee('Attack_B', 'Attack_B', row('fx_b')),
+    ], { diffFromLast: true }) }]);
+    const m = t.index.units.char_391_rosmon.modes[0];
+    let prev = null;
+    walk(t, 'none', 12, (n, clip) => {
+      const wind = t.w._attackSet(t.index.units.char_391_rosmon, m, t.s, t.e, 'none', n);
+      const strike = t.w._attackSet(t.index.units.char_391_rosmon, m, t.s, t.e, 'none', n);
+      const fx = clip === 'Attack_A' ? 'fx_a' : 'fx_b';
+      assert.equal(wind.cast[0].effects[0], fx, `wind-up ${n}`);
+      assert.equal(strike.cast[0].effects[0], fx, `strike ${n}`);
+      assert.equal(t.w.attackClip(t.s, t.e, 'none'), clip, 'asking again changes nothing');
+      assert.notEqual(clip, prev, `attack ${n} differs from the last`);
+      prev = clip;
+    });
+  });
+
+  test('a loop group goes in turn; Chongyue\'s skill window keeps its role\'s clip', async () => {
+    const pair = () => group('loop', [melee('Attack_A'), melee('Attack_B')]);
+    const t = await unit('char_2024_chyue', [{ name: 'Default', attack: pair() }, { name: 'Changed', attack: pair() }]);
+    walk(t, 'none', 4, (n, clip) => assert.equal(clip, ['Attack_A', 'Attack_B'][n % 2]));
+    t.s.flags = UF.SKILL;
+    assert.equal(t.w.attackClip(t.s, t.e, 'none'), null);
+  });
+
+  test('parallel sub-abilities: the one with the emitter names the clip (Haruka S3)', async () => {
+    const first = { ...melee('Skill_3_Loop_A', 'FirstAttack'), emitters: [emitter('RANDOM', ['Skill_3_Loop_A', 'Skill_3_Loop_B'], 'Skill_3_Loop_A')] };
+    const t = await unit('char_4202_haruka', [{ name: 'Default', attack: group('parallel', [first, melee('', 'Shield')]) }]);
+    walk(t, 'none', 4, (n, clip) => assert.equal(clip, ['Skill_3_Loop_A', 'Skill_3_Loop_B'][seedOf(1, n) % 2]));
+  });
+
+  test('an empty animKey goes by its node (伺夜 S3), the skin\'s and the mode\'s tables by mode (f12yin, wang)', async () => {
+    const vigil = await unit('char_427_vigil', [{ name: 'Default', attack: melee('') }, { name: 'S3', attack: group('sequential', [melee('', 'Attack_A'), melee('', 'Attack_B'), melee('', 'Attack_C')]) }], { skillIndex: 2 });
+    assert.equal(vigil.w.attackClip(vigil.s, vigil.e, 'none'), null, 'its Default has one attack');
+    vigil.w.skills.state = () => ({ on: true, plan: { modeName: 'S3' }, U: null });
+    vigil.w.skills.attackFx = () => null;
+    walk(vigil, 'none', 3, (n, clip) => assert.equal(clip, `Skill3_Attack_${'ABC'[n]}`));
+    const shan = await unit('char_264_f12yin', [{ name: 'Default', attack: group('loop', [melee('Attack_1'), melee('Attack_2')]) }]);
+    walk(shan, 'none', 2, (n, clip) => assert.equal(clip, ['Attack_A', 'Attack_B'][n]));
+    const em = () => ({ ...melee('Attack_A'), emitters: [emitter('LOOP', ['Attack_A', 'Attack_B'], 'Attack_A')] });
+    const wang = await unit('char_2027_wang', [{ name: 'Default', attack: em() }, { name: 'S2', attack: em() }], { skillIndex: 1 });
+    walk(wang, 'none', 2, (n, clip) => assert.equal(clip, ['Attack_1_A', 'Attack_1_B'][n]));
+    wang.w.skills.state = () => ({ on: true, plan: { modeName: 'S2' }, U: null });
+    wang.w.skills.attackFx = () => null;
+    wang.w.attackN.set(1, 0);
+    walk(wang, 'none', 2, (n, clip) => assert.equal(clip, ['Attack_2_A', 'Attack_2_B'][n]));
+  });
+
+  test('an emitter\'s list: in turn or seeded, as its rows are', async () => {
+    const lin = await unit('char_4046_ebnhlz', [{ name: 'Default', attack: { ...melee('Skill_3_A'), emitters: [emitter('LOOP', ['Skill_3_A', 'Skill_3_B', 'Skill_3_C'], 'Skill_3_A')] } }]);
+    walk(lin, 'none', 4, (n, clip) => assert.equal(clip, ['Skill_3_A', 'Skill_3_B', 'Skill_3_C', 'Skill_3_A'][n]));
+    const em = emitter('RANDOM', ['Attack_1', 'Attack_2'], 'Attack_1');
+    const a = { ...melee('Attack_1'), emitters: [em] };
+    const v = await unit('char_1019_siege2', [{ name: 'Default', attack: a }]);
+    walk(v, 'none', 6, (n, clip) => {
+      assert.equal(clip, ['Attack_1', 'Attack_2'][seedOf(1, n) % 2]);
+      assert.ok(v.w._rowOk({ anim: clip }, em, v.s, n, 0), 'its row plays');
+      assert.ok(!v.w._rowOk({ anim: clip === 'Attack_1' ? 'Attack_2' : 'Attack_1' }, em, v.s, n, 0), 'the other does not');
+    });
+  });
+
+  test('one attack on several targets is one clip: asked again in its frame, at the strike only', async () => {
+    const t = await unit('char_4010_etlchi', [{ name: 'Default', attack: group('loop', [melee('Skill_3_Loop_A'), melee('Skill_3_Loop_B')]) }]);
+    t.w.attack(t.s, t.e, 'none', 1);
+    assert.equal(t.w.attackN.get(1), 1);
+    assert.equal(t.w.attackClip(t.s, t.e, 'none', undefined, true), 'Skill_3_Loop_A', 'the next target of this attack');
+    assert.equal(t.w.attackClip(t.s, t.e, 'none'), 'Skill_3_Loop_B', 'the look-ahead: the coming attack');
+  });
+
+  test('facing down: Wisadel\'s down clips, the down list of char_4229_aphris\'s mode only the table names', async () => {
+    const three = () => group('loop', [melee('Attack_A'), melee('Attack_B'), melee('Attack_C')]);
+    const w1 = await unit('char_1035_wisdel', [{ name: 'Default', attack: three() }], { dir: 'DOWN' });
+    walk(w1, 'none', 3, (n, clip) => assert.equal(clip, `Attack_Down_${'ABC'[n]}`));
+    const w2 = await unit('char_1035_wisdel', [{ name: 'Default', attack: three() }]);
+    walk(w2, 'none', 3, (n, clip) => assert.equal(clip, `Attack_${'ABC'[n]}`));
+    const sk1 = { ...melee('Attack'), emitters: [emitter('LOOP', ['Skill_1_Loop_A', 'Skill_1_Loop_B'], 'Attack'), emitter('LOOP', ['Skill_Down_1_Loop_A', 'Skill_Down_1_Loop_B'], 'Attack_Down')] };
+    const modes = () => [{ name: 'Default', attack: melee('Attack') }, { name: 'Sk1', attack: sk1 }];
+    const a1 = await unit('char_4229_aphris', modes());
+    assert.equal(a1.w.attackClip(a1.s, a1.e, 'none'), null, 'skill off: its Default has one attack');
+    a1.s.flags = UF.SKILL;
+    walk(a1, 'none', 2, (n, clip) => assert.equal(clip, ['Skill_1_Loop_A', 'Skill_1_Loop_B'][n]));
+    const a2 = await unit('char_4229_aphris', modes(), { dir: 'DOWN' });
+    a2.s.flags = UF.SKILL;
+    walk(a2, 'none', 2, (n, clip) => assert.equal(clip, ['Skill_Down_1_Loop_A', 'Skill_Down_1_Loop_B'][n]));
+  });
+
+  test('仇白: her random pick is her Combat, only on the enemy she blocks', async () => {
+    const t = await unit('char_4082_qiubai', [{ name: 'Default', attack: { class: 'RangedAttack', animKey: 'Attack', node: 'Attack', cast: [], hit: [] }, combat: group('loop', [melee('Combat_A'), melee('Combat_B')]) }]);
+    assert.equal(t.w.attackClip(t.s, t.e, 'arrow'), null, 'not blocking: her one shot');
+    t.s.flags = UF.BLOCKED;
+    walk(t, 'none', 2, (n, clip) => assert.equal(clip, ['Combat_A', 'Combat_B'][n]));
+  });
+
+  test('no pick decides it: a state-driven group, an operator off the table, the skill\'s own rows', async () => {
+    const trig = await unit('char_4202_haruka', [{ name: 'Default', attack: group('trigger', [melee('Attack', 'AttackAndShield'), melee('Attack', 'ShieldOnly')]) }]);
+    assert.equal(trig.w.attackClip(trig.s, trig.e, 'none'), null);
+    const off = await unit('char_009_off_table', [{ name: 'Default', attack: group('random', [melee('Attack_A'), melee('Attack_B')]) }]);
+    assert.equal(off.w.attackClip(off.s, off.e, 'none'), null);
+    const rep = await unit('char_391_rosmon', [{ name: 'Default', attack: group('random', [melee('Attack_A'), melee('Attack_B')]) }]);
+    rep.w.skills.attackFx = () => ({ replace: true });
+    assert.equal(rep.w.attackClip(rep.s, rep.e, 'none'), null);
+  });
+});
+
+describe('塔露拉 S3: the 簇火 fly their lanes', () => {
+  const volley = (o = {}) => ({ id: 1, skill: 'oxi:heatwave', n: 2, lanes: [[2, 9, 0, 1], [2, 10, 0.3, 2]], dx: 1, dy: 0, len: 10, speed: 2.5, ...o });
+  const fake = (time) => ({ time, anchor: [0, 0, 0], def: {}, stopped: null, stop(o) { this.stopped = o; } });
+
+  test('each lane flies the main effect from its birth delay on, at the fx\'s speed; nothing procedural is drawn', async () => {
+    const { w, view, frame, spawned, handles, ofx } = await setup();
+    view(1, 'char_4247_oxi', 5);
+    frame();
+    assert.equal(w.simFx('heatwave', 5, 9, volley()), true);
+    frame();
+    assert.deepEqual(spawned, ['oxi_skill_03_trail_01'], 'the second lane waits for its birth delay');
+    ofx.time += 0.3;
+    frame();
+    assert.equal(spawned.length, 2);
+    assert.deepEqual(handles[1].place.pos.slice(0, 2), [2 - 10, 10 - 9], 'starts on its own tile, in the effects\' frame');
+    const fx = fake(2);
+    handles[0].opts.track(fx);
+    assert.deepEqual(fx.anchor, [2 + 2.5 * 2 - 10, 0, 0], 'along +x at speed × time');
+    assert.equal(fx.yaw, 0);
+    assert.equal(fx.stopped, null);
+  });
+
+  test('its way runs out: the flight stops at len / speed and is forgotten', async () => {
+    const { w, view, frame, handles, ofx } = await setup();
+    view(1, 'char_4247_oxi', 5);
+    frame();
+    w.simFx('heatwave', 5, 9, volley({ lanes: [[2, 9, 0, 1]] }));
+    frame();
+    const fx = fake(4);
+    handles[0].opts.track(fx);
+    assert.deepEqual(fx.stopped, { hit: true });
+    assert.equal(w.skills.shots.size, 0);
+    assert.ok(ofx.time < 1);
+  });
+
+  test('facing left the art turns, and the tile\'s height carries it', async () => {
+    const { w, view, frame, handles } = await setup({ heightAt: (r, c) => (c < 2 ? 1 : 0) });
+    view(1, 'char_4247_oxi', 5);
+    frame();
+    w.simFx('heatwave', 5, 9, volley({ lanes: [[3, 9, 0, 1]], dx: -1 }));
+    frame();
+    const fx = fake(1);
+    handles[0].opts.track(fx);
+    assert.equal(fx.anchor[0], 3 - 2.5 - 10);
+    assert.equal(fx.anchor[2], -1, 'over the high ground');
+    assert.ok(Math.abs(Math.abs(fx.yaw) - Math.PI) < 1e-9, 'heads for -x');
+  });
+
+  test('the blast that names a shot ends its flight, plays the official explosion on the enemy; a shot not yet born never flies', async () => {
+    const { w, view, frame, spawned, handles, ofx } = await setup();
+    view(1, 'char_4247_oxi', 5);
+    const e = view(2, 'enemy_1040_bombd', 7);
+    frame();
+    w.simFx('heatwave', 5, 9, volley());
+    frame();
+    assert.equal(w.simFx('blast', 7, 9, { id: 1, r: 1.5, skill: 'oxi:heatwave', target: e.info.id, shot: 1 }), true);
+    assert.equal(handles[0].stopped, true, 'the flying effect stops');
+    assert.ok(spawned.includes('oxi_skill_03_hit_01'));
+    assert.equal(w.simFx('blast', 7, 10, { id: 1, r: 1.5, skill: 'oxi:heatwave', target: e.info.id, shot: 2 }), true);
+    ofx.time += 0.4;
+    frame();
+    assert.equal(spawned.filter((k) => k === 'oxi_skill_03_trail_01').length, 1, 'shot 2 was gone before its birth');
+  });
+
+  test('without the extracted prefabs the procedural cue stays; a cleared field stops the flights', async () => {
+    const none = await setup({ installed: KEYS.filter((k) => !k.startsWith('oxi_')) });
+    none.view(1, 'char_4247_oxi', 5);
+    none.frame();
+    assert.equal(none.w.simFx('heatwave', 5, 9, volley()), false);
+    assert.equal(none.w.simFx('blast', 7, 9, { id: 1, r: 1.5, skill: 'oxi:heatwave', shot: 1 }), false);
+    const { w, view, frame, spawned, handles, ofx } = await setup();
+    view(1, 'char_4247_oxi', 5);
+    frame();
+    w.simFx('heatwave', 5, 9, volley());
+    frame();
+    w.skills.clear();
+    assert.equal(handles[0].stopped, true);
+    ofx.time += 0.4;
+    frame();
+    assert.equal(spawned.length, 1, 'the unborn one stays unborn');
+  });
+
+  test('preloading: the unit\'s keys hold both prefabs', async () => {
+    const { w, view } = await setup();
+    const v = view(1, 'char_4247_oxi', 5);
+    const keys = w.keysFor([v], false);
+    for (const k of ['oxi_skill_03_trail_01', 'oxi_skill_03_hit_01']) assert.ok(keys.includes(k), k);
+  });
+});
+
 describe('operators\' areas', () => {
   test('号角 S1: the flare is the light projectile\'s reached effects at the shot\'s landing point for its time', async () => {
     const { w, view, frame, spawned } = await setup();
@@ -528,7 +875,7 @@ describe('the extracted effects (when fx was extracted on this machine)', { skip
         if (b.owner === 'cast') assert.ok(idx.units[key].skills[b.skill], `${key}: skill ${b.skill}`);
       }
     }
-    for (const sid of ['skchr_horn_1', 'skchr_sleach_2', 'skchr_sleach_3']) {
+    for (const sid of ['skchr_horn_1', 'skchr_sleach_2', 'skchr_sleach_3', 'skchr_oxi_3']) {
       for (const [kind, b] of Object.entries(FX_BINDINGS[sid])) {
         const keys = bindingEffects(idx, b);
         assert.ok(keys.length && keys.every((k) => idx.prefabs[k]), `${sid} ${kind}: ${keys.join(' ')}`);
