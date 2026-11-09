@@ -7,6 +7,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Confirm Match Info and Equipment Supply on short landscape phones
+
+- On phones held sideways (360–390 px tall, e.g. 640×360 and 844×390), Confirm Match Info is now drawn at a phone's scale. The step header, section bars, enemy leader card, core and addon bond rows, banned operators, footer and Ready button are all a size smaller, with tighter spacing, so more of the briefing fits without scrolling. The section bars drop their small English captions there.
+- The Equipment Supply header (title, description, turn line and countdown) is a size smaller on the same phones.
+- Larger text sizes (Large, Extra Large) still grow a little, by the same capped steps the draft screen uses. Desktop and taller windows are unchanged.
+
 ### Spectate, filter popover, Final Assault watch, protocol list
 
 - Pressing Spectate right after entering the lobby could fail with "too many requests", because entering the lobby spends the server's budget for heavy messages (loadout, ownership, outfits and more). Spectate now tries again after 1.2 s, at most twice. Proposing a version already did this.
