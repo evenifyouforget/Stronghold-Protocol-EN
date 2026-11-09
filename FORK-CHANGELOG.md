@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Returning players load the game's code from their own browser
+
+- Behind the zero-downtime generations (the live servers), every script and style of a version was sent as "ask again every time", so a returning player's browser asked the server about each of the game's 250-odd code files on every visit, one chain step after another, which costs a distant player about 0.2 s per step even when Cloudflare holds the file. A version's code can never change under its address (each version is one commit, and every update gets a new address), so these files are now kept for a year by the browser and by Cloudflare. Measured on a local copy of the live setup, a second visit asked the server for 25 files instead of 272, and none of the 252 code files. The page itself, the service worker, the health check and the game data still ask every time, and a server started without versions (`npm start`) keeps asking for everything, so an edited file still shows on reload. The optional Cloudflare cache rule for scripts is no longer needed.
+
 ### Ping shows the connection, not the frame rate
 
 - The ping shown in the title screen, lobby, room and battle bar no longer grows when the game draws slowly. The browser handles the server's answer between frames, so on a slow battle render the shown ping included up to a whole frame: on a local server (real round trip about 1 ms) it read 31 ms at 33 fps, 101 ms at 10 fps and 251 ms at 4 fps. It is now worked out from the server's own receive time, which frames don't delay, and reads 1–3 ms at every one of those frame rates. A slower connection still shows. A page that is already slow when its first answer comes back still shows the old measured value until it has one quick answer to compare against.
