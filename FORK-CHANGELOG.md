@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### No image menu on a long press in the Operator Loadout
+
+- Holding a finger on an operator's card, the details drawer, the outfit pictures or a Custom Squad picker card no longer opens the phone browser's image menu (Open image in new tab, Download image). A mouse right-click and text fields keep their menus, and the deck still scrolls by dragging.
+
 ### Effect extraction follows every template of our units
 
 - The effect extractor (`tools/local-extract/fx.py`) now also exports the effects that only an action template names, for every operator, token and enemy in our data and for the seasons' bonds, bands and items. Before, it followed only the projectiles that templates fire, so effects such as the S2 and S3 buffs of Тоска (`char_4244_tocka`) were never extracted. An add-only run never rewrites a file that is already there. The new art isn't shown in battles yet; that needs separate client work.
