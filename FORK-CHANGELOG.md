@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Operator Loadout cards on short phones
+
+- On a phone in landscape (520 px tall or less, such as 640×360 or 844×390), the Operator Loadout deck is one row of cards instead of two, each card using the deck's full height. The cards keep their whole design there: every module as its own button under the skills, the promotion icons over the levels, the potential star, the branch icon and the alliance icons. Before, two rows squeezed the cards: the branch icon shrank to nothing at Extra Large and the alliance icons were cut off at the card's bottom. A Custom Squad slot keeps its full-size frame, count and label. Compact, Expanded and Outfits all use the one row, and so does the Custom Squad picker. Fewer cards fit on screen at once (4 at 640×360, 5 at 844×390); swipe to see more. Taller windows and desktops look the same as before.
+
 ### Bot turns are cheaper to work out
 
 - The bots' layout search no longer copies lists it only looks through: board tile names are read without temporary lists, the "do I already own this operator?" checks stop at the first match instead of listing and sorting every piece, and each move the search tries no longer copies the whole plan. The bots make exactly the same choices (same boards, hands and shops in 40 checked rounds), and a late-round bot turn takes about 20% less time (the busiest bot of the test match: 281 → about 220 ms on the same loaded machine; the whole 10-round match 2.5-3.0 → 2.0-2.2 s).
