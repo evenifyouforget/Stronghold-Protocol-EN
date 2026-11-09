@@ -19,6 +19,16 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 - The teammate-loadout test now expects a teammate's operator card to show ATK with the default Elite 2 Lv.60 bonus (×1.1), as the game has shown it since 0.2.2 and the other loadout tests already expect. The plugins test now accepts that the room loads the asset store together with the battlefield code it prepares for the match. No game change.
 
+### Match briefing and Equipment Supply headers on small phones
+
+- On phones (screens up to 520 px tall), the Confirm Match Info list now ends above the footer instead of running under it, so no enemy or alliance text shows through behind Reroll, Operator Loadout or Ready, the way the original reroll banner kept it before the reroll moved into the footer. At the Large and Extra Large text sizes, the Reroll button shows only its icon in English, Japanese and Korean (its name stays in the tooltip), so it no longer runs under Operator Loadout. "已就绪" no longer breaks across two lines. Taller windows and desktops are unchanged.
+- In the strategy draft overlay (Equipment Supply and the other draft screens), the description now sits under the title on phones narrower than 768 px at every text size, as it already did at Large and Extra Large. At Medium on a 640 px phone, "Obtain equipment without spending any funds." took one word per line beside the title and ran into "Your turn to decide".
+
+### More browser tests brought up to date
+
+- Tests that read Chinese text now start the page in Chinese (the fork opens in English): settings storage, wake lock, lobby media delete. Tests that open their own browser now skip the intro film, whose tap-to-enter screen blocked the title and lobby: stats, lobby media delete.
+- The emote test expects the Emote / Text tabs that match chat added to the wheel. The loadout battle test picks the skill on the card before opening the drawer, which now lies over the card. The selection-frame test waits until the board has drawn its pieces before clicking one, and until it stops moving before measuring. The lobby media test records its test video as VP8 and records again if a page's first recording comes out empty, and it waits for the picture's deletion to finish before deleting the music. The wake lock test opens Settings with the settings gear rather than the new battle stats button beside it, and moves the mouse off the help link between languages. The lobby test accepts that the TACTICAL TIPS label hides when there is no room for it, and still fails if it is ever cut off part-way.
+
 ### Operator Loadout fits every UI size and text size
 
 - At the Extra Large text size on a 640×360 phone, each card's level pill ended 4 px below the card. The branch icon above it now shrinks to make room when the rail is too short; every other size looks as before.
