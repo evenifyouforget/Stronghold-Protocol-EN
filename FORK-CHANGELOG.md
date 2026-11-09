@@ -37,6 +37,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - The bots' prep runner and the bot task queue now name the limit of each of their loops, as every loop in the match code does.
 - `board3d-extract` test: the profile icons are saved as WebP only, by choice, so the test no longer looks for a PNG beside them. It reads that list of folders from the extractor.
 - `issue25-downback` test: Amiya and Dobermann have pictures for the AI teammates but no model, so the test now checks every operator that has a model and names those two as the only exceptions.
+- The battle view now removes its WebGL context-loss listeners when it closes. The afterimage fix of 2026-10-15 added them, but only setup's own cleanup removed them, so every battle view that started successfully left two listeners on its canvas.
+- The effect viewer (`dev/fx-viewer.html`) prepares an effect's shaders and textures before playing it, as a battle does. Since shaders build in the background, an effect it never prepared drew nothing in its first frames: the `vfx` test saw a blank board for an enemy's death and for the light tier.
+- `feedback1-forms` and `feedback5-prisoners` tests: they push the battle into the page at a fixed pace instead of once a frame. Headless Chrome on the graphics card runs at over 100 frames a second, so the view fell about a second behind the battle and missed its form changes. `feedback1-forms` now also checks the death clip only while the model is still on the board.
+- `impostor-bounds` test: it measures the crowd's animations itself while it waits. The page measures them a little each frame, and in this 120-unit scene at about 17 frames a second that took longer than the test's 40 seconds.
+- `held-pose` test: reading the same unchanged picture back from the graphics card twice sometimes gave different pixels, so the test sometimes found a held death pose "different" from a live one. It now reads each picture until two reads in a row agree. The held pose itself was always the same.
 
 ### Update news
 
