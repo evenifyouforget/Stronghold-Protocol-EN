@@ -5,6 +5,12 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-10
+
+### Room cards show every player's outfit
+
+- In the room lobby, each player's big portrait card now shows that player's outfit for the operator they picked, on everyone's screen. Before, you saw your own outfit on your own card, but the other players' cards showed the default art, or your own outfit choice for that operator if you had one. The Strategy Draft's player cards follow the same rule. When the outfit has no portrait, or its picture fails to load, the card shows the default art.
+
 ## 2026-11-09
 
 ### Phones go fullscreen and turn to landscape on the first tap
