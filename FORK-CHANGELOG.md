@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Three browser tests open the mock match page again
+
+- The models, UI-flash and screen-fit browser tests timed out opening the mock match page. With the 3D renderer, Pixi starts its image worker from a blob: URL, and Chrome 156 never marks that worker's script as loaded, so the page never counts as network-idle. They now open the page the way the other mock tests already do: page loaded, game screen shown. The models test also waits until every operator's Spine model has loaded, and turns on 「部署时收起商店」 (off by default in this fork) because its drag checks expect the shop to fold. The game itself is unchanged.
+
 ### Room privacy bar follows the text size
 
 - The Public / Private bar in the room and its password box now grow with the Text Size setting like the rest of the room. On phones they used a fixed size. Desktop sizes are unchanged; on a phone they stay the same at Medium and are 2 px smaller at Small.
