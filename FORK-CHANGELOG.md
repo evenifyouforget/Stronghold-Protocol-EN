@@ -7,6 +7,13 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Bot helper review fixes
+
+- A host's page could claim "my bot helper is still starting" on every bot turn and hold each bot for up to 40 s. The server now allows that start time only until the helper has been up once on the connection, and again after a reconnect.
+- Once every player is Ready, a bot whose helper is still starting gets 10 s instead of 30 s, and the page stops waiting for the screen to finish loading.
+- A warm-up left over from a match that just ended no longer starts a helper in the next match.
+- With bot rehearsals in the host's browser, a host that reconnects or reloads gets its helper warmed again, and a helper stopped by a cancel is replaced by a warm one. Rooms whose bots already play in the host's browser no longer keep an idle rehearsal helper.
+
 ### Bot rehearsals in the host's browser answer from round 1
 
 - With the optional host rehearsal setting on, the host's browser now starts its rehearsal helper during the briefing, once the screen has loaded, instead of on round 1's first task. Round 1's AI layouts used to miss their short answer window while the helper started, so the server always worked them out itself. Nothing changes with the setting off (the default).
