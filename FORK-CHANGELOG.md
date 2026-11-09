@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Bot helper loads after the band draft's art
+
+- With bots run in the host's browser, the page started the bots' background worker (424 small script files) right as the briefing opened, so it shared a slow connection with the briefing and the band draft's art. On 10 Mbps the band icons came about 4 s later, and on 5 Mbps the first AI pick ran out of time and fell back to a rule pick. The worker now starts once that art has loaded (10 s at most). The server also gives the first AI pick its 10 s from the moment the worker is ready rather than from when the task arrived, with a 30 s limit on the start, so a slow connection no longer counts against the player and a worker that never starts still falls back to the rule pick.
+
 ### Three browser tests open the mock match page again
 
 - The models, UI-flash and screen-fit browser tests timed out opening the mock match page. With the 3D renderer, Pixi starts its image worker from a blob: URL, and Chrome 156 never marks that worker's script as loaded, so the page never counts as network-idle. They now open the page the way the other mock tests already do: page loaded, game screen shown. The models test also waits until every operator's Spine model has loaded, and turns on 「部署时收起商店」 (off by default in this fork) because its drag checks expect the shop to fold. The game itself is unchanged.
