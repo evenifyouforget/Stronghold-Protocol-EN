@@ -7,6 +7,14 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Spectate, filter popover, Final Assault watch, protocol list
+
+- Pressing Spectate right after entering the lobby could fail with "too many requests", because entering the lobby spends the server's budget for heavy messages (loadout, ownership, outfits and more). Spectate now tries again after 1.2 s, at most twice. Proposing a version already did this.
+- In Operator Loadout, answering the floating version vote no longer closes an open Filter popover. The vote gives the focus back to the popover's search field when it closes.
+- An eliminated player watching the Final Assault now gets the ‹ › buttons to switch between the two halves again. The board they followed during prep no longer holds the screen once the battle starts.
+- The Select Protocol list fits itself one frame after its size changes, instead of in the same frame. This stops "ResizeObserver loop" errors at some language and text-size combinations. It looks the same.
+- Browser tests brought up to date: screenshot paths on Windows, the settings gear that now sits after the Battle Stats button, the entry film that covers the title on a first visit, and the card view's Filter popover and layered Esc in the versions test.
+
 ### Room privacy bar follows the text size
 
 - The Public / Private bar in the room and its password box now grow with the Text Size setting like the rest of the room. On phones they used a fixed size. Desktop sizes are unchanged; on a phone they stay the same at Medium and are 2 px smaller at Small.
