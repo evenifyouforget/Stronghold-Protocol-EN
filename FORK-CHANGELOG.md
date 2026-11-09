@@ -12,6 +12,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - The bots' layout search no longer copies lists it only looks through: board tile names are read without temporary lists, the "do I already own this operator?" checks stop at the first match instead of listing and sorting every piece, and each move the search tries no longer copies the whole plan. The bots make exactly the same choices (same boards, hands and shops in 40 checked rounds), and a late-round bot turn takes about 20% less time (the busiest bot of the test match: 281 → about 220 ms on the same loaded machine; the whole 10-round match 2.5-3.0 → 2.0-2.2 s).
 - The test that checks a late-round bot turn stays under 300 ms of CPU now runs only in `npm run test:perf`, alone on the machine, like the other speed checks. Next to the browser tests the same code measured 390-530 ms (the machine's load, not the bots), and 110-170 ms on a quiet machine. The 300 ms limit is unchanged.
 
+### Chat button on small touch screens without the client art
+
+- When the game runs without the local client art (for example a lite install), the Chat button falls back to a plain text button. On a 640×360 phone that button was only 22 px tall, squeezed between the settings gear just above and the screen edge, so its tap area was 31 px, below the 34 px minimum. On touch screens the text button is now as tall as the art button (35 px), so the corner keeps the same layout with or without the art. The art button is unchanged.
+
 ### Bot helper review fixes
 
 - A host's page could claim "my bot helper is still starting" on every bot turn and hold each bot for up to 40 s. The server now allows that start time only until the helper has been up once on the connection, and again after a reconnect.
