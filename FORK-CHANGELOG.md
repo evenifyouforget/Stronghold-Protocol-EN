@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Sell / destroy plate colour test waits for what is on screen
+
+- The browser test that checks the Sell (amber) and Destroy (red) plates no longer waits fixed times. It waits until the mock board's own units are laid out before tapping one, and samples the plate until it shows a steady colour instead of its dark backing. In a fresh browser the plate was sampled before its picture was painted and read grey, and on a busy machine the bench was tapped before it was laid out. Both cases now pass 3 of 3 with Chrome's CPU slowed four times; a white or wrong-coloured plate still fails.
+
 ### Lint skips other branches' working copies
 
 - `npm run lint` no longer checks the git worktrees under `.claude/worktrees/` (other branches' working copies, which git already ignores). From the main folder it went through every one of them, which made it take about 6 minutes and print 2,325 warnings, all but 155 of them from those other copies; it now takes about 40 seconds. Each worktree is still linted from its own folder.
