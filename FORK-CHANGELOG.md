@@ -7,6 +7,22 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Bot helper review fixes
+
+- A host's page could claim "my bot helper is still starting" on every bot turn and hold each bot for up to 40 s. The server now allows that start time only until the helper has been up once on the connection, and again after a reconnect.
+- Once every player is Ready, a bot whose helper is still starting gets 10 s instead of 30 s, and the page stops waiting for the screen to finish loading.
+- A warm-up left over from a match that just ended no longer starts a helper in the next match.
+- With bot rehearsals in the host's browser, a host that reconnects or reloads gets its helper warmed again, and a helper stopped by a cancel is replaced by a warm one. Rooms whose bots already play in the host's browser no longer keep an idle rehearsal helper.
+
+### Bot rehearsals in the host's browser answer from round 1
+
+- With the optional host rehearsal setting on, the host's browser now starts its rehearsal helper during the briefing, once the screen has loaded, instead of on round 1's first task. Round 1's AI layouts used to miss their short answer window while the helper started, so the server always worked them out itself. Nothing changes with the setting off (the default).
+
+### Facing wheel and install offer browser tests
+
+- The facing wheel test could fail on a busy machine. After a cancel the piece slides back home over about 200 ms, and the test started its next drag before that, pressing the empty tile it was leaving. The test now waits for the piece to stop moving and checks that it went back to where it came from. The game itself was right.
+- The install offer test failed because Chrome now sends its own install offer a few milliseconds after the test's, and the game keeps the newest offer, which is correct. The test now holds Chrome's own offer back so its button press uses the test's offer.
+
 ### Spectate, filter popover, Final Assault watch, protocol list
 
 - Pressing Spectate right after entering the lobby could fail with "too many requests", because entering the lobby spends the server's budget for heavy messages (loadout, ownership, outfits and more). Spectate now tries again after 1.2 s, at most twice. Proposing a version already did this.
