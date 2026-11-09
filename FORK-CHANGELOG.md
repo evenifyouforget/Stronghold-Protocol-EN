@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Phones go fullscreen and turn to landscape on the first tap
+
+- On an Android phone (and other phone browsers with fullscreen), the first tap on the page now makes the game fullscreen and locks the screen in landscape. Browsers only allow fullscreen from a tap, so it can't happen as the page loads. That same tap still starts the opening film as before. It happens once per page: if the player leaves fullscreen, the next tap doesn't force it back, and leaving with the ⛶ button turns it off on that phone until the button is used to enter again. Tablets, desktops and touch laptops are not affected.
+- iPhone Safari has no fullscreen for web pages and can't lock the screen's turn, so the "Rotate your device to landscape" screen now tells iPhone players how to add the game to the Home Screen, which opens it without Safari's bars.
+
 ### Outfit summons for Swire the Elegant Wit and Catherine
 
 - Swire the Elegant Wit's outfit A Prosperous Visage and Catherine's outfit Cozy Bakery now give their summons the outfit's own look in battle (8 files, 138 KB) instead of the default one. The dev sandbox also draws a summon in its owner's outfit, as a match does.
