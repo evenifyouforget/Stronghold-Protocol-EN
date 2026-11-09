@@ -20,6 +20,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 - Swire the Elegant Wit's outfit A Prosperous Visage and Catherine's outfit Cozy Bakery now give their summons the outfit's own look in battle (8 files, 138 KB) instead of the default one. The dev sandbox also draws a summon in its owner's outfit, as a match does.
 
+### Operator Loadout's detail drawer on phones
+
+- On a phone in landscape the operator drawer is now half the screen wide (320–400 px instead of 256 px), and the whole drawer scrolls as one, header first. Skills, modules, stats and outfits get the drawer's full height instead of the 27–117 px that was left under a fixed header.
+- Reset to Default sits under the name instead of over it; Loadout / Outfits share the Collapse row; stat labels such as Attack Interval wrap instead of being cut; an outfit's Wearing badge no longer covers its name.
+- On touch screens every button in the drawer is at least 32 px. The same applies to the Custom Squad picker's drawer. Desktop is unchanged.
+
 ### Asset rebuilds skip voices for the AI teammates' pictures
 
 - Amiya and Dobermann are in the asset list only for the AI teammates' names and icons; they can't be fielded. The asset tool now plans voices only for operators the game can field and their outfits, so a rebuild no longer tries to add those two operators' 112 voice files in four languages. Nothing players hear changes.
