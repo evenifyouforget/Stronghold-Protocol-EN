@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-09
 
+### Chat button on small touch screens without the client art
+
+- When the game runs without the local client art (for example a lite install), the Chat button falls back to a plain text button. On a 640×360 phone that button was only 22 px tall, squeezed between the settings gear just above and the screen edge, so its tap area was 31 px, below the 34 px minimum. On touch screens the text button is now as tall as the art button (35 px), so the corner keeps the same layout with or without the art. The art button is unchanged.
+
 ### Bot helper review fixes
 
 - A host's page could claim "my bot helper is still starting" on every bot turn and hold each bot for up to 40 s. The server now allows that start time only until the helper has been up once on the connection, and again after a reconnect.
