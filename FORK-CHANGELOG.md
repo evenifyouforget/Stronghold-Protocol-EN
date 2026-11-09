@@ -11,6 +11,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 - The effect extractor (`tools/local-extract/fx.py`) now also exports the effects that only an action template names, for every operator, token and enemy in our data and for the seasons' bonds, bands and items. Before, it followed only the projectiles that templates fire, so effects such as the S2 and S3 buffs of Тоска (`char_4244_tocka`) were never extracted. An add-only run never rewrites a file that is already there. The new art isn't shown in battles yet; that needs separate client work.
 
+### Operator Loadout voice lines once per visit
+
+- Opening an operator's card on the Operator Loadout, or picking one in the Custom Squad picker, plays a Selecting Operator line only on the first touch; a skill or module change counts as that first touch too. Further clicks on the same operator (its skill, module, a reopen) stay silent until you touch another operator. Each return then takes that operator's other line, never the one it said last. Switching to an outfit with its own voice always speaks, in that voice: a Selecting or Deployment line (or any line it has). Any other outfit change counts as an ordinary click. The newest line cuts the previous one off, and the voice language and volume settings apply. No new downloads.
+
 ### Test a two-server release before players get it
 
 - `scripts/deploy-regions.mjs` now has `prepare` and `activate` as separate commands (`deploy` still does both). `prepare` starts the new version on every server without sending anyone there and prints its id and private test addresses; `activate <id>` switches every server, and refuses without switching any unless the version is ready on all of them with the same build (new `generations.mjs check <id>`). A prepared version now waits 4 hours for its activate instead of 1, so a private test fits.
