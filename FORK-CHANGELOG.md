@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Blaze the Igniting Spark sounds like the official game
+
+- Her S1 now plays its own cast and impact sounds, and the bolts of her S2 and S3 land with their own impact sounds instead of her normal attack's.
+- Her S3 plays its activation sound when it starts and its closing sound when the last bolt is spent.
+
 ### Plugin studio trial tests no longer time out on a busy machine
 
 - Two plugin studio tests ran a real trial against the production 20 s wall limit, though that trial alone takes 8–16 s and over 20 s while the machine is busy, so they failed even when run alone. They now allow the tests' shared load time (60 s) and still check the same results: the three trial presets, and the sandbox refusing code it cannot run. The studio's own 20 s limit for players is unchanged.
