@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Mostima's and Lemuen's Ambience Synesthesia S3 effects
+
+- Mostima in Ethereal Harmony (`char_213_mostma@ambienceSynesthesia#6`): every S3 attack now sends out its wave again. The outfit's wave waits 0.8 s before it appears, and the effects layer ended an attack's effects after 0.6 s, so it never showed: enemies were hit and pushed back with nothing on screen. An effect part that is still waiting when an attack's effects end now plays once, as authored. Her default outfit's wave already played.
+- Lemuen in Ambience Synesthesia (`char_4193_lemuen@ambienceSynesthesia#7`): her S3 lock crosshairs and shell bursts now use the outfit's own effects instead of the default ones. Any skill effect tied to a sim event this way now follows the operator's outfit.
+
 ### Big Grand Alliance fights stay smooth on a PC
 
 - On a computer at High quality, units now switch to impostors (sprites that redraw their pose every few frames) only past about 88 units on the field, not 44, as long as the frames keep up. A Grand Alliance relay field of 70–90 units is now drawn in full motion instead of in low-frame-rate sprites. If the frames fall behind during such a crowd, the field goes back to the old 44-unit limit until the crowd thins out. Phones and tablets, and Medium / Low quality, keep the old limits.
