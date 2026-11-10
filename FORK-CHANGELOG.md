@@ -7,6 +7,16 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Operators attack as in the official game: the swing starts, then the hit lands
+
+- An operator's attack now follows the official order. When its attack is ready and an enemy is in range, the attack animation starts from its first frame, and the damage (or heal) lands at the animation's strike frame. Before, the damage landed the moment the attack was ready and the animation was fitted around it, so the swing often had to be squeezed or restarted: the visible twitch before many strikes, and the first attack of a fight started mid-swing.
+- The strike frame comes at the official time: the animation is sped up or slowed to the operator's attack interval as in the official game (between 0.1× and 2.5× its normal speed), so a faster attacker swings faster and its hit comes sooner.
+- The target is chosen when the swing starts, as in the official game: an enemy that walks out of range during the swing is still hit; an enemy that arrives during it waits for the next attack. If the target dies first, the hit goes to another enemy in range, or the swing stops.
+- A stun, freeze, sleep or Disarm during the swing interrupts it: no hit, and the operator attacks again as soon as it can. A skill that starts or ends during the swing makes the hit pick its targets for the skill's attack (so a heal never lands on an enemy).
+- This changes battle results a little (every hit lands slightly later than before). Operators and summons with no attack animation in the game data, and the older game versions, keep the old timing.
+- Logos's S2 still attacks exactly every 0.5 s: its fixed rhythm now counts from the start of each swing.
+- Behind the scenes: a bot battle's progress timeline now ends at exactly the battle's reported end time (both to the millisecond).
+
 ### Plugin studio trial tests no longer time out on a busy machine
 
 - Two plugin studio tests ran a real trial against the production 20 s wall limit, though that trial alone takes 8–16 s and over 20 s while the machine is busy, so they failed even when run alone. They now allow the tests' shared load time (60 s) and still check the same results: the three trial presets, and the sandbox refusing code it cannot run. The studio's own 20 s limit for players is unchanged.
