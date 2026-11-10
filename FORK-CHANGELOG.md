@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Mostima swings on every S3 attack
+
+- Mostima's S3 (Key of Chronology), in every outfit, now plays her attack swing on each attack and stands in her S3 stance between attacks, as in the official game. Before, she raised her staff when the skill began and then held a still pose for the whole skill: the game had given her S3 the animations of her S2 (Lock of Shattered Time), going by the animation names, and that pose has no swing. The official game data now decides which animations each of her skills uses.
+- Her S2 now plays the channelling pose it was missing, and her S1 no longer plays a skill pose: she keeps attacking normally, as in the official game.
+
 ### Mostima's and Lemuen's skills look and sound as in the official game
 
 - Mostima in Ethereal Harmony (`char_213_mostma@ambienceSynesthesia#6`): every S3 attack now sends out its wave again. The outfit's wave waits 0.8 s before it appears, and the effects layer ended an attack's effects after 0.6 s, so it never showed: enemies were hit and pushed back with nothing on screen. An effect part that is still waiting when an attack's effects end now plays once, as authored. Her default outfit's wave already played.
