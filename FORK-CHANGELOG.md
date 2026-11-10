@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Stored skill charges show over the operator's head
+
+- An operator whose skill holds more than one charge (Talulah's S2 holds 5, Warfarin's S1 2) now shows how many are stored, as in the official game: a yellow ring that turns slowly, with the count in the middle in the game's own font (Novecento Wide), above the bars and status icons. It shows while at least one charge is stored. Before, nothing showed the charges.
+- It uses the official ring and disc art from the battle UI. The servers need the two new images (`ui/battleUi/sprite_auto.png`, `ui/battleUi/sprite_circle.png`); without them a stand-in ring in the same yellow shows.
+
 ### Mostima's and Lemuen's skills look and sound as in the official game
 
 - Mostima in Ethereal Harmony (`char_213_mostma@ambienceSynesthesia#6`): every S3 attack now sends out its wave again. The outfit's wave waits 0.8 s before it appears, and the effects layer ended an attack's effects after 0.6 s, so it never showed: enemies were hit and pushed back with nothing on screen. An effect part that is still waiting when an attack's effects end now plays once, as authored. Her default outfit's wave already played.
