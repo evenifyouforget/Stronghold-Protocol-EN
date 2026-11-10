@@ -7,6 +7,19 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Element bursts look as in the official game
+
+- When an element gauge fills and bursts, the unit now shows the official effect instead of the same orange flash for every element:
+
+  | Element | On an enemy | On an operator |
+  |---|---|---|
+  | Burn | a white-hot flash, then flame swirls | flames on the operator for the whole burst |
+  | Necrosis | a dark hit, then dark mist for the whole burst | the same |
+  | Nervous Impairment | the old flash (the official game shows none) | a nerve effect on the operator for the whole burst, next to the stun |
+  | Corrosion | a water hit | a water explosion, then the DEF-down mark while the DEF cut lasts |
+
+- The effects come from the official buff templates for each burst. `tools/local-extract/fx.py` names them in a new `burst` group of the effects index, and six new effect files are extracted.
+
 ### Skills cast when the official game casts them
 
 - Every skill the mode casts by itself now follows the live official client's rules for when to cast (the trigger table of the current CN season). Before, the game used the previous season's table plus several rules of its own. Skills that cast automatically in the official game anyway (they start by their own rule) are unchanged.
