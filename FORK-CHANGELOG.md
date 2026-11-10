@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Plugin studio trial tests no longer time out on a busy machine
+
+- Two plugin studio tests ran a real trial against the production 20 s wall limit, though that trial alone takes 8–16 s and over 20 s while the machine is busy, so they failed even when run alone. They now allow the tests' shared load time (60 s) and still check the same results: the three trial presets, and the sandbox refusing code it cannot run. The studio's own 20 s limit for players is unchanged.
+
 ### Reed the Flame Shadow's S3 blast looks and sounds as in the official game
 
 - During Reed the Flame Shadow's S3 (Ember of Life), an enemy that is defeated while carrying Cinder now bursts with the official blast effect on the ground where it fell, with the official explosion sound. Before, the game drew a stand-in orange ring, with no sound.
