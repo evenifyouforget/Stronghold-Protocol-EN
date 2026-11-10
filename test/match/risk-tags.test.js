@@ -165,7 +165,7 @@ test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the
   } finally { h.m.dispose(); }
 });
 
-test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5, ATK × 1.5 from United 2', () => {
+test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP × 1 / 2 / 3, ATK × 1.5 from United 2', () => {
   const wave = (level) => {
     const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, lobbyRules: { ccDelegation: level } });
     try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
@@ -174,11 +174,11 @@ test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5,
   const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
   const u1 = byKey(wave(1));
   assert.equal(u1[dg.degen].count, 1);
-  assert.equal(u1[dg.wave[1].key].count, 5);
-  assert.equal(u1[dg.wave[2].key].count, 5);
-  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2, atkMul: 1 });
-  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
-  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
+  assert.equal(u1[dg.wave[1].key].count, 2);
+  assert.equal(u1[dg.wave[2].key].count, 2);
+  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 1, atkMul: 1 });
+  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 2, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
   assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 1 } });
   try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
@@ -216,7 +216,7 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
     const b = bountySpawns(h.m.gd, h.m.round, h.m.wave, plain, ps.playerId);
     assert.ok(a.length > 0 && a.length === b.length);
     for (let i = 0; i < a.length; i++) {
-      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * 3) < 1e-9);
+      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * CC.delegation.hpMul.united2) < 1e-9);
       assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * 1.5) < 1e-9);
     }
   } finally { h.m.dispose(); }

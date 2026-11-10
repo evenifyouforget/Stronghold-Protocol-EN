@@ -3,7 +3,7 @@
 // (BattleSpec flags.rules). Prep-side tags (prices, shop upgrades, bench counting, Strategy rounds, extra enemies) live
 // with the match.
 //   ccForesight   every 远见 operator −20 ASPD, whether 远见 is active or not (Fish, 2026-10-15)
-//   ccSpRecovery  every operator's time-based SP recovers 0.2 / 0.5 / 0.8 SP/s slower (spRecoveryFlat)
+//   ccSpRecovery  every operator's time-based SP recovers 0.2 / 0.4 / 0.6 SP/s slower (spRecoveryFlat)
 //   ccLeaderDr    leaders — the Final Assault / Hidden Core bosses and the leader-class enemies (bosses.js BOSS_KEYS,
 //                 enemies/leaders.js LEADER_KITS) — take 50 / 90 % less Physical and Arts damage, except while under an
 //                 elemental burst (爆发: the burstLock flag)
@@ -15,9 +15,9 @@
 //                 holds the pool (sharedBoss.setHold)
 //   ccPatriot     Undying 1: Patriot's leak costs CC.patriot.leakLp; nobody took him (flags.ccPatriotSkipped) and Undying
 //                 2: the final bosses' ATK +100 % more. Undying 2: in Marching Stance (his 'ab:patriotMarch' buff) 90 % less
-//                 Physical / Arts damage from units not blocking him and immune to CC.patriot.marchImmune; +200 % HP and
-//                 never slower than his base speed (both forms). Undying 3: every enemy +40 % move speed, +40 ASPD while
-//                 he lives. Patriot, and the Degenbrecher of the Delegation sub-wave, use their Level 1 stats (data
+//                 Physical / Arts damage from units not blocking him. Undying 3: in Marching Stance immune to
+//                 CC.patriot.marchImmune; +200 % HP and never slower than his base speed (both forms); his escort
+//                 (the match: infra.js). Patriot, and the Degenbrecher of the Delegation sub-wave, use their Level 1 stats (data
 //                 enemies.json `level1`).
 //   ccDelegation  United 2: the sub-wave's Degenbrecher charges while unblocked (installDegenCharge); United 3's gate is in
 //                 her kit (enemies/leaders.js)
@@ -88,9 +88,9 @@ function installJunk(battle, rules) {
 }
 
 /**
- * ccVengeance — the Reids the tag adds (spawn mods bountyId 'risk:vengeance'): Invincible Blade 2: +150 % HP, +50 % ATK,
- * Status Resistance, 30 % less Physical / Arts damage below 50 % HP (his revive's 15 s 无敌: his kit, enemies/leaders.js);
- * Invincible Blade 3: +100 ASPD, below 50 % HP 60 % less damage instead and immune to CC.vengeance.immune.
+ * ccVengeance — the Reids the tag adds (spawn mods bountyId 'risk:vengeance'): Invincible Blade 2: +50 % ATK, Status
+ * Resistance, 40 % less Physical / Arts damage below 50 % HP (his revive's 15 s 无敌: his kit, enemies/leaders.js);
+ * Invincible Blade 3: below 50 % HP 80 % less damage instead and +100 ASPD.
  */
 function installVengeance(battle, rules) {
   const V = CC.vengeance;
@@ -100,7 +100,7 @@ function installVengeance(battle, rules) {
   const low = (u) => u.hpRatio < V.lowHp;
   battle.on('enemySpawn', ({ enemy }) => {
     if (!isRisk(enemy)) return;
-    S.passiveBuff(battle, enemy, 'risk:vengeance', { hpPct: V.hpPct, atkPct: V.atkPct, ...(blade3 ? { aspd: V.aspd } : {}) });
+    S.passiveBuff(battle, enemy, 'risk:vengeance', { atkPct: V.atkPct });
     battle.applyStatus(enemy, 'resist', { source: enemy });
   });
   battle.on('hit', (c) => {
@@ -109,8 +109,14 @@ function installVengeance(battle, rules) {
     c.dmg.mul *= 1 - (blade3 ? V.lowDr3 : V.lowDr2);
   });
   if (blade3) {
-    const immune = new Set(V.immune);
-    battle.on('beforeStatus', (c) => { if (isRisk(c.target) && low(c.target) && immune.has(c.status)) c.cancel = true; });
+    // +ASPD only while below half HP: a short buff renewed every 0.1 s (his revive's full HP ends it)
+    let acc = 0;
+    battle.on('tick', ({ dt }) => {
+      acc += dt;
+      if (acc < 0.1 - 1e-9) return;
+      acc = 0;
+      for (const e of battle.aliveEnemies()) if (isRisk(e) && low(e)) battle.addBuff(e, { key: 'risk:vengeanceLow', duration: 0.2, refresh: 'replace', mods: { aspd: V.aspd } });
+    });
   }
 }
 
@@ -285,33 +291,24 @@ function installPatriot(battle, rules) {
   if (!tagHas(rules, 'ccPatriot', 'undying1')) return;
   const pt = CC.patriot;
   const isPatriot = (u) => !!u && u.side === 'enemy' && keyOf(u) === pt.key;
-  const undying2 = tagHas(rules, 'ccPatriot', 'undying2'), rampage = tagHas(rules, 'ccPatriot', 'undying3');
+  const undying2 = tagHas(rules, 'ccPatriot', 'undying2'), undying3 = tagHas(rules, 'ccPatriot', 'undying3');
+  const marching = (u) => isPatriot(u) && !!u.findBuff('ab:patriotMarch');
   battle.on('enemySpawn', ({ enemy }) => {
     if (!isPatriot(enemy)) return;
     enemy.lpr = pt.leakLp;
-    if (undying2) S.passiveBuff(battle, enemy, 'risk:patriotUndying', { hpPct: pt.hpPct }, { flags: { moveFloor: true } });
+    if (undying3) S.passiveBuff(battle, enemy, 'risk:patriotUndying', { hpPct: pt.hpPct }, { flags: { moveFloor: true } });
   });
-  if (undying2) {
-    const marching = (u) => isPatriot(u) && !!u.findBuff('ab:patriotMarch');
+  if (undying3) {
     const immune = new Set(pt.marchImmune);
     battle.on('beforeStatus', (c) => { if (marching(c.target) && immune.has(c.status)) c.cancel = true; });
+  }
+  if (undying2) {
     battle.on('hit', (c) => {
       const t = c.target;
       if (!marching(t) || !c.dmg || (c.dmg.type !== 'phys' && c.dmg.type !== 'arts')) return;
       const src = c.source;
       if (!src || src.side !== 'ally' || t.blockedBy === src) return;
       c.dmg.mul *= 1 - pt.marchDr;
-    });
-  }
-  if (rampage) {
-    let acc = 0;
-    battle.on('tick', ({ dt }) => {
-      acc += dt;
-      if (acc < 0.1 - 1e-9) return;
-      acc = 0;
-      const enemies = battle.aliveEnemies();
-      if (!enemies.some(isPatriot)) return;
-      for (const e of enemies) battle.addBuff(e, { key: 'risk:patriotRampage', duration: 0.2, refresh: 'replace', mods: { moveMul: 1 + pt.rampage.movePct, aspd: pt.rampage.aspd } });
     });
   }
 }

@@ -82,42 +82,40 @@ function patriotField(rules) {
   return { h, p, d };
 }
 
-test('Patriot Undying 1: his leak costs 5; Undying 2: +200 % HP, 90 % less damage from non-blockers and the statuses refused in Marching Stance, never below base speed', () => {
+test('Patriot Undying 1: his leak costs 5; Undying 2: 90 % less damage from non-blockers in Marching Stance, nothing else', () => {
   const one = patriotField({ ccPatriot: 1 });
   assert.equal(one.p.lpr, CC.patriot.leakLp);
   const base = one.p.s.maxHp;
   const { h, p } = patriotField({ ccPatriot: 2 });
-  assert.ok(Math.abs(p.s.maxHp / base - (1 + CC.patriot.hpPct)) < 1e-9);
+  assert.equal(p.s.maxHp, base, 'no HP (Undying 3 has it since the balance draft of 2026-11)');
   const ally = h.allies().find((u) => u !== p.blockedBy);
   const hit = (src, type) => { const c = { source: src, target: p, dmg: { type, mul: 1 } }; h.b.emit('hit', c); return c.dmg.mul; };
   assert.ok(Math.abs(hit(ally, 'phys') - (1 - CC.patriot.marchDr)) < 1e-9);
   assert.ok(Math.abs(hit(ally, 'arts') - (1 - CC.patriot.marchDr)) < 1e-9);
   assert.equal(hit(ally, 'true'), 1);
   if (p.blockedBy) assert.equal(hit(p.blockedBy, 'phys'), 1, 'his blocker');
+  assert.equal(h.b.applyStatus(p, 'slow', { duration: 3, source: ally }), true, 'statuses land (Undying 3 refuses them)');
+  // out of Marching Stance (the kit drops 'ab:patriotMarch' at his knock-out): no reduction
+  h.b.removeBuff(p, 'ab:patriotMarch');
+  assert.equal(hit(ally, 'phys'), 1);
+});
+
+test('Patriot Undying 3: +200 % HP, the statuses refused in Marching Stance, never below base speed; no aura on the other enemies', () => {
+  const base = patriotField({ ccPatriot: 1 }).p.s.maxHp;
+  const { h, p, d } = patriotField({ ccPatriot: 3 });
+  assert.ok(Math.abs(p.s.maxHp / base - (1 + CC.patriot.hpPct)) < 1e-9);
+  const ally = h.allies().find((u) => u !== p.blockedBy);
+  const hit = (src, type) => { const c = { source: src, target: p, dmg: { type, mul: 1 } }; h.b.emit('hit', c); return c.dmg.mul; };
+  assert.ok(Math.abs(hit(ally, 'phys') - (1 - CC.patriot.marchDr)) < 1e-9, 'Undying 2 under it');
   for (const st of ['stun', 'slow', 'freeze', 'attract']) assert.equal(h.b.applyStatus(p, st, { duration: 3, source: ally }), false, st);
   h.b.addBuff(p, { key: 'test:slow', duration: 5, mods: { moveMul: 0.1 } });
   assert.ok(p.s.moveSpeed >= p.base.moveSpeed - 1e-9, 'never below his base speed');
-  // out of Marching Stance (the kit drops 'ab:patriotMarch' at his knock-out): no reduction, statuses land again
+  assert.ok(!d.buffs.some((b) => b.key.startsWith('risk:patriot')), 'the old Undying 3 aura (+40 % move speed, +40 ASPD) is gone');
   h.b.removeBuff(p, 'ab:patriotMarch');
-  assert.equal(hit(ally, 'phys'), 1);
-  assert.equal(h.b.applyStatus(p, 'slow', { duration: 3, source: ally }), true);
+  assert.equal(h.b.applyStatus(p, 'slow', { duration: 3, source: ally }), true, 'out of Marching Stance');
 });
 
-test('Patriot Undying 3: every enemy +40 % move speed, +40 ASPD while he lives', () => {
-  const { h, p, d } = patriotField({ ccPatriot: 3 });
-  const buff = (u) => u.buffs.find((b) => b.key === 'risk:patriotRampage');
-  assert.ok(buff(d) && buff(p));
-  h.b.kill(p, null);                                         // his revive: still alive, still on
-  h.run(1);
-  assert.ok(buff(d), 'while he revives');
-  h.runUntil(() => p.mem.ab.state !== 'reborn', 120);
-  h.b.kill(p, null);                                         // the second form's knock-out is for good
-  h.run(1);
-  assert.ok(!p.alive);
-  assert.ok(!buff(d), 'gone with him');
-});
-
-test('Delegation United 3: Degenbrecher\'s second form stops at every 9 %, loses nothing while casting, bursts after the cast', () => {
+test('Delegation United 3: Degenbrecher\'s second form stops at every 25 %, loses nothing while casting, bursts after the cast', () => {
   const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, flags: { rules: { ccDelegation: 3 } },
     units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
   h.step(1);

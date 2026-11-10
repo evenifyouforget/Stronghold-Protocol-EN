@@ -57,7 +57,7 @@ export const CC = Object.freeze({
     periodic: Object.freeze(['band_damaztic']),
   }),
   upgradeExtra: Object.freeze([null, Object.freeze({ 4: 2 }), Object.freeze({ 4: 3, 5: 3 })]), // shop level → +Funds
-  spRecovery: Object.freeze([0, 0.2, 0.5, 0.8]), // time SP slower by … per s
+  spRecovery: Object.freeze([0, 0.2, 0.4, 0.6]), // time SP slower by … per s (Fish's balance draft 2026-11: was 0.2 / 0.5 / 0.8)
   bossHp: Object.freeze([0, 0.5, 1.5, 4]), bossAtk: Object.freeze([0, 0.15, 0.25, 0.5]),
   leaderDr: Object.freeze([0, 0.5, 0.9]),
   dpPerSecMul: 0.5,                            // Deep Infiltration
@@ -67,14 +67,15 @@ export const CC = Object.freeze({
   ozPhys: Object.freeze({ share: 0.5, def: 5000 }),   // … as Physical
   lockout: Object.freeze({ every: Object.freeze([0, 0.68, 0.28, 0.18]), seconds: 10 }), // invulnerable 10 game s per step
   // Famiglia: Cleaner — rounds 10–13, the fewest stacks
-  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
+  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 2, rounds: Object.freeze([10, 11, 12, 13]) }), // (balance draft 2026-11: was 5)
   // Famiglia Unending / Seasonal — the Blood Ledger (血债账款) of every battle (arknights.wiki.gg Blood_Ledger): it fills
   // perSec per game second (+zaaroPerSec while Zaaro lives, + his Furious Howl, data skill WildCalling), and at max an
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
   // +15 %, +50 ASPD) per Liquidation so far in the battle, up to 5; one Shadow Silencer comes (Seasonal); the gauge drains
   // over drainSeconds and does not fill meanwhile. Unending: the whole battle is a Liquidation (no Silencer comes).
-  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare; max 200 instead of the
-  // official 500, empty at the start, half full from round 10 (Fish 2026-10-23; was 500, 25 %, 75 %). Tier 3: Zaaro joins Cleaner's sub-wave and
+  // Seasonal: fresh every battle, it starts at startShare of max, from round lateFrom at lateShare; max 300 instead of the
+  // official 500, empty at the start, half full from round 10 (Fish 2026-10-23; was 500, 25 %, 75 %; max 200 until the
+  // balance draft of 2026-11). Tier 3: Zaaro joins Cleaner's sub-wave and
   // costs zaaro.leakLp when he leaks.
   // Junk 1: every player gets Toxic Waste at the start (a Fish Edition item, made by ruleDataPatch): it cannot be
   // destroyed — not sold, not destroyed by the player, never replaced away, never expiring in the temporary hand; its carrier ATK −50 %; no 变形同构体 pairing. Junk 2:
@@ -83,17 +84,17 @@ export const CC = Object.freeze({
   junk: Object.freeze({ itemId: 'fish_item_toxic_waste', atkPct: -0.5, incomeLoss: 1, iconId: 'trap_1125_acarm125' }),
   // Vengeance: Reid, "Hateful Avenger" (enemy_1539_reid, the leader; Fish 2026-10-15, spawns reworked 2026-10-23).
   // Invincible Blade 1: 1 Reid in a normal battle of a player with an active alliance at perStacks stacks or more; the
-  // final boss rounds: always 1, once per field. 2: +150 % HP, +50 % ATK, Status Resistance, 30 % less Physical / Arts
-  // damage below 50 % HP, 15 s invulnerable after his revive. 3: 1 more per perStacks stacks above perStacks of the
-  // player's highest active alliance (the final boss rounds: the highest of any alive player's), +100 ASPD, below 50 % HP
-  // 60 % less damage and immune to the listed statuses.
+  // final boss rounds: always 1, once per field. 2: +50 % ATK, Status Resistance, 40 % less Physical / Arts damage below
+  // 50 % HP, 15 s invulnerable after his revive. 3: 1 more per perStacks stacks above perStacks of the player's highest
+  // active alliance (the final boss rounds: the highest of any alive player's); below 50 % HP 80 % less damage instead and
+  // +100 ASPD. (Fish's balance draft 2026-11: 2 was +150 % HP and 30 %; 3 was 60 %, ASPD at any HP, and immune to
+  // Slow, Stun, Bind, Cold, Freeze, Tremble, Sleep, Fear, Levitate and Lure below 50 % HP.)
   vengeance: Object.freeze({
-    key: 'enemy_1539_reid', perStacks: 200, hpPct: 1.5, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.3, lowDr3: 0.6,
+    key: 'enemy_1539_reid', perStacks: 200, atkPct: 0.5, lowHp: 0.5, lowDr2: 0.4, lowDr3: 0.8,
     reviveInvincible: 15, aspd: 100,
-    immune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
   }),
   famiglia: Object.freeze({
-    max: 200, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0, lateFrom: 10, lateShare: 0.5,
+    max: 300, perSec: 3, zaaroPerSec: 1, drainSeconds: 35, startShare: 0, lateFrom: 10, lateShare: 0.5,
     atkPct: 0.2, defPct: 0.15,
     silencerKeys: Object.freeze(['enemy_1283_sgkill', 'enemy_1283_sgkill_2']),
     silencer: Object.freeze({ atkPct: 0.15, defPct: 0.15, aspd: 50, maxStacks: 5 }),
@@ -105,32 +106,32 @@ export const CC = Object.freeze({
   }),
   // Patriot: Undying 1 — the round-9 Improv always offers him (no bounty); nobody taking him: the final boss +200 % HP
   // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — Marching Stance: 90 % less Physical / Arts
-  // damage from operators not blocking him, +200 % HP, the listed statuses cannot touch him, never slower than his base
-  // speed. Undying 3 — 5 Guerrilla Shieldguards join him, the sub-wave comes again in the final boss rounds (once per
-  // field), and every enemy +40 % move speed and +40 ASPD while he lives (Fish's playtest nerf, 2026-10-15: Support 3 /
-  // Rampage 3 became this one level).
+  // damage from operators not blocking him. Undying 3 — 2 Guerrilla Shieldguards join him, the sub-wave comes again in
+  // the final boss rounds (once per field); +200 % HP, the listed statuses cannot touch him in Marching Stance, never
+  // slower than his base speed. (Fish's balance draft 2026-11: the HP, the immunities and the speed floor were Undying
+  // 2's; Undying 3 had 5 Shieldguards and every enemy +40 % move speed, +40 ASPD while he lived.)
   patriot: Object.freeze({
     key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1, // Level 1 stats (data enemies.json level1)
     marchDr: 0.9, hpPct: 2,
     // the sim's status keys of Slow, Stun, Bind, Cold, Frozen, Frighten (战栗 tremble), Sleep, Fear, Levitate, Lure (attract)
     marchImmune: Object.freeze(['slow', 'sluggish', 'stun', 'bind', 'cold', 'freeze', 'tremble', 'sleep', 'fear', 'levitate', 'attract']),
-    escort: Object.freeze({ key: 'enemy_1081_sotisd', count: 5 }),
-    rampage: Object.freeze({ movePct: 0.4, aspd: 40 }),
+    escort: Object.freeze({ key: 'enemy_1081_sotisd', count: 2 }),
   }),
   // Delegation: the sub-wave of the final boss round(s), once per field; United 2 — the final boss cannot die while a
   // Degenbrecher lives, and she charges: move speed +up to chargePct while unblocked, reached after chargeSeconds, reset
-  // when blocked or unable to move; United 3 — Momentum Murder every 9 % with a hard HP gate (Fish's playtest nerf, 2026-10-15: HP 200 /
-  // 300 / 500 %, Cloned 3 gone)
+  // when blocked or unable to move; United 3 — Momentum Murder every 25 % (the game's own step) with a hard HP gate.
+  // HP 100 / 200 / 300 % (Fish's balance draft 2026-11: 1 Degenbrecher, 2 Shieldbearers, 2 Centurion Champions; was 5
+  // and 5, HP 200 / 300 / 500 % and a gate every 9 %; Fish's playtest nerf of 2026-10-15 removed Cloned 3)
   delegation: Object.freeze({
     wave: Object.freeze([
       Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
-      Object.freeze({ key: 'enemy_1387_winshd', count: 5 }),
-      Object.freeze({ key: 'enemy_1389_winbab_2', count: 5 }),
+      Object.freeze({ key: 'enemy_1387_winshd', count: 2 }),
+      Object.freeze({ key: 'enemy_1389_winbab_2', count: 2 }),
     ]),
     degen: 'enemy_1525_blkswb', // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
-    hpMul: Object.freeze({ united1: 2, united2: 3, united3: 5 }), atkMul: Object.freeze({ united2: 1.5 }),
+    hpMul: Object.freeze({ united1: 1, united2: 2, united3: 3 }), atkMul: Object.freeze({ united2: 1.5 }),
     chargePct: 3, chargeSeconds: 10,
-    gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
+    gateRatio: 0.25, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),
 });
 
