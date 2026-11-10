@@ -7,6 +7,13 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Element damage shows as the official ring under the feet
+
+- Elemental damage (Burn, Nervous Impairment, Corrosion, Necrosis) now shows the way the official game shows it, drawn with the official client's own art: a ring in the element's color under the unit's feet, with a white arc inside it for the element value left. The arc shrinks clockwise from 12 o'clock, and the burst comes when it runs out. Before, a small disc and a white bar sat in a row under the HP bar.
+- Operators' rings carry the element's icon and flash on every elemental hit, with a faint trail showing the last drop. An enemy's ring flashes outward when it bursts.
+- During the burst cooldown the arc refills at half opacity, as in the official game. Before, the bar turned the element's color and the disc blinked.
+- The HP and SP bars stay over the head as before. Until the new art has downloaded, the ring is drawn with the old element disc and a white arc in the same place.
+
 ### Skills cast when the official game casts them
 
 - Every skill the mode casts by itself now follows the live official client's rules for when to cast (the trigger table of the current CN season). Before, the game used the previous season's table plus several rules of its own. Skills that cast automatically in the official game anyway (they start by their own rule) are unchanged.
