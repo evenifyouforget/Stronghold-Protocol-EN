@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### The Custom Squad swap button is easier to spot
+
+- On a Custom Squad operator's card in Operator Loadout, the round button at the bottom of the left rail that opens the picker to choose another operator now has a mint ring and a mint swap icon, and fills the rail's width. Before, it was grey like the Alliance discs above it, and players said they couldn't find it. It stays in the same place and works the same way.
+
 ### The result screen scrolls through every player in Grand Alliance
 
 - With more players than fit on the screen (Grand Alliance, up to 8), the player cards on the "Simulation Complete" screen now scroll sideways: with the mouse wheel, by dragging, by swiping on a phone, with the ← / → keys, or with the round ‹ › buttons at the sides. The screen opens with your own card in the middle and keeps it there if the window resizes or a phone goes fullscreen, until you scroll; the edges fade where more cards are hidden. Before, the cards past the screen edges couldn't be reached. A 4-player result looks exactly as before. The scrolling is a shared piece, so other rows that outgrow the screen can use it too.
