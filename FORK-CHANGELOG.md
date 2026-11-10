@@ -7,6 +7,14 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Skills cast when the official game casts them
+
+- Every skill the mode casts by itself now follows the live official client's rules for when to cast (the trigger table of the current CN season). Before, the game used the previous season's table plus several rules of its own. Skills that cast automatically in the official game anyway (they start by their own rule) are unchanged.
+- A skill can now have several conditions, and it casts as soon as any of them is met, as in the official game. Defenders, for example, cast when they're hit or as soon as an enemy is in range. Before, most defenders waited for a hit, and a few cast only with an enemy in range.
+- Some skills now cast as soon as their SP is full, wherever the enemies are: Talulah S3 (Corona Ablaze), Degenbrecher S2 and S3, Executor the Ex Foedere S3, Passenger S3, Irene S2 and S3, Ch'en S3, Ch'en the Dawnstreak S2, Aphrissa S3 and Toska S3. Before, they waited for an enemy near them.
+- Snipers and casters cast with an enemy in their attack range or in their skill's own range. Medics cast for an injured ally in their attack range or skill range. A skill with a range of its own (Blaze the Igniting Spark S2 and S3, for example) also casts once an enemy enters that range.
+- Two of the game's earlier choices stay, because they play better than the official behaviour: Yu's S2 casts only with an enemy within two tiles, never from a hit (officially a ranged hit casts it with nobody to pull). Seven skills that grow the attack range by a tile or more still cast once an enemy enters the larger range: Archetto S3, Passenger S2, Hellagur S3, Saga S3, Pallas S2, Hoederer S3 and Jessica the Liberated S3 (officially they wait for the normal range).
+
 ### Mostima's and Lemuen's skills look and sound as in the official game
 
 - Mostima in Ethereal Harmony (`char_213_mostma@ambienceSynesthesia#6`): every S3 attack now sends out its wave again. The outfit's wave waits 0.8 s before it appears, and the effects layer ended an attack's effects after 0.6 s, so it never showed: enemies were hit and pushed back with nothing on screen. An effect part that is still waiting when an attack's effects end now plays once, as authored. Her default outfit's wave already played.
