@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Talulah casts her S3 as soon as it's ready
+
+- Talulah's S3 (Corona Ablaze, `char_4247_oxi`) now starts as soon as her SP is full, about 7 s into the fight, as in the official Season 3 mode. Before, she waited until an enemy came within her own reach, even though the skill's fireballs fly down the lanes from behind her and hit enemies far ahead. Her S1 and S2 already matched the official game: they fire by their own rules.
+
 ### Mostima's and Lemuen's skills look and sound as in the official game
 
 - Mostima in Ethereal Harmony (`char_213_mostma@ambienceSynesthesia#6`): every S3 attack now sends out its wave again. The outfit's wave waits 0.8 s before it appears, and the effects layer ended an attack's effects after 0.6 s, so it never showed: enemies were hit and pushed back with nothing on screen. An effect part that is still waiting when an attack's effects end now plays once, as authored. Her default outfit's wave already played.
