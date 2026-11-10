@@ -7,6 +7,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-10
 
+### Update news: 0.3.4-1
+
+- The lobby banner now announces Update 0.3.4-1, and it shows again for players who closed the 0.3.4 one. Its five headline lines are unchanged.
+- Seven new points come first: skills cast when the official game casts them; official element burst effects and the element ring under the feet; Mostima's, Lemuen's and Reed the Flame Shadow's S3 look and sound as in the official game; attacks no longer twitch before the strike; stored skill charges show over the operator's head; Damage Stats keep every round; and the Custom Squad's easier-to-spot swap button and ✕ to clear a slot.
+- Kept: Profile Icon, SilverAsh the Reignfrost's S3 with 20+ operators' attacks, 7 new outfits, and smarter bots. Dropped from the banner and the language packs: the lines about skills that replace an attack, the Viviana VFX fix, and skill cast sounds.
+
 ### Plugin studio trial tests no longer time out on a busy machine
 
 - Two plugin studio tests ran a real trial against the production 20 s wall limit, though that trial alone takes 8–16 s and over 20 s while the machine is busy, so they failed even when run alone. They now allow the tests' shared load time (60 s) and still check the same results: the three trial presets, and the sandbox refusing code it cannot run. The studio's own 20 s limit for players is unchanged.
