@@ -96,7 +96,7 @@ What a run fixes, so it can be repeated: the tactic code, the training seeds and
 
 ## Hypothesis tests: human Final Assault boards (2026-11-01)
 
-Fish's questions (TODO.md "# GitHub"): does a human's final board beat every boss, and can the AI win from a human's
+Fish's questions (2026-11-01): does a human's final board beat every boss, and can the AI win from a human's
 final board? Plus a third test that closes the loop. All on `mini/0.3.1-4` (03a9f044), solo Standard (FUNNY), whose
 final boss comes at round 9.
 
