@@ -27,7 +27,7 @@ Investor ... studying human games may be enlightening."
 - **Stacks are even until round 7.** The gap opens from rounds 7 to 13: humans gain about 400, bots about 150.
 - **The highest human seats are Paganini (Laterano) with Investor:** 1,000–4,600 stacks, with 160–340 sales and
   400–700 gold.
-- Every core Alliance shows the gap. Humans reach 1.5–3× the bots' medians, e.g. Laterano 763 against 196, and Yan
+- Every core Alliance shows the gap. Humans reach 1.3× (Kjerag) to 3.9× (Laterano: 763 against 196) the bots' medians; Yan is
   562 against 174.
 
 ## Why: humans cycle operators, bots hold a board
