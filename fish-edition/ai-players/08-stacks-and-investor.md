@@ -85,6 +85,36 @@ Per seat, whole match (`items.mjs` → `untracked/dyy-2026-11/items.md`):
 | 寻呼模块 (4: a free pick of 3 operators of the bearer's Alliances) | 1.0 / 1.0 | 0.02 |
 | 精打细算玩偶 (3: +1 fund every later round) | 0.5 / 0.5 | 0 |
 
+**In battle against the rest** (`untracked/dyy-2026-11/battle-stacks.mjs` → `battle-stacks.md`). Every normal battle of
+rounds 7–13 is replayed from its BattleSpec, and the stacks the battle itself gave each bond are read (`layerGains`).
+Replays of older human records don't always match exactly (324 of 425 battles give the recorded digest; bots 648 of
+730), so read these as close estimates.
+
+| Per seat, rounds 7–13 (means) | Humans | Bots |
+|---|---|---|
+| Stacks gained | 594 | 188 |
+| of which in battle | 229 | 88 |
+| of which outside battle (prep, 获得时, items, engines) | 365 | 100 |
+
+So the bots miss both: about a third of the gap is battle stacks, two thirds outside battle. By bond, in-battle stacks
+per round while the bond is active (rounds active in brackets):
+
+| Bond | Humans | Bots |
+|---|---|---|
+| Laterano | 58.7 (94) | 10.3 (61) |
+| Sargon | 37.9 (34) | 22.7 (39) |
+| Ægir | 30.6 (42) | 21.7 (56) |
+| Resilient | 23.2 (11) | 4.7 (96) |
+| Foresight | 20.9 (110) | 0.8 (97) |
+| Kazimierz | 20.0 (19) | 15.2 (116) |
+| Kjerag | 17.6 (34) | 16.5 (81) |
+| Raid | 15.7 (40) | 11.7 (102) |
+| Precision | 14.8 (67) | 3.2 (276) |
+
+- **Kjerag (freezing) is already fine:** the bots get about what humans get.
+- **Laterano (ammo) is not:** 10 a round against 59. Foresight (1 against 21) and Precision (3 against 15) are the other
+  big gaps. Why (which operators are deployed, Mostima's neighbours) is the next thing to look at.
+
 **Turnover still differs** (buys 68 against 30, sells 48 against 14 per match), but the split says it buys fewer
 stacks directly than it seemed. Its main effect is probably reaching the stackers and the merges sooner.
 
