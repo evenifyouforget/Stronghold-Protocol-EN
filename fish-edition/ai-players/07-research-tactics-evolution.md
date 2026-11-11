@@ -84,7 +84,28 @@ Each generation plays a fresh block of 40 seeds (generation g: seeds 40g+1 to 40
 mean over every block it has played. A lucky candidate must keep winning on new seeds, and its score regresses as it
 survives. The held-back seeds move to 1001–1060.
 
-Run 2 (`untracked/evolve-2026-11/solo-abyss-resample/`) is the same run with `--resample`. Its result goes here.
+### Run 2: the same with `--resample` (seeds 1–240 over 6 generations)
+
+| | Training (fresh seeds) | Held back (seeds 1001–1060) |
+|---|---|---|
+| legacy | 92/240 | 24/60 |
+| `sell-singles` | 106/240 (+37 / −23) | 23/60 (+13 / −14) |
+| `bounty-gate > bounty-optimism(k=3.9) > early-roll > sell-singles` | 107/240 (+44 / −29) | 17/60 (+7 / −14) |
+| `bounty-optimism(k=2.5)` | 51/120 (+0 / −0) | 24/60 (+0 / −0) |
+
+- **Resampling worked as meant.** The 4-tactic profile led generation 1 with 41/80, and its lead shrank on every new
+  block.
+- **`sell-singles` is the only lasting edge on training, and it isn't significant.** It has +14 wins over 240 seeds,
+  but 37 flips against 23 gives p ≈ 0.09, two-sided. On held-back seeds it is even.
+- **`bounty-optimism` never changes a pick.** Legacy already takes the bounties it would add, so the tactic is inert.
+- **Two flaws in the bench showed up:**
+  - Candidates with different seed blocks were ranked by raw means. A candidate that drew easier blocks looked better:
+    `bounty-optimism` ranked above legacy with identical play.
+  - The holdout check took the best fitness of any generation, so it picked the 4-tactic profile's early luck.
+  - Both are fixed. Fitness is now paired: each match's score minus legacy's on the same seed. The holdout takes the
+    final generation's top three.
+
+Run 3 (`untracked/evolve-2026-11/solo-abyss-paired/`) is run 2 with both fixes. Its result goes here.
 
 ### Further options, if run 2 is still noise
 

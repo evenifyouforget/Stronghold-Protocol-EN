@@ -29,7 +29,7 @@ SPA-CC final balance update (#31, #92)
               └─ spacc/working-spec.md, full test suite, PR into main
 
 Evolution bench ............................ built (tools/evolve.mjs, feature/bot-tactics-research)
-  run 2 (--resample) ....................... running; run 1 overfit (ai-players/07)
+  run 3 (paired, resampled) ............... running; runs 1–2: no real gain (ai-players/07)
   ├─ bot research: "try it in the evolution bench"
   ├─ DYYBot step 5 (05-dyybot.md "Process")
   └─ Mod Z: "try the evolution bench", then the report
@@ -76,7 +76,7 @@ browser-safe, deterministic and cheap: Yuri is moving bots to the browser.
 - **#129 `legacy-layered`:** the tuning run of its 35 parameters (botbench `--profile`, small saved chunks,
   held-back seeds) has not been started.
 - **Research tactics and the evolution bench:** `ai-players/07`. Branch `feature/bot-tactics-research` (pushed, no
-  PR). Run 2 is running; a 4-player run (`ai-players/06`) and `--pool legacy` (#129's tuning) come after it.
+  PR). Run 3 is running; a 4-player run (`ai-players/06`) and `--pool legacy` (#129's tuning) come after it.
 
 Fish's bot research list (2026-11-11):
 
@@ -86,7 +86,7 @@ Fish's bot research list (2026-11-11):
 - - [x] New tactics that could supplement existing tactics
 - [x] Determine if any data sharing model is needed, other than actions. Yes, at the boundary to legacy
       (`ai-players/07`). (ex. if board placement step needs to know who the carry is, this may force the tactic to be monolithic and unable to be broken up, unless every tactic replicates that carry dps logic OR a new form of data sharing is introduced)
-- [ ] Try it in the evolutionary auto-tuning bench (run 1 overfit, run 2 running: `ai-players/07`)
+- [ ] Try it in the evolutionary auto-tuning bench (runs 1–2 found nothing that holds up; run 3 running: `ai-players/07`)
 - - [ ] Answer: Did the most fit strategy win significantly more?
 - - [ ] Answer: Did the most fit strategy actually make use of evolution, or was it reachable with only parameter tuning?
 - - [ ] Answer: Is the evolution bench effective? If not, can we improve it to make it effective?
