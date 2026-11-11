@@ -12,6 +12,15 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
 - Its tests moved to `test/shelved/external-ai/` as `*.shelved.js`, which no runner picks up (`npm test`, the CI shards, the browser suite, perf): 15 whole files, plus the External AI cases split out of 6 files whose other tests keep running. `test/shelved/README.md` says how to run them by hand.
 
+### Outfits with their own official battle sounds play them
+
+- Three outfits have official battle sounds of their own, and now play them: Goldenglow's Party In The Garden, Executor the Ex Foedere's The Train Runner and Eyjafjalla's Fluffy Little Witch (the Sanrio outfits). Their attacks, impacts and skill sounds use the outfit's files; anything the outfit has no sound for stays the operator's. Eyjafjalla's outfit also has an S2 explosion sound of its own.
+- It works for any outfit: the asset build finds an outfit's sound banks in the official audio data by name, so a new one needs no code. Skadi the Corrupting Heart's Red Countess already played its own voice lines; its sound effects are the same as the default outfit's.
+- Goldenglow's drones were silent in every outfit. Each drone hit, a drone's self-destruct and S2 / S3's drone launch now play their official sounds. Eyjafjalla's attacks now have their impact sound (in her Sanrio outfit, S3's impact is its own).
+- The rest of these three operators' official battle sounds play too, in every outfit: Goldenglow's own S1 / S2 shot when she sends out drones, and each drone's signal 0.6 s after launch; Eyjafjalla's S2 swing and its hit; Executor the Ex Foedere's talent double strike (its own sound in S3) and his S3 final verdict. His Sanrio outfit's S2 attack also plays its second shot sound.
+- Behind the scenes: the dev sandbox plays an outfit's own battle sounds too, and an outfit sound's pitch and delay settings are found under the file's served name.
+- Server: 41 new sound files (26 for the outfits, 15 default ones for these three operators), all in data/assets.json.
+
 ### Blaze the Igniting Spark can no longer use skills while downed
 
 - While her talent From the Ashes has her downed, she can no longer start a skill, as in the official game, where the downed state silences her. Her SP still recovers, so a full skill starts the moment she stands back up.
