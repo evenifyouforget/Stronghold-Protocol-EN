@@ -81,6 +81,17 @@ Fights don't change, and bot battles do no extra work.
 - The points come from the battle: Aphrissa's S2 start now sends the beam's path, and Angelina the Mellow Wish's S3 start sends her skill range. These are display fields on events the battle already sent, so battles play out exactly as before. The new `render/vfx/pathfx.js` traces a tile set's outer edges into closed outlines through the tile corners, as the official range line does, and draws any official line through many points.
 - Not covered: Aphrissa's normal attack line and a beam path that changes during S2 (it keeps its starting path). Thorns the Lodestar's S3 polygon line is a separate follow-up.
 
+### Lemuen's skills show every official effect
+
+A full check of all 31 of Lemuen's effects, in her default look and Requiem Vesperis, found these pieces we never drew or drew wrong:
+
+- **S3 aim beams.** Each S3 lock now drops a beam onto the locked enemy (`lemuen_skill_03_trail_01`), gold in Requiem Vesperis. The beams stack, one per lock, and each stays until its shell lands, as in the official game.
+- **S2 aim reticle.** The aim line now also puts its reticle on the aimed enemy (`lemuen_skill_02_crosshair_01`, the line's own end effect), until her shot.
+- **Talent 2 (Extradition Procedure).** When it activates, its loop (`lemuen_talent_buff_02`) now plays on her for the rest of her deployment, instead of a stand-in burst.
+- **Outfit effects inside effects.** Effects that an effect starts on its own now use the unit's outfit version. In Requiem Vesperis, Lemuen's S1 glow showed a default-look piece; other operators' outfits that work the same way are fixed too.
+- **S2 aimed shot.** Her aimed S2 shot now plays its muzzle flash (`lemuen_skill_02_start_02`, the back-facing `_back` when she faces up, with `_start_01`) and flies its own projectile to the target, whose hit plays as it lands. Her ordinary shots during S2 now look like her normal shots; before, they borrowed the aimed shot's look and the aimed shots had no flash.
+- **Deploy effect in prep.** Putting an operator on the board in prep, and the round-start landing, now play the official deploy effect: the generic one, or the outfit's own (Requiem Vesperis: `lemuen_birth_01`). Before, only a stand-in flash showed. This applies to every operator.
+
 ### A player who leaves is out for good, and the next round doesn't wait for them
 
 - Leaving a match now eliminates the player in every room type, Grand Alliance included. Before, a Grand Alliance player who left (or was removed for idling) stayed in the match and the AI played their board every round. This also applies when a dropped player doesn't come back before the rejoin window ends. During that window nothing changes: in a Grand Alliance room the AI still plays a dropped player's board until they come back.
