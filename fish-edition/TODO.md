@@ -22,11 +22,10 @@ DYYBot line. No more sganggs syncs (they added SPA3, 2026-11-11); Yuri → main 
 
 ```
 SPA-CC final balance update (#31, #92)
-  bot sweeps before/after .................. running (balance-2026-11/run.sh)
-  stand-route fix merged into the branch ... waits for the sweeps
-    └─ Halley replay rerun + analyze.py → verdicts in spacc-balance-update.md
-         └─ Fish decides the values (+ pro player / community feedback, eos-notes)
-              └─ spacc/working-spec.md, full test suite, PR into main
+  bot sweeps, stand-route fix, Halley replay, verdicts .. done (spacc-balance-update.md)
+    └─ Fish decides the values (+ pro player / community feedback, eos-notes) ← next
+         open: Patriot Undying 2 once taken, Delegation United 2/3 in co-op
+         └─ spacc/working-spec.md, full test suite, PR into main
 
 Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07)
   first tactics: no real gain over legacy; bigger tactics needed (DYYBot, team play)
@@ -47,12 +46,11 @@ Fish's list (2026-11-11), with where each item stands. Details in `untracked/bal
       stronger since, so the tags the draft doesn't touch need a fresh sweep.
 - [x] Draft balance patch on a branch: `feature/spacc-balance-2026-11` (worktree `sp-sync2`, pushed, no PR). It has
       Fish's comments of 2026-11-11: Cleaner back to 5, the Degenbrecher at the round's start, the linked HP, 200/300/500 %.
-- [ ] Use bots to estimate values of rebalanced tags: the sweep is running.
-- [ ] Point out which nerfs are too small and should be undone: first verdicts are in `spacc-balance-update.md`.
-      They get updated when the sweep is done.
-- [ ] Point out which nerfs are too big: same.
-- [x] Estimate values of rebalanced tags vs the Ult+26 game: findings.md "Halley's Ult+26 replayed". Rerun after the
-      stand-route fix.
+- [x] Use bots to estimate values of rebalanced tags: 80 seeds each, `balance-2026-11/analyze-2026-11-11.md`.
+- [x] Point out which nerfs are too small and should be undone: the verdicts in `spacc-balance-update.md`.
+- [x] Point out which nerfs are too big: same (Delegation United 2/3 in co-op).
+- [x] Estimate values of rebalanced tags vs the Ult+26 game: `balance-2026-11/halley-branch2.md`, with the stand-route
+      fix.
 
 Branches that feed into it:
 
@@ -60,8 +58,9 @@ Branches that feed into it:
   balance branch. It is a bench-only profile.
 - `fix/spacc-subwave-stand-route` (pushed, no PR):
   - **The bug, also on main:** a risk sub-wave unit could take a leader's standing route (wait 500 s), so it stood still.
-    This is why United 2's Hidden Core took ~510 s in the Halley replay.
-  - **Options:** merge it into the balance branch, or open its own bug-fix PR (Fish's call).
+    This is why United 2's Hidden Core took ~510 s in the Halley replay. In Halley's real game the Degenbrecher and
+    the Reid stood still all Hidden Core.
+  - Merged into the balance branch. It could also go to main as its own bug-fix PR (Fish's call).
 
 Also open: #47 (Patriot targetable while invulnerable), #48 (Blood Debt icon), #121 (clears tracking issue;
 `untracked/spacc-clears.mjs` regenerates it), #125 (free-tags option: a feature, see "Needs Fish").
