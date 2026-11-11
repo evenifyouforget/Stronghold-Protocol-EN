@@ -6,3 +6,5 @@
 - You can't move inside your own squad any more, and you can change squad at most once every 5 seconds and 4 times a minute. The button counts down while you wait.
 - Changing squad clears your Ready. The host can still swap two players, but only between the squads.
 - Before: every empty seat had a Sit here button for every player, with no limit, so one player could jump around the room and make everyone's screen jump.
+
+Server cost: unmeasured (pre-rule)

@@ -9,3 +9,5 @@
   conflicted on the one-line manifest and on three totals in `test/audio-pools-data.test.js`.
 - The audio pool test now checks every unit's and every pool's count against `test/audio-pools-data.snapshot.json`
   (`npm run assets:pool-snapshot -- --update` rewrites it), not only the three totals.
+
+Server cost: none (pre-rule)
