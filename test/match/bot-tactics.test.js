@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { LEGACY_BOT } from '../../server/match/botStrategyContract.js';
 import { BOT_STRATEGIES } from '../../server/match/botStrategies.js';
 import { PASS, DECISION_POINTS, defineTactic, defineProfile, profileOf, resolveParams } from '../../server/match/botTactics.js';
-import { LEVEL_CURVE, BUY_TIER } from '../../server/match/botTacticsBasic.js';
+import { LEVEL_CURVE, BUY_TIER, TAKE_PATRIOT } from '../../server/match/botTacticsBasic.js';
 import { makeMatch, checkInvariants } from './harness.js';
 
 const soloBot = (opts = {}) => makeMatch({ mode: 'solo', difficulty: 'NORMAL', fake: true,
@@ -103,7 +103,7 @@ test('a profile whose tactics pass at every point plays a whole match exactly li
 });
 
 test('the registered profiles: opt-in ids, slot views, and their tactics act through the game\'s own intents', () => {
-  assert.deepEqual(Object.keys(BOT_STRATEGIES).filter((id) => id.startsWith('fish-')), ['fish-level', 'fish-tier6']);
+  assert.deepEqual(Object.keys(BOT_STRATEGIES).filter((id) => id.startsWith('fish-')), ['fish-level', 'fish-tier6', 'fish-patriot']);
   assert.deepEqual(profileOf('fish-tier6'), {
     tunables: null,
     tactics: [{ tactic: 'buy-tier', params: { minTier: 6, reserve: 0 } }, { tactic: 'level-curve', params: { scale: 'boss', shift: 0, maxLevel: 6, reserve: 0 } }],
@@ -122,4 +122,22 @@ test('the registered profiles: opt-in ids, slot views, and their tactics act thr
     assert.ok(handed, "legacy's level-ups follow");
     checkInvariants(m);
   } finally { m.dispose(); }
+});
+
+test('take-patriot: the round-9 Improv\'s Patriot card (ccPatriot Undying 1) is picked whenever offered; any other draft is legacy\'s', () => {
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 1 } });
+  try {
+    const { m } = h;
+    m.round = 9;
+    m.enterSpDraft();
+    const cards = m.sp.cards;
+    const idx = cards.findIndex((c) => c.id === 'risk:patriot');
+    assert.ok(idx >= 0, 'offered');
+    const ps = m.order[0];
+    const all = cards.map((_, i) => i);
+    assert.equal(BOT_STRATEGIES['fish-patriot'].pickCard(m, ps, cards, all), idx);
+    const at = (available) => TAKE_PATRIOT.at.pickCard({ args: [cards, available] });
+    assert.equal(at(all.filter((i) => i !== idx)), PASS, 'taken by someone else: legacy picks');
+    assert.equal(at([idx]), idx);
+  } finally { h.m.dispose(); }
 });
