@@ -2027,7 +2027,9 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
       if (job.done) return true;
       // (fork research) PREP_TIEBREAK's per-candidate prep-time stacks (arrangeSteps sets plan.prepGain)
       const bonus = plans.some((p) => p?.prepGain > 0) ? plans.map((p) => p?.prepGain || 0) : null;
-      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, { ...(limits || {}), bonus });
+      // (fork research) LEAK_ALLOW's per-candidate leak allowance (arrangeSteps sets plan.leakAllow)
+      const allow = plans.some((p) => p?.leakAllow > 0) ? plans.map((p) => p?.leakAllow || 0) : null;
+      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, { ...(limits || {}), bonus, allow });
       // A test replay (`control.replaying`) stops on the journalled step count, not the wall clock.
       const replaying = !!(control && control.replaying);
       const timed = !replaying && Number.isFinite(budgetMs);
@@ -3113,7 +3115,7 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
   // §37.37 the positional traits' arrangement goes first (the rehearsal still prefers one that leaks less or kills more)
   if (final && plans.length) {
     const pos = yield* positionPlanSteps(m, ps, chosen, plans[0], ctx);
-    if (pos) { if (plans[0].lineup) pos.lineup = plans[0].lineup; plans.unshift(pos); }
+    if (pos) { if (plans[0].lineup) pos.lineup = plans[0].lineup; pos.positional = true; plans.unshift(pos); }
   }
   // §37.62 the damage lineups: their default plan and, for a self-bound leader, the body plan, for a walking one the
   // leader chain; §37.63 the co-op alternatives of a normal round: their default plan — after the candidates the
@@ -3193,6 +3195,9 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
     }
   }
   if (PREP_TIEBREAK > 0 && plans.length > 1) for (const pl of plans) pl.prepGain = PREP_TIEBREAK * prepPositionGain(m, ps, rehChosen, pl, ctx);
+  if (LEAK_ALLOW > 0 && !boss && m.round >= LEAK_ALLOW_FROM && m.round <= LEAK_ALLOW_TO && ps.lp >= LEAK_ALLOW_LP) {
+    for (const pl of plans) if (pl.positional) pl.leakAllow = LEAK_ALLOW;
+  }
   if ((defer || adaptive) && plans.length > 1) {
     const limits = adaptive ? { stage: 3, tickBudget: 6 * (!m.wave && bossWaveOf(m, ps) ? faRehearsalTicks(m) : rehearsalCap(m.wave?.timeLimit)) } : null;
     const job = yield* createRehearsalSteps(m, ps, rehChosen, plans,
@@ -3226,6 +3231,15 @@ let PREP_TIEBREAK = 0;
  * members, whose skills are ammo skills, and the 猎手 branch). 0 (legacy): not valued, and her neighbours are not searched.
  */
 let AROUND_VALUE = 0;
+/**
+ * (fork research, ai-players/09) The positional candidate's leak allowance: the rehearsal counts its leaks minus this,
+ * so 0.5 makes it win a leak tie outright and 1.5 also with one leak more. Only in normal rounds LEAK_ALLOW_FROM to
+ * LEAK_ALLOW_TO while the LP is at least LEAK_ALLOW_LP. 0 (legacy): off. Like PREP_TIEBREAK, only a rehearsal run on this
+ * thread reads it.
+ */
+let LEAK_ALLOW = 0;
+let LEAK_ALLOW_LP = 20;
+const LEAK_ALLOW_FROM = 6, LEAK_ALLOW_TO = 11;
 
 const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
 
@@ -4738,12 +4752,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the

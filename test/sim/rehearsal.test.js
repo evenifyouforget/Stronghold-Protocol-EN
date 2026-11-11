@@ -129,3 +129,14 @@ test('(fork research) a candidate bonus (PREP_TIEBREAK\'s prep-time stacks) beat
   leak.note(fake(1, 10), 0); leak.note(fake(0, 5), 1);
   assert.equal(leak.index, 1, 'a leak still decides first');
 });
+
+test('(fork research) a leak allowance (LEAK_ALLOW) lets a candidate win with up to that many more leaks', async () => {
+  const { RehearsalScore } = await import('../../server/sim/rehearsal.js');
+  const fake = (leaks, killed) => ({ kind: 'normal', result: () => ({ perPlayer: { P: { leaked: Array.from({ length: leaks }, () => ({})), killed, layerGains: {} } } }) });
+  const tie = new RehearsalScore('P', null, [0.5, 0]);
+  tie.note(fake(2, 10), 0); tie.note(fake(2, 20), 1);
+  assert.equal(tie.index, 0, '0.5 wins a leak tie over more kills');
+  const one = new RehearsalScore('P', null, [1.5, 0, 0]);
+  one.note(fake(3, 10), 0); one.note(fake(2, 20), 1); one.note(fake(1, 5), 2);
+  assert.equal(one.index, 2, '1.5 beats one leak fewer, not two');
+});

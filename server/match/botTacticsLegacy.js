@@ -139,6 +139,8 @@ export const LEGACY_ARRANGE = defineTactic({
     posTolerance: num(0, 1, L.POSITION_TOLERANCE),
     prepTiebreak: num(0, 10, L.PREP_TIEBREAK),
     aroundValue: num(0, 10, L.AROUND_VALUE),
+    leakAllow: num(0, 10, L.LEAK_ALLOW),
+    leakAllowLp: num(0, 100, L.LEAK_ALLOW_LP),
   },
   at: pass('arrangeSteps', true),
   tunables: (p) => ({
@@ -148,6 +150,8 @@ export const LEGACY_ARRANGE = defineTactic({
     POSITION_TOLERANCE: p.posTolerance,
     PREP_TIEBREAK: p.prepTiebreak,
     AROUND_VALUE: p.aroundValue,
+    LEAK_ALLOW: p.leakAllow,
+    LEAK_ALLOW_LP: p.leakAllowLp,
   }),
 });
 
