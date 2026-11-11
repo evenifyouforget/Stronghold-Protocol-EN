@@ -5,6 +5,16 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-11
+
+### Outfits with their own official battle sounds play them
+
+- Three outfits have official battle sounds of their own, and now play them: Goldenglow's Party In The Garden, Executor the Ex Foedere's The Train Runner and Eyjafjalla's Fluffy Little Witch (the Sanrio outfits). Their attacks, impacts and skill sounds use the outfit's files; anything the outfit has no sound for stays the operator's. Eyjafjalla's outfit also has an S2 explosion sound of its own.
+- It works for any outfit: the asset build finds an outfit's sound banks in the official audio data by name, so a new one needs no code. Skadi the Corrupting Heart's Red Countess already played its own voice lines; its sound effects are the same as the default outfit's.
+- Goldenglow's drones were silent in every outfit. Each drone hit, a drone's self-destruct and S2 / S3's drone launch now play their official sounds. Eyjafjalla's attacks now have their impact sound (in her Sanrio outfit, S3's impact is its own).
+- Behind the scenes: the dev sandbox plays an outfit's own battle sounds too, and an outfit sound's pitch and delay settings are found under the file's served name.
+- Server: 22 new sound files (16 for the outfits, 6 default Goldenglow / Eyjafjalla sounds), all in data/assets.json.
+
 ## 2026-11-10
 
 ### Operators attack as in the official game: the swing starts, then the hit lands
