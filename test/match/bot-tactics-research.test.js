@@ -73,3 +73,30 @@ test("plan-bond adds its bond to legacy's own plan for the round, from its round
   const stale = { round: 6, plan: { bonds: [focus] } };
   assert.equal(run(7, stale), stale, "another round's plan: untouched");
 });
+
+test("plan-engines puts the position stack operators into legacy's buy list, keeps the owned ones, and stops buying new ones at max", async () => {
+  const { PLAN_ENGINES } = await import('../../server/match/botTacticsResearch.js');
+  const h = soloBot({ seed: 3 });
+  h.start();
+  const m = h.m;
+  const params = { kinds: 'pos', fromRound: 4, toRound: 11, max: 1 };
+  // the whole visible pool (a match bans some operators per seed: SharedPool `banned`)
+  const pool = { entries: new Map(m.gd.visibleChess.map((id) => [id, {}])) };
+  const run = (round, level, owned = []) => {
+    const fake = { isBot: true, autoplay: false, _botSelf: { round, plan: Object.freeze({ bonds: [] }) }, gd: m.gd,
+      shop: { level }, allChess: () => owned.map((id, i) => ({ uid: 900 + i, id })) };
+    PLAN_ENGINES.at.sellJunk({ match: { round, pool, gd: m.gd }, player: fake, params, next: () => 'legacy' });
+    return fake._botSelf.plan;
+  };
+  const p = run(6, 6);
+  for (const id of ['chess_char_3_21_a', 'chess_char_3_02_a']) assert.ok(p.buy.includes(id), `${id} (position stacker) in the buy list`);
+  assert.ok(!p.buy.includes('chess_char_2_04_a'), '小满 (an Alliance-named engine legacy already values) is not');
+  assert.deepEqual(p.bonds, [], "legacy's own plan fields stay");
+  assert.ok(!run(6, 2).buy.includes('chess_char_3_21_a'), 'above the shop level: not listed');
+  const capped = run(6, 6, ['chess_char_3_21_b']);
+  assert.deepEqual(capped.buy, ['chess_char_3_21_a'], 'max reached: only the owned one (its copies) stays a buy');
+  assert.deepEqual(capped.keep, ['chess_char_3_21_b']);
+  assert.equal(run(3, 6).buy, undefined, 'before fromRound: untouched');
+  assert.equal(run(12, 6).buy, undefined, 'after toRound: untouched');
+  assert.ok(TACTICS['plan-engines'] || TACTICS.get?.('plan-engines'), 'registered');
+});

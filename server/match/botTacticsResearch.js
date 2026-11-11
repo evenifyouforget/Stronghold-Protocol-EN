@@ -258,5 +258,66 @@ export const PLAN_BOND = defineTactic({
   },
 });
 
+/**
+ * Writes legacy's own plan, like plan-bond: from `fromRound` to `toRound`, the stack operators that feed whichever
+ * Alliances are active go into the plan's `buy` (bought outright above the reserve, bot.js planSpendSteps; copies to
+ * merge too) and the owned ones into its `keep` (+18 in the bench and sale scores). Legacy's engine bonus (engineFor)
+ * only sees traits naming the focus Alliance or "自身所属／自身已激活的盟约", so it misses the position stackers:
+ *   - pos: SERVER_ADD_BOND_POSITION, the active Alliances of itself and the piece in front / behind +n each prep
+ *     (空弦, 断崖, 引星棘刺, 见行者). Humans deploy 空弦 and 断崖 7× and 19× as often as the bots in rounds 7–13
+ *     (fish-edition/ai-players/08); legacy already places them (§37.37 positionTraitsOf).
+ *   - own (kinds 'pos+own'): a prep-start / prep-end SERVER_ADD_BOND_CHESS_ALL, its own active Alliances +n (伊内丝, 赫默,
+ *     莱恩哈特, 蒂比).
+ * Buying stops once `max` different ones are owned (merging the owned ones goes on). Data only, never an action.
+ */
+const ENGINE_KINDS = Object.freeze(['pos', 'pos+own']);
+function stackerBases(m, kinds) {
+  const cache = m._tacticStackers || (m._tacticStackers = new Map());
+  if (cache.has(kinds)) return cache.get(kinds);
+  const gd = m.gd;
+  const out = [];
+  for (const id of m.pool?.entries?.keys?.() || []) { // the shop pool: what the shop can show
+    const c = gd.chess(id);
+    if (!c || gd.isGolden(id) || c.isHidden) continue;
+    const yes = (c.garrisonIds || []).some((gid) => {
+      const g = gd.garrison(gid);
+      if (!g || (g.eventType !== 'SERVER_PREP_FIN' && g.eventType !== 'SERVER_PREP_START')) return false;
+      return g.effectKey === 'SERVER_ADD_BOND_POSITION' || (kinds === 'pos+own' && g.effectKey === 'SERVER_ADD_BOND_CHESS_ALL');
+    });
+    if (yes) out.push(id);
+  }
+  const list = Object.freeze(out.sort());
+  cache.set(kinds, list);
+  return list;
+}
+export const PLAN_ENGINES = defineTactic({
+  id: 'plan-engines',
+  describe: "writes legacy's plan: the position stack operators (空弦, 断崖 …) into its buy and keep lists from a round on",
+  params: {
+    kinds: { type: 'choice', choices: ENGINE_KINDS, default: 'pos' },
+    fromRound: int(1, 14, 4),
+    toRound: int(1, 14, 11),
+    max: int(1, 4, 2),
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (m.round >= p.fromRound && m.round <= p.toRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = ps.gd || m.gd;
+        const bases = stackerBases(m, p.kinds);
+        const ownedBases = new Set(ps.allChess().map((q) => gd.baseIdOf(q.id)));
+        const owned = bases.filter((id) => ownedBases.has(gd.baseIdOf(id)));
+        const buy = owned.length >= p.max ? owned : bases.filter((id) => (gd.chess(id)?.tier || 9) <= ps.shop.level);
+        const keep = ps.allChess().filter((q) => bases.some((id) => gd.baseIdOf(id) === gd.baseIdOf(q.id))).map((q) => q.id);
+        const plan = own?.plan || {};
+        const merge = (a, b) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, 32));
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, buy: merge(plan.buy, buy), keep: merge(plan.keep, keep) }) };
+      }
+      return ctx.next();
+    },
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES]);
