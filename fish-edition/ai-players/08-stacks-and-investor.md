@@ -30,21 +30,53 @@ Investor ... studying human games may be enlightening."
 - Every core Alliance shows the gap. Humans reach 1.3× (Kjerag) to 3.9× (Laterano: 763 against 196) the bots' medians; Yan is
   562 against 174.
 
-## Why: humans cycle operators, bots hold a board
+## Why: the operators deployed and the items, more than cycling
 
-Several stack rules count operators **gained**:
-- Alliances that add stacks per operator gained in the round (`round_gain_char` in legacy's own stack model, `bot.js`);
-- the 获得时 ("on obtain") garrison effects.
+**Where the stacks come from, rounds 7–13** (`untracked/dyy-2026-11/stack-sources.mjs` → `stack-sources.md`). Each
+round's gain is split into estimates:
+- 获得时: the "on obtain" traits of the operators obtained, ×2 under Investor;
+- the engine: operators obtained × the deployed 小满 / 夕 / 山 ("each operator gained this round");
+- the rest: everything else (the prep-start and prep-end traits of deployed operators, items, Alliance effects).
 
-**Humans buy 2.3× as many operators and sell 3.5× as many.** They pay for it with more gold, more merge rewards, and
-selling. Each cheap operator bought feeds the stacks, then gets sold again.
+| Per seat, rounds 7–13 (median / mean) | Humans | Bots |
+|---|---|---|
+| Stacks gained | 410 / 594 | 169 / 188 |
+| 获得时 traits | 36 / 75 | 32 / 37 |
+| Engine (小满 / 夕 / 山) | 0 / 89 | 0 / 21 |
+| Rest | 336 / 430 | 112 / 130 |
+| Operators obtained | 30 / 43 | 17 / 17 |
 
-**Legacy buys toward a board and keeps it.** Its "layer trade" (`bot.js` §35.63: buy an operator whose 获得时 effect
-adds stacks, sell it again) is the right idea, but it fires rarely: 14 sales a match.
+- **Buying to feed the 获得时 traits explains little.** The median seat gets about the same from them on both sides.
+  The engine matters for a minority of human seats (Investor, Yan with 夕), so the mean differs, but the median
+  doesn't. (An earlier draft of this note blamed cycling first. This split corrects that.)
+- **Most of the gap is the rest: about 340 against 110.**
 
-**Items:** humans equip 31 per seat, bots 4. Many are consumables that are themselves engines: Alliance Coin (Funds),
-Identification Device (+3 stacks), Simple Communicator / Dispatch Module (operators of the bearer's Alliances). Legacy
-mostly leaves them in the hand.
+**What humans deploy** (rounds deployed per seat, rounds 7–13; `fielded.mjs`, in the same md):
+
+| Operator | Trait | Humans | Bots |
+|---|---|---|---|
+| 空弦 | prep start: itself and the piece in front, each active Alliance +3 | 2.8 | 0.4 |
+| 断崖 | prep end: itself and the piece behind, each active Alliance +3 | 2.1 | 0.1 |
+| 薄绿 | +2 Victoria per different-tier Victoria operator | 1.3 | 0.3 |
+| 夕 | +2 Yan / Arcane per operator gained | 1.2 | 0.5 |
+| 烛煌 | 获得时 +5 Yan / Victoria | 1.0 | 0.3 |
+| 伊内丝 | prep end: its own active Alliances +5 | 0.7 | 0.3 |
+| 山 | +1 Investor per operator gained | 0.6 | 0.0 |
+
+- **The position stackers 空弦 and 断崖** each add +3 to every active Alliance of two operators, every round. Next to
+  an operator with 3 active Alliances (and 2 of its own), that is 15 a round from one piece.
+- **Legacy undervalues them.** Its engine bonus (`engineFor`, +10) only sees a trait that names the focus Alliance or
+  says "自身所属／自身已激活的盟约". "使自身及身前一格干员的已激活盟约…" matches neither, so they get only the generic
+  `recurring × 4`. Legacy does place them well once owned (§37.37 `positionTraitsOf`).
+- **Not on every map:** a match bans about 22 operators per seed (`SharedPool.banned`); 空弦 and 断崖 were both out in
+  seeds 1 and 3. The humans' matches ban too, so the comparison holds.
+
+**Items:** humans equip 18 in rounds 7–13 (31 over the match), bots 2.4 (4). Many are consumables that are themselves
+engines: Alliance Coin (Funds), Identification Device (+3 stacks), Simple Communicator / Dispatch Module (operators of
+the bearer's Alliances). Legacy mostly leaves them in the hand.
+
+**Turnover still differs** (buys 68 against 30, sells 48 against 14 per match), but the split says it buys fewer
+stacks directly than it seemed. Its main effect is probably reaching the stackers and the merges sooner.
 
 ## Investor
 
@@ -65,7 +97,7 @@ and its bonds. A Bench-counted bond whose members are spread across tiers 1–5 
 it around round 10, when level 5 shows the tier-5 members.
 
 Investor alone doesn't explain the stacks. Human seats with Investor have 569 stacks, without it 461. Both are far
-above the bots' 200, so the cycling above is the bigger part.
+above the bots' 200, so the deployed stackers and items above are the bigger part.
 
 ## A first tactic: `plan-bond` (writes legacy's internal state)
 
@@ -93,15 +125,36 @@ It changes play, but too late and too rarely at these settings.
 **Queued** (`untracked/queue2-2026-11-12.sh` → `untracked/investor-2026-11/`): co-op Ultimate seeds 1–40, all seats
 the same bot. The variants are legacy, priority 3 from round 6, and priority 5 from round 4.
 
+## A second tactic: `plan-engines` (writes legacy's internal state)
+
+`plan-engines` (same file and branch, 78b911a6) puts the position stackers into the plan's `buy` list from a round on,
+and the owned ones into `keep`:
+- `buy`: legacy buys a listed operator outright when the shop shows it, above its reserve (`planSpendSteps`), and its
+  copies until the merge;
+- `keep`: +18 in the bench and sale scores.
+
+Parameters:
+- `kinds`: `pos` (空弦, 断崖, 引星棘刺, 见行者), or `pos+own`, which adds the prep-time "own active Alliances +n"
+  operators (伊内丝, 赫默, 莱恩哈特, 蒂比);
+- `fromRound` (4) and `toRound` (11);
+- `max` (2): no new kinds are bought once that many are owned.
+
+Like `plan-bond`, it changes data only.
+
+**Queued** (`untracked/queue4-2026-11-12.sh` → `untracked/engines-2026-11/`):
+- match records with `eng-pos` on the legacy records' setup (seeds 1–30), for `stacks.mjs` and `stack-sources.mjs`;
+- botbench on queue2's seeds: `eng-pos` and `eng-pos-own`.
+
 ## Next tactics (not built)
 
-1. **Cycling:** from round 7, while the funds allow, buy the cheapest operator that feeds an active stack rule (a
-   `round_gain_char` Alliance or a 获得时 effect), and sell it next prep. It's legacy's layer trade, run as a loop.
-   Parameters: start round, reserve, which tiers.
-2. **Consumables:** equip Alliance Coin, Identification Device, Simple Communicator and Dispatch Module when they pay.
-   This needs the plan's `items` channel (`items.equip`), or the tactic acts directly.
-3. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
+1. **Consumables:** equip Alliance Coin, Identification Device, Simple Communicator and Dispatch Module when they pay.
+   This needs the plan's `items` channel (`items.equip`), or the tactic acts directly. After the stackers, the
+   biggest measured gap (18 equips against 2.4 in rounds 7–13).
+2. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
    level 5.
+3. **Cycling:** from round 7, buy the cheapest operator that feeds an active 获得时 or engine rule and sell it next
+   prep. Lower priority after the split above. queue3's `trade1.5` (legacy's own trade at half the bar) tests the
+   cheap version first.
 
 **To measure:** stacks (botbench `--layers`) and boss damage, paired by seed against legacy. Wins alone need hundreds
 of seeds (07).
