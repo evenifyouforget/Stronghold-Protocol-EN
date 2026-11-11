@@ -38,7 +38,7 @@ Evolution bench ............................ built and effective (tools/evolve.m
 DYYBot (#135, draft)
   step 1: human games vs the draft, legacy's games vs the humans' .. done (05)
   ├─ forced-Du-Yaoye baseline + the draft, 160 seeds .. done (05: no win difference; early levels cost the board)
-  └─ step 3 tactics: `plan-iso` measured (inert at level 5); level 6 added, queue8 running ← results next; then the roll-down
+  └─ step 3 tactics: `plan-iso` measured: no gain (inert at level 5; level 6 from round 11 costs 20 → 12 wins, Isomorph adds nothing). Maybe: level 6 only with Muelsyse held; then the roll-down
        └─ step 5 evolution: on Fish's PC (one command, one zip)
 ```
 

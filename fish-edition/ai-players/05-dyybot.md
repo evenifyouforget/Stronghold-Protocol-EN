@@ -252,10 +252,24 @@ Ultimate, Du Yaoye forced, seeds 1–160, legacy against `iso`, paired.
 its merge-reward picks act; they change 49 of 160 seeds, with no visible gain (3 lost is noise, p 0.25).
 
 **Level 6 added** (33e86ab4): `legacy-level` has a new `level6From` (default 16: never), so a profile can set
-`maxLevel 6, level6From 11`. A three-seed smoke run reaches level 6 by round 13. **Queued** (`untracked/queue8-2026-11-12.sh`):
-the same 160 seeds with `lvl6` (level 6 from round 11) and `iso6` (the same plus `plan-iso`), against queue6's legacy.
-Legacy's own note (§37.38) found level 6 worse for legacy alone, so `lvl6` against `iso6` is the comparison that
-isolates the Isomorph.
+`maxLevel 6, level6From 11`. Measured (`untracked/queue8-2026-11-12.sh`, `compare-lvl6.md`, `compare-iso6-vs-lvl6.md`):
+the same 160 seeds.
+
+| | `legacy` | `lvl6` (level 6 from round 11) | `iso6` (`lvl6` + `plan-iso`) |
+|---|---|---|---|
+| Wins of 160 | 20 | 12 (12 lost / 4 gained vs legacy, p 0.08) | 9 (3 lost / 0 gained vs `lvl6`, p 0.25) |
+| Reached the Final Assault | 136 | 122 | 121 |
+| Shop level, round 13 | 5.0 | 5.9 | 5.9 |
+| Board value, round 13 | 50.1 | 46.6 | 46.4 |
+| Stacks, round 13 | 171 | 145 | 140 |
+| Leader damage per game | 2.00 M | 1.58 M | 1.55 M |
+
+- **Level 6 at round 11 costs legacy a lot**, as §37.38 found: the funds leave the board, and fewer games reach the boss.
+- **The Isomorph adds nothing on top.** Items held at round 14 rise only from 1.66 to 1.81, so the bot rarely gets one;
+  the three seeds lost are noise.
+- So, for a bot that plays legacy's board, the Isomorph route is not worth its price. Humans pay for level 6 with a
+  stronger economy (08: more gold, coins, merges). Before more Isomorph work, Fish's exact rule is worth one run:
+  level 6 only once Muelsyse is held (not on a fixed round). That needs a small `plan-iso` change (not built).
 
 **Next for step 3:** cloning Muelsyse, then the roll-down.
 
@@ -283,5 +297,5 @@ Solo Ultimate, Du Yaoye forced, seeds 1–160, paired, from `feature/fish-dyy-pr
 - **Games that reach the boss do as well:** 18–24 wins out of about 100, against legacy's 20 of 136.
 - **Merges halve.** The funds go into levels and Yan buys, not pairs. The stacks catch up by round 13.
 - So the early levelling only pays if the levels turn into strength. Humans do that with the roll-down and the
-  Isomorph engine (above). That is step 3's order: `plan-iso` first (queue6, then queue8 with level 6), then the roll-down.
+  Isomorph engine (above). That was step 3's order: `plan-iso` first (queue6, queue8: no gain), then the roll-down.
 
