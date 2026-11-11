@@ -74,12 +74,26 @@ addresses deployment. Once more stackers are deployed, their placement matters m
 | Ægir: a non-Ægir dps with Damazti Isomorph + an Ægir item | Isomorph is on DYYBot's list (05, step 3: the Isomorph plan). Legacy equips Isomorph only via 缪尔赛思's plan (`morphPlan`). | Part of the Isomorph tactic. |
 | Boss: a carry dps with maximum buffs and healing, on a ranged / fence tile | Mostly there. The road penalty keeps dealers off pathable tiles. Boss rounds get body plans, damage lineups (a strong bench piece swapped in) and the rehearsal's leader-damage ranking. What's missing is buffs: the exposure model knows DPS and healing cover, not the ATK auras or 鼓舞 skills a carry could stand in. | A "carry" candidate for the Final Assault: the top dealer first on the best off-road tile, buffers and healers around it. The rehearsal keeps it if it deals more. |
 
+## The tie-break tried (efd9963b)
+
+`legacy-arrange` has two new tunables, both off by default:
+- `prepTiebreak`: each candidate's prep-time positional stacks × this go into the rehearsal's stack tie-break;
+- `posTolerance`: the exposure share the positional plan may give up (legacy: 0.03).
+
+Six solo Ultimate matches with `plan-engines`, plain against `prepTiebreak 1` (and against `posTolerance 0.15`), changed
+almost nothing: 空弦's front was filled in 42 % and 50 % of 12 battles, and stacks were the same in 5 of 6 seeds.
+Tracing seed 5 shows why. The positional candidate exists in rounds 8–10 (+1.8, +5.4 and +7.8 stacks a round over
+the default plan), and it leaks more: 8 leaks against 6 in round 9, 8 against 7 in round 10. The tie-break never
+comes into play.
+
+So, on these boards, filling 空弦's front costs defence. The humans' 86 % says they pay that price. Whether it pays
+depends on what one stack is worth in LP. That's a policy question, not a tie-break.
+
 ## Proposed experiments, in order
 
-1. **Prep-time positional stacks in the rehearsal's stack tie-break.** Count the candidate's prep stacks (the
-   `positionValue` legacy already computes) next to the battle's stack gains. A positional candidate would then win
-   whenever it leaks no more and deals no less leader damage. It's a change to legacy's ranking, so it would go behind
-   a tunable (default off) for a paired run.
+1. **A leak allowance for the positional candidate:** it wins with up to k more leaks while the LP stays above a
+   floor, from round 6 to round 11. A paired run gives the exchange rate. This would be one more tunable next to
+   `prepTiebreak`.
 2. **The `around` positional kind** for 莫斯提马. Small, in the same machinery.
 3. **The Final Assault carry candidate.**
 4. **The Kjerag freeze model.** The largest of the four.
