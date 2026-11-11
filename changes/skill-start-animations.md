@@ -6,3 +6,5 @@
 - Being stunned, frozen or put to sleep during the animation cancels the cast and keeps the skill points.
 - Before: the skill took effect at once, and the first attack cut its start animation off.
 - Skills without a start animation, such as Mostima S3, are unchanged. This changes battle results a little; the stored test results (goldens) are regenerated with it.
+
+Server cost: unmeasured (pre-rule)
