@@ -5,6 +5,15 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-11
+
+### A player who leaves is out for good, and the next round doesn't wait for them
+
+- Leaving a match now eliminates the player in every room type, Grand Alliance included. Before, a Grand Alliance player who left (or was removed for idling) stayed in the match and the AI played their board every round. This also applies when a dropped player doesn't come back before the rejoin window ends. During that window nothing changes: in a Grand Alliance room the AI still plays a dropped player's board until they come back.
+- A battle the player was fighting when they left plays out to its end as usual. It goes at once to another player's browser (the host first, or the boss partner), the same way a disconnect's does. Before, a Grand Alliance player leaving mid-battle made everyone wait about a minute, then the server ran their board.
+- From the next round on, nothing of theirs runs any more: no AI board, no prep, no battles, on any player's browser or on the server.
+- The Grand Alliance idle warning now says the next idle round removes the player and eliminates them, instead of saying the AI takes over their board (all languages).
+
 ## 2026-11-10
 
 ### Operators attack as in the official game: the swing starts, then the hit lands
