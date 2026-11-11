@@ -7,6 +7,10 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### A skill with a start animation plays it in full before the skill begins
+
+- When an operator casts a skill that opens with a start animation, the animation now plays to its end before the skill takes effect, as in the official game. The operator's attacks wait for it, so the first attack no longer cuts it off. This covers 138 skills of 91 operators, such as Mizuki S3, Ayerscarpe S2 and Gavial the Invincible S2; the start animations last 0.1 to 1.5 s. Being stunned, frozen or put to sleep during the animation cancels the cast and keeps the skill points. Skills without a start animation, such as Mostima S3, are unchanged.
+
 ### External AI is shelved: locked in every build, and no test suite runs its tests
 
 - External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
