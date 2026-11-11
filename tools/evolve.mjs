@@ -9,6 +9,10 @@
 //                         [--jobs 8] [--elite 3] [--max-tactics 6] [--pool research,basic,legacy] [--rules R]
 //                         [--seed 1] [--halving]
 //   node tools/evolve.mjs --out DIR --holdout-only     score the best candidates and legacy on the held-back seeds
+// - --resample (recommended): generation g plays a fresh block of seeds (TRAIN's size, right after the previous one),
+//   and a candidate's fitness is the mean over every block it has played. A candidate that got lucky on one block
+//   regresses as it survives; without it, 12 candidates × 6 generations on one fixed block overfit that block (the
+//   first run: 20/40 vs legacy 14/40 on training, 27/60 each on held-back seeds). Held-back default: 1001-1060.
 //
 // - Fitness per match: victory + 0.25 × hidden core cleared + 0.25 × rounds passed / boss round; a candidate's
 //   fitness is the mean over the training seeds, minus 0.005 per tactic (against bloat). Paired seeds: every candidate
@@ -39,7 +43,7 @@ for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (!a.startsWith('--')) throw new Error(`unexpected argument ${a}`);
   const k = a.slice(2);
-  if (['halving', 'holdout-only'].includes(k)) opt[k] = true;
+  if (['halving', 'holdout-only', 'resample'].includes(k)) opt[k] = true;
   else opt[k] = args[++i];
 }
 if (!opt.out) { console.error('usage: node tools/evolve.mjs --out DIR [options] (see the header)'); process.exit(2); }
@@ -47,7 +51,14 @@ const OUT = resolve(opt.out);
 const CONFIG = opt.config || 'solo:ABYSS';
 const POP = +(opt.pop || 12), GENS = +(opt.gens || 6), ELITE = +(opt.elite || 3), MAXT = +(opt['max-tactics'] || 6);
 const range = (s) => { const [a, b] = String(s).split('-').map(Number); if (!(a >= 1 && b >= a)) throw new Error(`bad seed range ${s}`); return [a, b]; };
-const TRAIN = range(opt.train || '1-40'), HOLD = range(opt.holdout || '101-160');
+const TRAIN = range(opt.train || '1-40'), HOLD = range(opt.holdout || (opt.resample ? '1001-1060' : '101-160'));
+// --resample: generation g trains on the g-th block of TRAIN's size after TRAIN (fresh seeds each generation)
+const SPAN = TRAIN[1] - TRAIN[0] + 1;
+const blockOf = (gen) => (opt.resample ? [TRAIN[0] + gen * SPAN, TRAIN[1] + gen * SPAN] : TRAIN);
+{
+  const last = blockOf(Math.max(0, +(opt.gens || 6) - 1))[1];
+  if (HOLD[0] <= last && HOLD[1] >= TRAIN[0]) throw new Error(`held-back seeds ${HOLD.join('-')} overlap the training seeds ${TRAIN[0]}-${last}`);
+}
 const RULES = opt.rules || '';
 const SEED = +(opt.seed || 1);
 const JOBS_MAX = +(opt.jobs || 8);
@@ -156,8 +167,15 @@ function runChunk(g, [a, b]) {
   }
 }
 const score = (r) => (r.victory ? 1 : 0) + (r.hidden ? 0.25 : 0) + 0.25 * Math.min(1, (r.roundsPassed || 0) / Math.max(1, r.bossRound || 14));
-function evaluate(g, seeds) {
+/** The matches of `g` already saved for `seeds` (none are played). */
+function cachedRecs(g, seeds) {
+  const h = hashOf(g);
+  return chunks(seeds).flatMap(([a, b]) => { const f = join(OUT, 'cache', `${h}.s${a}-${b}.json`); return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : []; });
+}
+/** `g` on `seeds`; with --resample and `gen`, plus every earlier generation's block it has already played. */
+function evaluate(g, seeds, gen = 0) {
   const recs = chunks(seeds).flatMap((c) => runChunk(g, c));
+  if (opt.resample) for (let k = 0; k < gen; k++) recs.push(...cachedRecs(g, blockOf(k)));
   const fit = recs.reduce((s, r) => s + score(r), 0) / recs.length - 0.005 * g.length;
   return { fit, wins: recs.filter((r) => r.victory).length, n: recs.length, bySeed: new Map(recs.map((r) => [r.seed, r])) };
 }
@@ -165,21 +183,21 @@ const describe = (g) => g.length ? g.map((e) => `${e.tactic}(${Object.entries(e.
 
 // ---- the run ----
 const statePath = join(OUT, 'state.json');
-const meta = { config: CONFIG, train: TRAIN, holdout: HOLD, rules: RULES, seed: SEED, pop: POP, pool: POOL.map((t) => t.id), maxTactics: MAXT };
+const meta = { config: CONFIG, train: TRAIN, resample: !!opt.resample, holdout: HOLD, rules: RULES, seed: SEED, pop: POP, pool: POOL.map((t) => t.id), maxTactics: MAXT };
 if (existsSync(statePath)) {
   const st = JSON.parse(readFileSync(statePath, 'utf8'));
-  for (const k of ['config', 'train', 'rules', 'seed']) if (JSON.stringify(st.meta[k]) !== JSON.stringify(meta[k])) throw new Error(`DIR was made with ${k}=${JSON.stringify(st.meta[k])}; use another --out`);
+  for (const k of ['config', 'train', 'resample', 'rules', 'seed']) if (JSON.stringify(st.meta[k]) !== JSON.stringify(meta[k])) throw new Error(`DIR was made with ${k}=${JSON.stringify(st.meta[k])}; use another --out`);
 }
 
-function rank(pop, seeds) {
+function rank(pop, seeds, gen) {
   const half = opt.halving ? [seeds[0], seeds[0] + Math.floor((seeds[1] - seeds[0] + 1) / 2) - 1] : null;
   let rows;
   if (half && half[1] >= half[0] && half[1] < seeds[1]) {
-    rows = pop.map((g) => ({ g, ...evaluate(g, half), partial: true }));
+    rows = pop.map((g) => ({ g, ...evaluate(g, half, gen), partial: true }));
     rows.sort((x, y) => y.fit - x.fit);
     const keep = Math.ceil(rows.length / 2);
-    for (let i = 0; i < rows.length; i++) if (i < keep || rows[i].g.length === 0) Object.assign(rows[i], evaluate(rows[i].g, seeds), { partial: false });
-  } else rows = pop.map((g) => ({ g, ...evaluate(g, seeds), partial: false }));
+    for (let i = 0; i < rows.length; i++) if (i < keep || rows[i].g.length === 0) Object.assign(rows[i], evaluate(rows[i].g, seeds, gen), { partial: false });
+  } else rows = pop.map((g) => ({ g, ...evaluate(g, seeds, gen), partial: false }));
   // full scores above half-seed scores
   rows.sort((x, y) => (x.partial - y.partial) || (y.fit - x.fit));
   return rows;
@@ -187,7 +205,7 @@ function rank(pop, seeds) {
 
 function report(gen, rows) {
   const base = rows.find((r) => r.g.length === 0);
-  const lines = [`# Generation ${gen} — ${CONFIG}, seeds ${TRAIN.join('–')}${RULES ? `, rules ${RULES}` : ''}`, '',
+  const lines = [`# Generation ${gen} — ${CONFIG}, seeds ${blockOf(gen).join('–')}${opt.resample ? ' (fitness: every block played so far)' : ''}${RULES ? `, rules ${RULES}` : ''}`, '',
     '| # | fitness | wins | vs legacy (+ / −) | tactics | hash |', '|---|---|---|---|---|---|'];
   rows.forEach((r, i) => {
     let flips = '';
@@ -231,7 +249,7 @@ let pop;
   while (pop.length < POP) pop.push(Array.from({ length: 1 + Math.floor(rng() * 3) }, () => newEntry(rng)));
 }
 for (let gen = 0; gen < GENS; gen++) {
-  const rows = rank(pop, TRAIN);
+  const rows = rank(pop, blockOf(gen), gen);
   report(gen, rows);
   const top = rows.filter((r) => !r.partial).slice(0, Math.max(ELITE, 5));
   st.gens[gen] = { top: top.map((r) => ({ hash: hashOf(r.g), fit: r.fit, wins: r.wins, n: r.n, g: r.g })) };
