@@ -12,7 +12,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Each operator's attack now slows its animation only as far as the official game allows that attack: its own limit, read from the game client (`docs/research/15-attack-anim-scale.json`, 239 units). Until now every operator could slow down to 2.5×.
 - Most operators have a limit of 1×: a slow attacker swings at its normal speed and its hit lands at the swing's strike frame, early in its attack interval. Mostima's hit now lands 0.70 s after her swing starts instead of 1.17 s; Mizuki, Ashlock, Warfarin, Greyy and Ptilopsis gain about 0.7 s. A few attacks have a limit of 1.1×, 1.2× or 2×, and 62 have none.
 - Attack effects follow the same limit.
-- This changes battle results a little: in the test battles kills rise 0.8 %, healing 2.3 %, and the bot matches win one more (20 of 21).
+- This changes battle results a little: in the test battles kills rise 0.7 %, healing 2.2 %, and the bot matches win one more (20 of 21). The stored test results (goldens) are regenerated with it.
 - Not yet modelled: in the official game an enemy effect that slows a unit's animation also limits its swing further.
 
 ### Attack effects speed up with the attack, as in the official game
