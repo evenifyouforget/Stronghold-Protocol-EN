@@ -22,6 +22,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - A slow attack slows its effects only as far as its swing may slow (the attack's own limit, above). Effects the game doesn't mark (buffs, statuses, most hits) keep their speed; only their official start delay shortens with the attack, as in the game.
 - Display only: battle results and bots are unchanged.
 
+### Территория's talent lands 0.1 s after a withdrawal
+
+- When Территория leaves the field for any reason other than a knock-out (a retreat, a forced exit, a raid jump), the talent 此身为界 now deals its damage, stuns and shows its tile effect 0.1 s after the exit, as the official game's withdraw shot does. Before, it all happened in the same instant. A knock-out still lands 0.7 s later, as before.
+- The official withdraw shot is an invisible projectile that lives 0.1 s and hits as it stops. Its only visual is the tile effect on every tile of the operator's field (国度), which we already played; it has no sound of its own.
+- The dev sandbox's `hold(i, { retreat: true })` makes board unit `i` withdraw mid-fight, for proof captures.
+
 ### Tests no longer fail just because the computer is busy
 
 - Several tests failed only when the machine was busy (a full test run beside a browser run), and passed when run alone. They were checking real behaviour, but with stopwatches that assumed an idle machine. Each one now waits for the event it needs instead, with a generous limit that only stops a real hang. What each test checks is unchanged.
