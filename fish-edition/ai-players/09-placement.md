@@ -94,7 +94,10 @@ depends on what one stack is worth in LP. That's a policy question, not a tie-br
 1. **A leak allowance for the positional candidate:** it wins with up to k more leaks while the LP stays above a
    floor, from round 6 to round 11. A paired run gives the exchange rate. This would be one more tunable next to
    `prepTiebreak`.
-2. **The `around` positional kind** for 莫斯提马. Small, in the same machinery.
+2. **The `around` positional kind** for 莫斯提马: built (4bafc1c6), behind `legacy-arrange`'s `aroundValue` (default 0;
+   3 means three stacks per battle per ammo user beside her). Ammo users are Laterano members (their skills are ammo
+   skills) and the hunter branch. A unit test checks that it moves a Laterano operator next to her. Not measured yet:
+   she's deployed in few bot games, so it needs Laterano seats (07's per-Alliance range).
 3. **The Final Assault carry candidate.**
 4. **The Kjerag freeze model.** The largest of the four.
 
