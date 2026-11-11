@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### External AI is shelved: locked in every build, and no test suite runs its tests
+
+- External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
+- Its tests moved to `test/shelved/external-ai/` as `*.shelved.js`, which no runner picks up (`npm test`, the CI shards, the browser suite, perf): 15 whole files, plus the External AI cases split out of 6 files whose other tests keep running. `test/shelved/README.md` says how to run them by hand.
+
 ### Blaze the Igniting Spark can no longer use skills while downed
 
 - While her talent From the Ashes has her downed, she can no longer start a skill, as in the official game, where the downed state silences her. Her SP still recovers, so a full skill starts the moment she stands back up.
