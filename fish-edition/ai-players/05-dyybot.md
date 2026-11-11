@@ -237,11 +237,27 @@ take it 43 % of the time, bots 31 %. Legacy already equips an Isomorph well once
 Six solo Du Yaoye matches (seeds 1–6): an Isomorph got and equipped in 5 of 6 seats, against 2 of 6 for legacy.
 Stacks were the same within a few.
 
-**Queued** (`untracked/queue6-2026-11-12.sh`, after queue2): solo Ultimate, Du Yaoye forced, seeds 1–160, legacy
-against `iso`, paired.
+**Measured** (`untracked/queue6-2026-11-12.sh` → `untracked/engines-2026-11/dyy-iso/`, `compare-iso.md`): solo
+Ultimate, Du Yaoye forced, seeds 1–160, legacy against `iso`, paired.
 
-**Next for step 3:** level 6 (a `dyy-level` schedule that goes on to 6, Fish's "upgrade barge to level 6 when Muelsyse
-is in the inventory"), then cloning Muelsyse.
+| | `legacy` | `iso` |
+|---|---|---|
+| Wins of 160 | 20 | 17 (3 lost / 0 gained) |
+| Reached the Final Assault | 136 | 135 |
+| Leaks per game | 21.5 | 22.8 |
+| Stacks, rounds 10 / 13 | 77 / 171 | 77 / 167 |
+| Leader damage per game | 2.00 M | 1.98 M |
+
+**This mostly tested nothing.** Legacy stops at level 5, so `fromLevel` 6 never comes and `plan-iso` never buys. Only
+its merge-reward picks act; they change 49 of 160 seeds, with no visible gain (3 lost is noise, p 0.25).
+
+**Level 6 added** (33e86ab4): `legacy-level` has a new `level6From` (default 16: never), so a profile can set
+`maxLevel 6, level6From 11`. A three-seed smoke run reaches level 6 by round 13. **Queued** (`untracked/queue8-2026-11-12.sh`):
+the same 160 seeds with `lvl6` (level 6 from round 11) and `iso6` (the same plus `plan-iso`), against queue6's legacy.
+Legacy's own note (§37.38) found level 6 worse for legacy alone, so `lvl6` against `iso6` is the comparison that
+isolates the Isomorph.
+
+**Next for step 3:** cloning Muelsyse, then the roll-down.
 
 ## Baseline: the draft against legacy (2026-11-12)
 
@@ -267,5 +283,5 @@ Solo Ultimate, Du Yaoye forced, seeds 1–160, paired, from `feature/fish-dyy-pr
 - **Games that reach the boss do as well:** 18–24 wins out of about 100, against legacy's 20 of 136.
 - **Merges halve.** The funds go into levels and Yan buys, not pairs. The stacks catch up by round 13.
 - So the early levelling only pays if the levels turn into strength. Humans do that with the roll-down and the
-  Isomorph engine (above). That is step 3's order: `plan-iso` first (queued as queue6), then the roll-down.
+  Isomorph engine (above). That is step 3's order: `plan-iso` first (queue6, then queue8 with level 6), then the roll-down.
 
