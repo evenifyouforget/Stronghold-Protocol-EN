@@ -166,9 +166,30 @@ Parameters:
 
 Like `plan-bond`, it changes data only.
 
-**Queued** (`untracked/queue4-2026-11-12.sh` → `untracked/engines-2026-11/`):
-- match records with `eng-pos` on the legacy records' setup (seeds 1–30), for `stacks.mjs` and `stack-sources.mjs`;
-- botbench on queue2's seeds: `eng-pos` and `eng-pos-own`.
+**Measured** (`untracked/queue4-2026-11-12.sh` → `untracked/engines-2026-11/`, `compare-eng-pos*.md`). botbench,
+co-op Ultimate seeds 1–40, against queue2's legacy, paired:
+
+| | legacy | `eng-pos` | `eng-pos-own` (max 3) |
+|---|---|---|---|
+| Wins of 40 | 27 | 22 (7 lost / 2 gained, p 0.18) | 14 (15 / 2, p 0.002) |
+| Reached the boss | 39 | 34 | 31 |
+| LP left (mean) | 36.8 | 27.8 | 27.7 |
+| Bounties leaked | 56 | 65 | 77 |
+| Stacks at rounds 7 / 10 / 13 (mean per team) | 40 / 111 / 258 | 39 / 108 / 266 | 35 / 106 / 252 |
+| Leader damage (mean) | 3.16 M | 3.48 M | 2.20 M |
+
+The records (seeds 1–30, seat 0 Du Yaoye, against `dyy-2026-11/bot-legacy`; legacy there is main's, so the code
+differs slightly): `eng-pos` deploys 空弦 1.03 rounds per seat in rounds 7–13 (legacy 0.40) and 断崖 0.80 (0.10), but
+the median stacks stay at 38 / 87 / 156 at rounds 7 / 10 / 13 (legacy 35 / 100 / 150).
+
+**Verdict: deploying the position stackers doesn't give the stacks the humans get, and costs defence.** The bots now
+field 空弦 and 断崖 2–8× as often, and stacks rise by 3 % at most. `pos+own` is clearly worse. Why it fails is not
+measured yet. Likely reasons:
+- 空弦 / 断崖 are weak units, and they take a board slot from a fighter;
+- their +3 goes to "each active Alliance" of the piece beside them, so it pays only next to a piece with several active
+  Alliances (not checked: how many the bots' neighbours have);
+- the placement problem (09): the rehearsal still leaves the front empty half the time. queue7 (the leak allowance)
+  runs on top of `eng-pos` to test this one.
 
 ## A third tactic: `plan-items` (the plan, plus one buy step)
 

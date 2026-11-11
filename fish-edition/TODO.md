@@ -113,8 +113,8 @@ Long-term goals:
 
 - [ ] Be able to generate high stack counts. Why do the bots suck so much at generating 200+ stacks???
   Answer so far (`ai-players/08`): the gap opens from round 7. Most of it is prep-time stack operators the bots rarely
-  deploy (空弦, 断崖: 7× and 19× less often) and consumables they never buy, not cycling. Tactics `plan-engines` and
-  `plan-items` are queued.
+  deploy (空弦, 断崖: 7× and 19× less often) and consumables they never buy, not cycling. `plan-engines` measured: the bots
+  deploy them 2–8× as often, but stacks rise ≤ 3 % and wins drop (27 → 22 of 40). `plan-items` and the leak allowance are queued.
 - [ ] Be able to play Investor. Just my intuition, but this seems like the strategy the bots are least capable of doing. Studying human games may be enlightening.
   Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
   never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`): the 40-seed grid shows it does not help (27 → 26 / 22 wins, more leaks, same stacks). Next: the Bench-timing tactic.
