@@ -31,6 +31,11 @@ import { seedAssets } from '../ui/fieldHost.js';
 import { toast } from '../ui/toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
+const IO_TITLE = {
+  export: N_('导出时装'), // en: "Export Outfits"
+  import: N_('导入时装'), // en: "Import Outfits"
+};
+
 const cx = (...a) => a.filter(Boolean).join(' ');
 
 /** The switch above the detail header: 调配 (the loadout body) ⇄ 时装 (OutfitPanel). */
@@ -172,7 +177,7 @@ function OutfitIo({ io, setIo, ready }) {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch { /* copy stays available */ }
   };
-  return html`<${Modal} open=${true} onClose=${() => setIo(null)} title=${t(exp ? N_('导出时装') : N_('导入时装'))} micro="OUTFITS"
+  return html`<${Modal} open=${true} onClose=${() => setIo(null)} title=${t(exp ? IO_TITLE.export : IO_TITLE.import)} micro="OUTFITS"
     actions=${exp
       ? html`<${Button} variant="ghost" onClick=${() => setIo(null)}>${t('关闭')}<//>
           <${Button} variant="secondary" icon="copy" data-testid="outfit-io-copy" onClick=${copy}>${t('复制')}<//>

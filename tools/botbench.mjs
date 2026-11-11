@@ -13,6 +13,9 @@
 //   --json F    write the raw per-match records to F (the input of --compare)
 //   --bot ID    registered strategy ID (docs/BOT_STRATEGIES.md); default legacy (SP_BOT_STRATEGY and
 //               SP_BOT_STRATEGY_SEATS are not read)
+//   --profile F (fork) a tactics profile as JSON instead of --bot: { "id": "…", "tactics": [{ "tactic": "legacy-buy",
+//               "params": { "mergeHit": 40 } }, …] }, top first, legacy below (server/match/botStrategies.js
+//               profileFromData; the tactics: botTacticsBasic.js, botTacticsLegacy.js)
 //   --layers   include per-bond layer events, their nested sources, spending and prep/settlement snapshots in JSON;
 //              diagnostic only (timings include tracing overhead). No gameplay or RNG changes.
 //   --jobs N    run the matches in N worker threads (outcomes are identical; the timings are then inflated by the
@@ -46,6 +49,7 @@ import { traceLayers } from './ai/layer-trace.mjs';
 import { runMatch, strategyMetrics, aggregateStrategies } from './ai/run-match.mjs';
 import { Match } from '../server/match/Match.js';
 import { defineBotStrategy } from '../server/match/botStrategyContract.js';
+import { profileFromData } from '../server/match/botStrategies.js';
 import { VirtualScheduler } from '../server/match/scheduler.js';
 import { getData } from '../server/data.js';
 
@@ -86,6 +90,9 @@ const rules = opt.rules && opt.rules !== true
     return [k, v === undefined ? 1 : v === 'true' ? true : v === 'false' ? false : Number.isNaN(Number(v)) ? v : Number(v)];
   }))
   : undefined;
+// (fork) --profile: built once per thread from the same file, so every worker plays the same profile
+const profile = opt.profile ? profileFromData(JSON.parse(readFileSync(String(opt.profile), 'utf8'))) : null;
+if (profile && opt.bot) throw new Error('--bot and --profile: give one');
 const rehearsal = opt.rehearsal != null && opt.rehearsal !== true ? Math.max(0, Math.floor(Number(opt.rehearsal) || 0)) : undefined;
 
 async function runOne(cfg, seed) {
@@ -96,8 +103,8 @@ async function runOne(cfg, seed) {
   const errors = [];
   const log = { info() {}, debug() {}, warn() {}, error: (...a) => errors.push(a.map(String).join(' ')) };
   const m = new Match({
-    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal, rules,
-    botStrategy: opt.bot || 'legacy', botStrategySeats: {},
+    roomCode: 'BENCH', mode: cfg.mode, difficulty: cfg.difficulty, seats, seed, data, log, scheduler: sched, botRehearsal: rehearsal, rules, lobbyRules: rules,
+    botStrategy: profile || opt.bot || 'legacy', botStrategySeats: {},
     send: () => true, broadcast: () => {}, onEnd: (s) => { summary = s; },
   });
   // Test-only band forcing overrides the selected picker, preserving real band metadata for custom strategies.

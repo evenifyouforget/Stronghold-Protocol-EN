@@ -81,6 +81,7 @@ export const emptyMatch = () => ({ public: null, private: null, field: null, res
 /** Initial app state (exported for tests and resets). */
 export const initialState = Object.freeze({
   connection: { status: 'idle', ping: null, attempt: 0, retryAt: 0, lastError: null, everOnline: false },
+  region: null, // (fork) public/js/regions.js snapshot(): which server the socket uses
   me: { playerId: null, name: '', token: null },
   content: null,
   // how many unofficial plugins the server has (DESIGN §32 P1a: /healthz or welcome `content.plugins`; content.js)
@@ -91,9 +92,13 @@ export const initialState = Object.freeze({
   room: null,
   // welcome.testMode (DESIGN §34.8). The server omits the key when the switch is off; the client cannot set it.
   testMode: false,
+  // (fork) welcome.largeRooms (shared/largeRoom.js): the server allows 8-seat rooms
+  largeRooms: false,
   match: emptyMatch(),
   ticker: [],
   emotes: [],
+  /** (fork) match chat: the playerIds this page mutes (chatState.js) */
+  chatMute: [],
   clock: { offset: 0, rtt: null, synced: false },
   ui: { pendingJoin: null, restoring: false, buildStale: false },
   // planned maintenance (sys.maintenance, ui/maintenance.js): { at, closed } or null

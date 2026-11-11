@@ -5,11 +5,167 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-08
+
+### Profile icons
+
+- Doctors can pick a profile icon from a new profile chip in the lobby's top bar or from the icon on their own seat card in a room. The picker has two tabs. Operators lists every operator a seat card can show, with search and rarity tabs, worn in the player's outfit; its first tile, Assistant Operator, follows the room card's operator. Icons holds the game's 200 official profile icons, grouped as the game groups them (Dynamic Icon, Unique unlock, Event Icon, Default Icon). The pick is saved in the browser (`sp.pref.profile.avatar`) and comes back on the next visit, like the room's portrait operator (`sp.pref.room.card`, already saved).
+- Everyone sees the icon on the room's seat cards, the team panel, the strategy draft and the results. It travels in `hello.avatar`, and the server keeps only an id of `data/avatars.json`. A player without one (or on an older client) shows the official default icon. An operator icon is checked against the room's seat-card operators, like the room card. AI teammates now show their operator's avatar everywhere (the strategy screen, the team panel, the results), as their room seat card already did, instead of the robot icon. The band icon becomes a corner badge on a player's icon once a band is picked.
+- The icon names are the official English ones. Eight icons the English data doesn't have yet use the English server's names from the wiki. 31 CN-only icons use our own translations, marked "Unofficial translation" in the picker.
+- New: `tools/build-avatars.mjs` (writes `data/avatars.json`) and `tools/i18n/fallback-avatars-en.json`. `tools/build-i18n.mjs` now reads the icon table, and the data texts of every language were rebuilt. The art is extracted from the CN client as WebP (1.8 MB, local art group `avatar`, `extract.py --only avatar`), so a server needs that folder and an updated `data/local-assets.json`, and the preload zip picks it up. Without the art the chip shows the name's first letter and the picker stays closed.
+
+### Grand Alliance: 8-player rooms
+
+- New Grand Alliance: a co-op room with 8 seats, for humans only. It's off unless the server sets `SP_LARGE_ROOMS=1`.
+  The lobby then has a Grand Alliance mode, and Team Simulation a Grand Alliance card; both open a full-screen room browser of the open rooms, with Open and
+  Locked filters, and a button that creates one. Matchmaking never fills them, and they take no AI teammates.
+- The host can lock the room with a 4-letter password from the lock button beside the alliance key. Only the host sees
+  that button and the password. Locked rooms still show in the browser with a lock, and joining from the browser, by key
+  or by invite link asks for the password. Wrong guesses are limited to 6 a minute.
+- Seats 1–4 are squad A and 5–8 squad B. Players pick their seat or move to an empty one, and the host can swap two seats;
+  nobody balances them. Everyone in one squad plays the normal rules.
+- With players in both squads: each squad drafts strategies and 机变 cards on its own, both at once, with its own 6 cards.
+  The whole room fights over one operator and equipment pool, which grows with the room (×2 at 8). Defence relays across
+  the room: what still gets through goes to the next 2 perfect players, for at most 2 rounds. Everyone fights one shared
+  Enemy Leader in random pairs, as before. The Hidden Core threshold and the leader fight's overtime drain scale with the
+  room too.
+- A dropped player's board goes to the AI at once and back when they return, and a player who leaves keeps their board in
+  the match under the AI. That AI always runs in a browser, a squadmate's first, never on the server. A player idle for
+  3 prep rounds in a row is removed, with a warning after the 2nd.
+- An old server version that is still running an 8-player match now keeps running for 105 minutes after a deploy instead
+  of 60, so a long match isn't cut off. Every other old version still stops after 60.
+- Design: DESIGN §91 (`docs/design/large-rooms.md`). Squad, draft and relay ideas follow the GPL-3.0 forks
+  [LongQianChen/Stronghold-Protocol](https://github.com/LongQianChen/Stronghold-Protocol) and
+  [zhewang448/Stronghold-Protocol](https://github.com/zhewang448/Stronghold-Protocol), adapted to this code.
+
+### S.W.E.E.P. Report
+
+- An operator in an alliance's Operators list now opens Operator Loadout at that operator, selected and scrolled into view, with its detail open. A filter that would hide it is cleared. Back (or Esc) there returns to the report as it was left: same tab, alliance, scroll position, and focus on that operator. Opened the usual way, Back works as before. The report and the loadout always show the same season version, so every operator listed has a row.
+
+### Trait text
+
+- Blemishine's and Degenbrecher's deploy traits (`garrison_106_a/b`, `garrison_155_a/b`) now read "On deployment … (up to N stacks per battle)", as the Chinese and the game code have it. The official English added an "on skill activation" trigger that doesn't exist and gave the cap as "Can stack up to Nx". The fix is in `tools/i18n/corrections-en.json`.
+- 23 more traits gave their cap as "Can stack up to Nx", which reads like a number of triggers. They now say what the Chinese and the code cap: "up to N stacks per battle" ("per round" for Aroma and Angelina, "each" where two alliances each have their own cap). Executor's bullet trait now reads "up to 7 times per battle", and its Foresight part adds stacks, not "Alliances". The traits belong to Executor the Ex Foedere, Warfarin, Kroos the Keen Glint, Virtuosa, Surtr, Fartooth, Aroma, Titi and Angelina, plus the traits Warfarin, Kroos and Fartooth hand out.
+- Season 1 and Season 2 part 1 rooms get the same trait fixes. Their English texts (`data/versions/<slug>/i18n/en.json`) were rebuilt, and 7 Season 1 traits with Season 1's own caps (10 / 20 stacks) got their own corrections. The rebuild also brings in what the older-season texts were missing since the last build: 7 outfit names, the Rampage, Arcane Surge and Trigger effect keywords, and Rampage in the Elemental Injury list.
+- The traits Warfarin and Kroos the Keen Glint hand out at Elite (`garrison_95_b`, `garrison_96_b`) now state their per-battle cap, which the game code has always applied but neither the Chinese nor the English text gave. Each season shows its own number: Warfarin's is 14 stacks now, 24 in Season 2 part 1 and 20 in Season 1; Kroos's is 20 in every season. Older seasons read their numbers from their own `tools/i18n/corrections-en.<slug>.json`, which `tools/build-i18n.mjs` now tries before the shared corrections.
+
+### Room screen
+
+- The AI teammates' avatars in the room now come from the small URL helpers (`ui/assetUrls.js`) instead of `assets.js`, so a vanilla page no longer loads the asset store at start, as `test/ui/plugins-client.test.js` requires. `test/ui/playtest6-unite.test.js` now expects the team panel's leak tag to name a teammate through `shownName()`, which is how AI teammates show their operator's name.
+- `test/ui/text-scale.test.js` now lists the match chat's bubble (`.cbubble`) as in-match HUD text that the Text Size setting leaves alone, like the emote bubble and the chat panel it sits with.
+
+### Browser tests are silent
+
+- Every headless Chrome the tests and tools start is muted (`--mute-audio`): in `gpuArgs()` (`tools/perfbench.mjs`, the software mode included) and in each test file that launches its own browser. Game audio no longer plays on the machine running a browser suite. `test/perfbench.test.js` checks both, and AGENTS.md says sounds are checked through requests or play-call logs, never by listening.
+
+### Several servers, one game
+
+- The game can now run on more than one server, so players connect to the nearest one with better ping. It's off unless the operator sets `SP_REGIONS`, and a single server behaves as before (`docs/DEPLOY.en.md` §2.7).
+- The website stays on the main domain, so players keep their stats, settings, loadouts and art cache, and only the game connection goes to the other server. That server needs no art, so origin traffic doesn't double.
+- The first letter of an alliance key names its server, so keys and invite links work from anywhere, even while the servers can't reach each other.
+- Matchmaking looks at the player's own server first, then after 15 seconds across servers. It only moves a group into a match that starts at once, on the server with the most humans.
+- Browsers pick the faster server by ping, with an Auto / Singapore / US East choice in Settings, and the server's name appears beside the ping. A page that loses another server falls back to the main one.
+- The server choice moved from Settings to the lobby: tap the server name and ping at the top left to pick Auto, Singapore or US East, each with its live ping and the one you're on marked. As before, a change waits until you leave your alliance or queue, and a match never moves.
+- The online count's tooltip lists each server's players (hover, focus or tap the count), with yours marked; the count itself stays the total of every linked server.
+- The online count now updates at most once a minute for players already connected (a new player still gets it at once), instead of whenever it changed, checked every 2 seconds. At 300 players that cuts its traffic from about 1.6 GB a day to about 50 MB.
+- The online count covers every server. `scripts/deploy-regions.mjs` deploys one build to every server in two steps, so nobody is sent to a build that isn't ready, and old generations stay up while a match on the other server still needs them.
+
+### Browser tests
+
+- `board3d` and `fieldview` browser tests asked for Metal on every platform, which on Windows dropped them to a software driver: Chrome used about 7.5 cores and most of their checks failed. They now start through `gpuArgs()` in `tools/perfbench.mjs`, which uses the real GPU, keeps WebGL on a machine with no GPU and can be forced to software with `SP_E2E_SOFTWARE_GL=1`. `test/render/gpu-renderer.browser.test.js` logs the renderer in use.
+
+## 2026-11-07
+
+### Match chat
+
+- Text chat in a match, deliberately cruel: last round's kills are the letters you can type until the next round's result. Round 1 and zero kills leave you with emotes. The server enforces it all and chops anything over the limit; a faked kill count buys no more than the enemies it sent. Lines show as avatar bubbles and are never stored or replayed, and spectators can read but not write. Each line costs about 143 B per recipient, around 1% of a match's traffic in normal use. Mute is per page; `SP_CHAT=0` turns chat off.
+
+### First-visit loading
+
+- The entry film now plays with its sound on a first visit, however slow the connection. What the opening needs (film art, entry cue, lobby music) downloads first, from page load and at high priority, behind a Loading card; the card asks for the tap once they're in. A tap made while loading counts. The battle renderer's scripts and a resuming asset preload wait until those files are in. Before, the film was dropped if its art took over 1.2 s, and the sound only started downloading after the tap.
+- In a room and a match, what the screen needs loads first (`public/js/loadLater.js`). The leader and downed plates, the pre-game boot art, the render engine's code ahead of the match, the battle effects index and the simulation's scripts wait until the screen's images, the board, operator models and music are in (at most 20 s), and the simulation's warm-up only starts from the prep on. On a first visit the field no longer times out into its simplified view while files compete for connections.
+
+### Battle effects
+
+- SilverAsh the Reignfrost's S3 now shows its official effects: the skill range around him, the bird landing when it starts, a curved bird slash leaving him toward his target with each attack, and the official hit as it reaches each enemy. The bird art was never extracted because the skill names its projectiles only as a buff template's default value; `tools/local-extract/fx.py` now follows those too. The server and the preload zip need the new art.
+- SilverAsh the Reignfrost's normal attacks now play the animation that matches their effect: Attack_A, B or C with the same stab or slash, instead of always Attack_A.
+- 20 more operators whose attacks pick between animations now play the one that matches their effect instead of always the first: Rosmontis, Wiš'adel (with her down-facing animations), Chongyue, Ascalon, Crownslayer, Bellone, Mountain, Vigil, Entelechia, Qiubai, Pramanix the Prerita, Vina Victoria, Tragodia, Wang, Ebenholz, Lin, Hoederer, Logos, Haruka and Aphrissa. The official sources are listed at `ATTACK_CLIPS` in `public/js/render/vfx/wiring.js`. Random attacks that never repeat also picked their wind-up and strike effects separately, so the two could differ; they are now one pick. A pick between two also repeated for about 7 attacks on average, now about 2; that fix (`seedOf`) changes the random effect picks of every operator, not only these 20.
+- A skill that replaces the next attack (Vina Victoria's S1 and 25 more) now plays its whole animation once in place of that attack: once its SP is full the clip starts from the first frame a full wind-up before the predicted strike (the end of its attack cooldown, or when an enemy it can hit reaches its range, first attack of a fight included), with its cast effects, so the leap plays out and the blow lands on the hit; a strike that comes later than predicted is waited for just before the blow. Before, only the clip's last part showed, sometimes looped into a second swing, and from the second cast on the previous attack's clip often replaced it.
+- Talulah's S3 now plays its official sounds: the cast, each volley's launch, each fireball's impact and the overload.
+- Talulah's S3 now shows its official fireballs flying down every lane and exploding on the enemy they hit. The art was never extracted because the skill fires them from a buff template, and nothing drew them. `tools/local-extract/fx.py` now follows projectiles that an operator's buff templates fire, so local copies need `extract.py --only fx --fx-set used --fx-add-only`; until then the game keeps the procedural ring.
+
+### Outfits
+
+- Added the seven outfits CN released since our last outfit refresh: SilverAsh the Reignfrost's Snowfall Over Londinium, Swire the Elegant Wit's A Prosperous Visage, Blaze the Igniting Spark's Nocturnal Firelight, Shu's Everflowing Waters, Horn's The First Gleam, Vina Victoria's Votive Offering and Catherine's Cozy Bakery. Their skill effects come along through the outfit effect twins. The server and the preload zip need the new art.
+
+### Upstream merge
+
+- Merged upstream's unreleased 0.3.4 work (`dev` branch) at [`eff7d93a`](https://github.com/sganggs/Stronghold-Protocol/commit/eff7d93abbd1bd6986e2e9c2d7a1e066b1975bbc) (`4d12f915`). Fork-side decisions:
+  - Release notes open only from the title footer's button (no automatic opening: the lobby has its own update banner). Non-Chinese pages read `CHANGELOG.en.md`.
+  - The entry film plays every time the login screen is entered. A page load that lands in the lobby plays it once per browser tab session.
+  - The three-level deploy-fold setting is taken; it still defaults to off. P2P stays off (`SP_P2P` unset).
+  - Toska (冻河), Territoriya (国度) and Talulah (塔露拉) get English text in `tools/i18n/fallback-new-ops-en.json`, using names and terms from arknights.wiki.gg, until official EN data covers them.
+  - Not ready to deploy: upstream's new bot logic runs on the server. All bot calculation must move to the host's browser first.
+- Merged upstream 0.3.2 at [`c9d804f4`](https://github.com/sganggs/Stronghold-Protocol/commit/c9d804f470b8d7422ae04eb66faf671cef21ad52) (`a47b3db4`), through
+  [#14](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/14), thanks to @evenifyouforget. dev-0.2 had fixed the same Windows test problems itself; upstream's versions of
+  those three test files are taken.
+- Merged upstream 0.3.3 at [`f07b8965`](https://github.com/sganggs/Stronghold-Protocol/commit/f07b8965061bbc311ad7aa815879b09264a1e47d) (`d4958737`), through
+  [#22](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/22), thanks to @evenifyouforget. The fork's matchmaking, outfits, notices, maintenance and generations are kept
+  inside upstream's new lobby, room, loadout, custom-squad and briefing screens. On avatars and portraits an outfit wins
+  over an upstream skin. Upstream already had the sim side of [#18](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/18) and all of [#19](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/19) (upstream PR #862), so
+  those merged into the same code.
+- English README: `--game` also takes the install directory, as in upstream's Chinese README.
+
+### Contributions
+
+- Battle view: invulnerable units wear two spinning gold ribbons, after the original game's look. Multi-tile bosses
+  wear them three times as big ([#12](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/12), thanks to @evenifyouforget).
+- Official effects: the airstrike from Exusiai the New Covenant's talent plays its own official strike (a shell falling
+  with a smoke trail and a red-white burst). Before, it drew the procedural blast that looks like Lemuen's S3
+  ([#18](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/18), thanks to @evenifyouforget).
+- Official effects: Lemuen's S3 lock crosshair stays until her own shell lands, also where a defeated target stood.
+  Before, it vanished about 1 s after each lock ([#19](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/19), thanks to @evenifyouforget).
+- Battle view: a liftoff that only a talent grants (Kal'tsit - Esperanta, Leizi the Thunderbringer) is a low hover of
+  about a quarter tile. A skill's liftoff still flies at a flying enemy's height ([#20](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/20), thanks to @evenifyouforget).
+- Setup: `npm run assets:release-local` downloads a release's local art (`public/assets/local/` and
+  `data/local-*.json`, about 200 MB of the full package) for an install without a game client, such as a VPS. Setup's
+  hint names it ([#21](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/21), thanks to @evenifyouforget).
+- GitHub: English issue and PR templates ([#17](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation/pull/17), thanks to @evenifyouforget).
+
+### Changes
+
+- Host-browser bots, first three pieces ([design](docs/host-browser-bots.md)), off by default and not live yet: bot seats can draw from their own random streams and a reserved uid block (`seatStreams`); a snapshot restores the match outside the server (`botWorld.js`, `shadowMatch.js`); the real bot code plays on that copy and its actions come back as validated `g.*` moves (`botRunner.js`, `match/botTasks.js`). A same-seed test proves the copy plays the same game as the bot in the match.
+- Host-browser bots, pieces 4 and 8, off by default and not live yet: with `SP_BOT_BATTLES=host`, a field of bots runs in a human's browser instead of on the server, and falls back to the next human, then to a synthetic result. `public/js/battle/botWorker.js` and `botHost.js` run bot work in a Worker, and `/match/` now serves exactly the modules that Worker imports, computed from its imports (`server/http/botModules.js`).
+- Host-browser bots, piece 6, off by default and not live yet: with `SP_BOT_EXECUTION=host`, a bot seat's whole prep runs in a human's browser over live frames. The server only applies its moves. A silent, failed, hidden or lost browser hands the seat to the next human, and with nobody left the seat keeps its board and readies up. Fixed piece 8's check, which treated every normal room as a plugin room because normal rooms carry a content hash too.
+- Host-browser bots, piece 7, off by default and not live yet: bots' band and card picks also run in a human's browser, and in host mode a bot strategy's decision hooks throw on the server. A human taking an AI seat or turning autoplay off cancels that seat's task.
+- Host-browser bots, piece 9, off by default and not live yet: a boss field of bots only runs live in a human's browser and reports like a human's battle, and a load test measures the server's own CPU per bot seat (`test/match/bot-load.test.js`).
+- Host-browser bots, piece 11, off by default and not live yet: plugin and old-version rooms also run their bots in a human's browser, whose Worker loads that room's content and scripts, and the match host's child process now gets the host's id and the bot options. Every room's Worker now gets the whole data set, not only the simulation's files.
+- Host-browser bots, piece 10: removed the fork's host rehearsal additions (`SP_BOT_REHEARSAL_HOST`, `botRehearsalHost`, its default-on). Upstream's delegation stays, off by default, so `server/match/bot.js` is back to upstream's lines but for its CPU meter. Without `SP_BOT_EXECUTION=host`, no browser rehearses layouts for bots any more.
+- Host-browser bots, review fixes: any field with no connected human goes to a browser, a disconnected or departed human's field included, at the start or mid-battle; no player's board runs on the server, and with no browser at all the synthetic result stands. A bot task takes one receipt and one plan batch, so repeated frames cannot stall a prep. A departed co-op seat's strategy pick is never asked of the seat's AI strategy, as before.
+- AI teammates show their operator's name in the page's language, everywhere a name appears (`AI · Warfarin` instead of `AI · 华法琳`). It's decided by the seat being an AI: a human player named after an operator keeps their name exactly as typed.
+- In the room, AI teammates show their operator's icon instead of the robot. The art pack gains Amiya's and Dobermann's avatar and portrait for this, since they aren't in this mode's roster. A full room keeps the Find Teammates switch's place empty, so the seat cards don't resize when the last seat fills.
+- English text: the Rampage damage name and the Elemental Injury description now show five elements, several operators' potential-locked texts are translated, the 0.2.6 changelog and missing Playing Guide sections are in English, and the host rehearsal docs match the code.
+- Skill cast sounds follow the equipped skill. 23 operators get a cast sound they never played, such as Ch'en S2, SilverAsh S2 and Toska S3, because it wasn't on their primary skill. On 54 operators the primary skill's sound no longer rings on a skill that has no cast sound of its own, such as Exusiai the New Covenant S1 and S3; those skills now cast silently, as the official bank table says. A server needs 9 new files in `audio/sfx`.
+- Room screen: the Find Teammates switch shows its text again. The room layout from upstream 0.3.3 painted its background over it, leaving only its track visible. It now sits directly above the big button, which uses the Start Simulation look (amber with dark text while searching), and its description line is gone so the centre stays clear. On phones the switch, Add AI Teammate, the settings popup and the version tag are larger, and a seat's Preparing state can be read over light art.
+- Lobby: the update news panel uses its full width and scrolls inside itself when space is short, so it no longer pushes Achievements, Join with Key and Combat Tips off the screen. The mode buttons sit together as one group of equal cards (the long descriptions used to spread them apart): each description now wraps above its card, who plays first, the rest under it. "Solo Matchmaking" is no longer cut off.
+- Damage meters show one metric at a time. The result screen's Damage Stats and the in-match Combat statistics panel get a Damage / DPS / Healing / HPS selector (kept until the page reloads); rows sort by it, the top value fills its bar, and the row's width goes to the bar, so operators compare at a glance. Removed the panel's title, rank numbers, four-number rows, sort label and explanation box, and the chart's per-row DPS / healing text and All Rounds tag; hover a row for all four numbers.
+- Plugin studio, script checks and match hosts: their child processes no longer open console windows that steal focus on Windows (`windowsHide`).
+- `fetch-assets` names the operators missing from the local FX index. Their per-skill sounds are then planned differently,
+  which can make the run refuse to write `data/assets.json`, and retrying the downloads never helps. The refusal now says
+  so and gives the extract command that fills the index.
+- Sound: `data/assets.json` is rebuilt on a complete FX index. 19 older-season operators get their battle voices, and
+  operators such as Glider and Ceylon get attack sounds they were missing. A server needs `node tools/fetch-assets.mjs`
+  for the new files (about 1,300 more in the manifest, 34 MB).
+- Outfits: the operators of the other official versions get theirs too (26 more, on the 19 operators only Season 1 has,
+  such as Ceylon's Holiday HD49).
+- English: Season 1 and Season 2 part 1 rooms now show English game text. Each version has its own overlay
+  (`data/versions/<slug>/i18n/en.json`, built by `tools/build-i18n.mjs --data`), 99 % translated. They stayed Chinese before.
+
 ## 2026-10-18
 
 ### Upstream merge
 
-- Merged upstream 0.3.1 at [`d905c146`](https://github.com/sganggs/Stronghold-Protocol/commit/d905c1464f762a03d236c7ad6bc3ba31a74f4494) (`TBD`).
+- Merged upstream 0.3.1 at [`d905c146`](https://github.com/sganggs/Stronghold-Protocol/commit/d905c1464f762a03d236c7ad6bc3ba31a74f4494) (`99bcb678`).
   Upstream's plugin skins (`room.skins`, 显示其他玩家的皮肤) are merged but dormant next to the fork's outfits
   (`room.outfits`), which stay the skin system players use; no skin plugin is installed.
 - Damage meter: the fork's damage meter (`ui/damageChart.js`, `damageLog.js`) is replaced by upstream's Combat

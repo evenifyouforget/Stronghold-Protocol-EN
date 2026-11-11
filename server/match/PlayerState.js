@@ -147,6 +147,8 @@ export class PlayerState {
     this.seat = seat.seat;
     this.name = seat.name;
     this.isBot = !!seat.isBot;
+    // (fork) the profile icon (a known id, server/lobby.js avatarOf; m.public players[].avatar)
+    this.avatar = !this.isBot && typeof seat.avatar === 'string' ? seat.avatar : null;
     this.connected = this.isBot ? true : !!seat.connected;
     this.left = false;
     this.autoplay = false;
@@ -239,6 +241,12 @@ export class PlayerState {
     };
     this.eliminatedRound = null;
     this.creditedKills = 0;
+    /** (fork) match chat, the kill wallet (chatWallet.js): letters left, the round they were earned in (0: none yet) */
+    this.chatLeft = 0;
+    this.chatRound = 0;
+    /** kills of the round being resolved, until settlement turns them into the wallet (null: no real report) */
+    this.chatPending = null;
+    this.lastChatAt = -Infinity;
     this.lpAtFinal = null;
     /** last combat result for this player (unite carry state, bounties) */
     this.lastResult = null;

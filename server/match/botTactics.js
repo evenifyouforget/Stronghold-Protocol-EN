@@ -15,7 +15,7 @@
 // belongs to one slot of RFC sganggs #816 (draft / economy / placement), so a profile can be read as that RFC's
 // per-slot choice if upstream builds it.
 import { defineBotStrategy, LEGACY_BOT } from './botStrategyContract.js';
-import { createBotPrepSteps, LEGACY_PREP_ACTIONS } from './bot.js';
+import { createBotPrepSteps, LEGACY_PREP_ACTIONS, LEGACY_TUNABLES, legacyPrepPreamble, withLegacyTunables } from './bot.js';
 
 /** A handler's "not me": the next tactic down is asked. */
 export const PASS = Symbol('tactic.pass');
@@ -67,14 +67,16 @@ function checkSpec(tid, name, spec) {
 }
 
 /**
+ * `tunables(params)`: optional, the values of legacy's tunables (bot.js LEGACY_TUNABLES) this tactic's parameters
+ * set. A profile with any such tactic plays every hook with them (see defineProfile).
  * @param {{ id: string, describe?: string, params?: Record<string, object>,
- *   at: Partial<Record<keyof typeof DECISION_POINTS, Function>> }} def
+ *   at: Partial<Record<keyof typeof DECISION_POINTS, Function>>, tunables?: (params: object) => object }} def
  */
 export function defineTactic(def) {
   if (!def || typeof def !== 'object') throw new TypeError('Tactic: object required');
-  const { id, describe = '', params = {}, at } = def;
+  const { id, describe = '', params = {}, at, tunables = null } = def;
   if (typeof id !== 'string' || !ID.test(id) || id === 'legacy') throw new TypeError(`Tactic: bad id ${JSON.stringify(id)}`);
-  for (const key of Object.keys(def)) if (!['id', 'describe', 'params', 'at'].includes(key)) throw new TypeError(`Tactic ${id}: unknown field ${key}`);
+  for (const key of Object.keys(def)) if (!['id', 'describe', 'params', 'at', 'tunables'].includes(key)) throw new TypeError(`Tactic ${id}: unknown field ${key}`);
   if (!at || typeof at !== 'object' || !Object.keys(at).length) throw new TypeError(`Tactic ${id}: at least one decision point`);
   for (const [point, fn] of Object.entries(at)) {
     const dp = DECISION_POINTS[point];
@@ -83,9 +85,12 @@ export function defineTactic(def) {
       throw new TypeError(`Tactic ${id}: ${point} needs a ${dp.gen ? 'generator ' : ''}function`);
     }
   }
+  if (tunables !== null && typeof tunables !== 'function') throw new TypeError(`Tactic ${id}: tunables must be a function`);
   const specs = {};
   for (const [name, spec] of Object.entries(params)) specs[name] = checkSpec(id, name, spec);
-  return Object.freeze({ id, describe, params: Object.freeze(specs), at: Object.freeze({ ...at }) });
+  const tactic = Object.freeze({ id, describe, params: Object.freeze(specs), at: Object.freeze({ ...at }), tunables });
+  if (tunables) tunablesOf(tactic, resolveParams(tactic)); // the defaults must map to known tunables
+  return tactic;
 }
 
 /** A tactic's parameter values: the given ones checked, the rest defaulted. */
@@ -94,6 +99,29 @@ export function resolveParams(tactic, given = {}) {
   const out = {};
   for (const [name, spec] of Object.entries(tactic.params)) out[name] = checkParam(tactic.id, name, spec, given[name]);
   return Object.freeze(out);
+}
+
+/** A tactic's tunables for these parameter values, checked against bot.js LEGACY_TUNABLES. */
+function tunablesOf(tactic, params) {
+  const t = tactic.tunables(params);
+  if (!t || typeof t !== 'object') throw new TypeError(`Tactic ${tactic.id}: tunables() must return an object`);
+  for (const k of Object.keys(t)) if (!Object.hasOwn(LEGACY_TUNABLES, k)) throw new TypeError(`Tactic ${tactic.id}: unknown legacy tunable ${k}`);
+  return t;
+}
+
+/** `fn` (a hook) run with the tunables `t`: around each call, and for a generator around each of its steps. */
+function scoped(t, fn) {
+  if (!isGenFn(fn)) return (...a) => withLegacyTunables(t, () => fn(...a));
+  return function* (...a) {
+    const it = withLegacyTunables(t, () => fn(...a));
+    let r = withLegacyTunables(t, () => it.next());
+    // loop-cap: one pass per step of the wrapped generator, which bounds its own steps
+    while (!r.done) {
+      const v = yield r.value;
+      r = withLegacyTunables(t, () => it.next(v));
+    }
+    return r.value;
+  };
 }
 
 // Per-seat state of each profile entry: a tactic definition is shared and frozen, the player is per match.
@@ -154,8 +182,24 @@ export function defineProfile({ id, tactics = [] } = {}) {
     const fn = chainOf(entries, point, LEGACY_PREP_ACTIONS[point]);
     if (fn !== LEGACY_PREP_ACTIONS[point]) actions[point] = fn;
   }
-  // no prep point taken: legacy's own prep hooks, not a rebuilt copy
-  if (Object.keys(actions).length) Object.assign(hooks, createBotPrepSteps(actions));
+  // legacy's tunables set by the profile's tactics (the topmost tactic wins a key two of them set)
+  const tunables = {};
+  for (const e of [...entries].reverse()) if (e.tactic.tunables) Object.assign(tunables, tunablesOf(e.tactic, e.params));
+  const tuned = Object.keys(tunables).length ? Object.freeze(tunables) : null;
+  // no prep point taken: legacy's own prep hooks, not a rebuilt copy (a tuned profile rebuilds them: the refresh cap
+  // is read when the steps are made)
+  if (Object.keys(actions).length || tuned) {
+    const steps = withLegacyTunables(tuned, () => createBotPrepSteps(actions));
+    // the legacy prep's own preamble first (bot.js botPrepBeginSteps), so a profile differs from legacy only where its
+    // tactics act
+    hooks.prepBegin = function* prepBegin(m, ps, options = {}) { legacyPrepPreamble(m, ps); return yield* steps.prepBegin(m, ps, options); };
+    hooks.prepEnd = steps.prepEnd;
+  }
+  if (tuned) {
+    for (const hook of ['pickBand', 'pickCard', 'bountyKillChance']) hooks[hook] = scoped(tuned, hooks[hook] ?? LEGACY_BOT[hook]);
+    hooks.prepBegin = scoped(tuned, hooks.prepBegin);
+    hooks.prepEnd = scoped(tuned, hooks.prepEnd);
+  }
   const strategy = defineBotStrategy({ id, ...hooks });
   const slots = { draft: [], economy: [], placement: [] };
   for (const e of entries) {
@@ -165,6 +209,7 @@ export function defineProfile({ id, tactics = [] } = {}) {
     }
   }
   PROFILES.set(id, Object.freeze({
+    tunables: tuned,
     tactics: Object.freeze(entries.map((e) => Object.freeze({ tactic: e.tactic.id, params: e.params }))),
     slots: Object.freeze({ draft: Object.freeze(slots.draft), economy: Object.freeze(slots.economy), placement: Object.freeze(slots.placement) }),
   }));

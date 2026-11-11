@@ -14,9 +14,10 @@ export function forkSandbox(entry, { memoryMb = 768 } = {}) {
 export function sandboxProcessOptions(memoryMb = 768) {
   // [ASSUMED] The child needs only its install tree; no fs-write/child/worker/addon permission, no inherited NODE_OPTIONS.
   const matchEnv = {};
-  for (const key of ['SP_VERIFY', 'SP_COMBAT', 'SP_BOT_EMOTES']) if (process.env[key] !== undefined) matchEnv[key] = process.env[key];
+  for (const key of ['SP_VERIFY', 'SP_COMBAT', 'SP_BOT_EMOTES', 'SP_CHAT']) if (process.env[key] !== undefined) matchEnv[key] = process.env[key];
   return {
     cwd: INSTALL_ROOT,
+    windowsHide: true,
     execArgv: ['--permission', `--allow-fs-read=${INSTALL_ROOT}`, `--max-old-space-size=${Math.max(64, Math.floor(memoryMb))}`],
     env: { NODE_ENV: 'production', SP_PLUGIN_SCRIPTS: 'sandbox', ...matchEnv },
   };

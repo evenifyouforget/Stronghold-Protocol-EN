@@ -63,7 +63,7 @@ test('a profile whose tactics take no decision point is legacy itself; one point
   const bandOnly = defineProfile({ id: 'band-only', tactics: [defineTactic({ id: 't', at: { pickBand: () => PASS } })] });
   assert.notEqual(bandOnly.pickBand, LEGACY_BOT.pickBand);
   for (const hook of ['pickCard', 'prepBegin', 'prepEnd', 'bountyKillChance']) assert.equal(bandOnly[hook], LEGACY_BOT[hook], hook);
-  assert.deepEqual(profileOf(empty), { tactics: [], slots: { draft: [], economy: [], placement: [] } });
+  assert.deepEqual(profileOf(empty), { tunables: null, tactics: [], slots: { draft: [], economy: [], placement: [] } });
   assert.equal(profileOf(LEGACY_BOT), null);
 });
 
@@ -105,6 +105,7 @@ test('a profile whose tactics pass at every point plays a whole match exactly li
 test('the registered profiles: opt-in ids, slot views, and their tactics act through the game\'s own intents', () => {
   assert.deepEqual(Object.keys(BOT_STRATEGIES).filter((id) => id.startsWith('fish-')), ['fish-level', 'fish-tier6', 'fish-dyy']);
   assert.deepEqual(profileOf('fish-tier6'), {
+    tunables: null,
     tactics: [{ tactic: 'buy-tier', params: { minTier: 6, reserve: 0 } }, { tactic: 'level-curve', params: { scale: 'boss', shift: 0, maxLevel: 6, reserve: 0 } }],
     slots: { draft: [], economy: ['buy-tier', 'level-curve'], placement: [] },
   });

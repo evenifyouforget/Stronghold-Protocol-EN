@@ -9,7 +9,8 @@
 //   * `sys.retire { gen }` to every session now and after every later hello. The client goes to `/` (the router sends it
 //     to the new generation) once no match is on screen; a waiting room is lost on purpose (the operator's decision).
 // A missing or unreadable file never retires: only a file that names another generation does.
-// scripts/generations.mjs reap stops the process at 0 human matches (/healthz `humanMatches`) or after an hour.
+// scripts/generations.mjs reap stops the process at 0 human matches (/healthz `humanMatches`) or after an hour (105 min while
+// it runs a large-room match, /healthz `largeMatches`).
 
 import fsp from 'node:fs/promises';
 import { sendSession } from './net.js';
@@ -51,6 +52,9 @@ export class GenerationWatch {
 
   frame() { return { t: 'sys.retire', gen: this.gen }; }
 
+  /** (fork) Is this the generation players are sent to? A prepared or a retiring one does not speak for the region (server/peerLink.js). */
+  active() { return this.wasCurrent && !this.retiring; }
+
   async check() {
     if (this.busy || this.retiring) return;
     this.busy = true;
@@ -72,6 +76,8 @@ export class GenerationWatch {
       // sent pages round in a reload loop (2026-10-11). Retire only a generation the table lists (a restarted old one
       // too), or one that was current and has been dropped.
       const listed = !!table.gens && typeof table.gens === 'object' && Object.hasOwn(table.gens, this.gen);
+      // (fork) prepared for a deploy to several regions: listed so the router reaches it, not current yet (scripts/generations.mjs)
+      if (listed && table.gens[this.gen]?.prepared) return;
       if (listed || this.wasCurrent) this.retire(current);
     } finally {
       this.busy = false;

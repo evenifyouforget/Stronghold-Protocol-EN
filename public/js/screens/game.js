@@ -96,11 +96,13 @@ import { DetailPanel, resolveDetail } from '../ui/detailPanel.js';
 import { RewardOverlay } from '../ui/rewardOverlay.js';
 import { FinalAssaultPlate, HiddenCorePlate, EndPlate, preloadBossPlateArt, bossPlateArtReady, finalPlateRows, endPlateOf } from '../ui/bossPlates.js';
 import { DownedPlate, downedDue, preloadDownedArt, downedArtReady } from '../ui/downedPlate.js';
+import { loadLater } from '../loadLater.js';
 import { OfferOverlay, offerBlocksPrep } from '../ui/offerOverlay.js';
 import { ChoiceOverlay, spMarks } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel } from '../ui/emotes.js';
+import { ChatPane, useChatBox } from '../ui/chat.js';
 import { CombatMetricsPanel } from '../ui/combatMetrics.js';
 import { EffectsList } from '../ui/effectsList.js';
 import { CombatHud } from '../ui/combatHud.js';
@@ -148,7 +150,7 @@ import { keepEarly, audioEarly } from './game/early.js';
 import { MatchEnded, PausedOverlay } from './game/overlays.js';
 import { inspectRange } from './game/range.js';
 import { useSkillRangePreview } from '../ui/rangePreview.js';
-import { t, tParts } from '../../../shared/i18n.js';
+import { t, tParts, shownName } from '../../../shared/i18n.js';
 import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
@@ -240,6 +242,7 @@ function MatchScreen() {
   const emotes = useStore((s) => s.emotes);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
+  const chat = useChatBox({ pub, priv: spectator ? null : priv, myId, online: conn.status === 'online' });
   const playerSettings = useSettings();
   // gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark — re-rendered only when the room's content changes
   const modRoom = useStore((s) => (s.room?.content?.vanilla === false ? s.room : null), (a, b) => (a?.content ?? null) === (b?.content ?? null));
@@ -319,7 +322,7 @@ function MatchScreen() {
   // first view — turns false while a teammate is still in; 继续观战 closes it, 离开模拟 opens the exit dialog
   const [downed, setDowned] = useState(false);
   const wasAlive = useRef(undefined);
-  useEffect(() => { preloadDownedArt(); }, []);
+  useEffect(() => { loadLater(preloadDownedArt); }, []); // (fork) a later round's art: after what is on screen
   useEffect(() => {
     if (!spectator && !priv && !meP) return;
     const was = wasAlive.current;
@@ -333,7 +336,7 @@ function MatchScreen() {
   const scoutPid = watchingOther && field ? (field.fieldId?.startsWith('n:') ? field.fieldId.slice(2)
     : fieldMembers?.length === 1 ? fieldMembers[0] : null) : null;
   const scoutBandId = scoutPid ? ownerBandId(pub, scoutPid) : null;
-  const scoutBandOwner = scoutPid ? (players.find((p) => p.playerId === scoutPid)?.name || null) : null;
+  const scoutBandOwner = scoutPid ? (shownName(players.find((p) => p.playerId === scoutPid)) || null) : null;
   const viewedEffects = watchingOther && field ? (field.effects ?? null) : priv?.effects;
   const personalChoice = !spectator && alive ? normalizePersonalChoice(pub, priv, myId) : null;
   const hasPersonalChoice = !!personalChoice;
@@ -975,7 +978,7 @@ function MatchScreen() {
 
   // the run's end in the server's last pause before RESULT (ui/bossPlates.js endPlateOf: the hidden round over, the team
   // fallen in the 最终攻势 or eliminated at a settlement — 模拟中断 then takes the result box's place); never delays RESULT
-  useEffect(() => { preloadBossPlateArt(); }, []);
+  useEffect(() => { loadLater(preloadBossPlateArt); }, []); // (fork) a later round's art: after what is on screen
   const endKind = bossPlateArtReady() ? endPlateOf(phase, pub) : null;
   useEffect(() => {
     if (!endKind) return;
@@ -1736,9 +1739,9 @@ function MatchScreen() {
   const stripFid = strip.fieldId;
   const liveLayers = (combat || settleMode) && battleState?.bondLayers ? battleState.bondLayers : null;
   // the observing pill names the player whose bonds the strip shows (the same teammate as the strip's "👁 name" tag)
-  const observingName = cc && combat && watchedFid ? (!strip.self && stripFid === watchedFid ? strip.name : (players.find((p) => p.fieldId === watchedFid || ownFieldId(p.playerId) === watchedFid)?.name || t('队友'))) : null;
+  const observingName = cc && combat && watchedFid ? (!strip.self && stripFid === watchedFid ? strip.name : shownName(players.find((p) => p.fieldId === watchedFid || ownFieldId(p.playerId) === watchedFid), t('队友'))) : null;
   const watchedP = watchingOther ? (players.find((p) => p.playerId !== myId && (watching === ownFieldId(p.playerId) || (watching === p.fieldId && String(watching).startsWith('n:')))) || null) : null;
-  const watchedName = watchingOther ? (watchedP?.name || players.find((p) => watching === p.fieldId)?.name || t('队友')) : null;
+  const watchedName = watchingOther ? (shownName(watchedP) || shownName(players.find((p) => watching === p.fieldId), t('队友'))) : null;
   const stripBonds = strip.bonds;
   // a popup opened from the strip closes when the strip changes hands (another teammate scouted / a ‹ › half / back to
   // the own bonds); one opened from a card's chip keeps its unit owner (it carries its own player either way)
@@ -1867,7 +1870,7 @@ function MatchScreen() {
         </div>
       </div>
 
-      <${TeamPanel} pub=${pub} myId=${myId} watching=${watchingNow} bubbles=${bubbles} onWatch=${watchPlayer} cap=${gd.config?.lpCapPerRound ?? 10} uniteLocal=${uniteLocal}
+      <${TeamPanel} pub=${pub} myId=${myId} watching=${watchingNow} bubbles=${bubbles} onWatch=${watchPlayer} cap=${gd.config?.lpCapPerRound ?? 10} uniteLocal=${uniteLocal} chatOn=${spectator || Number.isInteger(priv?.chatLeft)}
         spMarks=${sp ? spMarks(sp, { solo }) : null}
         self=${Number.isFinite(priv?.lp) ? { lp: priv.lp, pending: liveLpNow.pending, unite: liveLpNow.unite, left: liveLpNow.left } : null}
         observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null} />
@@ -1906,7 +1909,8 @@ function MatchScreen() {
       <div class="gm__corner">
         <${AiTakeoverPanel} />
         ${showMetrics && metricsOpen ? html`<${CombatMetricsPanel} myId=${myId} onClose=${() => setMetricsOpen(false)} />` : null}
-        ${spectator ? null : html`<${EmoteWheel} open=${emoteOpen} onToggle=${(o) => { setEmoteOpen(o); if (o) setMetricsOpen(false); }} onSend=${(id) => actions.emote(id)} disabled=${conn.status !== 'online'} />`}
+        ${spectator ? null : html`<${EmoteWheel} open=${emoteOpen} onToggle=${(o) => { setEmoteOpen(o); if (o) setMetricsOpen(false); }} onSend=${(id) => actions.emote(id)} disabled=${conn.status !== 'online'}
+          textPane=${chat.available ? html`<${ChatPane} chat=${chat} onClose=${() => setEmoteOpen(false)} />` : null} textLeft=${chat.left} />`}
         ${showMetrics ? html`<button type="button" class="gm__gear gm__metrics" aria-label=${t('作战统计')} title=${t('作战统计')} aria-expanded=${metricsOpen}
           aria-controls="combat-metrics-panel" onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${() => {
             setMetricsOpen(!metricsOpen);

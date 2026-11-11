@@ -369,6 +369,7 @@ as newly missing assets. Full illustrations and alternate outfits remain optiona
 version; base/E2 avatars and half-body portraits are mandatory where the data selects them.
 
 - **Operators:** the pool, hidden chess, backups and DIY picks of all installed official versions, keyed by charId (`tools/assets/versions.mjs`). The current union has 229 operators (210 in today’s data and 19 earlier-only), all with Front models and 225 with Back models. Three bards and 安洁莉娜 use one facing. The plan supplies base/E2 avatars and half-body portraits, default battle Spine, every skill icon and skill sound, and sub-profession icons. Extra identities use the established `patternOperator` URL patterns.
+- **AI seats' operators:** `shared/constants.js BOT_OPERATORS`, for the room's seat icons. Those the roster lacks (char_002_amiya, char_130_doberm) get a `chars` entry with `avatar` and `portrait` only: no model, voice or sounds, because they never fight.
 - **Tokens:** the union of each version’s `tokens.json` and backup/DIY summons. The manifest has 58 `token_*` entries; char/enemy-backed summons resolve through those identity tables. Pictures and available default models come from the normal plan, supplemented by the official local-client overlay ("Token models from the local client"). Five effect/marker tokens have no separate Spine and keep that documented presentation.
 - **Enemies:** 258 manifest identities: the existing 252 plus six earlier-only enemies. 心烛 remains without an entry. The set is the union of:
   - the 07 enemy list;
@@ -410,7 +411,9 @@ version; base/E2 avatars and half-body portraits are mandatory where the data se
     index. Held loops, own strikes and skill idles retain their existing logic. The alleged Tulip S2 is not an
     official skill in the local tables (§35.21); no mapping is added for it.
     Raw effects-index animKey values are not generally skeleton clip names: mode `_replaceAnimPairs` and skin
-    `_animations` are not exported by the current index. Other indexed skills retain their existing roles until
+    `_animations` are not exported by the current index. Operators whose attacks pick between clips use the table
+    `ATTACK_CLIPS` (`public/js/render/vfx/wiring.js`), read from those fields in the client, with `FxWiring.attackClip`
+    making the same pick as their effects. Other indexed skills retain their existing roles until
     those mappings are available [ASSUMED]. No manifest or skeleton metadata is rewritten.
   - A web enemy model whose clip names mislead the resolver gets the roles of its official battle prefab
     (`tools/assets/spine.mjs PREFAB_SPINE_ROLES`, read from the local client's `battle/enm_pfb_*.ab`: the prefab's anim
@@ -524,6 +527,8 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
                 mix?: { [attack|hit|die|born]: { p?, vol? } },
                 pools?: { [attack|hit]: bankId }, attackPools?: {[skillIndex]: bankId}, hitPools?: {[skillIndex]: bankId},
                 groups?: { [skill|die|born]: mixerGroup }, skillGroups?: {[skillIndex]: mixerGroup},  // (fork) mixer groups
+                fxSounds?: {['<fx kind>|<skill tag>']: { url, pool?: bankId }},  // fork: a kit fx's official sound (塔露拉 S3's 簇火, overload)
+                // (fork) an operator with a choice of skills has `skills`; its absent index casts silently, `skill` does not stand in
                 stings?: {[skillIndex]: { clips: [{ url, w }], pool?: bankId, loop?: url, loopGroup?: mixerGroup }},  // (fork) 丰川祥子's skill stings
                 notes?: {[look]: { born?: url, bornPool?: bankId, hit?: url, hitPool?: bankId }} } },  // (fork) her per-note sounds
       pools: { [bankId]: { maxSoundAllowed, popOldest, group?: mixerGroup,
@@ -820,10 +825,16 @@ all files in memory. In a secure context (HTTPS or localhost) each complete body
 (Cache Storage `sp-imported-assets-v1`, `assetCache.js openDownloadStore`; content-hashed URLs only) and added to its
 index, so `public/sw.js` answers it from there and a later check counts it ready without a request (GitHub #725:
 Chrome keeps at most 320 MB of HTTP cache on Windows, 1.28 GB elsewhere — less than a whole art set of about 1 GB —
-and a queue walking every file in order evicted each one before it was asked for again). Over plain HTTP only the
+and a queue walking every file in order evicts most of it before it is asked for again: with a 320 MB cap a second pass
+sent 93 % of the bytes again, with 4 GB none; history §37.99). Over plain HTTP only the
 browser HTTP cache keeps the files, and the dialog says that a reload may download them again; a failed write (over
 quota) sends the rest of that run to the HTTP cache with a note. Completion itself is still not persisted as a flag: a
 later check reads current manifests, skips the stored files and revalidates the rest through the HTTP cache.
+
+The worker finds a stored file by its URL path exactly as the manifest spells it, so the client requests a manifest URL
+unchanged (`[opt]x.webp`, not `%5Bopt%5Dx.webp`) and takes a file's URL from the manifest rather than a plain path. After
+a whole download a match asks the server for no art but the board's crop table (`map/autochess/tiles.json`, `no-cache`,
+in no manifest); the page shell's plain fonts (`/fonts/fonts.css`) stay outside too.
 
 The dialog shows successful file count, progress, and bytes read (including cache hits). Closing it or leaving the
 title screen pauses and aborts pending requests. Resume keeps completed files for this page; retry requests only

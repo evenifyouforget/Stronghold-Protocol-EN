@@ -8,6 +8,24 @@ import { simMeter } from '../simMeter.js';
 import { testSlice } from '../testTrace.js';
 import { DELAYS } from './common.js';
 
+/**
+ * §37.72 [ASSUMED] Wall-clock ms the built-in bot's prep may still need once an external plan seat's decision ends (its
+ * plan arrives or its budget runs out): server/match/externalAI.js keeps this much of a timed prep out of the plan's
+ * budget (planReserveMs, never more than half of what is left). Measured in the round-62 coop4 终极 botbench (480
+ * matches, about 9 busy threads; handoff/round65 diag coop-timing §4): 1.5 × the p99 of the four seats' summed prep wall
+ * time — four plans can land together and then share one event loop — is at most 3.9 s in R1–R5, 8.0 s in R6–R8, 10.7 s
+ * in R9–R13, 35.4 s at the Final Assault prep and 23.7 s at the Hidden Core prep. `rounds` lists [last round, ms] (a
+ * later normal round takes the last entry), `boss` / `hidden` are gd.bossRound / gd.hiddenRound, `choice` a band, 机变
+ * or offer decision (a weighted draw or the window's default, far below a millisecond; the second keeps the pick ahead
+ * of the turn timer). Revisit when the prep gets heavier (§37.47 doubled the rehearsal candidates).
+ */
+export const BOT_PREP_RESERVE_MS = Object.freeze({
+  rounds: Object.freeze([Object.freeze([5, 5000]), Object.freeze([8, 9000]), Object.freeze([13, 12000])]),
+  boss: 36000,
+  hidden: 24000,
+  choice: 1000,
+});
+
 export class MatchPrep {
   enterPrep() {
     this.phase = PHASE.PREP;
@@ -48,7 +66,17 @@ export class MatchPrep {
    * the delegation — which is why the continuation is installed here and not with the frame.
    */
   scheduleBotPrep(ps, i = 0) {
+    // (fork) match/botTasks.js. The dev-only external host still decides from here; its fallback goes through the queue.
+    if (this.botExecution === 'host') {
+      const round = this.round;
+      const live = () => this.phase === PHASE.PREP && this.round === round && ps.alive && !ps.ready && ps.botControlled;
+      if (!this.botFor(ps).decide?.(this, ps, { kind: 'prep', valid: live, complete: () => ps.ready, fallback: () => this.queueBotPrep(ps) })) this.queueBotPrep(ps);
+      return;
+    }
     const round = this.round;
+    /** (fork) seat streams (match/botTasks.js): the seat's own random streams and uid block while its steps run */
+    let task = null;
+    const onSeat = (fn) => (task ? this.withSeatStreams(task, fn) : fn());
     const token = (ps._botPrepToken = (ps._botPrepToken || 0) + 1);
     const valid = () => this.phase === PHASE.PREP && this.round === round && ps.alive && !ps.ready && ps.botControlled && ps._botPrepToken === token;
     const bounded = Number.isFinite(this.botSliceMs);
@@ -61,7 +89,7 @@ export class MatchPrep {
       let r = null;
       try {
         do {
-          r = gen.next();
+          r = onSeat(() => gen.next());
           if (!r || typeof r.done !== 'boolean') throw new TypeError('Bot prep hooks must return a synchronous iterator');
           if (sliceCtl) sliceCtl.note(1);
         } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
@@ -98,7 +126,7 @@ export class MatchPrep {
       const slice = () => {
         if (!valid()) return;
         let done = true;
-        try { done = job.run(this.botSliceMs, sliceCtl); } catch (e) { this.reportError(`bot ${ps.playerId} rehearsal`, e); }
+        try { done = onSeat(() => job.run(this.botSliceMs, sliceCtl)); } catch (e) { this.reportError(`bot ${ps.playerId} rehearsal`, e); }
         if (done) finish(job);
         else this.later(0, slice);
       };
@@ -108,6 +136,7 @@ export class MatchPrep {
     };
     const begin = () => {
       if (!valid()) return;
+      if (this.seatStreams) task = this.newBotTask(ps);
       let gen;
       try { gen = this.botFor(ps).prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
       catch (e) { this.reportError(`bot ${ps.playerId}`, e); end(null); return; }
@@ -149,6 +178,7 @@ export class MatchPrep {
   }
 
   maybeEndPrep() {
+    this._botMaybeHurry(); // (fork) match/botTasks.js
     if (this.phase !== PHASE.PREP || this._prepEndQueued) return;
     const allReady = () => { const alive = this.alivePlayers(); return alive.length > 0 && alive.every((p) => p.ready); };
     if (!allReady()) return;
@@ -165,6 +195,7 @@ export class MatchPrep {
     if (this.phase !== PHASE.PREP) return;
     for (const ps of this.alivePlayers()) {
       if (ps.ready) continue;
+      this._noteIdlePrep(ps); // (fork) a large room's idle seats (match/largeRoom.js)
       this.autoPickPersonalChoice(ps, 'random');
       ps.resolveTemp();
       ps.ready = true;
@@ -178,6 +209,7 @@ export class MatchPrep {
     // rehearsals still waiting for a host's answer die with the prep: their bots place the default layout, a late answer
     // is ignored (Match._takeOverRehearsal / MatchRehearsal) and nothing of them runs after the phase ended
     this._cancelRehearsal();
+    this.cancelBotTasks(); // (fork) match/botTasks.js
     this.setDeadline(0);
     const alive = this.alivePlayers();
     for (const ps of alive) this.dispatch(ps, 'onPrepEnd', { round: this.round });

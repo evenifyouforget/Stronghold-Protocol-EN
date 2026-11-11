@@ -6,7 +6,7 @@
 //   /data.js   the browser stand-in of server/data.js (server/http/static.js DATA_SHIM_JS, passed in as `shim`)
 //   data/      every data/<name>.json that server/data.js loads, but the presentation files (PRESENTATION_DATA:
 //              assets — the art manifest —, local-assets / local-fx — this machine's extracted art and official
-//              effects —, emotes)
+//              effects —, emotes, avatars — the profile icons)
 //
 // Until rooms can choose gameplay plugins (P1c) it is the identity of every room — a room's cosmetic plugins change no
 // battle, so they leave it (DESIGN §32.3): welcome.content, room.state.content, /healthz
@@ -26,7 +26,7 @@ import { APP_VERSION } from '../../shared/constants.js';
 import { CONTENT_HASH_VERSION, contentHashOf, simHashOf } from '../../shared/plugins/identity.js';
 
 /** data/*.json files that only the browser's presentation reads (never part of `cs`). */
-export const PRESENTATION_DATA = Object.freeze(['assets', 'local-assets', 'local-fx', 'emotes']);
+export const PRESENTATION_DATA = Object.freeze(['assets', 'local-assets', 'local-fx', 'emotes', 'avatars']);
 /** server/sim files that are never served (lower-case; static.js SIM_PRIVATE). */
 const SIM_PRIVATE = new Set(['nodedata.js']);
 const noopLog = { info() {}, warn() {}, error() {}, debug() {} };
@@ -145,6 +145,7 @@ export function contentIndexOf(content, { dataUrl = '/data/', version = null, bo
     v: CONTENT_HASH_VERSION, cs: content.cs, app: content.app, vanilla: true,
     ...(version ? { version } : {}),
     sim: content.sim, simFiles: { ...content.simFiles }, data, plugins: [], settings: {},
+    ...(content.i18n ? { i18n: Object.fromEntries(Object.entries(content.i18n).map(([lang, f]) => [lang, { url: `${dataUrl}${f.file}?v=${f.sha256.slice(0, 8)}`, sha256: f.sha256, bytes: f.bytes }])) } : {}),
     ...(bounds ? { bounds: { official: { ...bounds } } } : {}),
   };
 }
@@ -168,6 +169,15 @@ export function versionContentOf({ vanilla, dataDir, dataUrl, version, hash = no
     } catch (e) { log.warn(`[versions] cannot read ${version} ${f.file}: ${e?.code || e?.message || e}`); }
   }
   if (!Object.keys(data).length) return null;
-  const cs = contentHashOf({ app: vanilla.app, sim: vanilla.sim, data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.sha256])) });
-  return { cs, app: vanilla.app, vanilla: true, sim: vanilla.sim, simFiles: { ...vanilla.simFiles }, data, version, dataUrl };
+  // (fork) the version's own game texts (i18n/<lang>.json, tools/build-i18n.mjs --data <its directory>): in its cs too
+  const i18n = {};
+  const langDir = path.join(dataDir, 'i18n');
+  for (const file of fs.existsSync(langDir) ? fs.readdirSync(langDir).filter((f) => f.endsWith('.json')).sort() : []) {
+    const buf = fs.readFileSync(path.join(langDir, file));
+    i18n[file.slice(0, -'.json'.length)] = { file: `i18n/${file}`, sha256: hash(buf), bytes: buf.length };
+  }
+  const langs = Object.entries(i18n);
+  const cs = contentHashOf({ app: vanilla.app, sim: vanilla.sim, data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.sha256])),
+    ...(langs.length ? { i18n: Object.fromEntries(langs.map(([k, v]) => [k, v.sha256])) } : {}) });
+  return { cs, app: vanilla.app, vanilla: true, sim: vanilla.sim, simFiles: { ...vanilla.simFiles }, data, version, dataUrl, ...(langs.length ? { i18n } : {}) };
 }

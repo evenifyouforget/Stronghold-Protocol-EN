@@ -38,7 +38,9 @@
 //               Kengxxiao/ArknightsGameData_YoStar en_US (archived in 2025-11: no 盟约 season, only the 2025 test event
 //               act1vautochess)
 //   --refresh   re-download the target tables;  --offline  never download (fail when a table is missing)
-//   --cache     zh_CN cache (default <repo>/.cache/gamedata, shared with build-data; missing tables are downloaded)
+//   --cache     zh_CN cache (default <repo>/.cache/gamedata, shared with build-data; missing tables are downloaded). A table
+//               is read at the commit the default build pins its group to, from <cache>@<sha> (tools/versions/act2autochess.mjs,
+//               as tools/build-data.mjs: the texts of data/*.json come from those tables, DESIGN §37.91)
 //   --cache-en  target cache (default <repo>/.cache/gamedata-en for en 'assets', .cache/gamedata-en-yostar for 'yostar',
 //               .cache/gamedata-<code> for the others)
 //   --data      the data/*.json to localize (default <repo>/data);  --out  default <repo>/data/i18n/<code>.json
@@ -53,6 +55,8 @@ import { existsSync } from 'node:fs';
 import { basename, dirname, join, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildRecordOverlay, applyFileOverlay, OVERLAY_VERSION } from '../shared/i18nData.js';
+import defaultProfile from './versions/act2autochess.mjs';
+import { pinnedShaOf } from './versions/profiles.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE = 'usage: node tools/build-i18n.mjs [--lang en|ja|ko|zh-TW | --lang <code> --dict <file.json>] [--dict <file.json>] [--refresh | --offline] [--source assets|yostar] [--cache <dir>] [--cache-en <dir>] [--data <dir>] [--out <file>] [--report <file>] [--check] [--quiet]';
@@ -81,6 +85,13 @@ export const EN_SOURCES = Object.freeze({
   },
 });
 const ZH_URL = 'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/';
+/** Where the zh_CN side reads a table: the default build's pinned commit for its group (master's activity_table has no 盟约
+ * season since CN 2.7.91), cached in <cache>@<sha> like tools/build-data.mjs sourceOf. */
+function zhSourceOf(cache, rel) {
+  const sha = pinnedShaOf(defaultProfile, rel);
+  return sha ? { dir: `${cache}@${sha}`, url: `https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/${sha}/zh_CN/gamedata/` }
+    : { dir: cache, url: ZH_URL };
+}
 
 /**
  * The official clients by target language, each with its table sources. `untranslated`: how a target text that is not
@@ -140,6 +151,8 @@ const TABLES = [
   { rel: 'excel/skin_table.json', pick: (j) => ({ charSkins: j?.charSkins, brandList: j?.brandList }) },
   // the status keyword glossary (data/terms.json)
   { rel: 'excel/gamedata_const.json', pick: (j) => j?.termDescriptionDict },
+  // fork: the player profile icons' names and groups of data/avatars.json (tools/build-avatars.mjs)
+  { rel: 'excel/display_meta_table.json', pick: (j) => ({ avatars: j?.playerAvatarData }) },
 ];
 
 /** A Unity-style list of { Key, Value } entries as a plain map (the two dumps serialize some tables either way). */
@@ -155,9 +168,9 @@ const SEASON_SCOPE = 'act2';
 
 /** data/*.json files localized, in output order. */
 export const DATA_FILES = Object.freeze(['chess', 'backups', 'tokens', 'bonds', 'garrisons', 'items', 'bands', 'effects',
-  'choices', 'enemies', 'factions', 'stages', 'bosses', 'config', 'emotes', 'outfits', 'terms']);
-/** Files whose names never feed the `names` map (no server message names an outfit). */
-const NO_NAMES = new Set(['outfits']);
+  'choices', 'enemies', 'factions', 'stages', 'bosses', 'config', 'emotes', 'outfits', 'terms', 'avatars']);
+/** Files whose names never feed the `names` map (no server message names an outfit or a profile icon). */
+const NO_NAMES = new Set(['outfits', 'avatars']);
 
 /**
  * Research / developer notes of the data files (English with Chinese terms; no screen shows them): never translated,
@@ -285,7 +298,7 @@ async function loadTable(dir, base, rel, { refresh, offline, log }) {
 
 // ===== the parallel walk: Chinese source → English source pairs ======================================================
 
-const KEY_FIELDS = ['Key', 'key', 'id', 'charId', 'skillId', 'uniEquipId', 'enemyId', 'itemId', 'effectId', 'bondId', 'bandId', 'stageId', 'modeId', 'bossId', 'talentIndex'];
+const KEY_FIELDS = ['Key', 'key', 'id', 'charId', 'skillId', 'uniEquipId', 'enemyId', 'itemId', 'effectId', 'bondId', 'bandId', 'stageId', 'modeId', 'bossId', 'talentIndex', 'avatarId'];
 
 /** The field an array of records is keyed by (every element an object with a distinct string/number value), or null. */
 function arrayKeyField(arr) {
@@ -744,7 +757,8 @@ async function main() {
   const zh = [];
   const en = [];
   for (const t of client ? TABLES : []) {
-    const zj = await loadTable(opts.cache, ZH_URL, t.rel, { refresh: false, offline: opts.offline, log });
+    const zs = zhSourceOf(opts.cache, t.rel);
+    const zj = await loadTable(zs.dir, zs.url, t.rel, { refresh: false, offline: opts.offline, log });
     const ej = await loadTable(opts.cacheEn, src.url, t.rel, { refresh: opts.refresh, offline: opts.offline, log });
     zh.push(t.pick ? t.pick(zj) : zj);
     en.push(t.pick ? t.pick(ej) : ej);
@@ -761,15 +775,21 @@ async function main() {
   try { version = versionFile ? (await readFile(versionFile, 'utf8')).trim() : null; } catch { /* optional */ }
   const data = {};
   for (const f of DATA_FILES) {
-    const abs = join(opts.data, `${f}.json`);
+    // (fork) a version's directory has no emotes / outfits / terms, and its rooms take no default-id overlay: its own
+    // overlay covers the default files it shares (--data data/versions/<slug>)
+    const own = join(opts.data, `${f}.json`);
+    const shared = dirname(opts.data) === join(ROOT, 'data', 'versions') ? join(ROOT, 'data', `${f}.json`) : own;
+    const abs = existsSync(own) ? own : shared;
     if (existsSync(abs)) data[f] = JSON.parse(await readFile(abs, 'utf8'));
   }
   const readDict = async (abs) => (existsSync(abs) ? JSON.parse(await readFile(abs, 'utf8')) : {});
   // the remake's own strings and PR #70's are English; another language falls back to its own optional
   // tools/i18n/fallback-remake.<code>.json (texts its client lacks, e.g. newer status keywords), then its pack's UI strings
   const fallback = opts.lang === 'en' ? {
-    // fork: + the English names of the CN-only outfits (arknights.wiki.gg; docs/OUTFITS.md), counted as 'remake'
-    remake: { ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-outfits-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-remake.json')) },
+    // fork: + the English names of the CN-only outfits (arknights.wiki.gg; docs/OUTFITS.md), the texts of the CN-only
+    // operators (fallback-new-ops-en.json) and the names of the CN-only profile icons (fallback-avatars-en.json), counted
+    // as 'remake'
+    remake: { ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-outfits-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-new-ops-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-avatars-en.json')), ...await readDict(join(ROOT, 'tools', 'i18n', 'fallback-remake.json')) },
     pr70: await readDict(join(ROOT, 'tools', 'i18n', 'fallback-pr70.json')),
     ui: await readDict(join(ROOT, 'public', 'i18n', 'en.json')),
   } : {
@@ -778,7 +798,13 @@ async function main() {
   };
   if (opts.dict) fallback.dict = JSON.parse(await readFile(opts.dict, 'utf8'));
   // corrections of the language's own official texts (none for a language without a file)
-  const corrections = await readDict(join(ROOT, 'tools', 'i18n', `corrections-${opts.lang}.json`));
+  // (fork) + a version's own tools/i18n/corrections-<lang>.<slug>.json (--data data/versions/<slug>), which wins: the
+  // same Chinese text can carry another number in another season (华法琳's granted garrison_95_b: 14 / 24 / 20 stacks)
+  const slug = dirname(opts.data) === join(ROOT, 'data', 'versions') ? basename(opts.data) : null;
+  const corrections = {
+    ...await readDict(join(ROOT, 'tools', 'i18n', `corrections-${opts.lang}.json`)),
+    ...(slug ? await readDict(join(ROOT, 'tools', 'i18n', `corrections-${opts.lang}.${slug}.json`)) : {}),
+  };
   const { overlay, report } = buildOverlay({ zh, en, data, fallback, corrections, lang: opts.lang, source: client ? { id: opts.source, label: src.label, home: src.home, season: seasonEn } : { id: 'dict', label: src.label } });
 
   // self-check: applying the overlay keeps every record's shape (strings replace strings only)
