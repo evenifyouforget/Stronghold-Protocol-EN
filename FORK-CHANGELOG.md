@@ -7,6 +7,11 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### Shots leave from the right spot when a model has no usual muzzle point
+
+- Ch'en the Holungday's Holiday (summer#20) outfit aims from its own muzzle again. Its model has different muzzle bones from her default look, so her shots and muzzle effects used to start from a fixed spot of the default model. A muzzle point now also tries the usual muzzle bones of the model actually drawn.
+- An operator or enemy without a muzzle point now shoots from its feet, as in the official game: the client's animators hand over the foot point when there is no muzzle. Santalla's S2 ice spikes now leave from her feet instead of 0.4 tiles above them.
+
 ### External AI is shelved: locked in every build, and no test suite runs its tests
 
 - External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
