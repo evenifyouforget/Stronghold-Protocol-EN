@@ -224,5 +224,39 @@ export const EARLY_ROLL = defineTactic({
   },
 });
 
+/**
+ * Writes legacy's own plan (bot.js selfPlan, aiPlan.js advisorPlan): from `fromRound`, add `bond` at `priority` to the
+ * bonds of the seat's plan for the round, next to legacy's focus. Legacy reads the plan's bonds itself:
+ *   - buying: a member it doesn't own yet scores + priority × 6 (planUnitWeight, planCopyUseful);
+ *   - the lineup: the same weight;
+ *   - its sales: a member is kept while selling it would lower the bond's active tier (planProtected).
+ * So the tactic changes data only, never an action. A Bench-counted bond (投资人) is the case legacy misses most
+ * (fish-edition/ai-players/08). No effect on a seat with an external advisor's plan naming its own bonds.
+ */
+const PLAN_BONDS = Object.freeze(['investShip', 'yanShip', 'sargonShip', 'victoriaShip', 'kjeragShip', 'lateranoShip', 'egirShip',
+  'siracusaShip', 'kazimierzShip', 'preciShip', 'swiftShip', 'skillfulShip', 'arcaneShip', 'steadShip', 'deputShip', 'visiShip',
+  'miraShip', 'raidShip', 'indomShip', 'soloShip', 'suntShip']);
+export const PLAN_BOND = defineTactic({
+  id: 'plan-bond',
+  describe: "writes legacy's plan: adds a bond (default 投资人) to the seat's plan bonds from a round on; legacy's buying, lineup and sales follow it",
+  params: {
+    bond: { type: 'choice', choices: PLAN_BONDS, default: 'investShip' },
+    priority: int(1, 5, 3),
+    fromRound: int(1, 14, 6),
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (m.round >= p.fromRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const bonds = (own?.plan?.bonds || []).filter((b) => b.id !== p.bond);
+        const add = Object.freeze({ id: p.bond, priority: p.priority });
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...(own?.plan || {}), bonds: Object.freeze([...bonds, add]) }) };
+      }
+      return ctx.next();
+    },
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND]);

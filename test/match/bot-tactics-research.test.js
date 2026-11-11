@@ -57,3 +57,19 @@ test('each research tactic plays a whole match through the game\'s intents, the 
     assert.equal(playOut(p, 7), a, `${t.id} is deterministic`);
   }
 });
+
+test("plan-bond adds its bond to legacy's own plan for the round, from its round on, and keeps legacy's focus", async () => {
+  const { PLAN_BOND } = await import('../../server/match/botTacticsResearch.js');
+  const at = PLAN_BOND.at.sellJunk;
+  const focus = Object.freeze({ id: 'yanShip', priority: 5 });
+  const run = (round, self) => {
+    const ps = { isBot: true, autoplay: false, _botSelf: self };
+    at({ match: { round }, player: ps, params: { bond: 'investShip', priority: 3, fromRound: 6 }, next: () => 'legacy' });
+    return ps._botSelf;
+  };
+  assert.equal(run(5, null), null, 'before fromRound: untouched');
+  assert.deepEqual(run(6, { round: 6, plan: { bonds: [focus] } }).plan.bonds, [focus, { id: 'investShip', priority: 3 }]);
+  assert.deepEqual(run(7, null).plan.bonds, [{ id: 'investShip', priority: 3 }], 'no focus: the bond alone');
+  const stale = { round: 6, plan: { bonds: [focus] } };
+  assert.equal(run(7, stale), stale, "another round's plan: untouched");
+});
