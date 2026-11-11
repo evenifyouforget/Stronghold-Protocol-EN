@@ -23,8 +23,10 @@ DYYBot line. No more sganggs syncs (they added SPA3, 2026-11-11); Yuri → main 
 ```
 SPA-CC final balance update (#31, #92)
   bot sweeps, stand-route fix, Halley replay, verdicts .. done (spacc-balance-update.md)
-    └─ Fish's changes of 2026-11-12 (3 Silencers, Patriot, Delegation; United 3 gate 15 %) .. re-sweep running
-         └─ verdicts ← next; #131 and #125 (ok'd) go into the same patch
+    └─ Fish's changes of 2026-11-12 (3 Silencers, Patriot, Delegation; United 3 gate 15 %) .. re-swept, verdicts written
+         └─ #131 merged into the balance branch (63f6d6d6) ✓
+              └─ Fish: read the 2026-11-12 verdicts (Undying 3 = Undying 2 for bots; United 2 = United 3 for bots) ← next
+                   └─ #125 (ok'd), same patch: needs Fish's choices (option name, how awarded tags show)
          └─ spacc/working-spec.md, full test suite, PR into main
 
 Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07)
