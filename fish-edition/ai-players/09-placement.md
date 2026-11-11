@@ -120,9 +120,21 @@ Back pieces of the snakes: humans 深巡 13, 幽灵鲨 10, 归溟幽灵鲨 7, �
 1. **A leak allowance for the positional candidate:** built (7766a87d), behind `legacy-arrange`'s `leakAllow`
    (default 0) and `leakAllowLp` (20). In normal rounds 6–11 while the LP is at least the floor, the rehearsal counts
    the positional candidate's leaks minus `leakAllow`: 0.5 wins a leak tie outright, 1.5 also with one leak more. In a
-   two-seed solo smoke run, seed 5 gained 13 stacks by round 14 with the same leaks. **Queued** (`untracked/queue7-2026-11-12.sh`
-   → `untracked/placement-2026-11/`, after queue3): co-op Ultimate seeds 1–80, all seats `plan-engines`, against the
-   same with `leakAllow` 0.5 / 1.5 / 2.5.
+   two-seed solo smoke run, seed 5 gained 13 stacks by round 14 with the same leaks. **Measured**
+   (`untracked/queue7-2026-11-12.sh` → `untracked/placement-2026-11/`): co-op Ultimate seeds 1–80, all seats
+   `plan-engines`, paired:
+
+   | | `eng-pos` | `leakAllow` 0.5 | 1.5 | 2.5 |
+   |---|---|---|---|---|
+   | Wins of 80 | 47 | 48 (2 lost / 3 gained) | 51 (3 / 7, p 0.34) | 52 (4 / 9, p 0.27) |
+   | Stacks at round 13 (sum of the team, mean) | 679 | 684 | 676 | 683 |
+   | Leaks per game (team) | 192.9 | 192.8 | 194.1 | 194.3 |
+   | LP left | 29.7 | 28.7 | 27.4 | 28.0 |
+   | Leader damage (team, mean) | 12.6 M | 12.5 M | 12.8 M | 13.1 M |
+
+   **No stack gain** (paired t −0.13 to +0.44), so the positional candidate wins more often but doesn't change the
+   stacks that matter. Wins drift up with the allowance (+5 at 2.5), but not significantly. Not worth adopting on this
+   evidence; it can stay as a tunable for the evolution race.
 2. **The `around` positional kind** for 莫斯提马: built (4bafc1c6), behind `legacy-arrange`'s `aroundValue` (default 0;
    3 means three stacks per battle per ammo user beside her). Ammo users are Laterano members (their skills are ammo
    skills) and the hunter branch. A unit test checks that it moves a Laterano operator next to her. Not measured yet:
