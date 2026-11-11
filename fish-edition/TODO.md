@@ -33,9 +33,11 @@ Evolution bench ............................ built and effective (tools/evolve.m
   ├─ DYYBot step 5 (05-dyybot.md "Process")
   └─ Mod Z: "try the evolution bench", then the report
 
-DYYBot
-  forced-Du-Yaoye baseline (05-dyybot.md) .. not run (the first try ran out of memory)
-    └─ DYY tactics (sp-dyy-wt, uncommitted) measured against it
+DYYBot (#135, draft)
+  step 1: human games vs the draft, legacy's games vs the humans' .. done (05)
+  ├─ forced-Du-Yaoye baseline + the draft, 160 seeds .. runs here after the balance sweep
+  └─ step 3 tactics: the Isomorph plan first (05) ← next
+       └─ step 5 evolution: on Fish's PC (one command, one zip)
 ```
 
 ## SPA-CC
@@ -63,19 +65,18 @@ Branches that feed into it:
   - Merged into the balance branch. It could also go to main as its own bug-fix PR (Fish's call).
 
 Also open: #47 (Patriot targetable while invulnerable), #48 (Blood Debt icon), #121 (clears tracking issue;
-`untracked/spacc-clears.mjs` regenerates it), #125 (free-tags option: a feature, see "Needs Fish").
+`untracked/spacc-clears.mjs` regenerates it). #125 and #131: "Scoping under the freeze".
 
 ## Bots
 
 Allowed under the freeze: DYYBot, its siblings, and the research already started (no new bots). Keep bot code
 browser-safe, deterministic and cheap: Yuri is moving bots to the browser.
 
-- **DYYBot:** the steps are in `ai-players/05-dyybot.md` "Process". First the forced-Du-Yaoye baseline (the command is
-  in 05), then the tactics in `sp-dyy-wt`.
+- **DYYBot:** draft PR #135 (`feature/fish-dyy-profile`, worktree `sp-dyy-wt`; it merges the research branch). The
+  steps are in `ai-players/05-dyybot.md` "Process"; where it stands is in "What blocks what".
 - **#129 `legacy-layered`:** the tuning run of its 35 parameters (botbench `--profile`, small saved chunks,
   held-back seeds) has not been started.
-- **Research tactics and the evolution bench:** `ai-players/07`. Branch `feature/bot-tactics-research` (pushed, no
-  PR). Next: bigger tactics (DYYBot), a 4-player run (`ai-players/06`), `--pool legacy` (#129's tuning).
+- **Research tactics and the evolution bench:** `ai-players/07`. Branch `feature/bot-tactics-research`, in #135. Next: bigger tactics (DYYBot), a 4-player run (`ai-players/06`), `--pool legacy` (#129's tuning).
   Whether to PR the bench into main is Fish's call (bench-only code, no bot behaviour change).
 
 Fish's bot research list (2026-11-11):
@@ -91,11 +92,7 @@ Fish's bot research list (2026-11-11):
 - - [x] Answer: Did the most fit strategy actually make use of evolution, or was it reachable with only parameter tuning? Neither helped.
 - - [x] Answer: Is the evolution bench effective? If not, can we improve it to make it effective? Now it is (resampled, paired); the tactics are too small.
 
-Bot issues still open:
-
-- answered in `ai-players/`, could be closed: #36, #71, #72;
-- research: #29, #115, #124, #128;
-- features: #87, #117 (see "Needs Fish").
+Bot issues still open: research #29, #115; the rest are in "Scoping under the freeze".
 
 - [ ] Break up legacy tactics to be less monolithic, so there are more opportunities to build on it.
 
@@ -147,10 +144,34 @@ Everything is in `untracked/eos-notes.md`. Open:
 - the translations once Fish's EN text is final;
 - the repos' README notice.
 
+## Scoping under the freeze (GitHub, 2026-11-12)
+
+Every open issue and PR on the fork that isn't a bug (bugs are allowed: "Bugs" above). For Fish to mark **ok**
+(done despite the freeze) or **no** (not doing: close, or label and leave). Sizes are my guesses.
+
+| | What | Kind | Size | Note | Fish |
+|---|---|---|---|---|---|
+| #131 | promoted operators ignore the 300k damage cap | gameplay | small | Fish and Halley want it as a feature; could go into the balance patch | |
+| #132 | popup with the operator copies left in the shared deck | UI | medium | shows what only the bots' pool stats see today | |
+| #133 | cheat: Transmitter+ | cheat | medium | | |
+| #134 | cheat: Damazti Isomorph+ (more item → Alliance pairs) | cheat | medium | needs Fish's list of pairs | |
+| #125 | lobby option to award free tags automatically | SPA-CC feature | small–medium | | |
+| #128 | bots equip custom operators | bot research | medium | also in Fish's bot list above; 4 of 15 human Du Yaoye seats used one (05) | |
+| #124 | how strong each bot is | bot research | small | botbench runs exist (05, 07); needs a write-up | |
+| #117 | rehearsals: bonus for clearing a round quickly | bot feature | small | | |
+| #87 | show AI players' personality | UI | small | | |
+| #118 | public username in the profile, in match records | feature | medium | records are anonymous by design (#32) | |
+| #105 | pull down the improv overlay to see boards | UI | medium | | |
+| #104 | replays rich enough to continue a match mid-way | feature | large | | |
+| #52 | SPA-CC as a plugin | research | | answered: the plugins repo (#52's decision in ROADMAP) | |
+| #33, #34 | accuracy audit; official effects (tracking) | tracking | | | |
+| #93, #121 | SPA-CC balance reporting; clears (tracking) | tracking | | keep while SPA-CC is live? | |
+| #36, #71, #72 | bot questions | question | | answered in `ai-players/`: close? | |
+| #135 | DYYBot draft + research tactics (draft PR) | bots | | allowed (DYYBot line) | ok |
+
 ## Needs Fish
 
-- **Feature issues under the freeze, close or label and leave:** #87, #104, #105, #117, #118, #124, #125, #128.
-- **Research and tracking issues to keep or close:** #33, #34, #52, #93.
+- **Scoping under the freeze:** the table below.
 - **Bot findings post** (`untracked/bot-findings-post.md`, written for an issue on sganggs's repo): post it elsewhere,
   or drop it now that there are no more sganggs syncs?
 - **Lobby rules and SPA-CC for Yuri:** Fish asked Yuri on 2026-10-16 whether gameplay mods are welcome as dormant
