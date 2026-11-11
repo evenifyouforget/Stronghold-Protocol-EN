@@ -29,7 +29,7 @@ SPA-CC final balance update (#31, #92)
                    └─ #125 (ok'd), same patch: needs Fish's choices (option name, how awarded tags show)
          └─ spacc/working-spec.md, full test suite, PR into main
 
-Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07)
+Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07); iterated racing --race (ai-players/10), first real race queued (queue9)
   first tactics: no real gain over legacy; bigger tactics needed (DYYBot, team play)
   ├─ bot research: "try it in the evolution bench"
   ├─ DYYBot step 5 (05-dyybot.md "Process")
@@ -112,29 +112,39 @@ We should also look at any other resources that human players have access to but
 Long-term goals:
 
 - [ ] Be able to generate high stack counts. Why do the bots suck so much at generating 200+ stacks???
-  Answer so far (`ai-players/08`): the gap opens from round 7. Most of it is prep-time stack operators the bots rarely
-  deploy (空弦, 断崖: 7× and 19× less often) and consumables they never buy, not cycling. `plan-engines` measured: the bots
-  deploy them 2–8× as often, but stacks rise ≤ 3 % and wins drop (27 → 22 of 40). `plan-items` (buying
-  consumables) is the first that moves stacks: +7–10 % at round 13 (records' median 156 → 216), leader damage +15 %, same
-  wins, a little less defence. The leak allowance is queued.
+      Answer so far (`ai-players/08`): the gap opens from round 7. Most of it is prep-time stack operators the bots rarely
+      deploy (空弦, 断崖: 7× and 19× less often) and consumables they never buy, not cycling. `plan-engines` measured: the bots
+      deploy them 2–8× as often, but stacks rise ≤ 3 % and wins drop (27 → 22 of 40). `plan-items` (buying
+      consumables) is the first that moves stacks: +7–10 % at round 13 (records' median 156 → 216), leader damage +15 %, same
+      wins, a little less defence. The leak allowance is queued.
+- - [ ] Study some selected high-stack human games in more depth. What are they doing that the bot is not doing?
 - [ ] Be able to play Investor. Just my intuition, but this seems like the strategy the bots are least capable of doing. Studying human games may be enlightening.
-  Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
-  never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`): the 40-seed grid shows it does not help (27 → 26 / 22 wins, more leaks, same stacks). Next: the Bench-timing tactic.
+      Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
+      never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`): the 40-seed grid shows it does not help (27 → 26 / 22 wins, more leaks, same stacks). Next: the Bench-timing tactic.
 
 Small tweaks may be possible:
 
-- [ ] Tactics that make better use of specific Operators
+- [ ] Commit to Aegir if got Gladiia
+- [ ] Commit to Laterano if got Mostima or Executor the Ex Foedore
+- [ ] Executor Alter > Ines on field if Foresight is active
+- [ ] Commit to Yan or Arcane if got Dusk
+- [ ] Take Yu and field Yu (for most boards) (just to generate operators)
+- [ ] Commit to Kjerag if got Silverash Alter and have 3 Kjerag operators
+- [ ] Put Archetto behind an operator with desirable alliances (this is a lowroll method compared to more efficient stack generators)
+- [ ] Yan/Investor: Have Swire in inventory and don't sell unless it's the boss round. Her passive income is great
+- [ ] Other tactics that make better use of specific Operators
 
 Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
-  How it works, and each idea against legacy and the records: `ai-players/09`.
+How it works, and each idea against legacy and the records: `ai-players/09`.
 
 - [ ] Laterano specific: put Mostima next to an ammo user
 - [ ] Kjerag specific: maximize overlap between freeze area and "on freeze, + stack" range
 - [ ] Kjerag specific: do not have a tile in front (earlier in path) that can be frozen but doesn't generate stacks
 - [ ] Put Civilight behind a stack generating Operator
+- [ ] Kazimierz specific: Fartooth + Blemishine combo (or Fartooth + Degenbrecher is even better)
 - [ ] Aegir specific: build a snake with the dps operator at the back
 - [ ] Aegir specific: can use a non-Aegir dps operator if they are given damazti isomorph + aegir equipment
-- [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile)
+- [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
 ## Mod Z
 
