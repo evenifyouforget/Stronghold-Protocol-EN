@@ -5,6 +5,15 @@ on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sg
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
 [CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
 
+## 2026-11-11
+
+### Attack effects speed up with the attack, as in the official game
+
+- When a unit attacks faster than its attack animation lasts (attack-speed buffs, fast skills), the effects of its attack now play faster too, as the official game plays them: the swing and skill effects the game marks for it (2,976 of the 10,330 effect files, mostly attack and skill starts), their delays included, so a flash or a wave stays with the swing. Vulpisfoglia's S3 now plays its swing effects at 2×, Archetto's S3 and Swire's S2 at about 1.25×.
+- Each effect keeps the official limit: most may play at most 2× as fast in real time, so at 2× battle speed they keep their normal speed. A few have no limit or a higher one.
+- A slow attack never slows its effects down. Effects the game doesn't mark (buffs, statuses, most hits) keep their speed; only their official start delay shortens with the attack, as in the game.
+- Display only: battle results and bots are unchanged.
+
 ## 2026-11-10
 
 ### Operators attack as in the official game: the swing starts, then the hit lands
