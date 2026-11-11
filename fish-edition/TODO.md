@@ -117,7 +117,7 @@ Long-term goals:
   `plan-items` are queued.
 - [ ] Be able to play Investor. Just my intuition, but this seems like the strategy the bots are least capable of doing. Studying human games may be enlightening.
   Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
-  never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`); a grid is queued.
+  never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`): the 40-seed grid shows it does not help (27 → 26 / 22 wins, more leaks, same stacks). Next: the Bench-timing tactic.
 
 Small tweaks may be possible:
 

@@ -132,8 +132,23 @@ only, never an action. It's the first tactic for Fish's "a tactic that writes ea
 
 It changes play, but too late and too rarely at these settings.
 
-**Queued** (`untracked/queue2-2026-11-12.sh` → `untracked/investor-2026-11/`): co-op Ultimate seeds 1–40, all seats
-the same bot. The variants are legacy, priority 3 from round 6, and priority 5 from round 4.
+**Measured** (`untracked/queue2-2026-11-12.sh` → `untracked/investor-2026-11/`, `compare-*.md`): co-op Ultimate seeds
+1–40, all seats the same bot.
+
+| | legacy | priority 3 from round 6 | priority 5 from round 4 |
+|---|---|---|---|
+| Wins | 27 | 26 (lost 6, gained 5; p 1.00) | 22 (lost 7, gained 2; p 0.18) |
+| Reached the boss | 39 | 36 | 34 |
+| Rounds passed (mean) | 13.70 | 13.53 | 13.43 |
+| LP left (mean) | 36.8 | 32.3 | 31.7 |
+| Bounties leaked | 56 | 53 | 68 |
+| Stacks at rounds 7 / 10 / 13 (mean per team) | 40 / 111 / 258 | 37 / 104 / 265 | 36 / 103 / 266 |
+| Leader damage (mean) | 3.16 M | 3.27 M | 3.53 M |
+
+**Verdict: neither setting helps.** Stacks at round 13 barely move (+3 %), and both lose defence: fewer teams reach the
+boss and less LP is left. Priority 5 is clearly worse. Chasing Investor through the plan's buy weight alone takes
+board strength without enough stack return; the cheap members are weak units. If Investor is retried, it should be
+the timing tactic below (members on the Bench, not the board), measured with records for how often it activates.
 
 ## A second tactic: `plan-engines` (writes legacy's internal state)
 
