@@ -22,17 +22,21 @@ Server cost:
 
 | Measure | Typical | Worst case |
 |---|---|---|
-| Bandwidth out / in, per player | 0.0005 / 0 MB/s (0.04 / 0 GB/day) | 0.005 / 0 MB/s (0.43 / 0 GB/day) |
-| Bandwidth out / in, per room (4 players; 8 in Grand Alliance) | 0.002 / 0 MB/s (0.004 with 8) | 0.02 / 0 MB/s (0.04 with 8) |
-| Bandwidth out / in, 300 players | 0.15 / 0 MB/s (13 / 0 GB/day) | 1.5 / 0 MB/s (130 / 0 GB/day) |
+| Bandwidth out / in, per player | 0.0001 / 0 MB/s (0.01 / 0 GB/day) | 0.001 / 0 MB/s (0.09 / 0 GB/day) |
+| Bandwidth out / in, per room (4 players; 8 in Grand Alliance) | 0.0004 / 0 MB/s (0.0008 with 8) | 0.004 / 0 MB/s (0.008 with 8) |
+| Bandwidth out / in, 300 players | 0.03 / 0 MB/s (2.6 / 0 GB/day) | 0.3 / 0 MB/s (26 / 0 GB/day) |
 | Server CPU | under 0.1 % of one core | under 0.5 % of one core |
 | Memory | under 0.1 MB | under 1 MB |
 | Disk | 0 MB/day | 0 MB/day |
-| Bot budget | 0 ms/round | under 0.1 ms/round |
+| Bot budget | 0 ms/round | 0 ms/round |
 
-- Cap: one b.snap `fxs` row per unit and buff (a unit's states are keyed by buff, one probe per buff), each gone with
-  its duration or the unit's deployment, so a field sends at most its units × the ~15 buffs of part 2; the probes run
-  only when a snapshot is built, never in the battle's ticks (the bots build none).
-- Estimated, not measured: part 2's rows are about 40 bytes each in every 20 Hz b.snap to the field's watchers;
-  typical 3 rows (a ready glow, a few marks), worst case 40 (Carnelian's marks on a full wave and Heavyrain's aura on
-  every ally); about 7× smaller after the WebSocket's deflate. Part 1 went in before the rule (unmeasured).
+- Default client-side combat (production; `SP_COMBAT` unset): 0 for all of it. The server sends no `b.snap` for combat
+  there (docs/design/network.md); the table is the legacy server-run mode (`SP_COMBAT=server`).
+- Cap: one `fxs` row per unit and buff, gone with its duration or the unit's deployment; a field sends its rows only
+  when they change (`fxd`), plus the whole set once a second and to a watcher that just started or whose last frame was
+  dropped (shared/fxsDiff.js); the client keeps the sets of at most 16 fields. The probes run only when a snapshot is
+  built (the bots build none).
+- Estimated, not measured: rows of about 40 bytes; typical 3 rows and about 1 change a second, worst case 40 rows (Carnelian's
+  marks on a full wave and Heavyrain's aura on every ally) and about 10 changes a second; about 2.5× smaller after the
+  WebSocket's deflate. Every frame used to repeat every row: 5× more (0.15 / 1.5 MB/s for 300 players). Part 1 went in
+  before the rule (unmeasured); its rows now go on change too.
