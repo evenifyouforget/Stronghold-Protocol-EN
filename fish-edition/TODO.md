@@ -23,8 +23,8 @@ DYYBot line. No more sganggs syncs (they added SPA3, 2026-11-11); Yuri → main 
 ```
 SPA-CC final balance update (#31, #92)
   bot sweeps, stand-route fix, Halley replay, verdicts .. done (spacc-balance-update.md)
-    └─ Fish decides the values (+ pro player / community feedback, eos-notes) ← next
-         open: Patriot Undying 2 once taken, Delegation United 2/3 in co-op
+    └─ Fish's changes of 2026-11-12 (3 Silencers, Patriot, Delegation; United 3 gate 15 %) .. re-sweep running
+         └─ verdicts ← next; #131 and #125 (ok'd) go into the same patch
          └─ spacc/working-spec.md, full test suite, PR into main
 
 Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07)
@@ -147,27 +147,25 @@ Everything is in `untracked/eos-notes.md`. Open:
 ## Scoping under the freeze (GitHub, 2026-11-12)
 
 Every open issue and PR on the fork that isn't a bug (bugs are allowed: "Bugs" above). For Fish to mark **ok**
-(done despite the freeze) or **no** (not doing: close, or label and leave). Sizes are my guesses.
+(done despite the freeze) or **no** (not doing: close, or label and leave). Sizes are my guesses. Closed on
+2026-11-12: #33, #34 (no), #36, #52, #71, #72 (answered).
 
-| | What | Kind | Size | Note | Fish |
-|---|---|---|---|---|---|
-| #131 | promoted operators ignore the 300k damage cap | gameplay | small | Fish and Halley want it as a feature; could go into the balance patch | |
-| #132 | popup with the operator copies left in the shared deck | UI | medium | shows what only the bots' pool stats see today | |
-| #133 | cheat: Transmitter+ | cheat | medium | | |
-| #134 | cheat: Damazti Isomorph+ (more item → Alliance pairs) | cheat | medium | needs Fish's list of pairs | |
-| #125 | lobby option to award free tags automatically | SPA-CC feature | small–medium | | |
-| #128 | bots equip custom operators | bot research | medium | also in Fish's bot list above; 4 of 15 human Du Yaoye seats used one (05) | |
-| #124 | how strong each bot is | bot research | small | botbench runs exist (05, 07); needs a write-up | |
-| #117 | rehearsals: bonus for clearing a round quickly | bot feature | small | | |
-| #87 | show AI players' personality | UI | small | | |
-| #118 | public username in the profile, in match records | feature | medium | records are anonymous by design (#32) | |
-| #105 | pull down the improv overlay to see boards | UI | medium | | |
-| #104 | replays rich enough to continue a match mid-way | feature | large | | |
-| #52 | SPA-CC as a plugin | research | | answered: the plugins repo (#52's decision in ROADMAP) | |
-| #33, #34 | accuracy audit; official effects (tracking) | tracking | | | |
-| #93, #121 | SPA-CC balance reporting; clears (tracking) | tracking | | keep while SPA-CC is live? | |
-| #36, #71, #72 | bot questions | question | | answered in `ai-players/`: close? | |
-| #135 | DYYBot draft + research tactics (draft PR) | bots | | allowed (DYYBot line) | ok |
+|               | What                                                   | Kind           | Size         | Note                                                                                                                                        | Fish |
+| ------------- | ------------------------------------------------------ | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| #131          | promoted operators ignore the 300k damage cap          | gameplay       | small        | Fish and Halley want it as a feature; could go into the balance patch                                                                       | ok   |
+| #132          | popup with the operator copies left in the shared deck | UI             | medium       | shows what only the bots' pool stats see today                                                                                              | ok   |
+| #133          | cheat: Transmitter+                                    | cheat          | medium       |                                                                                                                                             | ok   |
+| #134          | cheat: Damazti Isomorph+ (more item → Alliance pairs)  | cheat          | medium       | Claude's draft of the pairs is on the issue, for Fish to correct                                                                                                                  | ok   |
+| #125          | lobby option to award free tags automatically          | SPA-CC feature | small–medium | you should also sanity check the definitions yourself to make sure the free award condition actually guarantees it would make no difference | ok   |
+| #128          | bots equip custom operators                            | bot research   | medium       | also in Fish's bot list above; 4 of 15 human Du Yaoye seats used one (05)                                                                   | ok   |
+| #124          | how strong each bot is                                 | bot research   | small        | botbench runs exist (05, 07); needs a write-up                                                                                              | ok   |
+| #117          | rehearsals: bonus for clearing a round quickly         | bot feature    | small        |                                                                                                                                             | ok   |
+| #87           | show AI players' personality                           | UI             | small        |                                                                                                                                             | ok   |
+| #118          | public username in the profile, in match records       | feature        | medium       | explicitly opt-in (Fish; noted on the issue) | ok   |
+| #105          | pull down the improv overlay to see boards             | UI             | medium       |                                                                                                                                             | ok   |
+| #104          | replays rich enough to continue a match mid-way        | feature        | large        |                                                                                                                                             | ok   |
+| #93, #121     | SPA-CC balance reporting; clears (tracking)            | tracking       |              | keep while SPA-CC is live?                                                                                                                  | ok   |
+| #135          | DYYBot draft + research tactics (draft PR)             | bots           |              | allowed (DYYBot line)                                                                                                                       | ok   |
 
 ## Needs Fish
 
