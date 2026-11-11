@@ -70,7 +70,7 @@ addresses deployment. Once more stackers are deployed, their placement matters m
 | Kjerag: overlap the freeze area with the "on freeze, + stack" range | Not modelled. 初雪 / 银灰 ("范围内1名敌人进入冻结时 … +1") are battle traits: counted by the rehearsal, not aimed for. 凛御银灰's grant to the piece in front is modelled. | Needs a freeze model: where the cold wind and freezes happen (the whole field every 25 s, plus 谢拉格不融冰 hits). Then the exposure model can weight the stack operators' cover of the tiles where enemies stand when frozen. Medium. |
 | Kjerag: no freezable tile in front that doesn't make stacks | Not modelled. | Same model: tiles early on the path covered by no stack operator are where freezes are wasted. Comes with the previous one. |
 | Civilight (魔王) behind a stack generator | Modelled (`extra`). The records agree (60 % of 10 battles, humans 44 %). | Nothing, unless more data says otherwise. |
-| Ægir snake, the dps at the back | Partly. §37.70 models the devour in normal rounds (stacks, the victims that stay down). §37.77 adds Final Assault candidates that feed a dealer (the devoured base ATK and block). The order is the official one: the leftmost and topmost Ægir devours first, and it devours the piece in front. A chain is possible but not aimed for. | Measure first: compare human and bot Ægir chains in the battle specs (chain length; whether the last link is the top dealer). |
+| Ægir snake, the dps at the back | Partly. §37.70 models the devour in normal rounds (stacks, the victims that stay down). §37.77 adds Final Assault candidates that feed a dealer (the devoured base ATK and block). The order is the official one: the leftmost and topmost Ægir devours first, and it devours the piece in front. A chain is possible but not aimed for. | Measured (below): humans snake more (65 % of battles against 40 %), but with a cheap Ægir at the back, not the top dealer. A "dealer at the back" candidate is still worth a rehearsal test. |
 | Ægir: a non-Ægir dps with Damazti Isomorph + an Ægir item | Isomorph is on DYYBot's list (05, step 3: the Isomorph plan). Legacy equips Isomorph only via 缪尔赛思's plan (`morphPlan`). | Part of the Isomorph tactic. |
 | Boss: a carry dps with maximum buffs and healing, on a ranged / fence tile | Mostly there. The road penalty keeps dealers off pathable tiles. Boss rounds get body plans, damage lineups (a strong bench piece swapped in) and the rehearsal's leader-damage ranking. What's missing is buffs: the exposure model knows DPS and healing cover, not the ATK auras or 鼓舞 skills a carry could stand in. | A "carry" candidate for the Final Assault: the top dealer first on the best off-road tile, buffers and healers around it. The rehearsal keeps it if it deals more. |
 
@@ -89,11 +89,40 @@ comes into play.
 So, on these boards, filling 空弦's front costs defence. The humans' 86 % says they pay that price. Whether it pays
 depends on what one stack is worth in LP. That's a policy question, not a tie-break.
 
+## Ægir chains in the records
+
+How the devour works in the simulation (`server/sim/content/bonds/core.js`, `devour`): each Ægir operator marks the
+piece in front of it and, through a marked Ægir, the pieces in front of that one too. It gains the base ATK and block
+of everything it marked, and each mark costs its target 5000 HP. So the back piece of a snake gains the whole chain,
+whatever order the devours run in.
+
+Battles from round 4 with 3+ Ægir operators on the board (`untracked/dyy-2026-11/aegir.mjs` → `aegir.md`):
+
+| | Humans | Bots |
+|---|---|---|
+| Battles (seats) | 75 (7) | 88 (11) |
+| Ægir operators per battle | 4.45 | 4.17 |
+| Longest chain 1 / 2 / 3 pieces | 26 / 36 / 13 | 53 / 31 / 4 |
+| Battles with a snake (2+ pieces marked by one Ægir) | 65 % | 40 % |
+| Snake: the back piece has the board's top tier | 4 % | 0 % |
+| Snake: the back piece is an elite | 22 % | 40 % |
+
+Back pieces of the snakes: humans 深巡 13, 幽灵鲨 10, 归溟幽灵鲨 7, 海霓 7, 歌蕾蒂娅 6; bots 深巡 13, 幽灵鲨 7, 海霓 5.
+
+- **Humans build snakes more often and longer.** Bots mostly devour one piece at a time.
+- **But the recorded humans don't put the top dealer at the back.** The back is usually a cheap Ægir. 深巡 attacks sea
+  monsters at 150 %, and 幽灵鲨 / 归溟幽灵鲨 gain stacks when knocked out, so the 5000 HP marks may be part of the plan.
+- Only 7 human seats, so this says little about which snake is best. Fish's version (the dealer at the back) is a
+  candidate to test in the rehearsal, not something the records already show.
+
 ## Proposed experiments, in order
 
-1. **A leak allowance for the positional candidate:** it wins with up to k more leaks while the LP stays above a
-   floor, from round 6 to round 11. A paired run gives the exchange rate. This would be one more tunable next to
-   `prepTiebreak`.
+1. **A leak allowance for the positional candidate:** built (7766a87d), behind `legacy-arrange`'s `leakAllow`
+   (default 0) and `leakAllowLp` (20). In normal rounds 6–11 while the LP is at least the floor, the rehearsal counts
+   the positional candidate's leaks minus `leakAllow`: 0.5 wins a leak tie outright, 1.5 also with one leak more. In a
+   two-seed solo smoke run, seed 5 gained 13 stacks by round 14 with the same leaks. **Queued** (`untracked/queue7-2026-11-12.sh`
+   → `untracked/placement-2026-11/`, after queue3): co-op Ultimate seeds 1–80, all seats `plan-engines`, against the
+   same with `leakAllow` 0.5 / 1.5 / 2.5.
 2. **The `around` positional kind** for 莫斯提马: built (4bafc1c6), behind `legacy-arrange`'s `aroundValue` (default 0;
    3 means three stacks per battle per ammo user beside her). Ammo users are Laterano members (their skills are ammo
    skills) and the hunter branch. A unit test checks that it moves a Laterano operator next to her. Not measured yet:
