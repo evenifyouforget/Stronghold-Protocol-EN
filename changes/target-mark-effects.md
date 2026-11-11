@@ -29,4 +29,18 @@
 | Raidian, Ling, Stainless, Magallan, Jessica the Liberated | The skill's glow on their summons while it runs |
 | Тоска, Angelina the Mellow Wish (not on EN yet) | S1 glow on the ally; S3 weapon glow and range ring |
 
-Server cost: unmeasured (pre-rule)
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): battles run in the players' browsers; the server sends no battle events | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the server only simulates fields with no player connected | no measurable change: a whole 4-bot match took 13.2 s of CPU before and 12.1 s after (medians), within the run-to-run spread |
+| Memory | 0 MB (one more reference per mark on a unit) | 0 MB (one more reference per mark on a unit) |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | no measurable change (about 800 ms/round of battle for 4 bots, before and after) | no measurable change (about 800 ms/round of battle for 4 bots, before and after) |
+
+- Cap: nothing new is sent, kept or written; the mark is read only when a browser draws the battle.
+- Measured: one 4-bot co-op match (NORMAL, seed 1, no rehearsals, so every run does the same work), timed in process CPU
+  before and after this change, alternated 3 times. The same version varies by about 20 % between runs.
