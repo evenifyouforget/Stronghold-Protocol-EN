@@ -3220,6 +3220,12 @@ let POSITION_TOLERANCE = 0.03;
  * this thread reads it (not a delegated or pooled one).
  */
 let PREP_TIEBREAK = 0;
+/**
+ * (fork research, ai-players/09) 莫斯提马's 「自身周围4格的干员每消耗6发弹药，使已激活的【拉特兰】层数+1」 (positional kind
+ * `around`): the stacks per battle one ammo user among her 4 neighbours is worth, per bond_add_count (ammo users: 拉特兰
+ * members, whose skills are ammo skills, and the 猎手 branch). 0 (legacy): not valued, and her neighbours are not searched.
+ */
+let AROUND_VALUE = 0;
 
 const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
 
@@ -3260,6 +3266,7 @@ export function positionTraitsOf(m, ps, c) {
         out.push(desc.includes('同一行最右边') ? { kind: 'mostRight', g2 } : { kind: 'grant', g2, need: bs.check_bond_id || null });
       }
     } else if (g.effectKey === 'act1autochess_gar_event_addition_cnt') out.push({ kind: 'extra', n: numOr(bb.extra_cnt, 1) });
+    else if (g.effectKey === 'act1autochess_gar_event_consume_ammo' && bs.range_id === 'x-5') out.push({ kind: 'around', bond: bs.bond_id, n: numOr(bb.bond_add_count, 1) });
     else if (g.effectKey === 'SERVER_TRIGGER_ANOTHER' && bs.scope === 'front' && bs.event === 'SERVER_GAIN') out.push({ kind: 'trigger' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_START') out.push({ kind: 'copy', event: 'SERVER_PREP_START' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_FIN') out.push({ kind: 'copy', event: 'SERVER_PREP_FIN' });
@@ -3335,6 +3342,17 @@ function positionTraitValue(m, ps, view, W, p, key, dir, t, final) {
   const sum = (bonds, n) => bonds.reduce((s, b) => s + n * W(b), 0);
   switch (t.kind) {
     case 'pos': { const q = chessAhead(view, key, dir, t.off); return q ? sum(bondsOf(q), t.n) : 0; }
+    case 'around': {
+      if (!(AROUND_VALUE > 0)) return 0;
+      const [r, c] = parseKey(key);
+      let users = 0;
+      for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const q = view.at.get(tileKey(r + dr, c + dc));
+        const rec = q && q.kind === 'chess' ? chessRec(m, q.id, ps) : null;
+        if (rec && ((rec.bonds || []).includes('lateranoShip') || rec.subProfessionId === 'hunter')) users++;
+      }
+      return users * AROUND_VALUE * t.n * W(t.bond);
+    }
     case 'row': return sum(t.bonds, t.n * rowChess(view, key));
     case 'row3': {
       if (rowChess(view, key) < t.need) return 0;
@@ -3705,6 +3723,12 @@ export function* positionPlanSteps(m, ps, chosen, base, ctx, { devourOnly = fals
       const spots = new Set();
       for (const k of [1, -1]) { const [pr, pc] = parseKey(key); const [dr, dc] = rotateOffset(0, k, dir); spots.add(tileKey(pr + dr, pc + dc)); }
       for (const [rr, cc] of legalTiles(deployMap, 'all')) if (rr === r) spots.add(tileKey(rr, cc));
+      // (fork research) AROUND_VALUE: an `around` piece's 4 neighbours too
+      const self = AROUND_VALUE > 0 ? chess.find((q) => q.uid === uid) : null;
+      if (self && positionTraitsOf(m, ps, chessRec(m, self.id, ps)).some((t) => t.kind === 'around')) {
+        const [pr, pc] = parseKey(key);
+        for (const [dr, dc] of [[1, 0], [-1, 0]]) spots.add(tileKey(pr + dr, pc + dc));
+      }
       for (const q of chess) {
         if (q.uid === uid) continue;
         for (const spot of spots) {
@@ -4714,12 +4738,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the

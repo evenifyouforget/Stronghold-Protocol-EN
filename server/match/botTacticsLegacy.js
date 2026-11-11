@@ -138,6 +138,7 @@ export const LEGACY_ARRANGE = defineTactic({
     faLineups: int(0, 4, L.FA_LINEUPS),
     posTolerance: num(0, 1, L.POSITION_TOLERANCE),
     prepTiebreak: num(0, 10, L.PREP_TIEBREAK),
+    aroundValue: num(0, 10, L.AROUND_VALUE),
   },
   at: pass('arrangeSteps', true),
   tunables: (p) => ({
@@ -146,6 +147,7 @@ export const LEGACY_ARRANGE = defineTactic({
     FA_LINEUPS: p.faLineups,
     POSITION_TOLERANCE: p.posTolerance,
     PREP_TIEBREAK: p.prepTiebreak,
+    AROUND_VALUE: p.aroundValue,
   }),
 });
 
