@@ -135,7 +135,7 @@ export const CC = Object.freeze({
     hpMul: Object.freeze({ united1: 1, united2: 2, united3: 3 }), // × the alive players, the Degenbrecher only
     degenAtkMul: 1.5, // United 2 and up, the Degenbrecher only
     chargePct: 3, chargeSeconds: 10,
-    gateRatio: 0.09, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
+    gateRatio: 0.15, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),
 });
 
