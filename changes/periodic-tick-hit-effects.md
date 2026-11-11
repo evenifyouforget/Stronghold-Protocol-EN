@@ -24,4 +24,18 @@ Many skills hit or heal again and again over time: a poison cloud, a heal rain, 
 
 - 7 new sound files (87 KB) for the server and the preload zip.
 
-Server cost: unmeasured (pre-rule)
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): battles run in the players' browsers; the server sends no battle events | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the server only simulates fields with no player connected | no measurable change: a whole 4-bot match took 11.1 s of CPU before and 11.4 s after (medians), within the run-to-run spread |
+| Memory | 0 MB | 0 MB |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | no measurable change (about 800 ms/round of battle for 4 bots, before and after) | no measurable change (about 800 ms/round of battle for 4 bots, before and after) |
+
+- Cap: nothing new is sent, kept or written; the tick signal is one more battle event, which only a browser that runs the battle sees.
+- Measured: one 4-bot co-op match (NORMAL, seed 1, no rehearsals, so every run does the same work), timed in process CPU
+  before and after this change, alternated 3 times. The same version varies by about 20 % between runs.
