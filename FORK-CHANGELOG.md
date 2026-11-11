@@ -13,6 +13,7 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - The relay acknowledgement tests (`test/p2p-server.test.js`) run on mocked timers, so the order of their steps is exact at any speed.
 - The generations tests (`test/generations.test.js`) wait until the server has picked up a table change instead of sleeping a fixed 80 or 150 ms.
 - Server-event waits in the plugin lobby, tab-identity and generations tests use the shared test limit (`WORKER_LOAD_MS`, 60 s) instead of 2, 5 or 15 seconds.
+- Plugin studio tests that check what a trial battle or a check finds no longer use the server's 20-second budget. They get their own guard of 180 s per trial (`STUDIO_TRIAL_MS`), because one short trial took 36–88 s on a fully busy machine. The server's budget is unchanged, and the tests of the budget itself keep theirs. The trial-timeout cleanup test now fires the timeout right after the probe starts, instead of racing a 12-second timer against it.
 - The script probe test (`test/plugins/script-review.test.js`) no longer kills a correct but slow-starting composition after 7 s; its hang guard is that shared limit, and its probe ceilings go up to 16 s.
 - New crew tool `cpu-load.mjs` reproduces these failures on purpose: it runs a test pinned to a few cores next to busy threads.
 
