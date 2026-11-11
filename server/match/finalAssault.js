@@ -152,7 +152,7 @@ export class SharedBossPool {
    * A field's cumulative damage to its Delegation Degenbrecher (the linked HP bar: bossRisk.js). No onRisk: the next
    * b.pool carries it (b.progress reports call _broadcastPool), and server-run fields read riskView() directly.
    */
-  noteDegen(fieldId, dealt) { if (this.risk) this.risk.noteDegen(fieldId, dealt); }
+  noteDegen(fieldId, dealt, gate) { if (this.risk) this.risk.noteDegen(fieldId, dealt, gate); }
 
   /** The lockout's invulnerability ended (the match's timer). */
   releaseLock() { if (this.risk && this.risk.inv) { this.risk.release(); this._riskChanged(['release']); } }
@@ -201,7 +201,7 @@ export class CreditPool {
   get maxHp() { return this.pool.maxHp; }
   riskView() { return this.pool.riskView ? this.pool.riskView() : null; }
   setHold(fieldId, on) { if (this.pool.setHold) this.pool.setHold(fieldId, on); }
-  noteDegen(fieldId, dealt) { if (this.pool.noteDegen) this.pool.noteDegen(fieldId, dealt); }
+  noteDegen(fieldId, dealt, gate) { if (this.pool.noteDegen) this.pool.noteDegen(fieldId, dealt, gate); }
 
   damage(playerId, amount, type) {
     const a = Number(amount);

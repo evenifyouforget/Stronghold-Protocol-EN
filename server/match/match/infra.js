@@ -112,10 +112,11 @@ export class MatchInfra {
    *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty; Unending 3 /
    *                        Seasonal 3: and Zaaro (his leak costs CC.famiglia.zaaro.leakLp, riskLoss)
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
-   *                        Undying 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
+   *                        Undying 2: 2 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
    *                        Patriot and his escort come again, once per field (bossSubWave)
    *   ccDelegation         the final boss rounds: Degenbrecher (at the round's start), 2 Delegation Shieldbearers and 2
-   *                        Delegation Centurion Champions once per field (bossSubWave), HP × 2 / 3 / 5
+   *                        Delegation Centurion Champions once per field (bossSubWave); the Degenbrecher's HP × 1 / 2 / 3
+   *                        per alive player, her ATK × 1.5 from United 2
    * @param {import('../PlayerState.js').PlayerState} ps
    * @param {{ boss?: boolean, field?: string[] }} [o] `field`: the boss field's player ids, left first (bossSubWave)
    */
@@ -129,7 +130,7 @@ export class MatchInfra {
     if (!this.lobbyRules || !ps.alive) return [];
     const out = [];
     const pt = CC.patriot;
-    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.escort.key)
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying2') && this.gd.enemy(pt.escort.key)
       && ps.bounties.some((b) => b.card && b.card.effectId === RISK_PATRIOT_CARD && b.roundsLeft > 0)) {
       out.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count));
     }
@@ -154,7 +155,7 @@ export class MatchInfra {
   }
 
   /**
-   * The SPA-CC sub-waves of a final boss round's field (Patriot Undying 3: Patriot and his escort; Delegation: the
+   * The SPA-CC sub-waves of a final boss round's field (Patriot Undying 2: Patriot and his escort; Delegation: the
    * Degenbrecher, Shieldbearers and Centurion Champions with their multipliers) — once per field, not per player, every
    * unit on a route that goes to the left portal first and then the right (Fish 2026-10-15; waves.js `leftFirst`). They
    * go with the field's first living player (left). Map playerId → bounty cards.
@@ -167,16 +168,19 @@ export class MatchInfra {
     if (!first) return out;
     const cards = [];
     const pt = CC.patriot;
-    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.key)) {
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying2') && this.gd.enemy(pt.key)) {
       cards.push(riskCard('risk:patriot', pt.key, 1, { leftFirst: true }));
       if (this.gd.enemy(pt.escort.key)) cards.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count, { leftFirst: true }));
     }
     const dg = CC.delegation;
     if (tagHas(this.lobbyRules, 'ccDelegation', 'united1')) {
       const has = (n) => tagHas(this.lobbyRules, 'ccDelegation', n);
-      const hpMul = has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
+      // the Degenbrecher only: HP × hpMul per alive player (her copies share one HP bar), ATK × degenAtkMul from United 2
+      const alive = [...this.players.values()].filter((p) => p && p.alive).length || 1;
+      const hpMul = (has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1) * alive;
+      const degenMods = { hpMul, ...(has('united2') ? { atkMul: dg.degenAtkMul } : {}) };
       // the Degenbrecher at the round's start (waves.js bountyPlan `atStart`): United 2's hold is never waiting on her
-      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul }, leftFirst: true, ...(w.key === dg.degen ? { atStart: true } : {}) }));
+      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { leftFirst: true, ...(w.key === dg.degen ? { atStart: true, riskMods: degenMods } : {}) }));
     }
     // ccVengeance: always at least 1, by the highest active alliance of any alive player, once per field
     const v = this.vengeanceCount(this.alivePlayers(), { boss: true });

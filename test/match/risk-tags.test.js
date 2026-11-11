@@ -148,8 +148,10 @@ test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6t
   } finally { h.m.dispose(); }
 });
 
-test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 3 } });
+test('ccPatriot Undying 2: the Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
+  const none = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccPatriot: 1 } });
+  try { none.m.round = 15; assert.equal(none.m.bossSubWave(['p_0']).size, 0, 'Undying 1: no sub-wave'); } finally { none.m.dispose(); }
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 2 } });
   try {
     h.m.round = 9;
     const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
@@ -165,10 +167,13 @@ test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the
   } finally { h.m.dispose(); }
 });
 
-test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP × 2 / 3 / 5, no ATK change; the Degenbrecher at the start', () => {
-  const wave = (level) => {
+test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2); the Degenbrecher alone: HP × 1 / 2 / 3 per alive player, ATK × 1.5 from United 2, at the start', () => {
+  const wave = (level, dead = 0) => {
     const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, lobbyRules: { ccDelegation: level } });
-    try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
+    try {
+      if (dead) h.ps('p_1').alive = false;
+      return h.m.bossSubWave(['p_0', 'p_1']);
+    } finally { h.m.dispose(); }
   };
   const dg = CC.delegation;
   const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
@@ -176,9 +181,12 @@ test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP �
   assert.equal(u1[dg.degen].count, 1);
   assert.equal(u1[dg.wave[1].key].count, 2);
   assert.equal(u1[dg.wave[2].key].count, 2);
-  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2 });
-  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3 });
-  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5 });
+  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2 }, '2 alive players × 1');
+  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 4, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 6, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3, 1))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 }, 'one alive player');
+  assert.equal(u1[dg.wave[1].key].riskMods, undefined, 'the minions keep the round\'s HP');
+  assert.equal(u1[dg.wave[2].key].riskMods, undefined);
   assert.equal(u1[dg.degen].atStart, true, 'the Degenbrecher spawns at the start');
   assert.ok(!u1[dg.wave[1].key].atStart && !u1[dg.wave[2].key].atStart, 'her escort joins the wave as before');
   assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
@@ -261,8 +269,9 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
     const b = bountySpawns(h.m.gd, h.m.round, h.m.wave, plain, ps.playerId);
     assert.ok(a.length > 0 && a.length === b.length);
     for (let i = 0; i < a.length; i++) {
-      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * CC.delegation.hpMul.united2) < 1e-9);
-      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul) < 1e-9, 'no ATK change');
+      const degen = a[i].enemyKey === CC.delegation.degen;
+      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * (degen ? CC.delegation.hpMul.united2 : 1)) < 1e-9);
+      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * (degen ? CC.delegation.degenAtkMul : 1)) < 1e-9);
     }
   } finally { h.m.dispose(); }
 });

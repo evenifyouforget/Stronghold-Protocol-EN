@@ -35,7 +35,7 @@ export function bossRiskConfig(rules) {
 export function initialRiskView(cfg, maxHp) {
   if (!cfg) return null;
   const v = { res: false, def: false, inv: false, hold: false, floor: cfg.every > 0 ? gateHp(maxHp, cfg.every, 1) : 0 };
-  if (cfg.degen) v.degen = {};
+  if (cfg.degen) { v.degen = {}; v.degenGate = {}; }
   return v;
 }
 
@@ -63,6 +63,8 @@ export class BossRiskState {
     this.reported = new Map();
     /** fieldId → the HP its battle took from its Degenbrecher so far (cumulative; the linked HP bar) */
     this.degen = new Map();
+    /** fieldId → the gate steps (United 3) its Degenbrecher has finished casting; one field's cast opens every field's */
+    this.degenGate = new Map();
   }
 
   get gate() { return this.cfg.every > 0 ? gateHp(this.maxHp, this.cfg.every, this.step) : 0; }
@@ -109,12 +111,17 @@ export class BossRiskState {
     return had !== this.holds.size > 0;
   }
 
-  /** A field's cumulative damage to its Degenbrecher (never lowered: a takeover's re-simulation starts from 0). */
-  noteDegen(fieldId, dealt) {
-    const d = Number(dealt);
-    if (!this.cfg.degen || fieldId == null || !Number.isFinite(d) || d <= (this.degen.get(fieldId) || 0)) return false;
-    this.degen.set(fieldId, d);
-    return true;
+  /**
+   * A field's cumulative damage to its Degenbrecher and the gate steps she has finished (United 3); neither is ever
+   * lowered (a takeover's re-simulation starts from 0). Returns whether the view changed.
+   */
+  noteDegen(fieldId, dealt, gate = 0) {
+    if (!this.cfg.degen || fieldId == null) return false;
+    let changed = false;
+    const d = Number(dealt), g = Number(gate);
+    if (Number.isFinite(d) && d > (this.degen.get(fieldId) || 0)) { this.degen.set(fieldId, d); changed = true; }
+    if (Number.isFinite(g) && g > (this.degenGate.get(fieldId) || 0)) { this.degenGate.set(fieldId, Math.floor(g)); changed = true; }
+    return changed;
   }
 
   /** The invulnerability ended: the next step's gate. */
@@ -138,7 +145,7 @@ export class BossRiskState {
 
   view() {
     const v = { res: this.res, def: this.def, inv: this.inv, hold: this.cfg.hold && this.holds.size > 0, floor: this.floor };
-    if (this.cfg.degen) v.degen = Object.fromEntries(this.degen);
+    if (this.cfg.degen) { v.degen = Object.fromEntries(this.degen); v.degenGate = Object.fromEntries(this.degenGate); }
     return v;
   }
 }

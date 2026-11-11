@@ -262,13 +262,15 @@ const DEGEN_SYNC = 'risk:degenSync';
  * `degen`) and deals her the other fields' damage it has not applied yet, as tagged True damage with no source — her
  * own rules still decide what it does (United 3's gate and cast, the second form after a KO), and the damage another
  * field's copy refused (a gate, her revival) is applied later. Her death on the field that dealt the last blow and the
- * others' follow within one sync (a client field: within one b.pool).
+ * others' follow within one sync (a client field: within one b.pool). United 3's gate is linked too (Fish, 2026-11-12):
+ * each field reports the gate steps its copy finished casting (`degenGate`), and a copy still held at a step another
+ * field has finished opens at once, so a field whose copy never casts cannot lock the others.
  */
 function installDegenLink(battle, rules) {
   const pool = battle.sharedBoss;
   if (!tagHas(rules, 'ccDelegation', 'united1') || !pool || typeof pool.noteDegen !== 'function') return;
   const isDegen = (e) => keyOf(e) === CC.delegation.degen && String(e.mods?.bountyId ?? '').startsWith('risk:delegation');
-  let own = 0, reported = 0, applied = 0, acc = 0;
+  let own = 0, reported = 0, applied = 0, acc = 0, gateReported = 0;
   battle.on('hpChanged', (c) => {
     if (c.delta < 0 && c.target && isDegen(c.target) && !(c.dmg?.tags || []).includes(DEGEN_SYNC)) own -= c.delta;
   });
@@ -276,8 +278,17 @@ function installDegenLink(battle, rules) {
     acc += dt;
     if (acc < 0.1 - 1e-9) return;
     acc = 0;
-    if (own > reported) { reported = own; pool.noteDegen(battle.fieldId, own); }
-    const by = pool.riskView()?.degen;
+    const her0 = battle.aliveEnemies().find(isDegen);
+    const gate = her0?.degenGate ? her0.degenGate.done() : 0;
+    if (own > reported || gate > gateReported) { reported = Math.max(reported, own); gateReported = Math.max(gateReported, gate); pool.noteDegen(battle.fieldId, reported, gateReported); }
+    const view = pool.riskView();
+    // United 3: one field's finished Momentum Murder opens the gate on every field
+    if (her0?.degenGate && view?.degenGate) {
+      let top = 0;
+      for (const [fid, k] of Object.entries(view.degenGate)) if (fid !== String(battle.fieldId) && Number.isFinite(k)) top = Math.max(top, k);
+      if (top > gate) her0.degenGate.open(top);
+    }
+    const by = view?.degen;
     if (!by) return;
     let others = 0;
     for (const [fid, d] of Object.entries(by)) if (fid !== String(battle.fieldId) && Number.isFinite(d)) others += d;

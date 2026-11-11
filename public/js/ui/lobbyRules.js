@@ -138,8 +138,8 @@ function patriotText(node, enemyName) {
   const name = enemyName(pt.key), escort = enemyName(pt.escort.key);
   switch (node) {
     case 'undying1': return { short: t('爱国者：不死 1'), full: t('第{r}回合的机变必定提供【{name}】（1级属性，无赏金，漏过时扣除{lp}点目标生命）；若无人选择，最终领袖最大生命值+{hp}%', { r: pt.round, name, lp: pt.leakLp, hp: pct(pt.skipHp) }) };
-    case 'undying2': return { short: t('爱国者：不死 2'), full: t('【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { name, dr: pct(pt.marchDr), atk: pct(pt.skipAtk) }) };
-    case 'undying3': return { short: t('爱国者：不死 3'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现（每个战场1组）；【{name}】最大生命值+{hp}%，处于行军姿态时免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导，移动速度不会低于基础值', { n: pt.escort.count, escort, name, hp: pct(pt.hpPct) }) };
+    case 'undying2': return { short: t('爱国者：不死 2'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现（每个战场1组）；【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { n: pt.escort.count, escort, name, dr: pct(pt.marchDr), atk: pct(pt.skipAtk) }) };
+    case 'undying3': return { short: t('爱国者：不死 3'), full: t('【{name}】最大生命值+{hp}%，处于行军姿态时免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导，移动速度不会低于基础值', { name, hp: pct(pt.hpPct) }) };
     default: return { short: '?', full: '?' };
   }
 }
@@ -148,9 +148,9 @@ function delegationText(node, enemyName) {
   const dg = CC.delegation;
   const [degen, shield, champ] = dg.wave.map((w) => enemyName(w.key));
   switch (node) {
-    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性，回合开始时即出现，各战场的【{degen}】共享生命值）、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
-    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置', { degen, hp: pct(dg.hpMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
-    case 'united3': return { short: t('访问团：联合 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】，释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.united3), degen, p: pct(dg.gateRatio) }) };
+    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性，回合开始时即出现，各战场的【{degen}】共享生命值）、{n}名【{shield}】与{m}名【{champ}】；【{degen}】最大生命值为每名存活玩家{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
+    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；【{degen}】最大生命值为每名存活玩家{hp}%，攻击力+{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.degenAtkMul - 1), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
+    case 'united3': return { short: t('访问团：联合 3'), full: t('【{degen}】最大生命值为每名存活玩家{hp}%；每损失{p}%最大生命值释放【瞬息杀机】，释放完成前生命值不会继续减少（任一战场的【{degen}】释放完成即可）', { hp: pct(dg.hpMul.united3), degen, p: pct(dg.gateRatio) }) };
     default: return { short: '?', full: '?' };
   }
 }

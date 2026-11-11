@@ -226,3 +226,37 @@ test('Delegation: the Degenbrechers of the boss fields share one HP bar (both li
   const plain = new SharedBossPool(1e9, { risk: bossRiskConfig({ ccDelegation: 0 }) });
   assert.equal(plain.riskView(), null);
 });
+
+test('Delegation United 3: one field\'s finished Momentum Murder opens the gate on every field (no lock-up on a field that never casts)', () => {
+  const rules = { ccDelegation: 3 };
+  const pool = new SharedBossPool(1e9, { risk: bossRiskConfig(rules) });
+  const field = (fieldId) => {
+    const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, fieldId, sharedBoss: pool, flags: { rules } });
+    h.step(1);
+    const dg = h.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0, bountyId: `risk:delegation:${CC.delegation.degen}` } });
+    return { h, dg };
+  };
+  const a = field('b1'), b = field('b2');
+  const max = a.dg.s.maxHp, step = CC.delegation.gateRatio;
+  const both = (s) => { for (let t = 0; t < s - 1e-9; t += 0.1) { a.h.run(0.1); b.h.run(0.1); } };
+  const hit = (f, x) => f.h.b.dealDamage(null, f.dg, { amount: x, type: 'true', sourceless: true });
+  const near = (x, y, msg) => assert.ok(Math.abs(x - y) < 1, `${msg}: ${x} vs ${y}`);
+  // the gate is the second form's: knock both into it
+  hit(a, max);
+  both(0.5);
+  for (let i = 0; i < 600 && [a, b].some((f) => f.dg.s.flags.invulnerable || f.dg.buffs.some((x) => x.key === 'ab:reborn')); i++) both(0.1);
+  near(a.dg.hp, max, 'second form, full');
+  assert.equal(a.dg.degenGate.done(), 0);
+  // only b2 steps: its copy reaches the gate, casts, and the step is done there
+  hit(b, max * (step + 0.03));
+  near(b.dg.hp, max * (1 - step), 'b2 held at the gate');
+  for (let t = 0; t < CC.delegation.castSeconds + 0.3; t += 0.1) b.h.run(0.1);
+  assert.equal(b.dg.degenGate.done(), 1, 'b2 cast');
+  near(pool.riskView().degenGate.b2, 1, 'b2 reported its step');
+  // b1 never cast: within one sync its gate is open, and b2's damage came through without a cast there
+  a.h.run(0.3);
+  assert.equal(a.dg.degenGate.done(), 1, 'b1\'s gate opened by b2\'s cast');
+  near(a.dg.hp, max * (1 - step), 'b2\'s damage reached b1');
+  hit(a, max * 0.05);
+  near(a.dg.hp, max * (1 - step - 0.05), 'past the old gate on b1');
+});
