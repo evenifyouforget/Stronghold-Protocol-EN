@@ -8,6 +8,8 @@
 //   node tools/evolve.mjs --out DIR [--config solo:ABYSS] [--pop 12] [--gens 6] [--train 1-40] [--holdout 101-160]
 //                         [--jobs 8] [--elite 3] [--max-tactics 6] [--pool research,basic,legacy] [--rules R]
 //                         [--seed 1] [--halving]
+//   node tools/evolve.mjs --out DIR --race [--budget 2400] [--iters 5] [--first 3] [--alpha 0.05] [--train 1-…]
+//                                           iterated racing (irace), the recommended mode: see "--race" below
 //   node tools/evolve.mjs --out DIR --holdout-only     score the best candidates and legacy on the held-back seeds
 // - --resample (recommended): generation g plays a fresh block of seeds (TRAIN's size, right after the previous one),
 //   and a candidate's fitness is the mean over every block it has played. A candidate that got lucky on one block
@@ -22,6 +24,16 @@
 //   derived from --seed, so a restart rebuilds the same population. One run per DIR (DIR/.pid).
 // - --halving: each generation scores everyone on the first half of the training seeds, then only the better half on
 //   the rest (the others keep their half-seed score, marked "½").
+// - --race (fish-edition/ai-players/10; tools/race.mjs): iterated racing after irace (López-Ibáñez et al. 2016).
+//   The seeds are one stream of 10-seed blocks from TRAIN's start. Each iteration samples new candidates around the
+//   elites (a parent picked by rank, mutated with a step that shrinks every iteration), then races them with the elites
+//   and legacy: block by block, every live candidate plays the same seeds; from block --first on, a paired t-test
+//   against the current best (Holm-corrected, --alpha) drops the significantly worse ones. Each race starts again at
+//   the first block, so a new candidate meets the elites on every seed they have played (cached: free for them), and
+//   an elite can only be dropped once the race has gone past the seeds it has already played. A race stops at the
+//   survivors' floor (2 + log2 of the parameters) or when its share of --budget (in matches) is spent; the survivors
+//   are the next elites. Legacy is the control: never dropped, and every fitness is paired against it.
+//   Held-back default for --race: 5001-5300.
 // - Output: DIR/gen-N.md (the ranking), DIR/best.json (the best profile; botbench --profile takes it), DIR/run.log,
 //   and with --holdout-only DIR/holdout.md: wins, flips against legacy and fitness on seeds no generation saw.
 // - Memory: botbench's workers are threads of one process. A chunk killed by a signal or out of memory is retried at
@@ -35,6 +47,7 @@ import { TACTICS } from '../server/match/botStrategies.js';
 import { BASIC_TACTICS } from '../server/match/botTacticsBasic.js';
 import { LEGACY_TACTICS } from '../server/match/botTacticsLegacy.js';
 import { RESEARCH_TACTICS } from '../server/match/botTacticsResearch.js';
+import * as RACE from './race.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -43,7 +56,7 @@ for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (!a.startsWith('--')) throw new Error(`unexpected argument ${a}`);
   const k = a.slice(2);
-  if (['halving', 'holdout-only', 'resample'].includes(k)) opt[k] = true;
+  if (['halving', 'holdout-only', 'resample', 'race'].includes(k)) opt[k] = true;
   else opt[k] = args[++i];
 }
 if (!opt.out) { console.error('usage: node tools/evolve.mjs --out DIR [options] (see the header)'); process.exit(2); }
@@ -51,7 +64,7 @@ const OUT = resolve(opt.out);
 const CONFIG = opt.config || 'solo:ABYSS';
 const POP = +(opt.pop || 12), GENS = +(opt.gens || 6), ELITE = +(opt.elite || 3), MAXT = +(opt['max-tactics'] || 6);
 const range = (s) => { const [a, b] = String(s).split('-').map(Number); if (!(a >= 1 && b >= a)) throw new Error(`bad seed range ${s}`); return [a, b]; };
-const TRAIN = range(opt.train || '1-40'), HOLD = range(opt.holdout || (opt.resample ? '1001-1060' : '101-160'));
+const TRAIN = range(opt.train || '1-40'), HOLD = range(opt.holdout || (opt.race ? '5001-5300' : opt.resample ? '1001-1060' : '101-160'));
 // --resample: generation g trains on the g-th block of TRAIN's size after TRAIN (fresh seeds each generation)
 const SPAN = TRAIN[1] - TRAIN[0] + 1;
 const blockOf = (gen) => (opt.resample ? [TRAIN[0] + gen * SPAN, TRAIN[1] + gen * SPAN] : TRAIN);
@@ -96,12 +109,13 @@ function randomParam(rng, s) {
   const v = s.min + rng() * (s.max - s.min);
   return s.type === 'int' ? Math.round(v) : +v.toFixed(3);
 }
+let STEP = 0.15;
 function tweakParam(rng, s, v) {
   if (s.type === 'bool') return !v;
   if (s.type === 'choice') return s.choices.length > 1 ? pick(rng, s.choices.filter((c) => c !== v)) : v;
   const span = s.max - s.min;
-  // a small step usually, a jump now and then
-  let n = rng() < 0.8 ? v + (rng() * 2 - 1) * span * 0.15 : s.min + rng() * span;
+  // a small step usually, a jump now and then (--race shrinks STEP every iteration)
+  let n = rng() < 0.8 ? v + (rng() * 2 - 1) * span * STEP : s.min + rng() * span;
   n = Math.max(s.min, Math.min(s.max, n));
   if (s.type === 'int') { n = Math.round(n); if (n === v) n = Math.max(s.min, Math.min(s.max, v + (rng() < 0.5 ? -1 : 1))); }
   return s.type === 'int' ? n : +n.toFixed(3);
@@ -145,6 +159,7 @@ function crossover(rng, a, b) {
 let jobs = JOBS_MAX, clean = 0;
 function chunks([a, b]) { const out = []; for (let s = a; s <= b; s += 10) out.push([s, Math.min(b, s + 9)]); return out; }
 function runChunk(g, [a, b]) {
+  if (process.env.EVOLVE_FAKE) return fakeChunk(g, [a, b]);
   const h = hashOf(g), file = join(OUT, 'cache', `${h}.s${a}-${b}.json`);
   if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
   const prof = join(OUT, 'cache', `${h}.profile.json`);
@@ -166,9 +181,30 @@ function runChunk(g, [a, b]) {
     log(`chunk ${h} s${a}-${b}: killed (memory?), retry at ${jobs} jobs`);
   }
 }
+/**
+ * EVOLVE_FAKE=<tactic id>: no matches, a synthetic game for checking the search itself (test/tools/evolve-race.test.js).
+ * Each tactic in the profile adds a fixed effect in ±0.04 to a 40 % win chance, the named tactic +0.15 (EVOLVE_FAKE_EFFECT); a seed's luck
+ * is shared by every candidate (60 %) plus the candidate's own (40 %), as paired matches are. Each chunk is counted in
+ * DIR/fake-matches.
+ */
+const unit = (s) => parseInt(createHash('sha1').update(String(s)).digest('hex').slice(0, 8), 16) / 2 ** 32;
+const fakeSeen = new Set();
+function fakeChunk(g, [a, b]) {
+  let p = 0.4;
+  for (const id of new Set(g.map((e) => e.tactic))) p += id === process.env.EVOLVE_FAKE ? +(process.env.EVOLVE_FAKE_EFFECT || 0.15) : (unit(id) - 0.5) * 0.08;
+  const out = [];
+  for (let seed = a; seed <= b; seed++) {
+    const luck = 0.6 * unit(`seed${seed}`) + 0.4 * unit(`${hashOf(g)}|${seed}`);
+    out.push({ seed, victory: luck < p, hidden: false, roundsPassed: luck < p ? 14 : 10, bossRound: 14 });
+  }
+  const key = `${hashOf(g)}.s${a}-${b}`; // counted once, as the real cache would play it once
+  if (!fakeSeen.has(key)) { fakeSeen.add(key); appendFileSync(join(OUT, 'fake-matches'), `${b - a + 1}\n`); }
+  return out;
+}
 const score = (r) => (r.victory ? 1 : 0) + (r.hidden ? 0.25 : 0) + 0.25 * Math.min(1, (r.roundsPassed || 0) / Math.max(1, r.bossRound || 14));
 /** The matches of `g` already saved for `seeds` (none are played). */
 function cachedRecs(g, seeds) {
+  if (process.env.EVOLVE_FAKE) return chunks(seeds).flatMap((c) => fakeChunk(g, c));
   const h = hashOf(g);
   return chunks(seeds).flatMap(([a, b]) => { const f = join(OUT, 'cache', `${h}.s${a}-${b}.json`); return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : []; });
 }
@@ -244,6 +280,8 @@ if (opt['holdout-only']) {
   process.exit(0);
 }
 
+if (opt.race) { raceMain(); process.exit(0); }
+
 const st = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { meta, gens: [] };
 st.meta = meta;
 log(`start: ${CONFIG}, pop ${POP}, gens ${GENS}, train ${TRAIN.join('-')}, pool ${POOL.length} tactics, jobs ${JOBS_MAX}`);
@@ -281,3 +319,73 @@ for (let gen = 0; gen < GENS; gen++) {
   pop = next;
 }
 log('done');
+
+// ---- --race: iterated racing (irace) ----
+function raceMain() {
+  const { eliminate, candidatesFor, minSurvivors, pickParent } = RACE;
+  const BUDGET = +(opt.budget || 2400), ITERS = +(opt.iters || 5), FIRST = +(opt.first || 3), ALPHA = +(opt.alpha || 0.05);
+  const blockAt = (k) => [TRAIN[0] + 10 * k, TRAIN[0] + 10 * k + 9];
+  const nParams = POOL.reduce((n, t) => n + 1 + Object.keys(t.params).length, 0);
+  const SURV = minSurvivors(nParams);
+  const st = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { meta, gens: [] };
+  st.meta = { ...meta, race: { budget: BUDGET, iters: ITERS, first: FIRST, alpha: ALPHA } };
+  log(`race: ${CONFIG}, budget ${BUDGET} matches, ${ITERS} iterations, first test after ${FIRST} blocks, alpha ${ALPHA}, survivors ${SURV}, pool ${POOL.length} tactics`);
+  // per genome: seed → paired score (its score minus legacy's on that seed)
+  const scoresOf = new Map(), base = new Map();
+  const play = (g, k) => {
+    const blk = blockAt(k);
+    if (blk[1] >= HOLD[0] && blk[0] <= HOLD[1]) throw new Error(`the race reached the held-back seeds ${HOLD.join('-')}; lower --budget or move --holdout`);
+    for (const r of runChunk([], blk)) base.set(r.seed, score(r));
+    const h = hashOf(g); if (!scoresOf.has(h)) scoresOf.set(h, new Map());
+    const m = scoresOf.get(h);
+    for (const r of runChunk(g, blk)) m.set(r.seed, score(r) - base.get(r.seed) - 0.005 * g.length);
+  };
+  let used = 0, seen = 0, elites = [];
+  for (let j = 0; j < ITERS; j++) {
+    const rng = rngOf(SEED * 1000003 + 7919 * (j + 1));
+    STEP = 0.15 * Math.pow(0.7, j);
+    const { n } = candidatesFor(Math.max(0, BUDGET / 10 - used), j, ITERS, FIRST);
+    const pop = [[], ...elites], hs = new Set(pop.map(hashOf));
+    // the first race screens every pool tactic alone (the space's first design), whatever N_0 is
+    if (j === 0) for (const t of POOL) { const g = [{ tactic: t.id, params: defaults(t) }]; if (!hs.has(hashOf(g))) { hs.add(hashOf(g)); pop.push(g); } }
+    for (let guard = 0; pop.length < Math.max(n, elites.length + 3) && guard < 500; guard++) {
+      let g = j === 0 || !elites.length ? Array.from({ length: 1 + Math.floor(rng() * 2) }, () => newEntry(rng)) : mutate(rng, pickParent(rng, elites));
+      if (j > 0 && rng() < 0.2 && elites.length > 1) g = mutate(rng, crossover(rng, pickParent(rng, elites), pickParent(rng, elites)));
+      const h = hashOf(g); if (!hs.has(h) && g.length) { hs.add(h); pop.push(g); }
+    }
+    const eliteHs = new Set(elites.map(hashOf));
+    let alive = pop.map((g) => ({ g, id: hashOf(g) }));
+    const limit = candidatesFor(Math.max(0, BUDGET / 10 - used), j, ITERS, FIRST).budget;
+    let spent = 0, k = 0;
+    for (; alive.length > SURV + 1 || k < Math.max(FIRST, seen); k++) {
+      const fresh = alive.filter((c) => c.g.length && !(scoresOf.get(c.id)?.has(blockAt(k)[0]))).length;
+      if (k >= Math.max(FIRST, seen) && spent + fresh > limit) break;
+      for (const c of alive) if (c.g.length) play(c.g, k); else for (const r of runChunk([], blockAt(k))) base.set(r.seed, score(r));
+      spent += fresh; used += fresh;
+      if (k + 1 < FIRST) continue;
+      const seeds = new Set(); for (let q = 0; q <= k; q++) for (let s = blockAt(q)[0]; s <= blockAt(q)[1]; s++) seeds.add(s);
+      const view = alive.map((c) => ({ id: c.id, protected: !c.g.length || (eliteHs.has(c.id) && k < seen),
+        scores: c.g.length ? new Map([...scoresOf.get(c.id)].filter(([s]) => seeds.has(s))) : new Map([...seeds].map((s) => [s, 0])) }));
+      const { drop } = eliminate(view, ALPHA);
+      if (drop.length) { alive = alive.filter((c) => !drop.includes(c.id)); log(`iter ${j} block ${k}: dropped ${drop.length}, ${alive.length} left`); }
+      if (spent >= limit && k + 1 >= Math.max(FIRST, seen)) { k++; break; }
+    }
+    seen = Math.max(seen, k);
+    const mean = (c) => { if (!c.g.length) return 0; const m = scoresOf.get(c.id); let s = 0, n2 = 0; for (const v of m.values()) { s += v; n2++; } return n2 ? s / n2 : -Infinity; };
+    const ranked = alive.filter((c) => c.g.length).sort((x, y) => mean(y) - mean(x));
+    elites = ranked.slice(0, SURV).map((c) => c.g);
+    const rows = [{ g: [], fit: 0 }, ...ranked.map((c) => ({ g: c.g, fit: mean(c) }))].sort((x, y) => y.fit - x.fit);
+    const winsOf = (g) => { let w = 0, n2 = 0; for (let q = 0; q < seen; q++) for (const r of (g.length ? cachedRecs(g, blockAt(q)) : runChunk([], blockAt(q)))) { n2++; if (r.victory) w++; } return { wins: w, n: n2 }; };
+    st.gens[j] = { top: rows.slice(0, Math.max(SURV, 5)).map((r) => ({ hash: hashOf(r.g), fit: r.fit, ...winsOf(r.g), g: r.g })) };
+    writeFileSync(statePath, JSON.stringify(st, null, 1));
+    const lines = [`# Race iteration ${j} — ${CONFIG}, seeds ${TRAIN[0]}–${blockAt(seen - 1)[1]} (${seen} blocks), ${pop.length} candidates, ${alive.length} survived; ${used * 10} of ${BUDGET} matches`, '',
+      '| # | fitness (vs legacy, per match) | wins | seeds | tactics | hash |', '|---|---|---|---|---|---|'];
+    st.gens[j].top.forEach((r, i) => lines.push(`| ${i + 1} | ${r.fit >= 0 ? '+' : ''}${r.fit.toFixed(3)} | ${r.wins} | ${r.n} | ${describe(r.g)} | ${r.hash} |`));
+    writeFileSync(join(OUT, `gen-${j}.md`), lines.join('\n') + '\n');
+    const best = rows.find((r) => r.g.length) || rows[0];
+    writeFileSync(join(OUT, 'best.json'), JSON.stringify({ id: `evo-${hashOf(best.g)}`, tactics: best.g }, null, 1));
+    log(`iter ${j}: ${pop.length} candidates, ${alive.length} survived after ${seen} blocks; best ${best.fit.toFixed(3)} ${describe(best.g)}; ${used * 10}/${BUDGET} matches`);
+    if (used * 10 >= BUDGET) break;
+  }
+  log('race done');
+}
