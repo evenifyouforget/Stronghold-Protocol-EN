@@ -3,13 +3,10 @@
 Changes made in this fork ([YuriRestia/Stronghold-Protocol-EN-translation](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation))
 on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol)). Upstream's
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
-[CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
+[CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first. New entries arrive as one file per
+change in [changes/](changes/README.md) and are folded in here with `npm run changelog`.
 
 ## 2026-11-11
-
-### A skill with a start animation plays it in full before the skill begins
-
-- When an operator casts a skill that opens with a start animation, the animation now plays to its end before the skill takes effect, as in the official game. The operator's attacks wait for it, so the first attack no longer cuts it off. This covers 138 skills of 91 operators, such as Mizuki S3, Ayerscarpe S2 and Gavial the Invincible S2; the start animations last 0.1 to 1.5 s. Being stunned, frozen or put to sleep during the animation cancels the cast and keeps the skill points. Skills without a start animation, such as Mostima S3, are unchanged.
 
 ### Slow attackers swing at their own speed, as in the official game
 
@@ -25,6 +22,12 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Each effect keeps the official limit: most may play at most 2× as fast in real time, so at 2× battle speed they keep their normal speed. A few have no limit or a higher one.
 - A slow attack slows its effects only as far as its swing may slow (the attack's own limit, above). Effects the game doesn't mark (buffs, statuses, most hits) keep their speed; only their official start delay shortens with the attack, as in the game.
 - Display only: battle results and bots are unchanged.
+
+### Территория's talent lands 0.1 s after a withdrawal
+
+- When Территория leaves the field for any reason other than a knock-out (a retreat, a forced exit, a raid jump), the talent 此身为界 now deals its damage, stuns and shows its tile effect 0.1 s after the exit, as the official game's withdraw shot does. Before, it all happened in the same instant. A knock-out still lands 0.7 s later, as before.
+- The official withdraw shot is an invisible projectile that lives 0.1 s and hits as it stops. Its only visual is the tile effect on every tile of the operator's field (国度), which we already played; it has no sound of its own.
+- The dev sandbox's `hold(i, { retreat: true })` makes board unit `i` withdraw mid-fight, for proof captures.
 
 ### Tests no longer fail just because the computer is busy
 
