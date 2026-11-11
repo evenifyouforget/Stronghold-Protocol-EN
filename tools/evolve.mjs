@@ -14,8 +14,8 @@
 //   regresses as it survives; without it, 12 candidates × 6 generations on one fixed block overfit that block (the
 //   first run: 20/40 vs legacy 14/40 on training, 27/60 each on held-back seeds). Held-back default: 1001-1060.
 //
-// - Fitness per match: victory + 0.25 × hidden core cleared + 0.25 × rounds passed / boss round; a candidate's
-//   fitness is the mean over the training seeds, minus 0.005 per tactic (against bloat). Paired seeds: every candidate
+// - Score per match: victory + 0.25 × hidden core cleared + 0.25 × rounds passed / boss round. A candidate's fitness
+//   is its mean score minus legacy's on the same seeds (paired; legacy = 0), minus 0.005 per tactic (against bloat). Paired seeds: every candidate
 //   plays the same seeds, and legacy (the empty profile) is always in the population as the control.
 // - Resumable: each candidate's matches are saved per 10-seed chunk under DIR/cache/<genome hash>.sA-B.json (written
 //   via .tmp), so a restart, an elite carried over, or the same genome found twice costs nothing. Generations are
@@ -176,8 +176,16 @@ function cachedRecs(g, seeds) {
 function evaluate(g, seeds, gen = 0) {
   const recs = chunks(seeds).flatMap((c) => runChunk(g, c));
   if (opt.resample) for (let k = 0; k < gen; k++) recs.push(...cachedRecs(g, blockOf(k)));
-  const fit = recs.reduce((s, r) => s + score(r), 0) / recs.length - 0.005 * g.length;
-  return { fit, wins: recs.filter((r) => r.victory).length, n: recs.length, bySeed: new Map(recs.map((r) => [r.seed, r])) };
+  // paired: each match against legacy's on the same seed (legacy plays every seed any candidate plays), so a
+  // candidate that drew easier seeds gains nothing from them
+  const base = new Map();
+  if (g.length) {
+    const ranges = [seeds, ...(opt.resample ? Array.from({ length: gen }, (_, k) => blockOf(k)) : [])];
+    for (const rg of ranges) for (const c of chunks(rg)) for (const x of runChunk([], c)) base.set(x.seed, x);
+  }
+  const diff = g.length ? recs.reduce((s, r) => s + score(r) - score(base.get(r.seed)), 0) / recs.length : 0;
+  const raw = recs.reduce((s, r) => s + score(r), 0) / recs.length;
+  return { fit: diff - 0.005 * g.length, raw, wins: recs.filter((r) => r.victory).length, n: recs.length, bySeed: new Map(recs.map((r) => [r.seed, r])) };
 }
 const describe = (g) => g.length ? g.map((e) => `${e.tactic}(${Object.entries(e.params).filter(([k, v]) => TACTICS[e.tactic].params[k].default !== v).map(([k, v]) => `${k}=${v}`).join(',')})`).join(' > ') : '(legacy)';
 
@@ -206,7 +214,7 @@ function rank(pop, seeds, gen) {
 function report(gen, rows) {
   const base = rows.find((r) => r.g.length === 0);
   const lines = [`# Generation ${gen} — ${CONFIG}, seeds ${blockOf(gen).join('–')}${opt.resample ? ' (fitness: every block played so far)' : ''}${RULES ? `, rules ${RULES}` : ''}`, '',
-    '| # | fitness | wins | vs legacy (+ / −) | tactics | hash |', '|---|---|---|---|---|---|'];
+    '| # | fitness (vs legacy) | wins | vs legacy (+ / −) | tactics | hash |', '|---|---|---|---|---|---|'];
   rows.forEach((r, i) => {
     let flips = '';
     if (base && !r.partial && r !== base) {
@@ -214,16 +222,15 @@ function report(gen, rows) {
       for (const [s, x] of r.bySeed) { const y = base.bySeed.get(s); if (!y) continue; if (x.victory && !y.victory) up++; if (!x.victory && y.victory) down++; }
       flips = `+${up} / −${down}`;
     }
-    lines.push(`| ${i + 1} | ${r.fit.toFixed(3)}${r.partial ? ' ½' : ''} | ${r.wins}/${r.n} | ${flips} | ${describe(r.g)} | ${hashOf(r.g)} |`);
+    lines.push(`| ${i + 1} | ${r.fit >= 0 ? '+' : ''}${r.fit.toFixed(3)}${r.partial ? ' ½' : ''} | ${r.wins}/${r.n} | ${flips} | ${describe(r.g)} | ${hashOf(r.g)} |`);
   });
   writeFileSync(join(OUT, `gen-${gen}.md`), lines.join('\n') + '\n');
 }
 
 if (opt['holdout-only']) {
   const st = JSON.parse(readFileSync(statePath, 'utf8'));
-  const seen = new Map();
-  for (const gen of st.gens) for (const r of gen.top) if (!seen.has(r.hash)) seen.set(r.hash, r);
-  const cands = [...seen.values()].sort((a, b) => b.fit - a.fit).slice(0, 3).map((r) => r.g);
+  // the final ranking's best: they have played the most seeds (the best of every generation would pick early luck)
+  const cands = st.gens[st.gens.length - 1].top.filter((r) => r.g.length).slice(0, 3).map((r) => r.g);
   const rows = [[], ...cands].map((g) => ({ g, ...evaluate(g, HOLD) }));
   const base = rows[0];
   const lines = [`# Held-back seeds ${HOLD.join('–')} — ${CONFIG}${RULES ? `, rules ${RULES}` : ''}`, '', '| profile | fitness | wins | vs legacy (+ / −) |', '|---|---|---|---|'];
