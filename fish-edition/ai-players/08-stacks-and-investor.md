@@ -204,8 +204,32 @@ The plan alone wasn't enough: in two solo test matches the shop showed 见钱眼
 the shop shows before legacy's loop starts; legacy equips them itself. 盟约之币 and Isomorph are left out: the coin is
 neutral, and Isomorph is DYYBot's step 3 (05).
 
-**Queued** (`untracked/queue5-2026-11-12.sh`, after queue4): botbench `items` and `items-eng` (with `plan-engines`) on
-queue2's seeds, then records of `items-eng` (seeds 1–30).
+**Measured** (`untracked/queue5-2026-11-12.sh` → `untracked/engines-2026-11/`, `compare-items*.md`). botbench, co-op
+Ultimate seeds 1–40, against queue2's legacy, paired; `set` both:
+
+| | legacy | `items` | `items-eng` (+ `plan-engines`) |
+|---|---|---|---|
+| Wins of 40 | 27 | 27 (7 lost / 7 gained) | 27 (8 / 8) |
+| Reached the boss | 39 | 37 | 35 |
+| LP left (mean) | 36.8 | 29.7 | 28.8 |
+| Bounties leaked | 56 | 65 | 72 |
+| Stacks at rounds 7 / 10 / 13 (mean per team) | 40 / 111 / 258 | 41 / 113 / 275 | 40 / 115 / 285 |
+| Leader damage (mean) | 3.16 M | 3.63 M | 3.63 M |
+
+The records (`items-eng`, seeds 1–30, seat 0 Du Yaoye; `records-items/`), per seat, with `eng-pos` alone on the same
+code and seeds:
+
+| | legacy (main) | `eng-pos` | `items-eng` |
+|---|---|---|---|
+| Median stacks at rounds 7 / 10 / 13 | 35 / 100 / 150 | 38 / 87 / 156 | 34 / 105 / 216 |
+| Seats with 200+ stacks (of 120) | 58 | 60 | 69 |
+| Matches won (of 30) | 8 | 11 | 16 |
+
+**Verdict: the first tactic that moves stacks.** Buying the stack and coin consumables raises round-13 stacks by 7 %
+(`items`) to 10 % (`items-eng`) in the means, and the records' median by 40 %. Leader damage rises by 15 %. Wins stay
+the same on 40 seeds, and the funds cost some defence (more leaks, less LP). In the records `items-eng` won 16 of 30
+against `eng-pos`'s 11 on the same code; that's suggestive, not significant. Next: the items' split (stack against
+coin) and a reserve, so the defence cost shrinks.
 
 ## Next tactics (not built)
 
