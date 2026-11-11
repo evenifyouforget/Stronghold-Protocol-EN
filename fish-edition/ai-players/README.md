@@ -12,6 +12,7 @@ out of the former `fish-edition/ai-players.md` (2026-11-07), keeping its order. 
 | [04-predictive-and-carry-rank.md](04-predictive-and-carry-rank.md) | Predictive models of board strength, the carry rank test, Alliance / Attribute copies, an HP-tracking boss pool, bot placement vs human placement, the #31 tag sweep |
 | [05-dyybot.md](05-dyybot.md) | DYYBot: Fish's tactics for a strong Du Yaoye bot, and whether the new bot framework makes them redundant |
 | [06-fang-russell-4man.md](06-fang-russell-4man.md) | Fang and Russell, team-play tactics, and why evolution needs 4-player lobbies |
+| [07-research-tactics-evolution.md](07-research-tactics-evolution.md) | Nine research tactics, whether tactics need a data sharing model, and the evolution bench's first runs |
 
 **Research order (Fish, 2026-11-05):**
 1. Get everything out of the measurements first: predictive models and carry rank.
