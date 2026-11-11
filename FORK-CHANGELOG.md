@@ -7,6 +7,15 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### Tests no longer fail just because the computer is busy
+
+- Several tests failed only when the machine was busy (a full test run beside a browser run), and passed when run alone. They were checking real behaviour, but with stopwatches that assumed an idle machine. Each one now waits for the event it needs instead, with a generous limit that only stops a real hang. What each test checks is unchanged.
+- The relay acknowledgement tests (`test/p2p-server.test.js`) run on mocked timers, so the order of their steps is exact at any speed.
+- The generations tests (`test/generations.test.js`) wait until the server has picked up a table change instead of sleeping a fixed 80 or 150 ms.
+- Server-event waits in the plugin lobby, tab-identity and generations tests use the shared test limit (`WORKER_LOAD_MS`, 60 s) instead of 2, 5 or 15 seconds.
+- The external-AI tests (upstream's shelved dev feature) give each AI call that limit. The §37.72 timing test starts its test agent before the match and answers at three quarters of its budget instead of at a fixed 900 ms of 1182 ms.
+- New crew tool `cpu-load.mjs` reproduces these failures on purpose: it runs a test pinned to a few cores next to busy threads.
+
 ### A player who leaves is out for good, and the next round doesn't wait for them
 
 - Leaving a match now eliminates the player in every room type, Grand Alliance included. Before, a Grand Alliance player who left (or was removed for idling) stayed in the match and the AI played their board every round. This also applies when a dropped player doesn't come back before the rejoin window ends. During that window nothing changes: in a Grand Alliance room the AI still plays a dropped player's board until they come back.
