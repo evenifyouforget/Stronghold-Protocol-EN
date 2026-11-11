@@ -100,3 +100,21 @@ test("plan-engines puts the position stack operators into legacy's buy list, kee
   assert.equal(run(12, 6).buy, undefined, 'after toRound: untouched');
   assert.ok(TACTICS['plan-engines'] || TACTICS.get?.('plan-engines'), 'registered');
 });
+
+test("plan-items puts the shop consumables into legacy's items.buy before the Final Assault, the early doll only with 5 rounds left", async () => {
+  const { PLAN_ITEMS } = await import('../../server/match/botTacticsResearch.js');
+  const gd = { bossRound: 14 };
+  const run = (round, set, plan = { bonds: [] }) => {
+    const ps = { isBot: true, autoplay: false, gd, _botSelf: { round, plan } };
+    PLAN_ITEMS.at.sellJunk({ match: { round, gd }, player: ps, params: { set, fromRound: 4, reserve: 0 }, next: () => 'legacy' });
+    return ps._botSelf.plan;
+  };
+  assert.deepEqual(run(5, 'stack').items.buy, ['chess_item_1_04_e_a', 'chess_item_2_06_e_a', 'chess_item_4_01_e_a']);
+  assert.deepEqual(run(5, 'coin').items.buy, ['chess_item_2_07_e_a', 'chess_item_3_12_e_a', 'chess_item_2_05_e_a']);
+  assert.deepEqual(run(10, 'coin').items.buy, ['chess_item_2_07_e_a', 'chess_item_3_12_e_a'], '4 rounds left: no 精打细算玩偶');
+  assert.equal(run(5, 'both').items.buy.length, 6);
+  const kept = run(5, 'stack', { bonds: [], items: { keep: ['x'], buy: ['y'] } }).items;
+  assert.deepEqual([kept.keep, kept.buy[0]], [['x'], 'y'], "legacy's own item lists stay");
+  assert.equal(run(3, 'both').items, undefined, 'before fromRound');
+  assert.equal(run(14, 'both').items, undefined, 'not in the Final Assault prep');
+});
