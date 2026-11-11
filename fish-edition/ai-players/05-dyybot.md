@@ -188,3 +188,33 @@ The draft only models phase 1. To explain 90 %, the list needs (pseudocode, for 
 
 Not covered yet: why 28 % of the special refreshes skip a wanted Yan operator. It's most likely funds, which the
 records don't log per action; a replay of the economy would tell.
+
+### The bot's Du Yaoye games against the humans'
+
+Legacy (main, #108) as Du Yaoye in 30 co-op Ultimate matches with three legacy teammates (seeds 1–30, recorded with
+`untracked/dyy-2026-11/botrecords.mjs`; 28 passed round 10; 8 won). Per seat, against the 15 human seats:
+
+| | Humans | Legacy |
+|---|---|---|
+| Level 2 / 3 / 4 / 5 at round (medians) | 2 / 4 / 6 / 10 | **4 / 6 / 8** / 9 |
+| Special refreshes in round 3 | 9 over 15 seats | 4 over 28 seats |
+| Yan share of operator buys | 54 % | **37 %** |
+| Freezes per seat | 5.6 (56 % for an item) | **1.2** |
+| Seats that got a 变形同构体 (Isomorph) | 11 of 17 (the cheat filter here is per rule key) | **5 of 28** |
+| Isomorph equips per seat | 3.7 | **0.2** |
+| 简易通讯机 bought or offered and taken | 23 | **1** |
+| Refreshes per seat | 40 | 35 |
+| Sells per seat | 20 (31 % tier 1) | 18 (52 % tier 1) |
+| Extra refreshes start | round 9 | round 5–7 |
+
+**Where legacy differs most from the humans:**
+- **Early levelling.** Legacy is two rounds behind at levels 2–4, and catches up at 5. `dyy-level` (either schedule)
+  targets exactly this.
+- **The Isomorph engine.** Legacy rarely gets an Isomorph and almost never equips one. Humans build around it
+  (Fish's "General insights"). This is the biggest gap, and the draft has no tactic for it.
+- **Yan focus and freezing.** Legacy buys fewer Yan operators and freezes a quarter as often.
+
+**What's not a gap:** the roll-down. Legacy already refreshes about as much, starting earlier.
+
+So, for step 3, in order: an Isomorph plan (get one, equip it on a carry or a Yan-feasible member, keep 简易通讯机
+and cloning items), `dyy-level`, the Yan-focused buying and freezing. Then the roll-down only as a tuning of legacy's.
