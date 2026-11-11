@@ -34,6 +34,11 @@ Many official skills light up a lasting glow only when something happens mid-fig
 
 Fights don't change, and bot battles do no extra work.
 
+### Shots leave from the right spot when a model has no usual muzzle point
+
+- Ch'en the Holungday in her Holiday HD79 outfit: her S2 and S3 water bursts now leave her water gun. That outfit's model has different muzzle bones from her default look, so they used to start below her feet. A muzzle point now also tries the usual muzzle bones of the model actually drawn.
+- A unit with no muzzle point at all (Santalla, Viy) now aims from its feet, as in the official game, where the animator hands over the foot point when there is no muzzle. Before, it was a guessed spot 0.4 tiles up.
+
 ### External AI is shelved: locked in every build, and no test suite runs its tests
 
 - External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
