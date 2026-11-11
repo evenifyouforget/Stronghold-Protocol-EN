@@ -17,6 +17,19 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Logos's S2 still attacks exactly every 0.5 s: its fixed rhythm now counts from the start of each swing.
 - Behind the scenes: a bot battle's progress timeline now ends at exactly the battle's reported end time (both to the millisecond).
 
+### The lobby's update news can change without a new release
+
+- The servers can now replace the lobby's Update banner at any time: one news file holds every language, and `node scripts/deploy-regions.mjs news --hosts spa,usspa news.json` sends it to both servers (`--show` and `--clear` too; `scripts/news.mjs` on one server). Online players see the new banner within about 10 seconds, without a reload, and it shows again for players who closed an earlier one. A new release is still needed for anything else.
+- Each player sees the news in their own language, else in the file's English, else the banner built into the release. Lines can use the game's own colour tags (blue, red, orange, mint, grey); there is no HTML and no links.
+- The file is checked before it is sent and again on each server: size, lengths, languages and line breaks. A refused file changes nothing. Notes in `docs/DEPLOY.md` / `DEPLOY.en.md` §1.7.
+- Server side: the notice, maintenance and news boards now share one file-polling base (`server/fileBoard.js`) instead of separate copies.
+
+### Update news: 0.3.4-1
+
+- The lobby banner now announces Update 0.3.4-1, and it shows again for players who closed the 0.3.4 one. Its five headline lines are unchanged.
+- Seven new points come first: skills cast when the official game casts them; official element burst effects and the element ring under the feet; Mostima's, Lemuen's and Reed the Flame Shadow's S3 look and sound as in the official game; attacks no longer twitch before the strike; stored skill charges show over the operator's head; Damage Stats keep every round; and the Custom Squad's easier-to-spot swap button and ✕ to clear a slot.
+- Kept: Profile Icon, SilverAsh the Reignfrost's S3 with 20+ operators' attacks, 7 new outfits, and smarter bots. Dropped from the banner and the language packs: the lines about skills that replace an attack, the Viviana VFX fix, and skill cast sounds.
+
 ### Plugin studio trial tests no longer time out on a busy machine
 
 - Two plugin studio tests ran a real trial against the production 20 s wall limit, though that trial alone takes 8–16 s and over 20 s while the machine is busy, so they failed even when run alone. They now allow the tests' shared load time (60 s) and still check the same results: the three trial presets, and the sandbox refusing code it cannot run. The studio's own 20 s limit for players is unchanged.
