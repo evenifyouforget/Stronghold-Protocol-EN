@@ -243,3 +243,29 @@ against `iso`, paired.
 **Next for step 3:** level 6 (a `dyy-level` schedule that goes on to 6, Fish's "upgrade barge to level 6 when Muelsyse
 is in the inventory"), then cloning Muelsyse.
 
+## Baseline: the draft against legacy (2026-11-12)
+
+Solo Ultimate, Du Yaoye forced, seeds 1–160, paired, from `feature/fish-dyy-profile` (c1f872e4). Data:
+`untracked/dyy-2026-11/solo/` (chunks, joined `*.all.json`, `compare-*.md`).
+
+| | `legacy` | `fish-dyy` (levels 2 / 4 / 5 / 7) | `fish-dyy-human` (2 / 4 / 6 / 9) |
+|---|---|---|---|
+| Wins of 160 | 20 | 18 (9 lost / 7 gained, p 0.80) | 24 (11 / 15, p 0.56) |
+| Reached the Final Assault | 136 | 101 | 102 |
+| LP left at the end | 13.7 | 8.2 | 8.8 |
+| Leaks per game | 21.5 | 25.3 | 24.7 |
+| Shop level, rounds 4 / 7 / 10 | 1.9 / 3.3 / 4.9 | 3.0 / 4.3 / 5.0 | 3.0 / 4.0 / 5.0 |
+| Board value, rounds 4 / 7 / 10 | 19.8 / 28.9 / 36.6 | 11.6 / 21.9 / 31.0 | 11.6 / 23.3 / 33.6 |
+| Merges per game | 6.4 | 3.5 | 4.0 |
+| Stacks, rounds 10 / 13 | 77 / 171 | 66 / 188 | 71 / 191 |
+| Leader damage per game | 2.00 M | 1.58 M | 1.61 M |
+
+- **No difference in wins** that 160 seeds can see. `fish-dyy-human` is ahead by 4, which is noise (p 0.56).
+- **The levelling does what it says, and costs the board.** At round 4 the drafts have shop level 3 against 1.9, and
+  about 60 % of legacy's board value. They leak more from round 2 to round 8, and 35 fewer games reach the Final
+  Assault.
+- **Games that reach the boss do as well:** 18–24 wins out of about 100, against legacy's 20 of 136.
+- **Merges halve.** The funds go into levels and Yan buys, not pairs. The stacks catch up by round 13.
+- So the early levelling only pays if the levels turn into strength. Humans do that with the roll-down and the
+  Isomorph engine (above). That is step 3's order: `plan-iso` first (queued as queue6), then the roll-down.
+

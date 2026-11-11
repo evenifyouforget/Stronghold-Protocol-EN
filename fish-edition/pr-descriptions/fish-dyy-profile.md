@@ -27,6 +27,20 @@ forced, seeds 1–160, on the same seeds:
 
 That's 480 matches, about an hour. It answers whether the draft beats legacy as Du Yaoye, and which schedule is better.
 
+**Result (2026-11-12):** neither draft beats legacy yet; the differences in wins are noise.
+
+| | `legacy` | `fish-dyy` | `fish-dyy-human` |
+|---|---|---|---|
+| Wins of 160 | 20 | 18 (9 lost / 7 gained, p 0.80) | 24 (11 / 15, p 0.56) |
+| Reached the Final Assault | 136 | 101 | 102 |
+| Shop level, rounds 4 / 7 | 1.9 / 3.3 | 3.0 / 4.3 | 3.0 / 4.0 |
+| Merges per game | 6.4 | 3.5 | 4.0 |
+| Stacks, round 13 | 171 | 188 | 191 |
+| Leader damage per game | 2.00 M | 1.58 M | 1.61 M |
+
+The early levelling works as designed but costs the board: fewer merges and more leaks in rounds 2–8. Fewer games
+reach the boss. Those that do win about as often. The details are in 05 ("Baseline").
+
 **For Fish's PC, later: the DYYBot evolution run** (05 "Process", step 5). It waits for the step 3 tactics: the
 Isomorph plan, the levelling, Yan-focused buying and freezing. Then this PR gets one command that runs everything and
 writes one zip to send back.
