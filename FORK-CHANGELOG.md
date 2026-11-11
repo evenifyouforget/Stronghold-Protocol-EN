@@ -12,8 +12,34 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Skills now play their own sounds from the official audio data for every operator, not just a few picked by hand. Before, 72 skills on 66 operators made no sound of their own (Texas S2 Sword Rain, Ifrit S2, Ch'en S1, Mudrock S2 …). Now 71 of them do, and 91 of the 122 skills that were missing some of their sounds have more of them.
 - The sound files decide where each sound goes: a skill's own swing and impact play on its attacks while it runs, its cast plays when it starts (beside the activation sound when it has one), a looping sound (Ifrit S3's flamethrower) holds until the skill ends, and its end sound plays when it ends.
 - Blaze the Igniting Spark, Lemuen, Mostima and Talulah keep their hand-made sound setups.
-- 200 new sound files (5.9 MB) for the server and the preload zip.
+- 197 new sound files (5.8 MB) for the server and the preload zip.
 - Not covered yet: sounds the game plays on its own triggers inside a skill (custom triggers, check points, attack finishes), which need per-operator work.
+
+### External AI is shelved: locked in every build, and no test suite runs its tests
+
+- External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
+- Its tests moved to `test/shelved/external-ai/` as `*.shelved.js`, which no runner picks up (`npm test`, the CI shards, the browser suite, perf): 15 whole files, plus the External AI cases split out of 6 files whose other tests keep running. `test/shelved/README.md` says how to run them by hand.
+
+### Outfits with their own official battle sounds play them
+
+- Three outfits have official battle sounds of their own, and now play them: Goldenglow's Party In The Garden, Executor the Ex Foedere's The Train Runner and Eyjafjalla's Fluffy Little Witch (the Sanrio outfits). Their attacks, impacts and skill sounds use the outfit's files; anything the outfit has no sound for stays the operator's. Eyjafjalla's outfit also has an S2 explosion sound of its own.
+- It works for any outfit: the asset build finds an outfit's sound banks in the official audio data by name, so a new one needs no code. Skadi the Corrupting Heart's Red Countess already played its own voice lines; its sound effects are the same as the default outfit's.
+- Goldenglow's drones were silent in every outfit. Each drone hit, a drone's self-destruct and S2 / S3's drone launch now play their official sounds. Eyjafjalla's attacks now have their impact sound (in her Sanrio outfit, S3's impact is its own).
+- The rest of these three operators' official battle sounds play too, in every outfit: Goldenglow's own S1 / S2 shot when she sends out drones, and each drone's signal 0.6 s after launch; Eyjafjalla's S2 swing and its hit; Executor the Ex Foedere's talent double strike (its own sound in S3) and his S3 final verdict. His Sanrio outfit's S2 attack also plays its second shot sound.
+- Behind the scenes: the dev sandbox plays an outfit's own battle sounds too, and an outfit sound's pitch and delay settings are found under the file's served name.
+- Server: 41 new sound files (26 for the outfits, 15 default ones for these three operators), all in data/assets.json.
+
+### Blaze the Igniting Spark can no longer use skills while downed
+
+- While her talent From the Ashes has her downed, she can no longer start a skill, as in the official game, where the downed state silences her. Her SP still recovers, so a full skill starts the moment she stands back up.
+
+### Line and path effects: Территория's kingdom, Aphrissa's S2 beam, Angelina the Mellow Wish's S3 range line
+
+- Территория's kingdom now shows the official kingdom look: the kingdom effect on every tile of it and the official line along its outer edge. It follows his range as it grows and shrinks, and fades shortly after he leaves. Before, the game drew a stand-in purple field.
+- Aphrissa's S2 beam now draws the official beam: one line from her weapon along the beam's path, bending where her relays and allied operators turn it, with the official start, relay and end point effects, for as long as S2 runs. Before, nothing showed the beam.
+- Angelina the Mellow Wish's S3 now shows the official range line around her running attack range: her original skill range plus the tiles around her, following her as she flies.
+- The points come from the battle: Aphrissa's S2 start now sends the beam's path, and Angelina the Mellow Wish's S3 start sends her skill range. These are display fields on events the battle already sent, so battles play out exactly as before. The new `render/vfx/pathfx.js` traces a tile set's outer edges into closed outlines through the tile corners, as the official range line does, and draws any official line through many points.
+- Not covered: Aphrissa's normal attack line and a beam path that changes during S2 (it keeps its starting path). Thorns the Lodestar's S3 polygon line is a separate follow-up.
 
 ### A player who leaves is out for good, and the next round doesn't wait for them
 
@@ -43,6 +69,25 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
   | Corrosion | no sound | the corrosion sound |
 
 - The sounds come from the official buff templates of each burst, which name the sound each one plays. They are in `tools/assets/plan.mjs` (`BURST_SOUND_BANKS`) and the manifest's new `audio.sfx.burst`, and they follow each official sound's own pitch range, volume and how many can play at once. Five new sound files.
+
+### Lemuen's Wanted mark looks as in the official game
+
+- An enemy that Lemuen's talent marks as Wanted now carries the official mark, a loop on the enemy (`lemuen_talent_buff_01`), for as long as it stays Wanted: until it dies or leaves, or the Lemuen it counts for leaves. It was a short stand-in reticle drawn by the game.
+- In Requiem Vesperis (`char_4193_lemuen@ambienceSynesthesia#7`) the mark uses the outfit's own version.
+- It shows whatever skill she has equipped. Its sound (`p_imp_lmwlcrstrmk`) already played as the mark appears; that is unchanged.
+
+### Talulah (塔露拉): her talent's sword effects, her S2 stack as in the official game, no stand-in overload glow
+
+- Talent 1 (怒火): her blade glows (the official oxi_buff_02) while she holds any 怒火 layer, and embers run along it (oxi_buff_03) once the layers are full. An attack that spends a layer ends the embers.
+- S2: while its stack holds, her attacks land the official BuffedAttack impact sound (p_imp_xtlfgbw_h) instead of her normal one, and the stack's flame (oxi_skill_02_buff_01) lasts until the last layer runs out. It used to end one stack duration after the cast.
+- S3: the overload no longer draws a made-up orange glow on her. The official game plays only its sound there, which stays.
+- Her S3 still ends without a closing sound: the official client plays that sound (b_char_boostclose) only when a player stops the skill by hand, which this mode doesn't allow.
+- Behind the scenes: the battle sends her 怒火 and S2 layer counts to the client as a display-only fx (`buffLayers`). No battle result changes; only the fx counts of the two Talulah golden scenarios (diy-140, diy-141) moved.
+
+### Mizuki's skills play their own animations and impact sounds
+
+- Mizuki now animates each skill as in the official game, in every outfit. Her S2 (Prisoner's Dilemma) attacks with its own swing and rests in her normal pose. Her S3 (Moon in the Water) opens with its start animation, swings its own attack, stands in its skill stance between attacks and closes with its end animation. An S1 (Awaken) charge is her normal swing. Before, the game paired her animations with her skills by their names, which her model doesn't follow: S2 played S3's animations, S3 swung her plain attack and S1 played S2's swing.
+- Her attacks now land with their impact sound, and an S1 charge has its own impact instead of S2's. During S2 and S3 she swings with her normal swing sound and each hit lands with that skill's own impact. Before, the impact sound played at the swing.
 
 ## 2026-11-10
 
