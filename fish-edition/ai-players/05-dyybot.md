@@ -218,3 +218,28 @@ Legacy (main, #108) as Du Yaoye in 30 co-op Ultimate matches with three legacy t
 
 So, for step 3, in order: an Isomorph plan (get one, equip it on a carry or a Yan-feasible member, keep 简易通讯机
 and cloning items), `dyy-level`, the Yan-focused buying and freezing. Then the roll-down only as a tuning of legacy's.
+
+## Step 3 begun: the Isomorph tactic `plan-iso` (2026-11-12)
+
+Where the humans' Isomorphs come from (all 62 human seats of 08): **merge rewards** (54 of 97; 缪尔赛思 56 of 76),
+then strategy gifts (25) and buying (14). Half the human seats reach level 6, at a median of round 12. Legacy never goes
+past level 5 (`BOT_MAX_LEVEL`), so tier 6 never shows in its shop. When a reward offers 缪尔赛思 or an Isomorph, humans
+take it 43 % of the time, bots 31 %. Legacy already equips an Isomorph well once held (`morphPlan`).
+
+`plan-iso` (`server/match/botTacticsResearch.js`, branch `feature/bot-plan-tactics`, 58d6c04a):
+- **takes a merge reward** offering 缪尔赛思 or a 变形同构体, while fewer than `maxIso` (6) are owned;
+- from shop level `fromLevel` (6), puts 缪尔赛思 and the 变形同构体 into the plan's buy lists;
+- once an Isomorph is owned, lists the bond items of the Alliances one Isomorph completes. Fish's rule is applied to
+  the owned members: first threshold ≤ 3, owned members one short. For a Yan board that's Durable, Arcane and Raid
+  from the data alone, and Swift or Precision once one member is owned;
+- keeps the Isomorphs and those bond items (`items.keep`).
+
+Six solo Du Yaoye matches (seeds 1–6): an Isomorph got and equipped in 5 of 6 seats, against 2 of 6 for legacy.
+Stacks were the same within a few.
+
+**Queued** (`untracked/queue6-2026-11-12.sh`, after queue2): solo Ultimate, Du Yaoye forced, seeds 1–160, legacy
+against `iso`, paired.
+
+**Next for step 3:** level 6 (a `dyy-level` schedule that goes on to 6, Fish's "upgrade barge to level 6 when Muelsyse
+is in the inventory"), then cloning Muelsyse.
+

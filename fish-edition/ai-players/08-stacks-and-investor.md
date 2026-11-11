@@ -177,7 +177,11 @@ queue2's seeds, then records of `items-eng` (seeds 1–30).
    level 5.
 2. **Cycling:** from round 7, buy the cheapest operator that feeds an active 获得时 or engine rule and sell it next
    prep. Lower priority after the split above. queue3's `trade1.5` (legacy's own trade at half the bar) tests the
-   cheap version first.
+   cheap version first; it now runs last (`queue3-late`), after queue5.
+
+**Queue order** (log `untracked/queue-2026-11-12.log`): the balance sweep and the DYY baseline → queue2 (Investor) →
+queue6 (DYY Isomorph, 05) → queue4 (`plan-engines`) → queue5 (`plan-items`) → queue3 (`trade1.5`). queue4 and queue5
+run in sp-plan-run2 at 58d6c04a; their tactics' code is the same as at 78b911a6 and f93e6db6.
 
 **To measure:** stacks (botbench `--layers`) and boss damage, paired by seed against legacy. Wins alone need hundreds
 of seeds (07).
