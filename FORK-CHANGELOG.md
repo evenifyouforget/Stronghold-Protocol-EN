@@ -16,6 +16,53 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - Behind the scenes: the dev sandbox plays an outfit's own battle sounds too, and an outfit sound's pitch and delay settings are found under the file's served name.
 - Server: 41 new sound files (26 for the outfits, 15 default ones for these three operators), all in data/assets.json.
 
+### Blaze the Igniting Spark can no longer use skills while downed
+
+- While her talent From the Ashes has her downed, she can no longer start a skill, as in the official game, where the downed state silences her. Her SP still recovers, so a full skill starts the moment she stands back up.
+
+### A player who leaves is out for good, and the next round doesn't wait for them
+
+- Leaving a match now eliminates the player in every room type, Grand Alliance included. Before, a Grand Alliance player who left (or was removed for idling) stayed in the match and the AI played their board every round. This also applies when a dropped player doesn't come back before the rejoin window ends. During that window nothing changes: in a Grand Alliance room the AI still plays a dropped player's board until they come back.
+- A battle the player was fighting when they left plays out to its end as usual. It goes at once to another player's browser (the host first, or the boss partner), the same way a disconnect's does. Before, a Grand Alliance player leaving mid-battle made everyone wait about a minute, then the server ran their board.
+- From the next round on, nothing of theirs runs any more: no AI board, no prep, no battles, on any player's browser or on the server.
+- The Grand Alliance idle warning now says the next idle round removes the player and eliminates them, instead of saying the AI takes over their board (all languages).
+
+### Blaze the Igniting Spark looks and sounds complete
+
+- Her S1 now shows its red smoke ring around the operator it picks, for the skill's 20 seconds.
+- Her S2 leaves burning ground on every tile it strikes, until the skill ends.
+- The fire ring of her talent From the Ashes no longer burns at her feet all fight. It now appears only while she is downed, and she kneels inside it as in the official game. Standing back up plays the official burst.
+- Her outfits use their own versions of all these effects.
+- New sounds: her S3's ability end (alongside its closing sound), going down, standing back up, and her Meltdown talent's Burn burst.
+- A skill can now play several official sounds when it starts or ends, not just one.
+
+### Element bursts sound as in the official game
+
+- When an element gauge fills and bursts, the official burst sound now plays. As in the official game, the sound belongs to the unit that bursts:
+
+  | Element | On an enemy | On an operator |
+  |---|---|---|
+  | Burn | no sound | the burn sound, layered with a flare |
+  | Necrosis | the necrosis sound (slightly quieter) | the same |
+  | Nervous Impairment | no sound | the nervous impairment sound |
+  | Corrosion | no sound | the corrosion sound |
+
+- The sounds come from the official buff templates of each burst, which name the sound each one plays. They are in `tools/assets/plan.mjs` (`BURST_SOUND_BANKS`) and the manifest's new `audio.sfx.burst`, and they follow each official sound's own pitch range, volume and how many can play at once. Five new sound files.
+
+### Lemuen's Wanted mark looks as in the official game
+
+- An enemy that Lemuen's talent marks as Wanted now carries the official mark, a loop on the enemy (`lemuen_talent_buff_01`), for as long as it stays Wanted: until it dies or leaves, or the Lemuen it counts for leaves. It was a short stand-in reticle drawn by the game.
+- In Requiem Vesperis (`char_4193_lemuen@ambienceSynesthesia#7`) the mark uses the outfit's own version.
+- It shows whatever skill she has equipped. Its sound (`p_imp_lmwlcrstrmk`) already played as the mark appears; that is unchanged.
+
+### Talulah (塔露拉): her talent's sword effects, her S2 stack as in the official game, no stand-in overload glow
+
+- Talent 1 (怒火): her blade glows (the official oxi_buff_02) while she holds any 怒火 layer, and embers run along it (oxi_buff_03) once the layers are full. An attack that spends a layer ends the embers.
+- S2: while its stack holds, her attacks land the official BuffedAttack impact sound (p_imp_xtlfgbw_h) instead of her normal one, and the stack's flame (oxi_skill_02_buff_01) lasts until the last layer runs out. It used to end one stack duration after the cast.
+- S3: the overload no longer draws a made-up orange glow on her. The official game plays only its sound there, which stays.
+- Her S3 still ends without a closing sound: the official client plays that sound (b_char_boostclose) only when a player stops the skill by hand, which this mode doesn't allow.
+- Behind the scenes: the battle sends her 怒火 and S2 layer counts to the client as a display-only fx (`buffLayers`). No battle result changes; only the fx counts of the two Talulah golden scenarios (diy-140, diy-141) moved.
+
 ## 2026-11-10
 
 ### Operators attack as in the official game: the swing starts, then the hit lands
