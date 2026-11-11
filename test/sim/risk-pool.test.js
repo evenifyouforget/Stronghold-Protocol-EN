@@ -13,7 +13,9 @@ import { CC } from '../../shared/ruleData.js';
 
 test('no config without a boss-pool tag', () => {
   assert.equal(bossRiskConfig(null), null);
-  assert.equal(bossRiskConfig({ ccBoss: 3, ccDelegation: 1 }), null, 'United 1 alone holds nothing');
+  assert.equal(bossRiskConfig({ ccBoss: 3 }), null);
+  const u1 = bossRiskConfig({ ccBoss: 3, ccDelegation: 1 });
+  assert.ok(u1.degen && !u1.hold, 'United 1: the linked Degenbrecher HP bar, no hold');
   assert.ok(bossRiskConfig({ ccDelegation: 2 }).hold);
   assert.equal(bossRiskConfig({ ccLockout: 2 }).every, CC.lockout.every[2]);
 });

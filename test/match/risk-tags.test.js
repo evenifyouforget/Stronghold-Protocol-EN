@@ -165,7 +165,7 @@ test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the
   } finally { h.m.dispose(); }
 });
 
-test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP × 1 / 2 / 3, ATK × 1.5 from United 2', () => {
+test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP × 2 / 3 / 5, no ATK change; the Degenbrecher at the start', () => {
   const wave = (level) => {
     const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, lobbyRules: { ccDelegation: level } });
     try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
@@ -176,9 +176,11 @@ test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2), HP �
   assert.equal(u1[dg.degen].count, 1);
   assert.equal(u1[dg.wave[1].key].count, 2);
   assert.equal(u1[dg.wave[2].key].count, 2);
-  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 1, atkMul: 1 });
-  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 2, atkMul: 1.5 });
-  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
+  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2 });
+  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3 });
+  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5 });
+  assert.equal(u1[dg.degen].atStart, true, 'the Degenbrecher spawns at the start');
+  assert.ok(!u1[dg.wave[1].key].atStart && !u1[dg.wave[2].key].atStart, 'her escort joins the wave as before');
   assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 1 } });
   try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
@@ -205,6 +207,24 @@ test('the sub-wave takes the left-first route of a pair field (left portal, then
   } finally { h.m.dispose(); }
 });
 
+test('ccDelegation: the Degenbrecher spawns at 0 s in both final rounds, apart from the wave; her escort joins it', async () => {
+  const { buildBossWave, bountySpawns } = await import('../../server/match/waves.js');
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccDelegation: 2 } }).start();
+  try {
+    h.toPrep(2);
+    const m = h.m;
+    for (const round of [14, 15]) for (const solo of [false, true]) {
+      const wave = buildBossWave(m.gd, m.rngWaves, m.factions, round, { bossId: round === 15 ? m.hiddenBossId || m.bossId : m.bossId, solo });
+      const specs = bountySpawns(m.gd, round, wave, m.bossSubWave(solo ? ['p_0'] : ['p_0', 'p_1']).get('p_0'), 'p_0', { side: 'L' });
+      const her = specs.filter((s) => s.enemyKey === CC.delegation.degen);
+      assert.equal(her.length, 1, `round ${round}`);
+      assert.equal(her[0].time, 0, `round ${round}`);
+      assert.equal(her[0].actionIndex, undefined, 'joins no action');
+      assert.ok(specs.some((s) => s.enemyKey !== CC.delegation.degen), 'the escort is there');
+    }
+  } finally { h.m.dispose(); }
+});
+
 test('a sub-wave riskMods multiply the round spawn mods', async () => {
   const { bountySpawns } = await import('../../server/match/waves.js');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 2 } });
@@ -217,7 +237,7 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
     assert.ok(a.length > 0 && a.length === b.length);
     for (let i = 0; i < a.length; i++) {
       assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * CC.delegation.hpMul.united2) < 1e-9);
-      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * 1.5) < 1e-9);
+      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul) < 1e-9, 'no ATK change');
     }
   } finally { h.m.dispose(); }
 });

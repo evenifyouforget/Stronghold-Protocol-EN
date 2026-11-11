@@ -6,8 +6,11 @@
 //   ccLockout    every CC.lockout.every[level] of the pool lost: invulnerable for CC.lockout.seconds game seconds. The pool
 //                stops at each step (a hard gate: a big hit does not skip a step) until the invulnerability ends
 //   ccDelegation United 2: the final boss cannot die while a Degenbrecher of the sub-wave lives on any field (the pool
-//                stops at 1 HP; `holds` = the fields that report one alive)
-// The view the fields get (`view()`; b.pool `risk`, the boss spec's `risk`): { res, def, inv, floor, hold } — `floor` is
+//                stops at 1 HP; `holds` = the fields that report one alive). Every United level: the Degenbrechers of all
+//                the boss fields share one HP bar — each field reports the HP it took from its own (`degen`, cumulative,
+//                both of her lives) and applies the others' (server/sim/content/risk.js installDegenLink)
+// The view the fields get (`view()`; b.pool `risk`, the boss spec's `risk`): { res, def, inv, floor, hold, degen? } —
+// `degen`: fieldId → that field's cumulative damage to its Degenbrecher (Delegation only); `floor` is
 // the HP the pool cannot go below right now (the next gate, or 1 while held), so a field clamps its own damage to it
 // before the server has heard of it.
 
@@ -23,14 +26,17 @@ export function bossRiskConfig(rules) {
     phys: tagLevel(rules, 'ccOzPhys') > 0 ? CC.ozPhys : null,
     every,
     hold: tagHas(rules, 'ccDelegation', 'united2'),
+    degen: tagHas(rules, 'ccDelegation', 'united1'),
   };
-  return cfg.arts || cfg.phys || cfg.every > 0 || cfg.hold ? cfg : null;
+  return cfg.arts || cfg.phys || cfg.every > 0 || cfg.hold || cfg.degen ? cfg : null;
 }
 
 /** The view a field starts from (before the server's first b.pool). */
 export function initialRiskView(cfg, maxHp) {
   if (!cfg) return null;
-  return { res: false, def: false, inv: false, hold: false, floor: cfg.every > 0 ? gateHp(maxHp, cfg.every, 1) : 0 };
+  const v = { res: false, def: false, inv: false, hold: false, floor: cfg.every > 0 ? gateHp(maxHp, cfg.every, 1) : 0 };
+  if (cfg.degen) v.degen = {};
+  return v;
 }
 
 /** The pool HP of lockout step `k` (1 = the first), or 0 when there is none. */
@@ -55,6 +61,8 @@ export class BossRiskState {
     this.direct = { arts: 0, phys: 0 };
     /** fieldId → the latest { arts, phys } its client reported (cumulative) */
     this.reported = new Map();
+    /** fieldId → the HP its battle took from its Degenbrecher so far (cumulative; the linked HP bar) */
+    this.degen = new Map();
   }
 
   get gate() { return this.cfg.every > 0 ? gateHp(this.maxHp, this.cfg.every, this.step) : 0; }
@@ -101,6 +109,14 @@ export class BossRiskState {
     return had !== this.holds.size > 0;
   }
 
+  /** A field's cumulative damage to its Degenbrecher (never lowered: a takeover's re-simulation starts from 0). */
+  noteDegen(fieldId, dealt) {
+    const d = Number(dealt);
+    if (!this.cfg.degen || fieldId == null || !Number.isFinite(d) || d <= (this.degen.get(fieldId) || 0)) return false;
+    this.degen.set(fieldId, d);
+    return true;
+  }
+
   /** The invulnerability ended: the next step's gate. */
   release() {
     if (!this.inv) return;
@@ -121,6 +137,8 @@ export class BossRiskState {
   }
 
   view() {
-    return { res: this.res, def: this.def, inv: this.inv, hold: this.cfg.hold && this.holds.size > 0, floor: this.floor };
+    const v = { res: this.res, def: this.def, inv: this.inv, hold: this.cfg.hold && this.holds.size > 0, floor: this.floor };
+    if (this.cfg.degen) v.degen = Object.fromEntries(this.degen);
+    return v;
   }
 }

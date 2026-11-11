@@ -148,8 +148,8 @@ function delegationText(node, enemyName) {
   const dg = CC.delegation;
   const [degen, shield, champ] = dg.wave.map((w) => enemyName(w.key));
   switch (node) {
-    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性）、{n}名【{shield}】与{m}名【{champ}】', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count }) };
-    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%，攻击力提升至{atk}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置', { degen, hp: pct(dg.hpMul.united2), atk: pct(dg.atkMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
+    case 'united1': return { short: t('访问团：联合 1'), full: t('最终领袖回合，每个战场额外出现1名【{degen}】（1级属性，回合开始时即出现，各战场的【{degen}】共享生命值）、{n}名【{shield}】与{m}名【{champ}】，最大生命值提升至{hp}%', { degen, shield, champ, n: dg.wave[1].count, m: dg.wave[2].count, hp: pct(dg.hpMul.united1) }) };
+    case 'united2': return { short: t('访问团：联合 2'), full: t('【{degen}】存活时最终领袖不会死亡；上述敌人最大生命值提升至{hp}%；【{degen}】未被阻挡时移动速度逐渐提升，{s}秒后达到+{c}%，被阻挡或无法移动时重置', { degen, hp: pct(dg.hpMul.united2), s: dg.chargeSeconds, c: pct(dg.chargePct) }) };
     case 'united3': return { short: t('访问团：联合 3'), full: t('上述敌人最大生命值提升至{hp}%；【{degen}】每损失{p}%最大生命值释放【瞬息杀机】，释放完成前生命值不会继续减少', { hp: pct(dg.hpMul.united3), degen, p: pct(dg.gateRatio) }) };
     default: return { short: '?', full: '?' };
   }

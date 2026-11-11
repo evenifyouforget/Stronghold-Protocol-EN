@@ -20,7 +20,8 @@
 //                 (the match: infra.js). Patriot, and the Degenbrecher of the Delegation sub-wave, use their Level 1 stats (data
 //                 enemies.json `level1`).
 //   ccDelegation  United 2: the sub-wave's Degenbrecher charges while unblocked (installDegenCharge); United 3's gate is in
-//                 her kit (enemies/leaders.js)
+//                 her kit (enemies/leaders.js). Every level: the Degenbrechers of all the boss fields share one HP bar
+//                 (installDegenLink)
 //   ccJunk        the Toxic Waste's carrier ATK −50 % (installJunk; the item itself: shared/ruleData.js, the match)
 //   ccVengeance   Invincible Blade 2 / 3 on the Reids the tag adds (installVengeance)
 //   ccFamiglia    Unending / Seasonal: the Blood Ledger of every battle (installFamiglia; battle.ledger, the snapshot's
@@ -73,6 +74,7 @@ export function install(battle) {
   installPatriot(battle, rules);
   installLevel1(battle, rules);
   installDegenCharge(battle, rules);
+  installDegenLink(battle, rules);
   installFamiglia(battle, rules);
   installZaaro(battle, rules);
   installJunk(battle, rules);
@@ -250,6 +252,43 @@ function summonSilencer(battle, key) {
 }
 
 const keyOf = (u) => u.def?.key ?? u.key;
+
+const DEGEN_SYNC = 'risk:degenSync';
+
+/**
+ * ccDelegation: one HP bar for the Degenbrechers of every boss field (Fish, balance draft 2026-11 — a field that cannot
+ * kill hers is helped by the others, so United 2's hold never rests on the weakest board). Every 0.1 s this field
+ * reports the HP its own battle took from its Degenbrecher (both lives; the pool's `noteDegen` → the risk view's
+ * `degen`) and deals her the other fields' damage it has not applied yet, as tagged True damage with no source — her
+ * own rules still decide what it does (United 3's gate and cast, the second form after a KO), and the damage another
+ * field's copy refused (a gate, her revival) is applied later. Her death on the field that dealt the last blow and the
+ * others' follow within one sync (a client field: within one b.pool).
+ */
+function installDegenLink(battle, rules) {
+  const pool = battle.sharedBoss;
+  if (!tagHas(rules, 'ccDelegation', 'united1') || !pool || typeof pool.noteDegen !== 'function') return;
+  const isDegen = (e) => keyOf(e) === CC.delegation.degen && String(e.mods?.bountyId ?? '').startsWith('risk:delegation');
+  let own = 0, reported = 0, applied = 0, acc = 0;
+  battle.on('hpChanged', (c) => {
+    if (c.delta < 0 && c.target && isDegen(c.target) && !(c.dmg?.tags || []).includes(DEGEN_SYNC)) own -= c.delta;
+  });
+  battle.on('tick', ({ dt }) => {
+    acc += dt;
+    if (acc < 0.1 - 1e-9) return;
+    acc = 0;
+    if (own > reported) { reported = own; pool.noteDegen(battle.fieldId, own); }
+    const by = pool.riskView()?.degen;
+    if (!by) return;
+    let others = 0;
+    for (const [fid, d] of Object.entries(by)) if (fid !== String(battle.fieldId) && Number.isFinite(d)) others += d;
+    const due = others - applied;
+    if (!(due >= 1)) return;
+    const her = battle.aliveEnemies().find(isDegen);
+    if (!her) return;
+    applied += battle.dealDamage({ source: null, target: her, amount: due, type: 'true', calculation: 'resolved',
+      attackType: 'ADDITION', applyWay: 'NONE', dodgeMode: 'ignore', tags: [DEGEN_SYNC] }) || 0;
+  });
+}
 
 /** The final boss pool's Risk view on this field's boss units, and United 2's hold (server/sim/bossRisk.js). */
 function installBossPool(battle, rules) {

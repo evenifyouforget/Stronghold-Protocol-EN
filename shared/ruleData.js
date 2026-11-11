@@ -67,7 +67,7 @@ export const CC = Object.freeze({
   ozPhys: Object.freeze({ share: 0.5, def: 5000 }),   // … as Physical
   lockout: Object.freeze({ every: Object.freeze([0, 0.68, 0.28, 0.18]), seconds: 10 }), // invulnerable 10 game s per step
   // Famiglia: Cleaner — rounds 10–13, the fewest stacks
-  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 2, rounds: Object.freeze([10, 11, 12, 13]) }), // (balance draft 2026-11: was 5)
+  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 5, rounds: Object.freeze([10, 11, 12, 13]) }),
   // Famiglia Unending / Seasonal — the Blood Ledger (血债账款) of every battle (arknights.wiki.gg Blood_Ledger): it fills
   // perSec per game second (+zaaroPerSec while Zaaro lives, + his Furious Howl, data skill WildCalling), and at max an
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
@@ -120,8 +120,10 @@ export const CC = Object.freeze({
   // Delegation: the sub-wave of the final boss round(s), once per field; United 2 — the final boss cannot die while a
   // Degenbrecher lives, and she charges: move speed +up to chargePct while unblocked, reached after chargeSeconds, reset
   // when blocked or unable to move; United 3 — Momentum Murder every 25 % (the game's own step) with a hard HP gate.
-  // HP 100 / 200 / 300 % (Fish's balance draft 2026-11: 1 Degenbrecher, 2 Shieldbearers, 2 Centurion Champions; was 5
-  // and 5, HP 200 / 300 / 500 % and a gate every 9 %; Fish's playtest nerf of 2026-10-15 removed Cloned 3)
+  // HP 200 / 300 / 500 %. The Degenbrecher spawns at the start of the round, and her HP is linked across the boss fields
+  // (server/sim/content/risk.js installDegenLink). Fish's balance draft 2026-11: 1 Degenbrecher, 2 Shieldbearers, 2
+  // Centurion Champions (was 5 and 5), no ATK × 1.5 from United 2 (was), a gate every 25 % (was 9 %); Fish's playtest
+  // nerf of 2026-10-15 removed Cloned 3
   delegation: Object.freeze({
     wave: Object.freeze([
       Object.freeze({ key: 'enemy_1525_blkswb', count: 1 }),
@@ -129,7 +131,7 @@ export const CC = Object.freeze({
       Object.freeze({ key: 'enemy_1389_winbab_2', count: 2 }),
     ]),
     degen: 'enemy_1525_blkswb', // the sub-wave's Degenbrecher uses her Level 1 stats (enemies.json level1)
-    hpMul: Object.freeze({ united1: 1, united2: 2, united3: 3 }), atkMul: Object.freeze({ united2: 1.5 }),
+    hpMul: Object.freeze({ united1: 2, united2: 3, united3: 5 }),
     chargePct: 3, chargeSeconds: 10,
     gateRatio: 0.25, castSeconds: 1, // [ASSUMED] Momentum Murder's cast: no HP lost meanwhile, the burst at its end
   }),

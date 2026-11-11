@@ -114,8 +114,8 @@ export class MatchInfra {
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
    *                        Undying 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
    *                        Patriot and his escort come again, once per field (bossSubWave)
-   *   ccDelegation         the final boss rounds: Degenbrecher, 10 Delegation Shieldbearers and 10 Delegation Centurion
-   *                        Champions once per field (bossSubWave), HP × 2 / 3 / 5, ATK × 1.5 from United 2
+   *   ccDelegation         the final boss rounds: Degenbrecher (at the round's start), 2 Delegation Shieldbearers and 2
+   *                        Delegation Centurion Champions once per field (bossSubWave), HP × 2 / 3 / 5
    * @param {import('../PlayerState.js').PlayerState} ps
    * @param {{ boss?: boolean, field?: string[] }} [o] `field`: the boss field's player ids, left first (bossSubWave)
    */
@@ -175,8 +175,8 @@ export class MatchInfra {
     if (tagHas(this.lobbyRules, 'ccDelegation', 'united1')) {
       const has = (n) => tagHas(this.lobbyRules, 'ccDelegation', n);
       const hpMul = has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
-      const atkMul = has('united2') ? dg.atkMul.united2 : 1;
-      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
+      // the Degenbrecher at the round's start (waves.js bountyPlan `atStart`): United 2's hold is never waiting on her
+      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul }, leftFirst: true, ...(w.key === dg.degen ? { atStart: true } : {}) }));
     }
     // ccVengeance: always at least 1, by the highest active alliance of any alive player, once per field
     const v = this.vengeanceCount(this.alivePlayers(), { boss: true });

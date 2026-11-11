@@ -697,9 +697,10 @@ export const C2S = {
     left: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isInt(x, 0, 1e5)),
     leaksBy: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, 1e6)),
     // SPA-CC boss-pool Risk tags (server/sim/bossRisk.js): this field's cumulative Arts / Physical damage to the pool, and
-    // whether a Degenbrecher of the Delegation sub-wave lives on it (United 2)
-    bossArts: (v) => isNum(v, 0, BIG), bossPhys: (v) => isNum(v, 0, BIG), hold: isBool,
-    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy', 'bossArts', 'bossPhys', 'hold'],
+    // whether a Degenbrecher of the Delegation sub-wave lives on it (United 2), and the HP it took from her (`degen`,
+    // cumulative: the Degenbrechers' linked HP bar)
+    bossArts: (v) => isNum(v, 0, BIG), bossPhys: (v) => isNum(v, 0, BIG), hold: isBool, degen: (v) => isNum(v, 0, BIG),
+    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy', 'bossArts', 'bossPhys', 'hold', 'degen'],
   },
   // `cs` (DESIGN §32, optional): the content hash the reporting browser ran the battle on — its spec's `cs`. In a room
   // with gameplay plugins (P1c, DESIGN §32.6) the match refuses a result without it or with another one (and runs the

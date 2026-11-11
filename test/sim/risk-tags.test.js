@@ -7,6 +7,9 @@ import assert from 'node:assert/strict';
 import { makeBattle, enemyRec } from '../helpers/battleHarness.js';
 import { isLeaderEnemy } from '../../server/sim/content/risk.js';
 import { CC } from '../../shared/ruleData.js';
+import { SharedBossPool } from '../../server/match/finalAssault.js';
+import { bossRiskConfig } from '../../server/sim/bossRisk.js';
+import { LocalBossPool, battleProgress } from '../../server/sim/spec.js';
 
 const DEFS = { enemies: { enemy_dummy: enemyRec({ key: 'enemy_dummy', hp: 1e7, speed: 0 }) } };
 const battle = (rules, units, enemies = [{ key: 'enemy_dummy', pos: [10, 7] }], bonds = undefined) => {
@@ -129,14 +132,14 @@ test('Delegation United 3: Degenbrecher\'s second form stops at every 25 %, lose
   const bursts = () => h.eventsOf('fx').filter((e) => e[1] === 'explode' && JSON.stringify(e).includes('clearSp')).length;
   const b0 = bursts();
   hitHard(max * 0.5);
-  assert.ok(Math.abs(dg.hp / max - (1 - CC.delegation.gateRatio)) < 1e-6, `stopped at 91 %: ${dg.hp / max}`);
+  assert.ok(Math.abs(dg.hp / max - (1 - CC.delegation.gateRatio)) < 1e-6, `stopped at the first step: ${dg.hp / max}`);
   hitHard(max * 0.5);
   assert.ok(Math.abs(dg.hp / max - (1 - CC.delegation.gateRatio)) < 1e-6, 'nothing while casting');
   assert.equal(bursts(), b0, 'the burst waits for the cast');
   h.run(CC.delegation.castSeconds + 0.2);
   assert.equal(bursts(), b0 + 1);
   hitHard(max * 0.5);
-  assert.ok(Math.abs(dg.hp / max - (1 - 2 * CC.delegation.gateRatio)) < 1e-6, 'the next step at 82 %');
+  assert.ok(Math.abs(dg.hp / max - (1 - 2 * CC.delegation.gateRatio)) < 1e-6, 'the next step');
   // without the tag: 25 % steps, no gate
   const plain = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, units: [{ chessId: 'chess_char_3_08_a', row: 10, col: 6 }] });
   plain.step(1);
@@ -173,4 +176,53 @@ test('Delegation United 2: the sub-wave Degenbrecher charges while unblocked (+3
   const d1 = off.spawn(CC.delegation.degen, { pos: [10, 9], routeIndex: 0, mods: { speedMul: 0.0001, bountyId: `risk:delegation:${CC.delegation.degen}` } });
   off.run(5);
   assert.equal(mul(d1), 1, 'United 1: no charge');
+});
+
+test('Delegation: the Degenbrechers of the boss fields share one HP bar (both lives); each field reports its own damage', () => {
+  const rules = { ccDelegation: 1 };
+  const pool = new SharedBossPool(1e9, { risk: bossRiskConfig(rules) });
+  const field = (fieldId) => {
+    const h = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, fieldId, sharedBoss: pool, flags: { rules } });
+    h.step(1);
+    const dg = h.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0, bountyId: `risk:delegation:${CC.delegation.degen}` } });
+    return { h, dg };
+  };
+  const a = field('b1'), b = field('b2');
+  const max = a.dg.s.maxHp;
+  assert.equal(b.dg.s.maxHp, max);
+  const both = (s) => { for (let t = 0; t < s - 1e-9; t += 0.1) { a.h.run(0.1); b.h.run(0.1); } };
+  const hit = (f, x) => f.h.b.dealDamage(null, f.dg, { amount: x, type: 'true', sourceless: true });
+  const near = (x, y, msg) => assert.ok(Math.abs(x - y) < 1, `${msg}: ${x} vs ${y}`);
+  hit(a, max * 0.4);
+  both(0.5);
+  near(b.dg.hp, max * 0.6, 'the other field\'s copy took it');
+  near(a.dg.hp, max * 0.6, 'nothing comes back');
+  near(pool.riskView().degen.b1, max * 0.4, 'b1 reported');
+  hit(b, max * 0.3);
+  both(0.5);
+  near(a.dg.hp, max * 0.3, 'and the other way');
+  near(b.dg.hp, max * 0.3, 'b2 itself');
+  // b2's KO (her first life) knocks out b1's copy too; both revive into the second form at full HP
+  hit(b, max);
+  both(0.5);
+  assert.ok(a.dg.buffs.some((x) => x.key === 'ab:reborn') && b.dg.buffs.some((x) => x.key === 'ab:reborn'), 'both reviving');
+  for (let i = 0; i < 600 && [a, b].some((f) => f.dg.s.flags.invulnerable || f.dg.buffs.some((x) => x.key === 'ab:reborn')); i++) both(0.1);
+  near(a.dg.hp, max, 'b1 full again');
+  near(b.dg.hp, max, 'b2 full again');
+  // b1 ends her second life: b2's copy dies with her
+  hit(a, max);
+  both(0.5);
+  assert.equal(a.dg.alive, false);
+  assert.equal(b.dg.alive, false, 'b2\'s copy died too');
+  // a client field (LocalBossPool) reports its own damage in b.progress
+  const local = new LocalBossPool(1e9, 1e9, pool.riskView());
+  const c = makeBattle({ defs: DEFS, autoFinish: false, timeLimit: 400, seed: 3, fieldId: 'b3', sharedBoss: local, flags: { rules } });
+  c.step(1);
+  const dg = c.spawn(CC.delegation.degen, { pos: [10, 7], routeIndex: 0, mods: { speedMul: 0, bountyId: `risk:delegation:${CC.delegation.degen}` } });
+  c.b.dealDamage(null, dg, { amount: 1000, type: 'true', sourceless: true });
+  c.run(0.3);
+  near(battleProgress(c.b).degen, 1000, 'b.progress degen');
+  // without the tag: no link
+  const plain = new SharedBossPool(1e9, { risk: bossRiskConfig({ ccDelegation: 0 }) });
+  assert.equal(plain.riskView(), null);
 });
