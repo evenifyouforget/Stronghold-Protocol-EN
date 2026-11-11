@@ -2025,7 +2025,9 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
     chosen, plans, inputs, cap: ticks, limits, stats: null, best: plans[0], done: false, pending: false,
     run(budgetMs = Infinity, control = null) {
       if (job.done) return true;
-      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, limits || {});
+      // (fork research) PREP_TIEBREAK's per-candidate prep-time stacks (arrangeSteps sets plan.prepGain)
+      const bonus = plans.some((p) => p?.prepGain > 0) ? plans.map((p) => p?.prepGain || 0) : null;
+      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, { ...(limits || {}), bonus });
       // A test replay (`control.replaying`) stops on the journalled step count, not the wall clock.
       const replaying = !!(control && control.replaying);
       const timed = !replaying && Number.isFinite(budgetMs);
@@ -3190,6 +3192,7 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
       more += fresh.length;
     }
   }
+  if (PREP_TIEBREAK > 0 && plans.length > 1) for (const pl of plans) pl.prepGain = PREP_TIEBREAK * prepPositionGain(m, ps, rehChosen, pl, ctx);
   if ((defer || adaptive) && plans.length > 1) {
     const limits = adaptive ? { stage: 3, tickBudget: 6 * (!m.wave && bossWaveOf(m, ps) ? faRehearsalTicks(m) : rehearsalCap(m.wave?.timeLimit)) } : null;
     const job = yield* createRehearsalSteps(m, ps, rehChosen, plans,
@@ -3208,7 +3211,15 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
 /** [ASSUMED] §37.37: a free operator each prep (歌蕾蒂娅 / 余 with 3 in their row), in layers of the focus bond. */
 const GIFT_VALUE = 12;
 /** [ASSUMED] §37.37: the share of the default plan's layout value a positional placement may give up. */
-const POSITION_TOLERANCE = 0.03;
+let POSITION_TOLERANCE = 0.03;
+/**
+ * (fork research, fish-edition/ai-players/09) The rehearsal breaks a leak and leader-damage tie by the stacks the battle
+ * gained, but prep-time positional stacks (空弦 at prep start, 断崖 at prep end …) happen outside the battle, so a candidate
+ * that kills one more enemy beats the positional one. With PREP_TIEBREAK > 0 each candidate's prep-time positional value
+ * (prepPositionGain, in focus-bond stacks) × PREP_TIEBREAK joins that tie-break. 0 (legacy): off. Only a rehearsal run on
+ * this thread reads it (not a delegated or pooled one).
+ */
+let PREP_TIEBREAK = 0;
 
 const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
 
@@ -3575,6 +3586,27 @@ export function* devourFeedSteps(m, ps, pieces, plans, ctx) {
     out = distinctPlans([...out, fed]);
   }
   return out;
+}
+
+/**
+ * (fork research, PREP_TIEBREAK) The prep-time part of a plan's positional value: the traits that run at prep start or end
+ * (not in the battle, which the rehearsal measures itself), weighted as positionPlanSteps weighs them.
+ */
+function prepPositionGain(m, ps, pieces, plan, ctx) {
+  const pgd = ps.gd || m.gd;
+  const chess = pieces.filter((p) => p.kind === 'chess' && plan.has(p.uid));
+  const board = new Map(chess.map((p, i) => [`x${i}`, p]));
+  const inSet = new Set(chess.map((p) => p.uid));
+  const bonds = computeBonds(pgd, { board, hand: ps.hand.filter((p) => p && !inSet.has(p.uid)), layers: ps.layers, bondCountBonus: ps.bondCountBonus });
+  const W = (b) => (!bonds[b]?.active ? 0 : b === ctx.focus ? 1 : pgd.bond(b)?.isCore ? 0.5 : 0.3);
+  const view = planView(plan, chess);
+  const final = !m.wave && m.round === m.gd.bossRound;
+  let v = 0;
+  for (const [uid, key] of view.keyOf) {
+    const p = view.byUid.get(uid);
+    for (const t of positionTraitsOf(m, ps, chessRec(m, p.id, ps))) if (t.on !== 'IN_BATTLE') v += positionTraitValue(m, ps, view, W, p, key, view.dirOf.get(uid), t, final);
+  }
+  return v;
 }
 
 /** §37.37 Σ positional trait value of a plan (`dm`: devourModel). */
@@ -4682,12 +4714,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the

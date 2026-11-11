@@ -136,12 +136,16 @@ export const LEGACY_ARRANGE = defineTactic({
     roadPenalty: num(0, 1, L.LAYOUT_PARAMS.roadPenalty),
     spread: int(1, 99, L.LAYOUT_PARAMS.spread),
     faLineups: int(0, 4, L.FA_LINEUPS),
+    posTolerance: num(0, 1, L.POSITION_TOLERANCE),
+    prepTiebreak: num(0, 10, L.PREP_TIEBREAK),
   },
   at: pass('arrangeSteps', true),
   tunables: (p) => ({
     LAYOUT_PARAMS: Object.freeze({ ...L.LAYOUT_PARAMS, hold: p.hold, kill: p.kill, secondHold: p.secondHold,
       healHold: p.healHold, roadPenalty: p.roadPenalty, spread: p.spread }),
     FA_LINEUPS: p.faLineups,
+    POSITION_TOLERANCE: p.posTolerance,
+    PREP_TIEBREAK: p.prepTiebreak,
   }),
 });
 

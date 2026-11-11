@@ -41,9 +41,13 @@ export function rehearsalLeaks(battle, playerId) {
  * A boss field ranks leader damage less a leak's cost first (§37.61, FA_LEAK_SECONDS).
  */
 export class RehearsalScore {
-  /** @param {string} playerId whose leaks and kills the candidates are compared by */
-  constructor(playerId) {
+  /**
+   * @param {string} playerId whose leaks and kills the candidates are compared by
+   * @param {number[] | null} [bonus] (fork research) stacks per candidate added to the battle's own in the tie-break
+   */
+  constructor(playerId, bonus = null) {
     this.playerId = playerId;
+    this.bonus = bonus;
     this.index = 0;
     this.leaks = Infinity;
     this.boss = -Infinity;
@@ -78,7 +82,7 @@ export class RehearsalScore {
     const boss = Math.max(0, Number(pp.bossDamage) || 0);
     const score = -leaks * 1000 + (pp.killed || 0) - candidateIndex * 0.01;
     // §37.37: the layers the battle gained (its 特质 and bonds, `layerGains`) break a leak and leader-damage tie
-    const gain = Object.values(pp.layerGains || {}).reduce((s, n) => s + (Number(n) || 0), 0);
+    const gain = Object.values(pp.layerGains || {}).reduce((s, n) => s + (Number(n) || 0), 0) + (Number(this.bonus?.[candidateIndex]) || 0);
     if (bossField(battle) && this.leaks < Infinity && (boss > 0 || this.boss > 0)) {
       const value = boss * Math.max(0, 1 - leaks / FA_LEAK_SECONDS), best = this.boss * Math.max(0, 1 - this.leaks / FA_LEAK_SECONDS);
       if (Math.abs(value - best) > 1e-6) {
@@ -124,9 +128,9 @@ export class RehearsalRun {
    *   never scored, never picked
    * @param {string} playerId whose leaks and kills the candidates are compared by
    * @param {number} cap ticks per candidate ({@link rehearsalCap})
-   * @param {{ onError?: (e: Error, index: number) => void, stage?: number, tickBudget?: number }} [opts] a factory that throws is reported and skipped
+   * @param {{ onError?: (e: Error, index: number) => void, stage?: number, tickBudget?: number, bonus?: number[] | null }} [opts] a factory that throws is reported and skipped; `bonus`: RehearsalScore's per-candidate stacks
    */
-  constructor(candidates, playerId, cap, { onError = null, stage = 0, tickBudget = 0 } = {}) {
+  constructor(candidates, playerId, cap, { onError = null, stage = 0, tickBudget = 0, bonus = null } = {}) {
     this.candidates = candidates;
     this.cap = cap;
     if (!Number.isInteger(stage) || stage < 0 || stage > 8
@@ -137,7 +141,7 @@ export class RehearsalRun {
     this.completed = 0;
     this.zeroComplete = false;
     this.stopReason = null;
-    this.score = new RehearsalScore(playerId);
+    this.score = new RehearsalScore(playerId, bonus);
     this.onError = onError;
     this.index = 0;
     this.ticks = 0;

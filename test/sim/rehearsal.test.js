@@ -115,3 +115,17 @@ test('a candidate the slice never steps cannot run the whole list past the calle
   assert.deepEqual(errors, [1]);
   assert.equal(unbuilt.score.index, 2);
 });
+
+test('(fork research) a candidate bonus (PREP_TIEBREAK\'s prep-time stacks) beats more kills, never fewer leaks', async () => {
+  const { RehearsalScore } = await import('../../server/sim/rehearsal.js');
+  const fake = (leaks, killed) => ({ kind: 'normal', result: () => ({ perPlayer: { P: { leaked: Array.from({ length: leaks }, () => ({})), killed, layerGains: {} } } }) });
+  const plain = new RehearsalScore('P');
+  plain.note(fake(0, 10), 0); plain.note(fake(0, 11), 1);
+  assert.equal(plain.index, 1, 'without a bonus: more kills win');
+  const bonus = new RehearsalScore('P', [6, 0]);
+  bonus.note(fake(0, 10), 0); bonus.note(fake(0, 11), 1);
+  assert.equal(bonus.index, 0, 'the bonus breaks the tie before kills');
+  const leak = new RehearsalScore('P', [6, 0, 0]);
+  leak.note(fake(1, 10), 0); leak.note(fake(0, 5), 1);
+  assert.equal(leak.index, 1, 'a leak still decides first');
+});
