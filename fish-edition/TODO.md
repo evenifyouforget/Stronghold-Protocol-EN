@@ -107,6 +107,29 @@ We should also look at any other resources that human players have access to but
 - [ ] Add tactics that equip custom operators
 - [ ] See if there are other actions/information that humans could use, and try writing tactics that use them
 
+Long-term goals:
+
+- [ ] Be able to generate high stack counts. Why do the bots suck so much at generating 200+ stacks???
+  Answer so far (`ai-players/08`): humans buy 2.3× and sell 3.5× as many operators, and equip 8× as many items; the
+  gap opens from round 7. Tactics to try are listed there.
+- [ ] Be able to play Investor. Just my intuition, but this seems like the strategy the bots are least capable of doing. Studying human games may be enlightening.
+  Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
+  never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`); a grid is queued.
+
+Small tweaks may be possible:
+
+- [ ] Tactics that make better use of specific Operators
+
+Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
+
+- [ ] Laterano specific: put Mostima next to an ammo user
+- [ ] Kjerag specific: maximize overlap between freeze area and "on freeze, + stack" range
+- [ ] Kjerag specific: do not have a tile in front (earlier in path) that can be frozen but doesn't generate stacks
+- [ ] Put Civilight behind a stack generating Operator
+- [ ] Aegir specific: build a snake with the dps operator at the back
+- [ ] Aegir specific: can use a non-Aegir dps operator if they are given damazti isomorph + aegir equipment
+- [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile)
+
 ## Mod Z
 
 Designs in `operator-mod-z/` (Fish's, uncommitted). Mod Z is new gameplay, so it may not fit the freeze: Fish's call.
@@ -150,22 +173,22 @@ Every open issue and PR on the fork that isn't a bug (bugs are allowed: "Bugs" a
 (done despite the freeze) or **no** (not doing: close, or label and leave). Sizes are my guesses. Closed on
 2026-11-12: #33, #34 (no), #36, #52, #71, #72 (answered).
 
-|               | What                                                   | Kind           | Size         | Note                                                                                                                                        | Fish |
-| ------------- | ------------------------------------------------------ | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
-| #131          | promoted operators ignore the 300k damage cap          | gameplay       | small        | Fish and Halley want it as a feature; could go into the balance patch                                                                       | ok   |
-| #132          | popup with the operator copies left in the shared deck | UI             | medium       | shows what only the bots' pool stats see today                                                                                              | ok   |
-| #133          | cheat: Transmitter+                                    | cheat          | medium       |                                                                                                                                             | ok   |
-| #134          | cheat: Damazti Isomorph+ (more item → Alliance pairs)  | cheat          | medium       | Claude's draft of the pairs is on the issue, for Fish to correct                                                                                                                  | ok   |
-| #125          | lobby option to award free tags automatically          | SPA-CC feature | small–medium | you should also sanity check the definitions yourself to make sure the free award condition actually guarantees it would make no difference | ok   |
-| #128          | bots equip custom operators                            | bot research   | medium       | also in Fish's bot list above; 4 of 15 human Du Yaoye seats used one (05)                                                                   | ok   |
-| #124          | how strong each bot is                                 | bot research   | small        | botbench runs exist (05, 07); needs a write-up                                                                                              | ok   |
-| #117          | rehearsals: bonus for clearing a round quickly         | bot feature    | small        |                                                                                                                                             | ok   |
-| #87           | show AI players' personality                           | UI             | small        |                                                                                                                                             | ok   |
-| #118          | public username in the profile, in match records       | feature        | medium       | explicitly opt-in (Fish; noted on the issue) | ok   |
-| #105          | pull down the improv overlay to see boards             | UI             | medium       |                                                                                                                                             | ok   |
-| #104          | replays rich enough to continue a match mid-way        | feature        | large        |                                                                                                                                             | ok   |
-| #93, #121     | SPA-CC balance reporting; clears (tracking)            | tracking       |              | keep while SPA-CC is live?                                                                                                                  | ok   |
-| #135          | DYYBot draft + research tactics (draft PR)             | bots           |              | allowed (DYYBot line)                                                                                                                       | ok   |
+|           | What                                                   | Kind           | Size         | Note                                                                                                                                        | Fish |
+| --------- | ------------------------------------------------------ | -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| #131      | promoted operators ignore the 300k damage cap          | gameplay       | small        | Fish and Halley want it as a feature; could go into the balance patch                                                                       | ok   |
+| #132      | popup with the operator copies left in the shared deck | UI             | medium       | shows what only the bots' pool stats see today                                                                                              | ok   |
+| #133      | cheat: Transmitter+                                    | cheat          | medium       |                                                                                                                                             | ok   |
+| #134      | cheat: Damazti Isomorph+ (more item → Alliance pairs)  | cheat          | medium       | Claude's draft of the pairs is on the issue, for Fish to correct                                                                            | ok   |
+| #125      | lobby option to award free tags automatically          | SPA-CC feature | small–medium | you should also sanity check the definitions yourself to make sure the free award condition actually guarantees it would make no difference | ok   |
+| #128      | bots equip custom operators                            | bot research   | medium       | also in Fish's bot list above; 4 of 15 human Du Yaoye seats used one (05)                                                                   | ok   |
+| #124      | how strong each bot is                                 | bot research   | small        | botbench runs exist (05, 07); needs a write-up                                                                                              | ok   |
+| #117      | rehearsals: bonus for clearing a round quickly         | bot feature    | small        |                                                                                                                                             | ok   |
+| #87       | show AI players' personality                           | UI             | small        |                                                                                                                                             | ok   |
+| #118      | public username in the profile, in match records       | feature        | medium       | explicitly opt-in (Fish; noted on the issue)                                                                                                | ok   |
+| #105      | pull down the improv overlay to see boards             | UI             | medium       |                                                                                                                                             | ok   |
+| #104      | replays rich enough to continue a match mid-way        | feature        | large        |                                                                                                                                             | ok   |
+| #93, #121 | SPA-CC balance reporting; clears (tracking)            | tracking       |              | keep while SPA-CC is live?                                                                                                                  | ok   |
+| #135      | DYYBot draft + research tactics (draft PR)             | bots           |              | allowed (DYYBot line)                                                                                                                       | ok   |
 
 ## Needs Fish
 

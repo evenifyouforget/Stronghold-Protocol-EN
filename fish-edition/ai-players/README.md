@@ -13,6 +13,7 @@ out of the former `fish-edition/ai-players.md` (2026-11-07), keeping its order. 
 | [05-dyybot.md](05-dyybot.md) | DYYBot: Fish's tactics for a strong Du Yaoye bot, and whether the new bot framework makes them redundant |
 | [06-fang-russell-4man.md](06-fang-russell-4man.md) | Fang and Russell, team-play tactics, and why evolution needs 4-player lobbies |
 | [07-research-tactics-evolution.md](07-research-tactics-evolution.md) | Nine research tactics, whether tactics need a data sharing model, and the evolution bench's first runs |
+| [08-stacks-and-investor.md](08-stacks-and-investor.md) | Why bots fall behind on stacks (humans cycle operators and equip items) and never play Investor; the `plan-bond` tactic |
 
 **Research order (Fish, 2026-11-05):**
 1. Get everything out of the measurements first: predictive models and carry rank.
