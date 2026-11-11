@@ -7,6 +7,14 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### Effects that stay after a skill ends
+
+- Pramanix the Prerita's idle glow now goes away while any of her skills is on and comes back when it ends, as in the official game. Before, it stayed on through her skills.
+- Nasti's S1 glow is now the other way round from before: it shows while S1 is off (from deployment) and disappears while S1 is on. Before, it only showed during S1.
+- Gavial the Invincible's S3 now leaves its bleed effect on her for 20 seconds after the skill ends (the skill's own final duration). Before, it never showed.
+- Their outfits use their own versions of these effects.
+- The effect extractor now records the duration of a buff that a skill creates, not only its parent's, so effects like these play for the official time.
+
 ### Every skill plays its own official sounds
 
 - Skills now play their own sounds from the official audio data for every operator, not just a few picked by hand. Before, 72 skills on 66 operators made no sound of their own (Texas S2 Sword Rain, Ifrit S2, Ch'en S1, Mudrock S2 …). Now 71 of them do, and 91 of the 122 skills that were missing some of their sounds have more of them.
