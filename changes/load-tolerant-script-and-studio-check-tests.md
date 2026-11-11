@@ -9,3 +9,5 @@
 - The studio takes an optional `checkMs` (the checker's time budget for saves and checks, default the server's 20 s).
   The third presentation review tests set it to the studio tests' 180 s guard (`STUDIO_TRIAL_MS`). Before, a save runs
   two checks of 20 s each, and on a busy machine it answered 504 instead of the finding being tested.
+
+Server cost: unmeasured (pre-rule)

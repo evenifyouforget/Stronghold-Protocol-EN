@@ -23,3 +23,5 @@ Many skills hit or heal again and again over time: a poison cloud, a heal rain, 
 | Тоска (CN) | S3 | The start effect on the ally that receives the S3 effect |
 
 - 7 new sound files (87 KB) for the server and the preload zip.
+
+Server cost: unmeasured (pre-rule)

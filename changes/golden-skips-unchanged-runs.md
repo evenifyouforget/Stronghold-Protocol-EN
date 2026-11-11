@@ -9,3 +9,5 @@
 - New `npm run golden:fast` runs only the quick subset, for branch checks; the whole corpus stays the check at merge.
 - Golden never uses more than 4 worker threads, even when asked for more, so a run never loads every core of the PC.
 - Before: `--jobs` took any number.
+
+Server cost: none (pre-rule)
