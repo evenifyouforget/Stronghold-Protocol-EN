@@ -409,13 +409,19 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
 /** Boss-field column that splits the left (L) and the right (R) player's half (the goals are at cols 2–3 / 17). */
 const BOSS_MID_COL = 10;
 
+/** A leader's own route: it stands where it spawned (a `wait` of STAND_WAIT_S or more, e.g. the Hidden Core's 500 s). */
+const STAND_WAIT_S = 60;
+const standsStill = (r) => Array.isArray(r.steps) && r.steps.some((x) => x && x.t === 'wait' && Number(x.s) >= STAND_WAIT_S);
+
 /**
  * The first route of the requested motion whose first move goes to the left half of a boss field (the left portal,
  * then — its end — the right one; pair templates have them, e.g. act1autochess_h07_04 routes 2 / 3 / 5), else the first
- * route of that motion ending on the left (a one-player `_s` field: every route is the left one), else −1.
+ * route of that motion ending on the left (a one-player `_s` field: every route is the left one), else −1. Never a
+ * leader's standing route: the Hidden Core's route 0 waits 500 s where the leader stands, and a sub-wave there never
+ * walked (a Delegation Degenbrecher on it held the pool under United 2 until the overtime; 0.3.3 match records).
  */
 export function leftFirstRoute(routes, fly) {
-  const ok = (r) => r && (fly ? r.motion === 'FLY' : r.motion !== 'FLY' && r.motion !== 'E_NUM');
+  const ok = (r) => r && (fly ? r.motion === 'FLY' : r.motion !== 'FLY' && r.motion !== 'E_NUM') && !standsStill(r);
   const firstMove = (r) => (Array.isArray(r.steps) ? r.steps.find((x) => x && x.t === 'move' && Array.isArray(x.p)) : null);
   const i = (routes || []).findIndex((r) => ok(r) && firstMove(r) && firstMove(r).p[1] < BOSS_MID_COL && Array.isArray(r.end) && r.end[1] > BOSS_MID_COL);
   if (i >= 0) return i;
