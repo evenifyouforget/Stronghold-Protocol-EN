@@ -28,8 +28,8 @@ SPA-CC final balance update (#31, #92)
          └─ Fish decides the values (+ pro player / community feedback, eos-notes)
               └─ spacc/working-spec.md, full test suite, PR into main
 
-Evolution bench ............................ built (tools/evolve.mjs, feature/bot-tactics-research)
-  run 3 (paired, resampled) ............... running; runs 1–2: no real gain (ai-players/07)
+Evolution bench ............................ built and effective (tools/evolve.mjs; ai-players/07)
+  first tactics: no real gain over legacy; bigger tactics needed (DYYBot, team play)
   ├─ bot research: "try it in the evolution bench"
   ├─ DYYBot step 5 (05-dyybot.md "Process")
   └─ Mod Z: "try the evolution bench", then the report
@@ -76,7 +76,8 @@ browser-safe, deterministic and cheap: Yuri is moving bots to the browser.
 - **#129 `legacy-layered`:** the tuning run of its 35 parameters (botbench `--profile`, small saved chunks,
   held-back seeds) has not been started.
 - **Research tactics and the evolution bench:** `ai-players/07`. Branch `feature/bot-tactics-research` (pushed, no
-  PR). Run 3 is running; a 4-player run (`ai-players/06`) and `--pool legacy` (#129's tuning) come after it.
+  PR). Next: bigger tactics (DYYBot), a 4-player run (`ai-players/06`), `--pool legacy` (#129's tuning).
+  Whether to PR the bench into main is Fish's call (bench-only code, no bot behaviour change).
 
 Fish's bot research list (2026-11-11):
 
@@ -86,10 +87,10 @@ Fish's bot research list (2026-11-11):
 - - [x] New tactics that could supplement existing tactics
 - [x] Determine if any data sharing model is needed, other than actions. Yes, at the boundary to legacy
       (`ai-players/07`). (ex. if board placement step needs to know who the carry is, this may force the tactic to be monolithic and unable to be broken up, unless every tactic replicates that carry dps logic OR a new form of data sharing is introduced)
-- [ ] Try it in the evolutionary auto-tuning bench (runs 1–2 found nothing that holds up; run 3 running: `ai-players/07`)
-- - [ ] Answer: Did the most fit strategy win significantly more?
-- - [ ] Answer: Did the most fit strategy actually make use of evolution, or was it reachable with only parameter tuning?
-- - [ ] Answer: Is the evolution bench effective? If not, can we improve it to make it effective?
+- [x] Try it in the evolutionary auto-tuning bench (3 runs and a confirmation: `ai-players/07` "Answers")
+- - [x] Answer: Did the most fit strategy win significantly more? No: at most +2–3 points, not significant on 600 seeds.
+- - [x] Answer: Did the most fit strategy actually make use of evolution, or was it reachable with only parameter tuning? Neither helped.
+- - [x] Answer: Is the evolution bench effective? If not, can we improve it to make it effective? Now it is (resampled, paired); the tactics are too small.
 
 Bot issues still open:
 - answered in `ai-players/`, could be closed: #36, #71, #72;

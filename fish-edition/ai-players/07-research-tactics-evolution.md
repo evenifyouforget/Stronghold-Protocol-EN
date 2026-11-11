@@ -105,7 +105,47 @@ survives. The held-back seeds move to 1001–1060.
   - Both are fixed. Fitness is now paired: each match's score minus legacy's on the same seed. The holdout takes the
     final generation's top three.
 
-Run 3 (`untracked/evolve-2026-11/solo-abyss-paired/`) is run 2 with both fixes. Its result goes here.
+### Run 3: paired fitness (run 2 with both fixes)
+
+| | Training (240 fresh seeds) | Held back (1001–1060) |
+|---|---|---|
+| legacy | 92/240 | 24/60 |
+| `sell-singles` (defaults) | 106/240 (+37 / −23) | 26/60 (+11 / −9) |
+| `sell-singles > bounty-gate` | 56/120 (+17 / −12) | 22/60 (+9 / −11) |
+| `bounty-gate > bounty-optimism > early-roll > sell-singles` | 107/240 (+44 / −29) | 17/60 (+7 / −14) |
+
+Every combination did worse on held-back seeds than `sell-singles` alone.
+
+### Confirmation: `sell-singles` against legacy on 300 untouched seeds (2001–2300)
+
+| | Wins | Flips vs legacy | Sign test |
+|---|---|---|---|
+| legacy | 113/300 | | |
+| `sell-singles` | 119/300 | +44 / −38 | p = 0.58 |
+| Pooled with run 3 (600 seeds) | | +92 / −70 | p ≈ 0.10 |
+
+The paired score difference is +0.024 ± 0.034 (SE). No errors on either side. Data: `untracked/evolve-2026-11/confirm/`.
+
+### Answers (2026-11-11)
+
+- **Did the most fit strategy win significantly more?** No. The best, `sell-singles`, is at most 2–3 points of win rate
+  above legacy, and 600 seeds can't tell that from zero.
+- **Did it make use of evolution, or was it reachable with only parameter tuning?** Neither helped. No combination
+  beat its best single tactic on new seeds, and `sell-singles` does best with its default parameters.
+- **Is the evolution bench effective? If not, can we improve it?** The first version wasn't: it overfit its fixed
+  seeds. Three changes made it effective, in the sense that lucky candidates now fade instead of winning:
+  - `--resample`: fresh seeds each generation;
+  - fitness paired against legacy on the same seeds;
+  - the holdout check takes the final ranking.
+
+  What it can find is limited by the tactics. Today's legacy is strong (#108), and small rules like these move its win
+  rate by a few points at most, which takes several hundred paired matches to see.
+
+**What this means for the next tactics:**
+- They need to be bigger ideas, like DYYBot's Du Yaoye lines (05) or the team play of 06.
+- `bountyKillChance`-style hooks into legacy's internals (the data sharing section above) would let tactics change
+  more than their own decision point.
+- Boss damage per match is a finer fitness than win / loss, and would need fewer seeds.
 
 ### Further options, if run 2 is still noise
 
