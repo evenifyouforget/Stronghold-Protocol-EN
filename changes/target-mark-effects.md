@@ -28,3 +28,5 @@
 | Mon3tr | S3: the glow as she moves to the Reconstruction and back |
 | Raidian, Ling, Stainless, Magallan, Jessica the Liberated | The skill's glow on their summons while it runs |
 | Тоска, Angelina the Mellow Wish (not on EN yet) | S1 glow on the ally; S3 weapon glow and range ring |
+
+Server cost: unmeasured (pre-rule)

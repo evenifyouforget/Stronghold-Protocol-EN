@@ -6,3 +6,5 @@
   takes `--write`, which runs only on dev-0.2 with `changes/` and this file committed.
 - `--help` and any unknown option print the usage and change nothing. Before, `--help` folded and deleted every
   fragment.
+
+Server cost: none (pre-rule)
