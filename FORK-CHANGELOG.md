@@ -14,6 +14,15 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 - From the next round on, nothing of theirs runs any more: no AI board, no prep, no battles, on any player's browser or on the server.
 - The Grand Alliance idle warning now says the next idle round removes the player and eliminates them, instead of saying the AI takes over their board (all languages).
 
+### Blaze the Igniting Spark looks and sounds complete
+
+- Her S1 now shows its red smoke ring around the operator it picks, for the skill's 20 seconds.
+- Her S2 leaves burning ground on every tile it strikes, until the skill ends.
+- The fire ring of her talent From the Ashes no longer burns at her feet all fight. It now appears only while she is downed, and she kneels inside it as in the official game. Standing back up plays the official burst.
+- Her outfits use their own versions of all these effects.
+- New sounds: her S3's ability end (alongside its closing sound), going down, standing back up, and her Meltdown talent's Burn burst.
+- A skill can now play several official sounds when it starts or ends, not just one.
+
 ## 2026-11-10
 
 ### Operators attack as in the official game: the swing starts, then the hit lands
