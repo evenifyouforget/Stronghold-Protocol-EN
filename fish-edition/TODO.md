@@ -110,8 +110,9 @@ We should also look at any other resources that human players have access to but
 Long-term goals:
 
 - [ ] Be able to generate high stack counts. Why do the bots suck so much at generating 200+ stacks???
-  Answer so far (`ai-players/08`): humans buy 2.3× and sell 3.5× as many operators, and equip 8× as many items; the
-  gap opens from round 7. Tactics to try are listed there.
+  Answer so far (`ai-players/08`): the gap opens from round 7. Most of it is prep-time stack operators the bots rarely
+  deploy (空弦, 断崖: 7× and 19× less often) and consumables they never buy, not cycling. Tactics `plan-engines` and
+  `plan-items` are queued.
 - [ ] Be able to play Investor. Just my intuition, but this seems like the strategy the bots are least capable of doing. Studying human games may be enlightening.
   Confirmed (`ai-players/08`): Investor is active in 30 of 62 human seats and 1 of 111 bot seats; 67 bot seats
   never hold an Investor operator. First tactic `plan-bond` (branch `feature/bot-plan-tactics`); a grid is queued.
@@ -121,6 +122,7 @@ Small tweaks may be possible:
 - [ ] Tactics that make better use of specific Operators
 
 Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
+  How it works, and each idea against legacy and the records: `ai-players/09`.
 
 - [ ] Laterano specific: put Mostima next to an ammo user
 - [ ] Kjerag specific: maximize overlap between freeze area and "on freeze, + stack" range
