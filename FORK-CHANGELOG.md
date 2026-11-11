@@ -7,6 +7,15 @@ own changes aren't repeated here; each upstream merge links the upstream commit 
 
 ## 2026-11-11
 
+### Lemuen's skills show every official effect
+
+A full check of Lemuen's effects against the game client found four pieces we never drew:
+
+- **S3 aim beams.** Each S3 lock now drops a beam onto the locked enemy (`lemuen_skill_03_trail_01`), gold in Requiem Vesperis. The beams stack, one per lock, and each stays until its shell lands, as in the official game.
+- **S2 aim reticle.** The aim line now also puts its reticle on the aimed enemy (`lemuen_skill_02_crosshair_01`, the line's own end effect), until her shot.
+- **Talent 2 (Extradition Procedure).** When it activates, its loop (`lemuen_talent_buff_02`) now plays on her for the rest of her deployment, instead of a stand-in burst.
+- **Outfit effects inside effects.** Effects that an effect starts on its own now use the unit's outfit version. In Requiem Vesperis, Lemuen's S1 glow showed a default-look piece; other operators' outfits that work the same way are fixed too.
+
 ### A player who leaves is out for good, and the next round doesn't wait for them
 
 - Leaving a match now eliminates the player in every room type, Grand Alliance included. Before, a Grand Alliance player who left (or was removed for idling) stayed in the match and the AI played their board every round. This also applies when a dropped player doesn't come back before the rejoin window ends. During that window nothing changes: in a Grand Alliance room the AI still plays a dropped player's board until they come back.
