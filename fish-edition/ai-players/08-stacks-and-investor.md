@@ -71,9 +71,19 @@ round's gain is split into estimates:
 - **Not on every map:** a match bans about 22 operators per seed (`SharedPool.banned`); 空弦 and 断崖 were both out in
   seeds 1 and 3. The humans' matches ban too, so the comparison holds.
 
-**Items:** humans equip 18 in rounds 7–13 (31 over the match), bots 2.4 (4). Many are consumables that are themselves
-engines: Alliance Coin (Funds), Identification Device (+3 stacks), Simple Communicator / Dispatch Module (operators of
-the bearer's Alliances). Legacy mostly leaves them in the hand.
+**Items:** humans equip 18 in rounds 7–13 (31 over the match), bots 2.4 (4). The bots don't leave them in the hand:
+they never buy them. §37.39 stopped legacy buying shop equipment, except the elite items and, in solo, the dolls.
+Per seat, whole match (`items.mjs` → `untracked/dyy-2026-11/items.md`):
+
+| Item | Humans: obtained / equipped | Bots |
+|---|---|---|
+| 盟约之币 (1 fund, gives 1 fund back) | 6.3 / 4.3 | 0.6 / 0.5 |
+| 变形同构体 (Isomorph) | 1.6 / 3.7 | 0.2 / 0.2 |
+| 简易通讯机 (2: an operator of the bearer's Alliances) | 1.5 / 1.5 | 0.01 |
+| 见钱眼开玩偶 (1: +2 funds next round) | 1.4 / 1.4 | 0.01 |
+| 骑士储蓄罐 (3: 1–6 funds) | 1.3 / 1.3 | 0.01 |
+| 寻呼模块 (4: a free pick of 3 operators of the bearer's Alliances) | 1.0 / 1.0 | 0.02 |
+| 精打细算玩偶 (3: +1 fund every later round) | 0.5 / 0.5 | 0 |
 
 **Turnover still differs** (buys 68 against 30, sells 48 against 14 per match), but the split says it buys fewer
 stacks directly than it seemed. Its main effect is probably reaching the stackers and the merges sooner.
@@ -145,14 +155,27 @@ Like `plan-bond`, it changes data only.
 - match records with `eng-pos` on the legacy records' setup (seeds 1–30), for `stacks.mjs` and `stack-sources.mjs`;
 - botbench on queue2's seeds: `eng-pos` and `eng-pos-own`.
 
+## A third tactic: `plan-items` (the plan, plus one buy step)
+
+`plan-items` (same branch, f93e6db6) puts shop consumables into the plan's `items.buy` from a round on, up to the Final
+Assault prep:
+- `set`: `stack` (随身身份牌, 简易通讯机, 寻呼模块), `coin` (见钱眼开玩偶, 骑士储蓄罐, and 精打细算玩偶 while 5+ rounds remain), or
+  `both`;
+- `fromRound` (4) and `reserve` (0).
+
+The plan alone wasn't enough: in two solo test matches the shop showed 见钱眼开玩偶 in rounds 4–5 and 寻呼模块 in rounds
+8–10, and legacy's buy loop spent the funds on operators and refreshes first. So the tactic also buys the listed items
+the shop shows before legacy's loop starts; legacy equips them itself. 盟约之币 and Isomorph are left out: the coin is
+neutral, and Isomorph is DYYBot's step 3 (05).
+
+**Queued** (`untracked/queue5-2026-11-12.sh`, after queue4): botbench `items` and `items-eng` (with `plan-engines`) on
+queue2's seeds, then records of `items-eng` (seeds 1–30).
+
 ## Next tactics (not built)
 
-1. **Consumables:** equip Alliance Coin, Identification Device, Simple Communicator and Dispatch Module when they pay.
-   This needs the plan's `items` channel (`items.equip`), or the tactic acts directly. After the stackers, the
-   biggest measured gap (18 equips against 2.4 in rounds 7–13).
-2. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
+1. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
    level 5.
-3. **Cycling:** from round 7, buy the cheapest operator that feeds an active 获得时 or engine rule and sell it next
+2. **Cycling:** from round 7, buy the cheapest operator that feeds an active 获得时 or engine rule and sell it next
    prep. Lower priority after the split above. queue3's `trade1.5` (legacy's own trade at half the bar) tests the
    cheap version first.
 
