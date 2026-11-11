@@ -118,3 +118,28 @@ test("plan-items puts the shop consumables into legacy's items.buy before the Fi
   assert.equal(run(3, 'both').items, undefined, 'before fromRound');
   assert.equal(run(14, 'both').items, undefined, 'not in the Final Assault prep');
 });
+
+test("plan-iso lists 缪尔赛思 and the Isomorph from its shop level, then the bond items one Isomorph completes", async () => {
+  const { PLAN_ISO } = await import('../../server/match/botTacticsResearch.js');
+  const h = soloBot({ seed: 3 });
+  h.start();
+  const gd = h.m.gd;
+  const run = (level, { hand = [], chess = [] } = {}) => {
+    const ps = { isBot: true, autoplay: false, gd, _botSelf: { round: 9, plan: Object.freeze({ bonds: [] }) }, shop: { level },
+      hand, temp: [], allChess: () => chess };
+    PLAN_ISO.at.sellJunk({ match: { round: 9, gd }, player: ps, params: { fromLevel: 6, maxIso: 6, bondItems: true, reserve: 0 }, next: () => 'legacy' });
+    return ps._botSelf.plan;
+  };
+  assert.equal(run(5).buy, undefined, 'below fromLevel: untouched');
+  const p6 = run(6);
+  assert.deepEqual([p6.buy, p6.items.buy], [['chess_char_6_11_a'], ['chess_item_6_09_e_a']], 'no Isomorph yet: no bond items');
+  // one Isomorph held; one 突袭 (raid, first threshold 2) member owned → its bond item 突袭手雷 is wanted
+  const raidOp = Object.values(gd.raw.chess).find((c) => !c.isGolden && (c.bonds || []).includes('raidShip'));
+  const iso = { kind: 'item', uid: 50, id: 'chess_item_6_09_e_a' };
+  const p = run(6, { hand: [iso], chess: [{ uid: 1, id: raidOp.chessId }] });
+  const raidItem = Object.values(gd.shopItemsByTier).flat().find((id) => gd.item(id).giveBondId === 'raidShip' && !gd.item(id).isGolden);
+  assert.ok(p.items.buy.includes(raidItem), 'the raid bond item is listed');
+  assert.deepEqual(p.items.keep, ['chess_item_6_09_e_a']);
+  const full = run(6, { hand: Array.from({ length: 6 }, (_, i) => ({ ...iso, uid: 60 + i })) });
+  assert.deepEqual([full.buy, full.items.buy], [[], []], 'maxIso reached: 缪尔赛思 and the Isomorph no longer listed');
+});

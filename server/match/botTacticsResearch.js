@@ -319,6 +319,21 @@ export const PLAN_ENGINES = defineTactic({
   },
 });
 
+/** The plan's listed shop items (items.buy) the shop shows, bought before legacy's buy loop (above params.reserve). */
+function* listedItemsFirst(ctx) {
+  const { match: m, player: ps, params: p, args: [opts] } = ctx;
+  const want = ps._botSelf?.round === m.round ? ps._botSelf.plan?.items?.buy : null;
+  if (!opts?.fillOnly && want?.length && ps.isBot && !ps.autoplay) {
+    for (let guard = 0; guard < 4; guard++) {
+      const i = ps.shop.slots.findIndex((sl) => sl && !sl.sold && sl.kind === 'item' && want.includes(sl.id)
+        && ps.funds - ps.priceOf(sl) >= (p.reserve || 0));
+      if (i < 0 || freeSlot(ps.hand) < 0 || !ok(() => ps.buy(i))) break;
+      yield;
+    }
+  }
+  return yield* ctx.next();
+}
+
 /**
  * Writes legacy's own plan: from `fromRound` to the Final Assault prep, shop consumables into the plan's `items.buy`.
  * The tactic buys the listed items the shop shows before legacy's buy loop; legacy's own plan step (planSpendSteps) buys
@@ -360,21 +375,87 @@ export const PLAN_ITEMS = defineTactic({
     },
     // Legacy's buy loop spends on operators and refreshes before a listed item wins a step, so the shop's listed items
     // are bought first (above `reserve`, with a free hand slot); legacy's equipItems uses them later in the prep.
-    *buyLoopSteps(ctx) {
-      const { match: m, player: ps, params: p, args: [opts] } = ctx;
-      const want = ps._botSelf?.round === m.round ? ps._botSelf.plan?.items?.buy : null;
-      if (!opts?.fillOnly && want?.length && ps.isBot && !ps.autoplay) {
-        for (let guard = 0; guard < 4; guard++) {
-          const i = ps.shop.slots.findIndex((sl) => sl && !sl.sold && sl.kind === 'item' && want.includes(sl.id)
-            && ps.funds - ps.priceOf(sl) >= p.reserve);
-          if (i < 0 || freeSlot(ps.hand) < 0 || !ok(() => ps.buy(i))) break;
-          yield;
+    *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
+  },
+});
+
+/**
+ * The Isomorph engine (fish-edition/ai-players/05, DYYBot step 3; Fish's draft "Muelsyse/Damazti Isomorph" and "up to 5
+ * more Isomorph-compatible items"). Writes legacy's plan from shop level `fromLevel`, while fewer than `maxIso`
+ * 变形同构体 are owned (hand, temp hand, worn):
+ *   - buy: 缪尔赛思 (获得时: 1 变形同构体, 2 as an elite; Investor doubles it);
+ *   - items.buy: the 变形同构体 itself (a tier-6 shop item);
+ *   - items.buy (bondItems): the bond item of an Alliance one Isomorph can complete: first threshold ≤ 3 and the owned
+ *     members one short of it (Fish: "if the Alliance needs N members and there are at least N-1 …"), while fewer such
+ *     items are held loose than Isomorphs owned;
+ *   - items.keep: the Isomorphs and those bond items.
+ * Legacy equips them itself: morphPlan puts a 变形同构体 with a bond item on the lineup operator that gains most. The
+ * listed items the shop shows are bought before legacy's buy loop, and a merge reward offering 缪尔赛思 or a 变形同构体 is
+ * taken (takeOffers).
+ */
+const ISOMORPH = 'chess_item_6_09_e_a';
+const MUELSYSE = 'chess_char_6_11_a';
+export const PLAN_ISO = defineTactic({
+  id: 'plan-iso',
+  describe: "writes legacy's plan: 缪尔赛思, 变形同构体 and the bond items one Isomorph completes, from a shop level on",
+  params: {
+    fromLevel: int(1, 6, 6),
+    maxIso: int(1, 8, 6),
+    bondItems: { type: 'bool', default: true },
+    reserve: int(0, 30, 0),
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (ps.shop.level >= p.fromLevel && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
+        const worn = ps.allChess().flatMap((q) => q.items || []);
+        const isIso = (it) => !!gd.item(it.id)?.canGiveBond;
+        const isoOwned = loose.filter(isIso).length + worn.filter(isIso).length;
+        const plan = own?.plan || {};
+        const items = plan.items || {};
+        const buy = [], itemBuy = [], keep = [];
+        if (isoOwned < p.maxIso) { buy.push(MUELSYSE); itemBuy.push(ISOMORPH); }
+        for (const q of loose) if (isIso(q)) keep.push(q.id);
+        if (p.bondItems && isoOwned > 0) {
+          const counts = new Map();
+          for (const q of ps.allChess()) for (const b of new Set(gd.chess(q.id)?.bonds || [])) counts.set(b, (counts.get(b) || 0) + 1);
+          const looseBond = loose.filter((q) => gd.item(q.id)?.giveBondId && !isIso(q));
+          for (const q of looseBond) keep.push(q.id);
+          if (looseBond.length < isoOwned) {
+            for (const id of Object.values(gd.shopItemsByTier || {}).flat()) {
+              const rec = gd.item(id);
+              if (!rec || rec.isGolden || rec.canGiveBond || !rec.giveBondId) continue;
+              const th = gd.bond(rec.giveBondId)?.thresholds || [];
+              if (th[0] && th[0] <= 3 && (counts.get(rec.giveBondId) || 0) === th[0] - 1) itemBuy.push(id);
+            }
+          }
         }
+        const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, buy: merge(plan.buy, buy, 32),
+          items: Object.freeze({ ...items, buy: merge(items.buy, itemBuy, 8), keep: merge(items.keep, keep, 32) }) }) };
       }
-      return yield* ctx.next();
+      return ctx.next();
+    },
+    *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
+    // most human Isomorphs come from merge rewards (54 of 97 in the records; 缪尔赛思 56 of 76): a reward offering one
+    // is taken, at any level, while fewer than maxIso are owned (legacy's takeOffers picks the rest)
+    takeOffers(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const gd = gdOf(m, ps);
+      for (let guard = 0; guard < 4 && ps.isBot && !ps.autoplay && ps.offers?.length; guard++) {
+        const isoOwned = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
+          + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
+        const i = isoOwned >= p.maxIso ? -1 : ps.offers[0].slots.findIndex((sl) => sl && !sl.sold
+          && (sl.id === ISOMORPH || gd.baseIdOf(sl.id) === MUELSYSE));
+        if (i < 0 || freeSlot(ps.hand) < 0 || !ok(() => ps.pickReward(i))) break;
+      }
+      return ctx.next();
     },
   },
 });
 
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO]);
