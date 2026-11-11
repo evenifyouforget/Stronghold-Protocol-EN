@@ -184,6 +184,31 @@ test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5,
   try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
 });
 
+test('the sub-wave never takes a leader\'s standing route (the Hidden Core\'s 500 s wait): it walks in both final rounds', async () => {
+  const { buildBossWave, bountySpawns, leftFirstRoute } = await import('../../server/match/waves.js');
+  const stand = { motion: 'WALK', start: [3, 9], end: [2, 2], steps: [{ t: 'wait', s: 500 }] };
+  const walk = { motion: 'WALK', start: [2, 10], end: [1, 3], steps: [] };
+  assert.equal(leftFirstRoute([stand, walk], false), 1);
+  assert.equal(leftFirstRoute([stand], false), -1);
+  const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 1, ccVengeance: 1 } }).start();
+  try {
+    h.toPrep(2);
+    const m = h.m;
+    for (const round of [m.gd.bossRound, m.gd.hiddenRound].filter(Boolean)) {
+      const bossId = round === m.gd.hiddenRound ? m.hiddenBossId || m.bossId : m.bossId;
+      for (let i = 0; i < 6; i++) {
+        const wave = buildBossWave(m.gd, m.rngWaves, m.factions, round, { bossId, solo: true });
+        const specs = bountySpawns(m.gd, round, wave, m.bossSubWave(['p_0']).get('p_0'), 'p_0', { side: 'L' });
+        assert.ok(specs.length > 0);
+        for (const sp of specs) {
+          const r = wave.routes[sp.routeIndex];
+          assert.ok(!(r.steps || []).some((x) => x.t === 'wait' && x.s >= 60), `${wave.templateId} route ${sp.routeIndex} stands`);
+        }
+      }
+    }
+  } finally { h.m.dispose(); }
+});
+
 test('the sub-wave takes the left-first route of a pair field (left portal, then right), the left one of a one-player field', async () => {
   const { buildBossWave, bountySpawns, leftFirstRoute } = await import('../../server/match/waves.js');
   const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccDelegation: 1, ccPatriot: 3 } }).start();
