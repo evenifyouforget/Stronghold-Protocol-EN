@@ -109,9 +109,11 @@ export const LEGACY_LEVEL = defineTactic({
     level4From: int(0, 15, levelFrom(4)),
     level5From: int(0, 15, levelFrom(5)),
     maxLevel: int(2, 6, L.BOT_MAX_LEVEL),
+    // (fork research, ai-players/05 step 3) the round level 6 is first wanted; 16 (legacy): never. Needs maxLevel 6.
+    level6From: int(0, 16, 16),
   },
   at: pass('levelUp'),
-  tunables: (p) => ({ LEVEL_TARGET: levelTarget([p.level2From, p.level3From, p.level4From, p.level5From]), BOT_MAX_LEVEL: p.maxLevel }),
+  tunables: (p) => ({ LEVEL_TARGET: levelTarget([p.level2From, p.level3From, p.level4From, p.level5From, p.level6From]), BOT_MAX_LEVEL: p.maxLevel }),
 });
 
 export const LEGACY_SPEND = defineTactic({ id: 'legacy-spend', describe: "legacy's end-of-prep spending", at: pass('spendDown') });
