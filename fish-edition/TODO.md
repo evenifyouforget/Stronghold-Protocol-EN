@@ -92,9 +92,23 @@ Fish's bot research list (2026-11-11):
 - - [x] Answer: Is the evolution bench effective? If not, can we improve it to make it effective? Now it is (resampled, paired); the tactics are too small.
 
 Bot issues still open:
+
 - answered in `ai-players/`, could be closed: #36, #71, #72;
 - research: #29, #115, #124, #128;
 - features: #87, #117 (see "Needs Fish").
+
+- [ ] Break up legacy tactics to be less monolithic, so there are more opportunities to build on it.
+
+To make sure we are making use of the shared data:
+
+- [ ] For each variable in the internal state, add at least one tactic that writes it
+- [ ] For each variable in the internal state, add at least one tactic that reads it and does something with that information
+
+We should also look at any other resources that human players have access to but bots currently are not using.
+
+- [ ] Add tactics that equip alternate operator skills
+- [ ] Add tactics that equip custom operators
+- [ ] See if there are other actions/information that humans could use, and try writing tactics that use them
 
 ## Mod Z
 

@@ -143,3 +143,48 @@ node tools/botbench.mjs --configs solo:ABYSS --seeds 160 --seed 1 --jobs 4 --bot
 
 Data: `untracked/bench-2026-11-05/` (the nine `--json` runs and their tables).
 
+
+## Process step 1: human Du Yaoye games against the draft (2026-11-12)
+
+The draft tactics are on `feature/fish-dyy-profile` (`server/match/botTacticsDyy.js`):
+- `dyy-level`: a fixed levelling schedule;
+- `dyy-shop`: buy Yan and side-Alliance operators, sell Bench operators for them, hunt Yan with the 2 special refreshes;
+- `dyy-freeze`: freeze an unaffordable Yan operator.
+
+**Data.** The match records in `logs/` (182 matches, 2026-10-27 to 11-08) have 39 human Du Yaoye seats. 21 passed
+round 10. 6 of those played with cheats (booster packs, extra Funds, tier start), including all four solo Ultimate wins,
+so they don't compare with a bot. That leaves **15 seats**, all co-op, 9 of them won. Scripts and tables:
+`untracked/dyy-2026-11/` (`dyy-step1.mjs` per seat, `dyy-step1b.mjs` what each action is for).
+
+**What the draft explains, and what it doesn't** (the 15 seats pooled):
+
+| | Humans | The draft |
+|---|---|---|
+| Levelling | level 2 / 3 / 4 / 5 at rounds 2 / 4 / 6 / 10 (medians; level 5 at 6–14) | `fish` 2 / 4 / 5 / 7 is two rounds early for level 5; `human` (2 / 4 / 6 / 9) fits |
+| Operator buys | Yan 54 %, side Alliance 6 %, other 40 % | Yan yes; side Alliances are rare buys |
+| The 2 special refreshes | every round from round 2; 42 % are followed by a Yan buy | the hunt, but only with no Yan showing (humans: 59 %) |
+| Further refreshes (327) | almost none before round 9, then 37–72 per round over all 15 seats; 46 % lead to another refresh, 6 % to a Yan buy | **not covered** |
+| Sells (301 operators) | 76 % Bench; 41 % leave another copy; 31 % tier 1; next action: refresh 26 %, a Yan buy 23 %, another buy 37 % | sell-to-buy covers about a quarter; **sell-to-roll isn't covered** |
+| Board sells (24 %) | 82 % followed by a move onto the board: a swap | **not covered** (legacy's board) |
+| Freezes (84) | 56 % for an item, 32 % for a wanted Yan operator; 80 % end the prep | the Yan freeze only |
+| Equips | rise from round 9 with the roll-down. Top: 盟约之币 (+1 / 2 Funds when equipped) 65, 变形同构体 56, 简易通讯机 (1 / 2 operators of the bearer's Alliances) 23 | **not covered** (legacy's equips) |
+| DIY operators | 4 of 15 seats | not covered |
+
+**The shape of a human Du Yaoye game.** Two phases:
+1. **Rounds 2–8, economy.** Level on schedule, the 2 special refreshes each round, buy Yan, freeze (a Yan operator or an
+   item) at the end of the prep.
+2. **From round 9 (about when level 5 is reached), the roll-down.** Refresh many times per round, fund it by selling
+   duplicate and low-tier Bench operators and cashing 盟约之币, swap better operators onto the board, equip.
+
+The draft only models phase 1. To explain 90 %, the list needs (pseudocode, for step 3):
+- **dyy-rolldown:** from level 5 (or round 9): while funds > a reserve, refresh; buy merge copies, Yan operators and
+  carry upgrades; sell duplicates and tier-1 / tier-2 Bench operators when funds run out. Parameters: start round or
+  level, reserve, what is sellable.
+- **dyy-cash-coins:** equip 盟约之币 when the funds buy a refresh or a wanted operator (not on a board slot's item).
+- **dyy-comms:** 简易通讯机 on a Yan operator (it brings operators of the bearer's Alliances).
+- **dyy-freeze-items:** also freeze for a wanted item (Isomorph, 简易通讯机, cloning items) at the end of the prep.
+- **dyy-level:** default schedule `human`.
+- Board swaps and the side Alliances: legacy's are probably enough. Check after the above.
+
+Not covered yet: why 28 % of the special refreshes skip a wanted Yan operator. It's most likely funds, which the
+records don't log per action; a replay of the economy would tell.
