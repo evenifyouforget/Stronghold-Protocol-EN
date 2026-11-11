@@ -169,15 +169,5 @@ export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE]);
 /** Opt-in: Fish's Du Yaoye list, legacy below. Plays as legacy for every other Strategy. */
 export const DYY_PROFILES = Object.freeze([
   defineProfile({ id: 'fish-dyy', tactics: [DYY_SHOP, DYY_FREEZE, DYY_LEVEL] }),
-  // BENCH-MUTANTS
-  defineProfile({ id: 'dyy-m-level', tactics: [DYY_LEVEL] }),
-  defineProfile({ id: 'dyy-m-levelh', tactics: [{ tactic: DYY_LEVEL, params: { schedule: 'human' } }] }),
-  defineProfile({ id: 'dyy-m-shop', tactics: [DYY_SHOP] }),
-  defineProfile({ id: 'dyy-m-hunt', tactics: [{ tactic: DYY_SHOP, params: { side: false, sellToBuy: false } }] }),
-  defineProfile({ id: 'dyy-m-nosell', tactics: [{ tactic: DYY_SHOP, params: { sellToBuy: false } }, DYY_FREEZE] }),
-  defineProfile({ id: 'dyy-m-freeze', tactics: [DYY_FREEZE] }),
-  defineProfile({ id: 'dyy-m-noside', tactics: [{ tactic: DYY_SHOP, params: { side: false } }, DYY_FREEZE] }),
-  defineProfile({ id: 'dyy-m-all-h', tactics: [DYY_SHOP, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } }] }),
-  // END-BENCH-MUTANTS
 ]);
 
