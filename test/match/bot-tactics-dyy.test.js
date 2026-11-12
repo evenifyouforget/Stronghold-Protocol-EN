@@ -86,8 +86,10 @@ test('dyy-shop: buys an unowned Yan operator, hunts with at most the 2 special r
   } finally { m.dispose(); }
 });
 
-test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with it (one more Isomorph), levels to 6; stops at maxIso', () => {
+test('dyy-muelsyse scroll: keeps 缪尔赛思 while a 画卷 is held, copies her with it (one more Isomorph), levels to 6; stops at maxIso', () => {
   const { m, ps } = prep({ round: 9, funds: 60 });
+  const SP = { ...resolveParams(DYY_MUELSYSE), scroll: true };
+  const cx = () => ({ ...ctxOf(DYY_MUELSYSE, m, ps), params: SP });
   const gd = m.gd;
   const isos = () => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
     + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
@@ -101,25 +103,25 @@ test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with i
   // no clone item held or shown: nothing kept (keep: clone), no level 6
   for (const sl of ps.shop.slots) if (sl && sl.kind === 'item') sl.sold = true;
   const own0 = ps._botSelf;
-  DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
+  DYY_MUELSYSE.at.sellJunk(cx());
   assert.equal(ps.shop.level, 5, 'no 画卷: no level 6');
   assert.ok(!(ps._botSelf?.plan?.keep || []).includes('chess_char_6_11_a'), 'not kept without a clone');
   ps._botSelf = own0;
   assert.ok(ps.acquireItem('chess_item_6_02_m', { source: 'test', requirePool: false }));
-  DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
+  DYY_MUELSYSE.at.sellJunk(cx());
   assert.equal(ps.shop.level, 6, 'Fish\'s rule: level 6 with her and a 画卷');
   assert.ok(ps._botSelf.plan.keep.includes('chess_char_6_11_a'));
   assert.ok(ps._botSelf.plan.items.keep.includes('chess_item_6_02_m'));
   assert.ok(ps._botSelf.plan.items.buy.includes('chess_item_6_02_m'));
   assert.ok(ps._botSelf.plan.items.buy.length <= 8);
   const mu0 = mus();
-  DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
-  assert.ok(mus() > mu0 || isos() > iso0, `copied: ${mu0} → ${mus()} Muelsyse, ${iso0} → ${isos()} Isomorphs`);
+  DYY_MUELSYSE.at.equipItems(cx());
+  assert.equal(mus(), mu0, 'the copy is sold at once (holder): one Muelsyse stays');
   assert.ok(isos() > iso0, 'the copy brought an Isomorph');
   assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.id === 'chess_item_6_02_m').length, 0, 'the 画卷 is used');
   checkInvariants(m);
   // at maxIso: passes everything to legacy
-  const p1 = { ...resolveParams(DYY_MUELSYSE), maxIso: isos() };
+  const p1 = { ...SP, maxIso: isos() };
   ps._botSelf = null;
   DYY_MUELSYSE.at.sellJunk({ ...ctxOf(DYY_MUELSYSE, m, ps), params: p1 });
   assert.equal(ps._botSelf, null, 'at maxIso: no plan written');
@@ -192,4 +194,27 @@ test('iso-not-muelsyse: legacy equips a loose Isomorph anywhere but on 缪尔赛
     assert.ok([...ps.hand, ...ps.temp].some((q) => q?.id === 'chess_item_6_09_e_a'), 'it waits in the hand');
     checkInvariants(m);
   } finally { m.dispose(); }
+});
+
+test('dyy-muelsyse: no 画卷 by default (left to legacy); the packaging cycle buys and sells cheap operators while 商业包装方案 is on her', () => {
+  const { m, ps } = prep({ round: 12, funds: 20 });
+  const shop0 = ps.shop.slots;
+  ps.shop.slots = [];
+  const gd = m.gd;
+  assert.ok(ps.acquireChess('chess_char_6_11_a', { source: 'test' }));
+  assert.ok(ps.acquireItem('chess_item_6_02_m', { source: 'test', requirePool: false }));
+  DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.ok(!ps._botSelf.plan.items.keep.includes('chess_item_6_02_m'), '画卷 not kept from legacy');
+  DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.id === 'chess_item_6_02_m').length, 1, 'not used on her');
+  const mu = ps.allChess().find((q) => gd.baseIdOf(q.id) === 'chess_char_6_11_a');
+  const pack = ps.acquireItem('chess_item_5_07_e_a', { source: 'test', requirePool: false });
+  assert.ok(pack && ps.equip(pack.uid, mu.uid).ok, 'the packaging plan on her');
+  const cheap = 'chess_char_1_03_a'; // tier 1: price 2, sells for 1
+  ps.shop.slots = [chessSlot(m, cheap), chessSlot(m, cheap), chessSlot(m, cheap)];
+  drain(DYY_MUELSYSE.at.buyLoopSteps(ctxOf(DYY_MUELSYSE, m, ps, [{}], () => [].values())));
+  assert.ok(ps._dyyCycle?.n >= 1, `cycled ${ps._dyyCycle?.n}`);
+  assert.ok(ps.allChess().some((q) => q.uid === mu.uid), 'she stays');
+  ps.shop.slots = shop0; // the test's own shop of banned operators
+  checkInvariants(m);
 });

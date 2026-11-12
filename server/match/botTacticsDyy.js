@@ -189,8 +189,16 @@ export const DYY_FREEZE = defineTactic({
  *   - levels to 6 (`level6`): `clone` = Fish's rule (she is held and a clone item is held or shown), `held` = she is held,
  *     `off` = never. Tier 6 only shows from shop level 6; legacy stops at 5.
  * From maxIso on, it does nothing: legacy sells her and uses the items its own way.
- * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics. `scroll: false` leaves 画卷 to legacy (which copies
- * its most valuable operator: queue21's scenario, Muelsyse + 画卷 at round 9, took legacy from 7 to 19 wins of 80).
+ * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics.
+ *
+ * What the human seats with 6+ Isomorphs did (7 of 131 clean HARD / ABYSS seats; the top three 11–12, all solo):
+ *   - no 画卷 at all (0 uses in clean human seats): `scroll` is off by default, and legacy's own Art rule (copy the most
+ *     valuable operator) keeps it; queue21's scenario: legacy with Muelsyse + 画卷 went 7 → 19 wins of 80;
+ *   - the sell engine: 商业包装方案 on one Muelsyse, dozens of cheap operators sold (each 8 sales print her), every printed
+ *     copy sold at once (her Isomorph stays; she goes back to the pool for the next print): `holder` keeps one
+ *     Muelsyse (the packed one, else an elite, else the oldest) and sells the other normal copies; `cycle` buys and
+ *     sells cheap operators while the plan is on her, up to that many sales a prep;
+ *   - 简易通讯机 ×2 on Muelsyse from level 6 (the Du Yaoye seat, 9 Isomorphs).
  */
 const MUELSYSE = 'chess_char_6_11_a';
 const SCROLL = 'chess_item_6_02_m';
@@ -270,6 +278,37 @@ function cloneMuelsyse(m, ps, p) {
   }
 }
 
+/** `holder`: one Muelsyse stays (the packed one, else an elite, else the oldest); the other normal copies are sold. */
+function sellExtraCopies(m, ps) {
+  const gd = gdOf(m, ps);
+  const all = heldMuelsyse(gd, ps);
+  if (all.length < 2) return;
+  const hold = all.find((q) => (q.items || []).some((it) => PACKAGING.includes(it.id)))
+    || all.find((q) => gd.isGolden(q.id)) || [...all].sort((a, b) => a.uid - b.uid)[0];
+  for (const q of all) if (q !== hold && !gd.isGolden(q.id) && !(q.items || []).length) ok(() => ps.sell(q.uid));
+}
+
+/**
+ * `cycle`: while 商业包装方案 is on her, buy and sell the shop's operators of price ≤ `cyclePrice` (price 1: a free sale; a
+ * tier-1 operator costs 2 and sells for 1), above `reserve` funds, up to `cycle` sales a prep.
+ */
+function* packagingCycle(m, ps, p) {
+  const gd = gdOf(m, ps);
+  ps._dyyCycle = ps._dyyCycle?.round === m.round ? ps._dyyCycle : { round: m.round, n: 0 };
+  for (let guard = 0; guard < 4 * p.cycle && ps._dyyCycle.n < p.cycle && packed(gd, ps); guard++) {
+    const i = ps.shop.slots.findIndex((sl) => sl && !sl.sold && sl.kind === 'chess' && ps.priceOf(sl) <= p.cyclePrice && !ps.completesChessMerge(sl.id));
+    if (i < 0) break;
+    if (freeSlot(ps.hand) < 0 || ps.funds - ps.priceOf(ps.shop.slots[i]) < p.reserve) break;
+    const before = new Set(ps.allChess().map((q) => q.uid));
+    if (!ok(() => ps.buy(i))) break;
+    const fresh = ps.allChess().find((q) => !before.has(q.uid) && gd.baseIdOf(q.id) !== MUELSYSE);
+    if (fresh) ok(() => ps.sell(fresh.uid));
+    ps._dyyCycle.n++;
+    sellExtraCopies(m, ps);
+    yield;
+  }
+}
+
 export const DYY_MUELSYSE = defineTactic({
   id: 'dyy-muelsyse',
   describe: 'Du Yaoye: keep 缪尔赛思 and clone her (画卷, 拟态物质, the same-Alliance printers) for more Isomorphs; level 6 for her; then legacy',
@@ -278,7 +317,11 @@ export const DYY_MUELSYSE = defineTactic({
     keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
     level6: { type: 'choice', choices: ['clone', 'held', 'off'], default: 'clone' },
     dyyOnly: { type: 'bool', default: true },
-    scroll: { type: 'bool', default: true },
+    scroll: { type: 'bool', default: false },
+    holder: { type: 'bool', default: true },
+    cycle: { type: 'int', min: 0, max: 60, default: 24 },
+    cyclePrice: { type: 'int', min: 1, max: 3, default: 2 },
+    reserve: { type: 'int', min: 0, max: 30, default: 2 },
   },
   at: {
     sellJunk(ctx) {
@@ -300,9 +343,17 @@ export const DYY_MUELSYSE = defineTactic({
       muelsyseLevel(ctx.match, ctx.player, ctx.params);
       return ctx.next();
     },
-    *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
+    *buyLoopSteps(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (p.cycle > 0 && muelsyseActive(m, ps, p) && !ctx.args?.[0]?.fillOnly) yield* packagingCycle(m, ps, p);
+      return yield* listedItemsFirst(ctx);
+    },
     equipItems(ctx) {
-      if (muelsyseActive(ctx.match, ctx.player, ctx.params)) cloneMuelsyse(ctx.match, ctx.player, ctx.params);
+      const { match: m, player: ps, params: p } = ctx;
+      if (muelsyseActive(m, ps, p)) {
+        cloneMuelsyse(m, ps, p);
+        if (p.holder) sellExtraCopies(m, ps);
+      }
       return ctx.next();
     },
   },
