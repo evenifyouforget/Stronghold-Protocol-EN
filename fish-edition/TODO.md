@@ -187,6 +187,11 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
       `order: either`, default), or both together (`order: hold`). queue18 measures hold, queue19 either. Placing that carry at the snake's start is still to do.)
 - [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
+Possibly useful for testing:
+
+- [ ] Set up a scenario where the game already starts with 1 Muelsyse (or gifts it on round 7), to see if the bots know how to scale from there (like how human games clone Muelsyse to make many Damazti Isomorph)
+- [ ] Other scenario tests, which make it possible to test if a tactic is useful even if it would only be relevant to 5% of games happening by chance
+
 ## Mod Z
 
 Designs in `operator-mod-z/` (Fish's, uncommitted). Mod Z is new gameplay, so it may not fit the freeze: Fish's call.
