@@ -3,17 +3,288 @@
 Changes made in this fork ([YuriRestia/Stronghold-Protocol-EN-translation](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation))
 on top of the upstream game ([sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol)). Upstream's
 own changes aren't repeated here; each upstream merge links the upstream commit it brought in, and
-[CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first. New entries arrive as one file per
-change in [changes/](changes/README.md) and are folded in here with `npm run changelog`.
+[CHANGELOG.en.md](CHANGELOG.en.md) covers what that release contains. Newest first.
+
+## 2026-11-12
+
+### Lobby update news: Update 0.3.4-2
+
+- The lobby banner now reads "Update 0.3.4-2" and shows again to everyone who closed the last one. Its new highlight: a
+  Doctor who leaves is out for good, and the next round no longer waits for them (disconnecting is fine). 0.3.4's highlights stay below it.
+- New points: room chat, full skill start animations, official skill and outfit sounds, more official effects, attack
+  timing that follows attack speed, and Lemuen, Blaze the Igniting Spark, Talulah and Mizuki as in the official game.
+  0.3.4's four main points stay after them; the 0.3.4-1 hotfix lines are gone from the banner and every language pack.
+- The banner has colour now: "out for good" in a dark blood red, operator names and room chat in leaf green, smarter
+  bots in cyan. The two new colours are text tags (`<@sp.blood>`, `<@sp.leaf>`) that the live news file can use too.
 
 ## 2026-11-11
+
+### Plain-text nicknames
+
+- Doctor names follow the same plain-text rules as chat: letters of every language, digits, punctuation and a few signs. Emoji, symbols, HTML tags, invisible "filler" characters and "Zalgo" stacks are removed, and fancy-font letters become normal letters.
+- Before: a name could hold emoji, symbols or invisible filler characters (blank-looking names).
+- A name made only of removed characters counts as empty, so the title screen asks for another one.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): no new messages | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | ≈ 0 % of one core: the chat filter once per login, about 1 µs | ≈ 0 % (a name is at most 12 characters) |
+| Memory | 0 MB | 0 MB |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | 0 ms/round | 0 ms/round |
+
+- Cap: a name is at most 12 characters and is cleaned once per hello.
+- Estimated: CPU from the measured filter time of a chat line.
+
+### Chat in the alliance room
+
+- The room screen (4 players or a Grand Alliance's 8) has a chat log under the seat cards: time, name (squad A green, squad B blue, yours gold) and the line, plus who joined or left. Scroll up to read back; a "↓ N new messages" button brings you down again, and ⤢ makes the log taller.
+- Each line also pops a bubble over the sender's seat card, emotes too. The mute button on each player's name plate hides their bubbles and their lines (the same mute list as in the match).
+- On a phone the log is a Chat button with an unread count and the last line; tap it to open the log over the left half of the screen.
+- No kill wallet in the room: anyone seated can talk, up to 100 letters a line. Spectators can read along.
+- Spam limits: one line every 1.5 s, 6 lines in any 15 s and 20 lines in any 5 minutes; going over pauses your chat for 30 s, then 60 s, then 120 s. The same line twice within 10 s is dropped. Reconnecting does not reset a pause.
+- If the whole server's chat gets too busy, or one room uses more than its fair share, a line is not sent and you see "Chat is busy. Try again in a moment." A room that floods the chat only silences itself, and lobby chat can never use up the part of the budget kept for in-game chat.
+- If you lose the connection and come back, you get the lines you had already seen. Someone who joins later does not see older lines. Chat is kept only in the server's memory, never saved, and is gone when the room closes.
+
+### Plain text in both chats
+
+- Match chat and room chat now take plain text only: letters of every language, digits, punctuation, currency signs and a few maths signs. HTML tags, emoji, symbols, invisible characters and "Zalgo" stacks of accents are removed; fancy-font letters become normal letters.
+- Before: match chat let emoji and any other character through.
+- A match chat line is also at most 100 letters now, whatever your kill wallet holds, and the same spam limits and busy check apply there.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0.00001 / 0.000002 MB/s (0.001 / 0.0002 GB/day): a line a minute in a 4-player room | 0.004 / 0.0004 MB/s for a 15 s burst; 0.0006 / 0.00007 MB/s sustained (0.055 / 0.006 GB/day) at the 5-minute cap, longest lines, 9 receivers |
+| Bandwidth out / in, per room | 0.00004 / 0.00001 MB/s (4 players); 0.0002 / 0.00003 MB/s (Grand Alliance, 8) | 0.008 MB/s out, the room's fair share (0.7 GB/day); ≤ 0.003 MB/s in |
+| Bandwidth out / in, 300 players | 0.001 / 0.0002 MB/s (0.08 / 0.02 GB/day): a third chatting a line a minute | 0.033 MB/s out, the server-wide budget (2.8 GB/day; without it 0.19 MB/s, 16 GB/day); ≤ 0.02 MB/s in |
+| Server CPU | ≈ 0 % of one core (1.3 µs filter per line) | ≤ 5 % of one core (≤ 260 µs filter, one run per player per 1.5 s), plus under 0.1 % for sending at the budget |
+| Memory | ≈ 0.5 MB | ≈ 1.5 MB at 300 players; ≤ 16 MB at the server's 1,000-room limit (16 KB history per room, under 1 KB of limits per player, about 100 B of budget per room chatting now) |
+| Disk | 0 MB/day | 0 MB/day (nothing logged or saved) |
+| Bot budget | 0 ms/round | 0 ms/round |
+
+- Cap: one server-wide chat budget of 32 KB/s on the wire (room and match chat together, `SP_CHAT_BUDGET_KBPS`); a quarter of it only match chat may use (`SP_CHAT_MATCH_RESERVE`), so room spam never blocks in-game chat; one room or match may use at most a quarter (`SP_CHAT_ROOM_SHARE`), so a spamming room only silences itself. Per player: 100 letters a line, one line per 1.5 s, 6 in any 15 s and 20 in any 5 minutes, then pauses of 30 / 60 / 120 s; per network 20 lines in any 15 s; a chat frame over 600 characters is refused; floods stop at the existing 40 messages a second per connection. Over the budget or a room's share the sender sees "Chat is busy. Try again in a moment."
+- Measured: message sizes (100 B typical, 987 B the longest) and filter times with the real server code; estimated: how often players chat, receivers per line, and 80 B of TLS / TCP overhead per message.
+
+### Summon and talent effects from the game client (part 1)
+
+The game client defines effects for summons and for talents that we never drew. This part adds:
+
+- **Summons know their summoner.** Each summon now tells the game which operator summoned it, so that operator's effects can play on it. Kal'tsit's Mon3tr now shows her S1–S3 buffs, Pozëmka's sub-bow shows hers, Closure's command center shows its S2 and S3 range loops, and Vigil's wolves and Mechanist's summons show their skill buffs.
+- **Muelsyse's clones.** A clone that splits during S3 now plays the official split effect, and its official end effect where it stood when it goes.
+- **Talent effects on other units.** Pallas's Peak Performance glow on the allies that have it, and her S3 blessing; Texas the Omertosa's S1 cut on the enemies it hits; Eunectes's S2 stun on the enemy she blocks; Astgenne the Lightchaser's S3 link on each linked enemy; Ho'olheyak's S3 lift; Insider's ammo grant on the chosen ally; Shu's S3 seed mark on marked enemies.
+- **Talents that fire at a moment.** Necrass's skeleton upgrade glow and her S3 special skeleton's growth; Kal'tsit Esperanta's S3 teleport out and landing; Typhon's S3 aim; Narantuya's S3 boomerang return.
+- **Sandbox.** A new `&tokens=` link parameter places summon pieces next to their summoner (Mon3tr, Closure's command center).
+
+### Summon and talent effects from the game client (part 2)
+
+Talent and trait effects that depend on what is happening in the battle now show while that holds:
+
+- **Ready and charged states.** Papyrus's and Lessing's glow while S1 is ready; Leizi the Thunderbringer's and Młynar's trait glow grows with their attack ramp.
+- **Effects while something lasts.** Nasti's S2 shield while it holds; Lucilla's S2 talent boost while S2 runs; Heavyrain's S2 aura on the allies inside it; Humus's recycle shield while it holds; Lee's guard while it is up, and its hit when it cancels a stun.
+- **Marks and moments.** Carnelian's S3 mark on enemies, part-charged and full; Swire the Elegant Wit's merchant payment and revive; Humus's trait heal; Aroma's S2 landing; Тоска's heal and SP grant on the ally.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0.0001 / 0 MB/s (0.01 / 0 GB/day) | 0.001 / 0 MB/s (0.09 / 0 GB/day) |
+| Bandwidth out / in, per room (4 players; 8 in Grand Alliance) | 0.0004 / 0 MB/s (0.0008 with 8) | 0.004 / 0 MB/s (0.008 with 8) |
+| Bandwidth out / in, 300 players | 0.03 / 0 MB/s (2.6 / 0 GB/day) | 0.3 / 0 MB/s (26 / 0 GB/day) |
+| Server CPU | under 0.1 % of one core | under 0.5 % of one core |
+| Memory | under 0.1 MB | under 1 MB |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | 0 ms/round | 0 ms/round |
+
+- Default client-side combat (production; `SP_COMBAT` unset): 0 for all of it. The server sends no `b.snap` for combat
+  there (docs/design/network.md); the table is the legacy server-run mode (`SP_COMBAT=server`).
+- Cap: one `fxs` row per unit and buff, gone with its duration or the unit's deployment; a field sends its rows only
+  when they change (`fxd`), plus the whole set once a second and to a watcher that just started or whose last frame was
+  dropped (shared/fxsDiff.js); the client keeps the sets of at most 16 fields. The probes run only when a snapshot is
+  built (the bots build none).
+- Estimated, not measured: rows of about 40 bytes; typical 3 rows and about 1 change a second, worst case 40 rows (Carnelian's
+  marks on a full wave and Heavyrain's aura on every ally) and about 10 changes a second; about 2.5× smaller after the
+  WebSocket's deflate. Every frame used to repeat every row: 5× more (0.15 / 1.5 MB/s for 300 players). Part 1 went in
+  before the rule (unmeasured); its rows now go on change too.
+
+### Grand Alliance: join a squad instead of hopping seats
+
+- In a Grand Alliance room you now change squad with Join Squad A / Join Squad B, shown on the other squad's empty seats. You take that squad's first free seat.
+- You can't move inside your own squad any more, and you can change squad at most once every 5 seconds and 4 times a minute. The button counts down while you wait.
+- Changing squad clears your Ready. The host can still swap two players, but only between the squads.
+- Before: every empty seat had a Sit here button for every player, with no limit, so one player could jump around the room and make everyone's screen jump.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day) | 0.0005 / 0.000003 MB/s (0.05 / 0 GB/day): a member at the 4 moves a minute cap |
+| Bandwidth out / in, per room (8 players) | 0.00002 / 0 MB/s: about 4 moves before a match, 8 KB each | 0.004 / 0.00002 MB/s: all 8 members at the cap (before: 2.6 MB/s, 40 moves a second each) |
+| Bandwidth out / in, 300 players | 0.0007 / 0 MB/s (0.06 / 0 GB/day) | 0.16 / 0.001 MB/s (14 / 0.1 GB/day) (before: 96 MB/s, 8300 GB/day) |
+| Server CPU | 0 % of one core | under 0.1 % of one core: one room update per allowed move |
+| Memory | under 0.001 MB per room | under 0.001 MB per room: at most 16 players × 4 move times |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | 0 ms/round | 0 ms/round |
+
+- Cap: one squad move per member per 5 s and 4 a minute; a refused move costs one 90-byte error and no room update.
+  Before this change a member could move up to 40 times a second (the connection's message limit).
+- Measured with the traffic meter: 6 test players in a Grand Alliance room, each allowed move sent one 0.9 KB room
+  update to every member (the same before and after: about 8 KB a move with 8 members). Counted before WebSocket
+  compression, so the real traffic is lower. Typical moves per match estimated; CPU and memory estimated from the code.
+
+### Official effects that skills put on the targets they hit
+
+- Pepe's normal attack and S3 now show their official impact effects on the enemy they hit. Before, they showed only a generic spark.
+- Closure's S3 now sends her official airplane to each target her attack marks.
+- The S3 hits of Specter the Unchained, Saga and Typhon, Executor the Ex Foedere's S3 finishing shot and Folinic's S2 hit (on enemies) now show their official effects.
+- Lee's S3 shows its knockback burst around him on each attack.
+- Vigil's wolves now show their own bite effect, and the enemies Burning Vine and 'Hateful Avenger' show their own attack effects.
+- When the game picks one of several versions (Pepe's S3 by stacks, Vigil's wolves by pack size), the plain version shows, since the battle doesn't tell the board which one applies.
+- The effect extractor now reads these buffs on attacks (and the ones projectiles leave as they end) and records which branch of a condition each effect sits on. A relink run (`--fx-relink`) adds them to the effect index; no new effect files are needed.
+
+### AI players in a player's browser can use Ioleta's adaptive AI
+
+- New server setting `SP_HOST_BOT_STRATEGY` picks the AI that bots play when they run in a human's browser (`SP_BOT_EXECUTION=host`, and every Grand Alliance room). The servers are meant to set it to `ioleta-adaptive`. Bots the server plays itself keep the original AI, and a per-seat setting still wins. Unset, nothing changes.
+- An unknown AI name in the setting stops the server at startup with a clear message.
+- New tool `tools/hostbotbench.mjs` times the real browser bot Worker in a GPU Chrome over whole matches, per AI and room size, against the bot time budget.
+- Measured on a desktop (14 preps, the same boards for both AIs): Ioleta's adaptive AI thinks less than the original. A whole round of bots took 3.8 s at the median and 18 s in the slowest round with 4 players (original AI: 6.4 s and 34 s), and 12.8 s and 79 s with 8 players (original AI: 17.1 s and 134 s). Only the last prep goes over the bot budget (42 s typical, 60 s there); the bots then place the best layout tried so far.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): the same bot frames, only the AI in the browser differs | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the setting is read once at startup | 0 % |
+| Memory | 0 MB | 0 MB |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | 3800 ms/round with 4 players, 12800 ms/round with 8 (original AI: 6400 and 17100) | 18000 ms/round with 4 players, 79000 ms/round with 8, cut at the 60 s budget (original AI: 34000 and 134000) |
+
+- Cap: the host browser's bot budget, 40 % of the prep time between 15 and 60 s; a bot that runs out places the best
+  layout it tried. The bots run in the host's browser, never on the server.
+- Measured with tools/hostbotbench.mjs (14 preps, the same boards for both AIs, a desktop GPU Chrome); the server
+  figures are 0 by the code (no new frame, timer or file).
+
+### A skill with a start animation plays it in full before the skill begins
+
+- When an operator casts a skill that opens with a start animation, the animation now plays to its end before the skill takes effect, as in the official game, and the operator's attacks wait for it. This covers 138 skills of 91 operators, such as Mizuki S3, Ayerscarpe S2 and Gavial the Invincible S2; the start animations last 0.1 to 1.5 s.
+- Being stunned, frozen or put to sleep during the animation cancels the cast and keeps the skill points.
+- Before: the skill took effect at once, and the first attack cut its start animation off.
+- Skills without a start animation, such as Mostima S3, are unchanged. This changes battle results a little.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): battles run in the players' browsers; the server sends no battle events | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the server only simulates fields with no player connected | no measurable change: a whole 4-bot match took 11.4 s of CPU before and 10.6 s after (medians); the battles differ a little, since attacks now wait for the start animation |
+| Memory | 0 MB (one more field per skill) | 0 MB (one more field per skill) |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | no measurable change (about 800 ms/round of battle for 4 bots, before and after) | no measurable change (about 800 ms/round of battle for 4 bots, before and after) |
+
+- Cap: nothing new is sent, kept or written; a skill waits at most its 0.1 to 1.5 s start animation.
+- Measured: one 4-bot co-op match (NORMAL, seed 1, no rehearsals, so every run does the same work), timed in process CPU
+  before and after this change, alternated 3 times. The same version varies by about 20 % between runs.
+
+### Skill marks now show on the unit that holds them
+
+- The official mark a skill puts on another unit now shows on that unit while it lasts: an enemy it locks, binds or puts to sleep, an ally it shields or heals, or the operator's own summons.
+- Before: the screen was never told which unit held the mark, so most of these marks never appeared.
+- This covers 41 of the 43 missing marks on 27 operators. Fights don't change, and bot battles do no extra work.
+- Two marks stay out on purpose: Mon3tr's model hide (the official game hides her body, not an effect), and Titi S3's line, which belongs to the planned line-effects work.
+
+| Operator | Mark that now shows |
+|---|---|
+| Papyrus | S2: the lock mark on the ally she heals, and her own glow |
+| Titi | S2: the glow on the ally she puts to sleep with her; S3: the mark on sleeping enemies, with its burst as they wake |
+| Lee | S2: the paper mark on his target |
+| Mostima | S2: the time-lock glow on every enemy she stops |
+| Degenbrecher | S2: the slashes on each enemy she hits |
+| Zima the Raging Tide | S3: the bind on the enemies the hammer pins |
+| Blemishine | S2: the sleep glow on the enemies on her tile |
+| Saria | S3: the calcification on the enemies around her |
+| Closure | S1: the shield on the allies it covers |
+| Tin Man | S2: the heal glow on allies standing in the zone |
+| Entelechia | S2: the blood scythes around her second unit |
+| Heavyrain | S1: the camouflage glow on the ally she hides |
+| Warfarin | S2: the plasma glow on her and the ally she picks |
+| Exusiai the New Covenant | S2: the mark on the operator she steals attack speed from |
+| Pith | S2: the glow on every Caster her skill boosts |
+| Pozëmka, Thorns, Swire, Gladiia | S1 / S2 / S1 / S3: the skill's own glow on themselves |
+| Mon3tr | S3: the glow as she moves to the Reconstruction and back |
+| Raidian, Ling, Stainless, Magallan, Jessica the Liberated | The skill's glow on their summons while it runs |
+| Тоска, Angelina the Mellow Wish (not on EN yet) | S1 glow on the ally; S3 weapon glow and range ring |
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): battles run in the players' browsers; the server sends no battle events | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the server only simulates fields with no player connected | no measurable change: a whole 4-bot match took 13.2 s of CPU before and 12.1 s after (medians), within the run-to-run spread |
+| Memory | 0 MB (one more reference per mark on a unit) | 0 MB (one more reference per mark on a unit) |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | no measurable change (about 800 ms/round of battle for 4 bots, before and after) | no measurable change (about 800 ms/round of battle for 4 bots, before and after) |
+
+- Cap: nothing new is sent, kept or written; the mark is read only when a browser draws the battle.
+- Measured: one 4-bot co-op match (NORMAL, seed 1, no rehearsals, so every run does the same work), timed in process CPU
+  before and after this change, alternated 3 times. The same version varies by about 20 % between runs.
+
+### Damage-over-time and heal ticks show their official hit effects
+
+Many skills hit or heal again and again over time: a poison cloud, a heal rain, a pulse every second. The official game plays an effect, and often a sound, on each unit at every tick. The battle never told the screen about those ticks, so 18 such effects never showed. Now each tick sends a display-only signal, and the screen plays the official effect on the right unit, even after the skill has ended (Lumen's S1 heals keep going after the cast). Nothing in combat changes.
+
+| Operator | Skill | What now shows at each tick |
+|---|---|---|
+| Tin Man | S1, S2 | The hit on every enemy in the alchemy unit's area, with its sound |
+| Lumen | S1 | The heal splash on each ally the rain heals |
+| Necrass | S2 | The hit on each linked enemy, with its sound |
+| Penance | S2 | The weapon slam on Penance and the hit on each enemy every second |
+| Haruka | S3, talent | The hit on each floating enemy; the burst on an ally whose bubble breaks and heals, with its sound |
+| Tragodia | S2 | The hit on each enemy the summon's burst left delirious, with its sound |
+| Thorns the Lodestar | S2 | The hit on every enemy in the drifting alchemy unit, with its sound |
+| Hoshiguma the Breacher | S2 | The hit on each enemy the circling shield strikes, with its sound |
+| SilverAsh the Reignfrost | S2 | The slash's hit on each enemy |
+| Titi | S3 | The burst on each enemy that wakes up, with its sound (instead of the plain wave) |
+| Yu | S2 | The teleport effect on each enemy pulled to Yu (instead of the plain flash) |
+| Muelsyse | S3 | The pull ring on each melee Flow at every pulse, with its sound |
+| Closure | S2 | The refund glow on an operator deployed in range |
+| Mechanist | S3 | The hit on each enemy Mechanist blocks |
+| Тоска (CN) | S3 | The start effect on the ally that receives the S3 effect |
+
+- 7 new sound files (87 KB) for the server and the preload zip.
+
+Server cost:
+
+| Measure | Typical | Worst case |
+|---|---|---|
+| Bandwidth out / in, per player | 0 / 0 MB/s (0 / 0 GB/day): battles run in the players' browsers; the server sends no battle events | 0 / 0 MB/s |
+| Bandwidth out / in, per room | 0 / 0 MB/s | 0 / 0 MB/s |
+| Bandwidth out / in, 300 players | 0 / 0 MB/s (0 / 0 GB/day) | 0 / 0 MB/s |
+| Server CPU | 0 % of one core: the server only simulates fields with no player connected | no measurable change: a whole 4-bot match took 11.1 s of CPU before and 11.4 s after (medians), within the run-to-run spread |
+| Memory | 0 MB | 0 MB |
+| Disk | 0 MB/day | 0 MB/day |
+| Bot budget | no measurable change (about 800 ms/round of battle for 4 bots, before and after) | no measurable change (about 800 ms/round of battle for 4 bots, before and after) |
+
+- Cap: nothing new is sent, kept or written; the tick signal is one more battle event, which only a browser that runs the battle sees.
+- Measured: one 4-bot co-op match (NORMAL, seed 1, no rehearsals, so every run does the same work), timed in process CPU
+  before and after this change, alternated 3 times. The same version varies by about 20 % between runs.
 
 ### Slow attackers swing at their own speed, as in the official game
 
 - Each operator's attack now slows its animation only as far as the official game allows that attack: its own limit, read from the game client (`docs/research/15-attack-anim-scale.json`, 239 units). Until now every operator could slow down to 2.5×.
 - Most operators have a limit of 1×: a slow attacker swings at its normal speed and its hit lands at the swing's strike frame, early in its attack interval. Mostima's hit now lands 0.70 s after her swing starts instead of 1.17 s; Mizuki, Ashlock, Warfarin, Greyy and Ptilopsis gain about 0.7 s. A few attacks have a limit of 1.1×, 1.2× or 2×, and 62 have none.
 - Attack effects follow the same limit.
-- This changes battle results a little: in the test battles kills rise 0.7 %, healing 2.2 %, and the bot matches win one more (20 of 21). The stored test results (goldens) are regenerated with it.
+- This changes battle results a little: in the test battles kills rise 0.7 %, healing 2.2 %, and the bot matches win one more (20 of 21).
 - Not yet modelled: in the official game an enemy effect that slows a unit's animation also limits its swing further.
 
 ### Attack effects speed up with the attack, as in the official game
@@ -27,17 +298,6 @@ change in [changes/](changes/README.md) and are folded in here with `npm run cha
 
 - When Территория leaves the field for any reason other than a knock-out (a retreat, a forced exit, a raid jump), the talent 此身为界 now deals its damage, stuns and shows its tile effect 0.1 s after the exit, as the official game's withdraw shot does. Before, it all happened in the same instant. A knock-out still lands 0.7 s later, as before.
 - The official withdraw shot is an invisible projectile that lives 0.1 s and hits as it stops. Its only visual is the tile effect on every tile of the operator's field (国度), which we already played; it has no sound of its own.
-- The dev sandbox's `hold(i, { retreat: true })` makes board unit `i` withdraw mid-fight, for proof captures.
-
-### Tests no longer fail just because the computer is busy
-
-- Several tests failed only when the machine was busy (a full test run beside a browser run), and passed when run alone. They were checking real behaviour, but with stopwatches that assumed an idle machine. Each one now waits for the event it needs instead, with a generous limit that only stops a real hang. What each test checks is unchanged.
-- The relay acknowledgement tests (`test/p2p-server.test.js`) run on mocked timers, so the order of their steps is exact at any speed.
-- The generations tests (`test/generations.test.js`) wait until the server has picked up a table change instead of sleeping a fixed 80 or 150 ms.
-- Server-event waits in the plugin lobby, tab-identity and generations tests use the shared test limit (`WORKER_LOAD_MS`, 60 s) instead of 2, 5 or 15 seconds.
-- Plugin studio tests that check what a trial battle or a check finds no longer use the server's 20-second budget. They get their own guard of 180 s per trial (`STUDIO_TRIAL_MS`), because one short trial took 36–88 s on a fully busy machine. The server's budget is unchanged, and the tests of the budget itself keep theirs. The trial-timeout cleanup test now fires the timeout right after the probe starts, instead of racing a 12-second timer against it.
-- The script probe test (`test/plugins/script-review.test.js`) no longer kills a correct but slow-starting composition after 7 s; its hang guard is that shared limit, and its probe ceilings go up to 16 s.
-- New crew tool `cpu-load.mjs` reproduces these failures on purpose: it runs a test pinned to a few cores next to busy threads.
 
 ### Effects that stay after a skill ends
 
@@ -87,10 +347,9 @@ Fights don't change, and bot battles do no extra work.
 - Ch'en the Holungday in her Holiday HD79 outfit: her S2 and S3 water bursts now leave her water gun. That outfit's model has different muzzle bones from her default look, so they used to start below her feet. A muzzle point now also tries the usual muzzle bones of the model actually drawn.
 - A unit with no muzzle point at all (Santalla, Viy) now aims from its feet, as in the official game, where the animator hands over the foot point when there is no muzzle. Before, it was a guessed spot 0.4 tiles up.
 
-### External AI is shelved: locked in every build, and no test suite runs its tests
+### External AI is shelved: locked in every build
 
 - External AI (the `sp-ai/1` advisor / plan / LLM integration, shelved upstream since 2026-11-05) is now off in every build, development checkouts included. Selecting it (`SP_BOT_STRATEGY=external`, a seat override, a match's `botStrategy: 'external'`, any `SP_EXTERNAL_AI_*` / `SP_LLM_*` setting) logs one line and the built-in bot plays. `SP_UNSHELVE_EXTERNAL_AI=1` brings it back; the code is unchanged.
-- Its tests moved to `test/shelved/external-ai/` as `*.shelved.js`, which no runner picks up (`npm test`, the CI shards, the browser suite, perf): 15 whole files, plus the External AI cases split out of 6 files whose other tests keep running. `test/shelved/README.md` says how to run them by hand.
 
 ### Outfits with their own official battle sounds play them
 
@@ -219,7 +478,7 @@ A full check of all 31 of Lemuen's effects, in her default look and Requiem Vesp
 ### Plugin rooms survive a busy server
 
 - A plugin room's match no longer ends with "the match host stopped" when the server is busy as the match starts. The hang watchdog (10 s without a heartbeat) counted from the moment the match process was created, so a slow start (Node itself, its modules, the room's 13 MB of data) on a loaded machine looked like a hung plugin. The watchdog now counts from the process's first heartbeat, sent as soon as the room's data arrives and before any plugin code runs; a process that sends nothing at all for 60 s still ends as a start failure. While it checks and reads the data, the match process now lets its heartbeats out between files.
-- Sandboxed plugin scripts work in a checkout whose `node_modules` is a link to another folder (a git worktree): the sandbox may now read that folder too, and nothing else. Before, every sandboxed plugin failed there with an access error.
+- Sandboxed plugin scripts work in a checkout whose `node_modules` is a link to another folder: the sandbox may now read that folder too, and nothing else. Before, every sandboxed plugin failed there with an access error.
 
 ### Element bursts look as in the official game
 
@@ -409,10 +668,6 @@ A full check of all 31 of Lemuen's effects, in her default look and Requiem Vesp
 ### Sell / destroy plate colour test waits for what is on screen
 
 - The browser test that checks the Sell (amber) and Destroy (red) plates no longer waits fixed times. It waits until the mock board's own units are laid out before tapping one, and samples the plate until it shows a steady colour instead of its dark backing. In a fresh browser the plate was sampled before its picture was painted and read grey, and on a busy machine the bench was tapped before it was laid out. Both cases now pass 3 of 3 with Chrome's CPU slowed four times; a white or wrong-coloured plate still fails.
-
-### Lint skips other branches' working copies
-
-- `npm run lint` no longer checks the git worktrees under `.claude/worktrees/` (other branches' working copies, which git already ignores). From the main folder it went through every one of them, which made it take about 6 minutes and print 2,325 warnings, all but 155 of them from those other copies; it now takes about 40 seconds. Each worktree is still linted from its own folder.
 
 ### Reproducing a failing browser test in minutes
 
@@ -1171,7 +1426,7 @@ A full check of all 31 of Lemuen's effects, in her default look and Requiem Vesp
   Ela and Muelsyse (and the Damazti Cluster strategy's grant of the same item) now skip the stock and hold no
   copy. Ported from upstream [PR #496](https://github.com/sganggs/Stronghold-Protocol/pull/496) (`1d1ff3b1`).
 - Lobby announcement banner lists both fixes above (new dismiss key `news.0.2.4.fixes`, so it shows again).
-- Fixed: the About panel read "Running HEAD @ …" since generations, because each release worktree is detached.
+- Fixed: the About panel read "Running HEAD @ …" since generations, because each release checkout is detached.
   `deploy` now records `app/`'s branch as `SP_BRANCH` in the generation's env file, and `scripts/server-info.mjs`
   uses it when git reports a detached HEAD.
 
