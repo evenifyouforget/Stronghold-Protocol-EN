@@ -136,15 +136,48 @@ const INSTALL = {
     liveBuff(battle, u, `${KEY}:zumama`, () => true, () => ({ defFlat: Math.min(5000, Math.max(0, Math.round(u.s.atk - u.base.atk))) }));
   },
 
-  // every skill an ammo skill (18 / 3 / 100 attacks); during it, ASPD +50 and max HP +100 %
+  // every skill an ammo skill (18 / 3 / 100 attacks: S1 her normal attacks, S2 / S3 one shell per ammo); during it,
+  // ASPD +50 and max HP +100 %
   uniequip_fishz_phenxi(battle, u) {
     const sk = u.skill;
     const i = skillIndex(u);
     const ammo = [18, 3, 100][i ?? -1];
     if (sk && !sk.noSkill && ammo && sk.kind !== 'passive') {
+      const was = sk.kind;
       sk.kind = 'ammo';
       sk.ammo = ammo;
       sk.duration = 0;   // no time cap: the skill ends when the ammo runs out [DRAFT]
+      // one ammo, as Skill.onAttackPerformed spends it (the `ammoUsed` hook: 拉特兰's per-ammo ATK, bonds/core.js)
+      const spend = () => {
+        if (!sk.active || sk.kind !== 'ammo') return;
+        sk.ammoLeft--;
+        if (battle._hooks.ammoUsed) battle.emit('ammoUsed', { unit: u, left: sk.ammoLeft, skill: sk });
+        if (sk.ammoLeft <= 0) sk.end('ammo');
+      };
+      const spec = sk.spec;
+      if (was === 'instant' && typeof spec.onStart === 'function') {
+        // S2: one 灼痕弹 per ammo (the cast's own shell first), one per attack interval, in place of her attacks
+        const shell = spec.onStart;
+        let cd = 0;
+        sk.spec = { ...spec, attack: { noAttack: true },
+          onStart(ctx) { shell(ctx); cd = u.s.interval; spend(); },
+          onTick(ctx) {
+            if (!u.canAct || u.s.flags.disarm) return;
+            cd -= ctx.dt;
+            if (cd > 1e-9) return;
+            cd = u.s.interval;
+            shell(ctx);
+            spend();
+          } };
+      } else if (was === 'toggle' && typeof spec.onTick === 'function') {
+        // S3: its shells are fired from onTick (her attack cycle); each one spends an ammo
+        const tick = spec.onTick;
+        sk.spec = { ...spec, onTick(ctx) {
+          const before = u.mem.phenxiCd ?? 0;
+          tick(ctx);
+          if ((u.mem.phenxiCd ?? 0) > before + 1e-9) spend();
+        } };
+      }
     }
     liveBuff(battle, u, `${KEY}:phenxi`, () => !!(u.skill && u.skill.active), () => ({ aspd: 50, hpMul: 2 }));
   },

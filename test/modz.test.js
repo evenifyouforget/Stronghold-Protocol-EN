@@ -155,3 +155,21 @@ test('Zuo Le Z: one more skill charge; Viviana Z: the RES shred stays after she 
   h.run(20);
   assert.deepEqual(h.b.errors.map((x) => `${x.label}: ${x.message}`), []);
 });
+
+test('Fiammetta Z: S2 fires one shell per ammo and ends; S3 shells spend ammo (the ammoUsed hook)', () => {
+  for (const [skillIndex, ammo] of [[1, 3], [2, 100]]) {
+    const h = makeBattle({ seed: 5, autoFinish: false, timeLimit: 60, hooks: [],
+      units: [{ diy: { slot: 6, charId: 'char_300_phenxi', skillIndex, uniEquipId: 'uniequip_fishz_phenxi' }, elite: true, row: 9, col: 4, dir: 'RIGHT' },
+        { diy: { slot: 5, charId: 'char_416_zumama', skillIndex: 0, uniEquipId: null }, elite: false, row: 9, col: 5, dir: 'RIGHT' }],
+      enemies: [{ key: 'enemy_1045_hammer', time: 1, count: 8, interval: 4 }] });
+    const u = h.b.allyUnits.find((a) => (a.def.charId ?? a.def.raw?.charId) === 'char_300_phenxi');
+    let used = 0;
+    h.b.on('ammoUsed', (c) => { if (c.unit === u) used++; });
+    h.step();
+    u.skill.gainSp(999, 'init', true);
+    h.run(12);
+    assert.equal(u.skill.kind, 'ammo');
+    if (ammo === 3) assert.ok(used === 3 && !u.skill.active, `S2: ${used} shells, active ${u.skill.active}`);
+    else assert.ok(used >= 2 && u.skill.ammoLeft === ammo - used, `S3: ${used} used, ${u.skill.ammoLeft} left`);
+  }
+});
