@@ -344,3 +344,19 @@ valued her as two focus members. The records showed it 3 times in 20 seats. d044
   nor the general item loop puts an Isomorph on her (it waits in the hand);
 - carry-iso's carry is never her (`carryAndFocus`, `plannedCarry`).
 Queue21 ran before this (a0bd1b85). Queue22: dyybot again, and with carry-iso's buying off.
+
+**Queue21** (a0bd1b85, before iso-not-muelsyse): solo Ultimate, Du Yaoye forced, paired against the baseline's legacy
+(today's legacy reproduces it: seeds 1–20 identical).
+
+| | Wins | Seeds won / lost vs legacy | p |
+|---|---|---|---|
+| legacy | 20 of 160 | | |
+| fish-dyy-human (baseline) | 24 | 15 / 11 | 0.56 |
+| dyybot | 17 | 10 / 13 | 0.68 |
+| dyybot without dyy-muelsyse | 16 | 10 / 14 | 0.54 |
+
+The scenario `mu-scroll` (Muelsyse and a 画卷 at round 9, a second 画卷 at round 11), seeds 1–80:
+- **legacy: 7 → 19 wins** with the gift (15 / 3, p 0.01). Legacy uses 画卷 on its most valuable operator.
+- **dyybot: 9 → 6** (2 / 5, p 0.45). It spends the 画卷 on Muelsyse (one more Isomorph) and pays for level 6.
+- dyybot's board is weaker from round 4 on (value 11.8 against legacy's 19.8: the early levels), so the two can't be
+  compared directly; queue23 tests the clone alone on legacy, with and without 画卷 (`scroll`, 65af52fa).
