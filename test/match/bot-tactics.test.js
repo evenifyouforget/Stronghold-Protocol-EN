@@ -103,7 +103,7 @@ test('a profile whose tactics pass at every point plays a whole match exactly li
 });
 
 test('the registered profiles: opt-in ids, slot views, and their tactics act through the game\'s own intents', () => {
-  assert.deepEqual(Object.keys(BOT_STRATEGIES).filter((id) => id.startsWith('fish-')), ['fish-level', 'fish-tier6']);
+  assert.deepEqual(Object.keys(BOT_STRATEGIES).filter((id) => id.startsWith('fish-')), ['fish-level', 'fish-tier6', 'fish-dyy']);
   assert.deepEqual(profileOf('fish-tier6'), {
     tunables: null,
     tactics: [{ tactic: 'buy-tier', params: { minTier: 6, reserve: 0 } }, { tactic: 'level-curve', params: { scale: 'boss', shift: 0, maxLevel: 6, reserve: 0 } }],
