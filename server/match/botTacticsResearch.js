@@ -681,7 +681,11 @@ export const DIY_CHOICES = Object.freeze({
   goldenglow: Object.freeze({ charId: 'char_377_gdglow', skillIndex: 2, uniEquipId: 'uniequip_002_gdglow' }),
   // Fish's TODO: "Kjerag: take Ascalon as custom operator with skill 2, give her Kjerag Nevermeltice to trigger a lot of
   // Frozen" (tier 6; while she is owned, the Nevermeltice goes into legacy's items.buy / keep)
-  ascalon: Object.freeze({ charId: 'char_4132_ascln', skillIndex: 1, uniEquipId: null, items: Object.freeze(['chess_item_5_02_e_a']) }),
+  // (Fish: "you can also get Nevermeltice from Kjera … on obtained": Kjera, tier 3 and 4, brings one when gained, so she
+  // goes into the buy plan too while Ascalon is owned and no Nevermeltice is held or worn; "Ascalon is typically equipped
+  // on tier 5": t5a / t5b take her as well)
+  ascalon: Object.freeze({ charId: 'char_4132_ascln', skillIndex: 1, uniEquipId: null, items: Object.freeze(['chess_item_5_02_e_a']),
+    chess: Object.freeze(['chess_char_3_20_a', 'chess_char_4_03_a']) }),
 });
 const DIY_OPTIONS = ['none', ...Object.keys(DIY_CHOICES)];
 export const DIY_PICKS = defineTactic({
@@ -713,6 +717,8 @@ export const DIY_PICKS = defineTactic({
         const held = new Set([...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item').map((q) => q.id));
         const worn = new Set(ps.allChess().flatMap((q) => (q.items || []).map((it) => it.id)));
         const itemBuy = pair.filter((id) => !held.has(id) && !worn.has(id)), itemKeep = pair.filter((id) => held.has(id));
+        // a choice's item bringers (Ascalon: Kjera) while its item is missing
+        if (p.buy) for (const c of Object.values(DIY_CHOICES)) if (c.chess && ownedChars.has(c.charId) && c.items.some((id) => itemBuy.includes(id))) buy.push(...c.chess);
         if (buy.length || keep.length || itemBuy.length || itemKeep.length) {
           const plan = own?.plan || {};
           const merge = (a, b, n = 32) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
@@ -1122,6 +1128,111 @@ export function placeAmmo(m, ps) {
   }
   return moved;
 }
+
+/**
+ * Moves `q` onto tile (r, c) facing `dir` (swapping with that tile's piece: PlayerState.move), unless the tile is in
+ * `keep`. Returns whether it moved.
+ */
+function moveTo(ps, q, r, c, dir, keep) {
+  const k = tileKey(r, c);
+  if (!inField(r, c) || keep.has(k)) return false;
+  return ok(() => ps.move(q.uid, { area: 'board', row: r, col: c }, dir));
+}
+const traitDescs = (gd, id) => (gd.chess(id)?.garrisonIds || []).map((gid) => gd.garrison(gid)).filter(Boolean);
+const STACK_UP = /层数\+\d/;
+
+/**
+ * Civilight Eterna (Fish's TODO: "Put Civilight behind a stack generating Operator"; "and also Civilight next to Mostima
+ * if both are available"): her trait gives the operator one tile in front of her +1 extra layer every time its trait
+ * raises layers in battle — so most behind a piece whose battle trait stacks often, like Mostima (+1 Laterano per 6
+ * bullets spent around her). After the rehearsed layout, each deployed Civilight not already behind such a piece moves
+ * onto the tile behind the best partner (Mostima first, then the highest tier battle-time stacker), facing it.
+ */
+const CIVILIGHT = /^chess_char_(4_25|5_09)_/;
+const MOSTIMA = 'chess_char_4_02_a';
+const battleStacker = (gd, id) => traitDescs(gd, id).some((g) => g.eventType === 'IN_BATTLE' && STACK_UP.test(g.desc || ''));
+export function placeCivilight(m, ps) {
+  const gd = gdOf(m, ps);
+  const pieces = () => [...ps.board.entries()].filter(([, q]) => q.kind === 'chess');
+  const frontOf = (key, q) => { const [r, c] = parseKey(key); const [dr, dc] = DIRS[pieceDir(q)] || [0, 0]; return ps.board.get(tileKey(r + dr, c + dc)); };
+  let moved = 0;
+  for (const [key, civ] of pieces()) {
+    if (!CIVILIGHT.test(civ.id)) continue;
+    const partners = pieces().filter(([, q]) => q !== civ && !CIVILIGHT.test(q.id) && battleStacker(gd, q.id))
+      .sort(([, a], [, b]) => ((gd.baseIdOf(b.id) === MOSTIMA) - (gd.baseIdOf(a.id) === MOSTIMA)) || (gd.tierOf(b.id) - gd.tierOf(a.id)) || a.uid - b.uid);
+    if (!partners.length) continue;
+    const now = frontOf(key, civ);
+    if (now && now === partners[0][1]) continue;
+    const keep = new Set(pieces().filter(([, q]) => q !== civ && (battleStacker(gd, q.id) || CIVILIGHT.test(q.id))).map(([k]) => k));
+    keep.delete(key);
+    for (const [pk] of partners.slice(0, 1)) {
+      const [pr, pc] = parseKey(pk);
+      for (const dir of Object.keys(DIRS)) {
+        const [dr, dc] = DIRS[dir];
+        if (moveTo(ps, civ, pr - dr, pc - dc, dir, keep)) { moved++; break; }
+      }
+    }
+  }
+  return moved;
+}
+export const PLACE_CIVILIGHT = defineTactic({
+  id: 'place-civilight',
+  describe: 'after the rehearsed layout, moves Civilight Eterna behind Mostima, else behind the best battle-time stacker',
+  params: { fromRound: int(1, 14, 4), boss: { type: 'bool', default: true } },
+  at: {
+    finishLayout(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && (p.boss || m.wave)) placeCivilight(m, ps);
+      return ctx.next();
+    },
+  },
+});
+
+/**
+ * Fartooth (Fish's TODO: "Kazimierz specific: Fartooth + Blemishine combo (or Fartooth + Degenbrecher is even better)"):
+ * at battle start she gives the rightmost operator in her row "<部署时> active Kazimierz and Precision +4 (up to 24 a
+ * battle)". After the rehearsed layout, the best deploy-trigger partner (Degenbrecher, then Blemishine, then any deployed
+ * piece with a 部署时 layer trait) moves to be the rightmost piece of Fartooth's row: onto a tile right of every other
+ * piece there, else swapping with the rightmost one.
+ */
+const FARTOOTH = /^chess_char_4_20_/;
+const DEGEN = 'chess_char_6_19_a', BLEMISHINE = 'chess_char_3_12_a';
+const deployStacker = (gd, id) => traitDescs(gd, id).some((g) => /部署时/.test(g.desc || '') && STACK_UP.test(g.desc || ''));
+export function placeFartooth(m, ps) {
+  const gd = gdOf(m, ps);
+  const pieces = () => [...ps.board.entries()].filter(([, q]) => q.kind === 'chess');
+  const ft = pieces().find(([, q]) => FARTOOTH.test(q.id));
+  if (!ft) return 0;
+  const rank = (q) => (gd.baseIdOf(q.id) === DEGEN ? 3 : gd.baseIdOf(q.id) === BLEMISHINE ? 2 : deployStacker(gd, q.id) ? 1 : 0);
+  const partner = pieces().filter(([, q]) => !FARTOOTH.test(q.id) && rank(q) > 0).sort(([, a], [, b]) => rank(b) - rank(a) || gd.tierOf(b.id) - gd.tierOf(a.id) || a.uid - b.uid)[0];
+  if (!partner) return 0;
+  const [row] = parseKey(ft[0]);
+  const inRow = () => pieces().filter(([k]) => parseKey(k)[0] === row);
+  const rightmost = () => inRow().sort(([a], [b]) => parseKey(b)[1] - parseKey(a)[1])[0];
+  if (rightmost()?.[1] === partner[1]) return 0;
+  const maxCol = Math.max(...inRow().filter(([, q]) => q !== partner[1]).map(([k]) => parseKey(k)[1]));
+  const keep = new Set([ft[0]]);
+  for (let c = 20; c > maxCol; c--) if (moveTo(ps, partner[1], row, c, pieceDir(partner[1]), keep)) return 1;
+  // no free tile right of them: swap with the rightmost piece (not Fartooth herself)
+  const [rk, rq] = rightmost() || [];
+  if (rk && !FARTOOTH.test(rq.id)) { const [r, c] = parseKey(rk); if (moveTo(ps, partner[1], r, c, pieceDir(partner[1]), keep)) return 1; }
+  return 0;
+}
+export const PLACE_FARTOOTH = defineTactic({
+  id: 'place-fartooth',
+  describe: "after the rehearsed layout, makes Degenbrecher (else Blemishine) the rightmost piece of Fartooth's row",
+  params: { fromRound: int(1, 14, 4), boss: { type: 'bool', default: true } },
+  at: {
+    finishLayout(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && (p.boss || m.wave)) placeFartooth(m, ps);
+      return ctx.next();
+    },
+  },
+});
+
+/** Drafted after the weekend race (2026-11-13) started: registered, but not in its `research` pool. */
+export const RESEARCH_TACTICS_LATE = Object.freeze([PLACE_CIVILIGHT, PLACE_FARTOOTH]);
 
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
   LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST, PLACE_AMMO]);

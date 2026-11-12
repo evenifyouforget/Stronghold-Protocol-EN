@@ -55,7 +55,7 @@ import { fileURLToPath } from 'node:url';
 import { TACTICS } from '../server/match/botStrategies.js';
 import { BASIC_TACTICS } from '../server/match/botTacticsBasic.js';
 import { LEGACY_TACTICS } from '../server/match/botTacticsLegacy.js';
-import { RESEARCH_TACTICS } from '../server/match/botTacticsResearch.js';
+import { RESEARCH_TACTICS, RESEARCH_TACTICS_LATE } from '../server/match/botTacticsResearch.js';
 import * as RACE from './race.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -86,7 +86,7 @@ const RULES = opt.rules || '';
 const SEED = +(opt.seed || 1);
 // --jobs: default from the machine (cores − 2, and about 1.5 GB a worker), so the PC command needs no tuning
 const JOBS_MAX = opt.jobs ? +opt.jobs : Math.max(1, Math.min((os.availableParallelism?.() ?? os.cpus().length) - 2, Math.floor(os.totalmem() / 1.5e9)));
-const POOLS = { research: RESEARCH_TACTICS, basic: BASIC_TACTICS, legacy: LEGACY_TACTICS };
+const POOLS = { research: RESEARCH_TACTICS, late: RESEARCH_TACTICS_LATE, basic: BASIC_TACTICS, legacy: LEGACY_TACTICS };
 // a pool entry is a pool name or a single tactic id (e.g. research,basic,legacy-rules)
 const POOL = [...new Set(String(opt.pool || 'research,basic').split(',').flatMap((p) => {
   if (POOLS[p]) return POOLS[p];

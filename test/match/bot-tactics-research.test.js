@@ -450,3 +450,62 @@ test('carry-iso order either: the Isomorph goes on first, the Alliance item late
     assert.equal(equipCarry(h.m, ps, params()), 0, 'done: both worn');
   } finally { h.m.dispose(); }
 });
+
+test('place-civilight puts Civilight Eterna behind Mostima, facing her; place-fartooth makes Degenbrecher the rightmost of her row', async () => {
+  const { placeCivilight, placeFartooth } = await import('../../server/match/botTacticsResearch.js');
+  const { tileKey, parseKey, inField, pieceDir } = await import('../../server/match/board.js');
+  const DIRS = { UP: [-1, 0], RIGHT: [0, 1], DOWN: [1, 0], LEFT: [0, -1] };
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(2);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const most = ps.newPiece('chess', 'chess_char_4_02_a'), civ = ps.newPiece('chess', 'chess_char_4_25_a');
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(most, r, c) && ps._legal(civ, r, c)) tiles.push([r, c]);
+    const M = tiles.find(([r, c]) => tiles.some(([r2, c2]) => Math.abs(r - r2) + Math.abs(c - c2) === 1));
+    const far = tiles.find(([r, c]) => Math.abs(r - M[0]) + Math.abs(c - M[1]) > 2);
+    ps.board.set(tileKey(...M), most);
+    ps.board.set(tileKey(...far), civ);
+    ps.recompute();
+    assert.equal(placeCivilight(h.m, ps), 1);
+    const [cr, cc] = parseKey([...ps.board].find(([, q]) => q === civ)[0]);
+    const [dr, dc] = DIRS[pieceDir(civ)];
+    assert.deepEqual([cr + dr, cc + dc], M, 'Mostima is in front of her');
+    assert.equal(placeCivilight(h.m, ps), 0, 'already behind her');
+
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const ft = ps.newPiece('chess', 'chess_char_4_20_a'), dg = ps.newPiece('chess', 'chess_char_6_19_a'), other = ps.newPiece('chess', 'chess_char_1_03_a');
+    const ok3 = (r, c) => inField(r, c) && ps._legal(ft, r, c) && ps._legal(dg, r, c) && ps._legal(other, r, c);
+    let row = null;
+    for (let r = -5; r <= 20 && row == null; r++) { const cs = []; for (let c = -5; c <= 20; c++) if (ok3(r, c)) cs.push(c); if (cs.length >= 4) row = { r, cs }; }
+    assert.ok(row, 'a row with 4 tiles');
+    const elsewhere = tiles.find(([r]) => r !== row.r && ps._legal(dg, ...[r, tiles.find((t) => t[0] === r)[1]]));
+    ps.board.set(tileKey(row.r, row.cs[0]), ft);
+    ps.board.set(tileKey(row.r, row.cs[row.cs.length - 1]), other);
+    ps.board.set(tileKey(...(elsewhere || [row.r, row.cs[1]])), dg);
+    ps.recompute();
+    placeFartooth(h.m, ps);
+    const inRow = [...ps.board].filter(([k, q]) => q.kind === 'chess' && parseKey(k)[0] === row.r).sort(([a], [b]) => parseKey(b)[1] - parseKey(a)[1]);
+    assert.equal(inRow[0][1], dg, `Degenbrecher rightmost of row ${row.r}`);
+  } finally { h.m.dispose(); }
+});
+
+test('diy-picks: while Ascalon is owned without a Nevermeltice, Kjera (who brings one) goes into the buy plan', async () => {
+  const { DIY_PICKS } = await import('../../server/match/botTacticsResearch.js');
+  const bot = profileFromData({ id: 't-diy-kjera', tactics: [{ tactic: 'diy-picks', params: { t5a: 'ascalon' } }] });
+  const h = soloBot({ botStrategy: bot, seed: 7 });
+  try {
+    h.start();
+    const ps = h.m.order[0];
+    assert.equal(ps.diy?.chess_char_5_diy1_a?.charId, 'char_4132_ascln', 'Ascalon on tier 5');
+    h.toPrep(3);
+    ps.ready = false;
+    assert.ok(ps.acquireChess('chess_char_5_diy1_a', { source: 'test' }));
+    ps._botSelf = null;
+    DIY_PICKS.at.sellJunk({ match: h.m, player: ps, params: resolveParams(DIY_PICKS, { t5a: 'ascalon' }), next: () => null });
+    assert.ok(ps._botSelf.plan.buy.includes('chess_char_3_20_a') && ps._botSelf.plan.buy.includes('chess_char_4_03_a'), JSON.stringify(ps._botSelf.plan.buy));
+  } finally { h.m.dispose(); }
+});
