@@ -401,3 +401,47 @@ Against legacy + iso-not-muelsyse, the clone without 画卷 is 1 / 4 (p 0.38).
   (her Yan item + Isomorph, "9 Yan with 8 deployed") may be worth something. Fish's rule stands; worth watching.
 - **Keeping her and level 6 without the 画卷:** 15 → 12 (n.s.). Level 6 by round 13 (5.6 against 5.0), and stacks at
   round 13 drop (178 against 210): the funds go into the level, not the board.
+
+## Queue24: the human-style clone (783d0ae7) (2026-11-13)
+
+Du Yaoye solo Ultimate, paired by seed. `legmu3` = legacy + the human-style dyy-muelsyse (keep her, sell the extra
+copies, no 画卷); `dyybot3` = the dyybot profile at 783d0ae7.
+
+**Muelsyse gifted at round 7 with a 画卷 (mu-scroll), seeds 1–80, against legacy (19 wins):**
+
+| | Wins | Seeds won / lost | p |
+|---|---|---|---|
+| legacy + iso-not-muelsyse (legnomu) | 15 | 1 / 5 | 0.22 |
+| legmu (first clone, 画卷 on her) | 4 | 1 / 16 | < 0.001 |
+| legmu3 (human-style) | 13 | 3 / 9 | 0.15 |
+| dyybot (queue21) | 6 | 1 / 14 | < 0.001 |
+| dyybot3 | 8 | 2 / 13 | 0.01 |
+
+**Muelsyse gifted at round 7 with a 商业包装方案 (mu-pack), seeds 1–80, against legacy (15 wins):**
+
+| | Wins | Seeds won / lost | p |
+|---|---|---|---|
+| legnomu | 13 | 1 / 3 | 0.63 |
+| legmu3 | 5 | 1 / 11 | 0.01 |
+| legmu3 without the packaging cycle | 5 | 1 / 11 | 0.01 |
+
+**Normal games (no gift), seeds 1–160, against legacy (20 wins):** dyybot 17, dyybot3 17, dyybot-nomu 16 (all n.s.,
+10 / 13 seeds). Muelsyse rarely comes up by herself, so the clone changes almost nothing there.
+
+- **The human-style clone loses less than the first one** (13 against 4 with the 画卷), but **still loses to not chasing
+  her at all** (legacy 19, legnomu 15). Buying her copies and levelling to 6 for them costs more than the Isomorphs
+  give the bots.
+- **With the packaging plan it is worse** (5 against 15): the plan is spent on Muelsyse instead of the board's best
+  operator, which is what legacy does with it.
+- **The packaging cycle never changed a game:** with and without it, every seed is identical. Either it never starts
+  in this scenario (its funds reserve, or no second plan) or it is broken. To check before trusting it.
+- **dyybot3's other tactics cost a little more** in the scenario (8 against legmu3's 13): carry-hologram, plan-iso
+  and the level schedule, tested one by one in queue25.
+- **Why the humans win with it and the bots don't:** the 11–12 Isomorph humans played Paganini solo and spent the
+  Isomorphs on alliance memberships that completed big Alliances. The bots place Isomorphs by legacy's rules
+  (`carry-iso`), which doesn't plan memberships. The clone pays only once that part exists: the next tactic to draft
+  is **iso-memberships** (put each Isomorph where it completes or upgrades an Alliance level), then re-test the clone
+  on top of it.
+
+**Next (queue25):** dyybot3 minus one tactic at a time in mu-scroll; the packaging cycle's trigger counts; the
+iso-memberships draft.
