@@ -299,3 +299,25 @@ Solo Ultimate, Du Yaoye forced, seeds 1–160, paired, from `feature/fish-dyy-pr
 - So the early levelling only pays if the levels turn into strength. Humans do that with the roll-down and the
   Isomorph engine (above). That was step 3's order: `plan-iso` first (queue6, queue8: no gain), then the roll-down.
 
+
+## Step 3 continued: the Muelsyse clone, and the `dyybot` profile (2026-11-13)
+
+**Why legacy never clones her:** legacy sells a normal 缪尔赛思 as soon as she arrives (§37.42 `sellMorphBringers`: the
+Isomorph she brought stays, she goes back to the pool). So no Muelsyse is held when a clone item comes.
+
+**The clone:** 画卷 (`chess_item_6_02_m`, a tier-6 Art) copies the operator on its tile, and the copy counts as a gain:
+one more 变形同构体 (2 for an elite, repeated under Investor). 拟态物质 is not a clone of one Muelsyse: it gives the third
+copy only with 2 normal copies held, otherwise a random operator of her Alliances.
+
+`dyy-muelsyse` (`server/match/botTacticsDyy.js`, c2b1b386): while fewer than `maxIso` (6) Isomorphs are owned and a
+Muelsyse is held:
+- keeps her (`keep: clone`: only while a 画卷 is held or shown; `always`);
+- lists 画卷 for buying and keeps it from legacy's own Art rule;
+- uses a held 画卷 on her (moving her onto the board first if needed);
+- levels to 6 by Fish's rule (`level6: clone`: she is held and a 画卷 is held or shown; `held`; `off`).
+From 6 Isomorphs on it stops, and legacy sells her.
+
+**`dyybot`** (the step-3 draft): dyy-muelsyse, dyy-shop, dyy-freeze, dyy-level (`human`), plan-iso from shop level 5,
+carry-iso, plan-items (stack items: 简易通讯机 and co.). Queue21: solo Ultimate, Du Yaoye forced, seeds 1–160, against
+the baseline above; `dyybot` without dyy-muelsyse; and the scenario `mu-scroll` (Muelsyse and a 画卷 at round 9, a
+second 画卷 at round 11), legacy against dyybot, seeds 1–80.

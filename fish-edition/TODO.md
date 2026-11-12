@@ -38,7 +38,9 @@ Evolution bench ............................ built and effective (tools/evolve.m
 DYYBot (#135, draft)
   step 1: human games vs the draft, legacy's games vs the humans' .. done (05)
   ├─ forced-Du-Yaoye baseline + the draft, 160 seeds .. done (05: no win difference; early levels cost the board)
-  └─ step 3 tactics: `plan-iso` measured: no gain (inert at level 5; level 6 from round 11 costs 20 → 12 wins, Isomorph adds nothing). Maybe: level 6 only with Muelsyse held; then the roll-down
+  └─ step 3 tactics: `plan-iso` measured: no gain (inert at level 5; level 6 from round 11 costs 20 → 12 wins, Isomorph adds nothing)
+       ├─ `dyy-muelsyse` + the `dyybot` profile (c2b1b386): keep Muelsyse, copy her with 画卷, level 6 only with her held. queue21: 160 seeds + a scenario
+       └─ then the roll-down
        └─ step 5 evolution: on Fish's PC (one command, one zip)
 ```
 
@@ -193,6 +195,14 @@ Possibly useful for testing:
       `botbench --scenario FILE` (d083044b, `tools/scenario.mjs`): gifts of operators, items or funds at a round's prep
       start, through the game's own gain path (Muelsyse's on-gain Isomorph arrives too). The Muelsyse run is next.
 - [ ] Other scenario tests, which make it possible to test if a tactic is useful even if it would only be relevant to 5% of games happening by chance
+      Fish (2026-11-13): many more scenarios, like puzzles / unit tests (e.g. 6 Ægir operators: does the bot build the
+      snake? Fartooth + Blemishine: does it combo them?); and, like integration tests, start from a human game's state
+      (round 7, 10 or the final boss) and see if the bot can take over and win. Only the original seed compares with
+      the human game; other seeds compare with each other. The first scenario for DYYBot is in queue21 (`mu-scroll`).
+
+Composite score:
+
+- [ ] May be useful as additional signal for auto-tuning, not just win/loss. Maybe something like, up to +20% bonus for killing the final boss fast, up to +10% awarded for having many total stacks (regardless of overall win/loss), +10% awarded for losing less LP before the final boss round. If research already says this is useless, we don't need to use it as a fitness metric. Maybe only or diagnostics.
 
 ## Mod Z
 
