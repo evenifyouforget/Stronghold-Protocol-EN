@@ -410,18 +410,29 @@ export function StagePreview({ stageId }) {
 }
 
 /**
- * (Fish Edition) The Mod Z / W the room allows, one button per operator module (shared/modZ.js; the cheat `modZ`). A 自选
- * pick naming a module that is not allowed fields the operator's first module instead (shared/diy.js modZFallbackPicks).
+ * (Fish Edition) The Mod Z / W the room equips, one button per module (shared/modZ.js; the cheat `modZ`): an operator's
+ * module on = every player's 自选 pick of that operator fields it (shared/diy.js modZRulePicks). One per operator: turning
+ * on Typhon W turns his Z off.
  */
 function ModZPicker({ rules, editable, onSet }) {
   useData('backups');
   const on = new Set(rules.modZ || []);
   const set = (ids) => onSet({ modZ: MODZ.map((m) => m.id).filter((id) => ids.has(id)) });
-  const toggle = (id) => { const next = new Set(on); if (next.has(id)) next.delete(id); else next.add(id); set(next); };
-  return html`<p class="rules-row__desc">${t('自选干员可以选择允许的Z型/W型模组（Fish Edition的自制模组，草案，未经平衡）；选择了未允许模组的自选干员改用其第一个模组')}</p>
+  const toggle = (id) => {
+    const next = new Set(on);
+    if (next.has(id)) next.delete(id);
+    else {
+      const z = MODZ.find((m) => m.id === id);
+      for (const m of MODZ) if (m.charId === z.charId) next.delete(m.id);
+      next.add(id);
+    }
+    set(next);
+  };
+  const ops = new Set(MODZ.map((m) => m.charId)).size;
+  return html`<p class="rules-row__desc">${t('开启后，所有博士的该自选干员都装备这个模组（Fish Edition的自制模组，草案，未经平衡）；每名干员最多开启一个')}</p>
     <div class="rules-bans">
-      <div class="rules-bans__head"><b>${t('允许的模组')}</b><span class="t-dim">${t('已选 {n}/{max}', { n: on.size, max: MODZ.length })}</span>
-        <${Button} size="sm" variant="ghost" disabled=${!editable || on.size === MODZ.length} onClick=${() => set(new Set(MODZ.map((m) => m.id)))}>${t('全部')}<//>
+      <div class="rules-bans__head"><b>${t('装备的模组')}</b><span class="t-dim">${t('已开启 {n}/{max}名干员', { n: on.size, max: ops })}</span>
+        <${Button} size="sm" variant="ghost" disabled=${!editable || on.size === ops} onClick=${() => set(new Set(MODZ.filter((m, i) => MODZ.findIndex((x) => x.charId === m.charId) === i).map((m) => m.id)))}>${t('全部Z型')}<//>
         <${Button} size="sm" variant="ghost" disabled=${!editable || on.size === 0} onClick=${() => set(new Set())}>${t('清空')}<//>
       </div>
       <div class="rules-bans__grid">

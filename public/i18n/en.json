@@ -2921,8 +2921,11 @@
   "攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力10%的法术伤害和5%的神经损伤": "Attack range +1; during his skill, range +1 more, +1 target, and Invisible; attacks also deal Arts damage equal to 10% of ATK and Nervous Impairment equal to 5% of ATK",
   "在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%": "While she is on the field, every enemy's weight −2; her damage to a target not in an elemental burst all becomes Corrosion; for each +10% ATK she has (up to 99 stacks), SP recovery +0.02 per second and the cannon's redeploy time −1%",
   "Z型/W型模组（草案）：{list}": "Mod Z / W (draft): {list}",
-  "自选干员可以选择允许的Z型/W型模组（Fish Edition的自制模组，草案，未经平衡）；选择了未允许模组的自选干员改用其第一个模组": "Custom operators may use the Mod Z / Mod W allowed here (Fish Edition's own modules: drafts, not balanced). A custom operator set to one that is not allowed uses its first module instead",
-  "允许的模组": "Allowed modules",
-  "已选 {n}/{max}": "{n}/{max} selected",
-  "Z型/W型模组": "Mod Z / W"
+  "Z型/W型模组": "Mod Z / W",
+  "在房间的自定义房间改动中为该干员开启Z型模组（作弊）": "Enable Mod Z (cheat) for this operator in the room's Custom Lobby Modifications",
+  "Z型模组可用": "Mod Z available",
+  "开启后，所有博士的该自选干员都装备这个模组（Fish Edition的自制模组，草案，未经平衡）；每名干员最多开启一个": "When on, this custom operator uses the module for every player (Fish Edition's own modules: drafts, not balanced). One module per operator at most",
+  "装备的模组": "Equipped modules",
+  "已开启 {n}/{max}名干员": "{n}/{max} operators on",
+  "全部Z型": "All Z"
 }

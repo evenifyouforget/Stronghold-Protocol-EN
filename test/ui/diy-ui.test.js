@@ -110,7 +110,7 @@ describe('自选编队 model (ui/diyModel.js)', () => {
   test('choices: three skills, the elite form\'s modules without the 集成战略 (ISW-A) ones; a prototype\'s locked selection', () => {
     const ch = M.pickChoices(SIEGE, T6A, D);
     assert.deepEqual(ch.skills.map((s) => s.index), [0, 1, 2]);
-    assert.deepEqual(ch.modules.map((x) => x.uniEquipId), ['uniequip_002_siege', 'uniequip_003_siege', 'uniequip_fishz_siege'], 'and his Mod Z (shared/modZ.js)');
+    assert.deepEqual(ch.modules.map((x) => x.uniEquipId), ['uniequip_002_siege', 'uniequip_003_siege']);
     assert.equal(ch.stage, 3);
     assert.equal(M.pickChoices(SIEGE, T5A, D).stage, 1);
     const kalts = M.pickChoices(KALTS, T6A, D);
@@ -294,7 +294,10 @@ describe('自选编队 picker (screens/diy.js)', () => {
     assert.deepEqual(skills.map((v) => v.props['data-skill']), [0, 1, 2]);
     assert.equal(skills.find((v) => v.props['aria-checked'] === 'true').props['data-skill'], 2);
     const mods = [...walk(tree)].filter((v) => v.props?.role === 'radio' && v.props['data-module'] != null);
-    assert.deepEqual(mods.map((v) => v.props['data-module']), ['none', 'uniequip_002_siege', 'uniequip_003_siege', 'uniequip_fishz_siege']);
+    assert.deepEqual(mods.map((v) => v.props['data-module']), ['none', 'uniequip_002_siege', 'uniequip_003_siege'], 'no Mod Z among the choices');
+    // (Fish Edition) an operator with a Mod Z / W says so on its card (the lobby rules equip it); one without does not
+    const tagged = (id) => [...walk(opts.find((v) => v.props['data-char'] === id))].some((v) => v.props?.['data-modz-available']);
+    assert.ok(tagged(SIEGE) && !tagged(SHARP), 'the "Mod Z available" tag');
     // another skill and no module, then 确认
     skills.find((v) => v.props['data-skill'] === 0).props.onClick();
     tree = view();
@@ -382,7 +385,7 @@ describe('自选编队 picker (screens/diy.js)', () => {
     assert.deepEqual(parts, ['lo-op__skills', 'lo-op__mods'], 'skills at the top, modules below');
     assert.deepEqual([...walk(side)].filter((v) => hasClass(v, 'lo-q--skill')).map((v) => v.props['data-skill']), [0, 1, 2]);
     const list = [...walk([...walk(side)].find((v) => hasClass(v, 'lo-op__mlist')))].filter((v) => hasClass(v, 'lo-q--mod'));
-    assert.deepEqual(list.map((v) => v.props['data-module']), ['none', 'uniequip_002_siege', 'uniequip_003_siege', 'uniequip_fishz_siege']);
+    assert.deepEqual(list.map((v) => v.props['data-module']), ['none', 'uniequip_002_siege', 'uniequip_003_siege']);
     const step = [...walk(side)].find((v) => hasClass(v, 'lo-op__mod'));
     assert.equal(step.props['data-module'], 'uniequip_002_siege', 'the default pick\'s module');
     step.props.onClick();

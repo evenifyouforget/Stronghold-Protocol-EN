@@ -25,7 +25,7 @@
 // Which operators have a kit (a pick without one is not offered) is the sim's kit registry
 // (server/sim/content/kits/index.js KITTED_CHARS), passed in as `kitted`.
 
-import { modZOf, isModZ } from './modZ.js';
+import { modZOf, isModZ, modZFor, withModZ } from './modZ.js';
 import { composeUnitRecord, unitForm, statusKey } from './standIn.js';
 import { atPotential } from './potential.js';
 
@@ -169,7 +169,7 @@ export function checkDiyPick(slotId, pick, data) {
   const wantMod = pick.uniEquipId === undefined || pick.uniEquipId === 'none' ? null : pick.uniEquipId;
   if (want !== null && !(Number.isInteger(want) && want >= 0 && want <= 9)) return { error: `${charId}: bad skill index ${want}` };
   if (wantMod !== null && (typeof wantMod !== 'string' || !ID.test(wantMod))) return { error: `${charId}: bad module ${wantMod}` };
-  const forms = [slot.normal, slot.golden].map((rec) => (rec ? unitForm(backupsOf(data), charId, rec.status) : null));
+  const forms = [slot.normal, slot.golden].map((rec) => (rec ? formWith(backupsOf(data), charId, rec.status, wantMod) : null));
   if (forms.some((f) => !f)) return { error: `${charId}: no form for ${slot.baseId}` };
   let skillIndex, uniEquipId;
   if (proto) {
@@ -214,7 +214,7 @@ export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
   const backups = backupsOf(data);
   const unit = backups?.units?.[charId] ?? null;
   const proto = isPrototypePick(data, slot.tier, charId);
-  const form = unitForm(backups, charId, slot.status);
+  const form = formWith(backups, charId, slot.status, uniEquipId);
   const rec = composeUnitRecord(slot, unit, proto ? form : atPotential(form, potential),
     { skillIndex, moduleId: uniEquipId, bonds: diyOf(data)?.operators?.[charId]?.bonds ?? null });
   if (!rec || !rec.skill) return null;
@@ -247,7 +247,7 @@ export function diyRecord(slotId, pick, { elite = false, data, potential = null 
  */
 export function diyModuleOf(slotId, charId, uniEquipId, data) {
   const slot = diySlot(slotId, data);
-  const form = slot?.golden ? unitForm(backupsOf(data), charId, slot.golden.status) : null;
+  const form = slot?.golden ? formWith(backupsOf(data), charId, slot.golden.status, uniEquipId) : null;
   return (form?.modules ?? []).find((m) => m && m.uniEquipId === uniEquipId) ?? null;
 }
 
@@ -293,25 +293,45 @@ export function validateDiyPicks(picks, { data, kitted = null } = { data: null }
 }
 
 /**
- * (Fish Edition) The picks a room fields under its Mod Z rule (shared/rules.js `modZ`: the allowed Mod Z / W ids,
- * shared/modZ.js): a pick naming a Mod Z / W the room does not allow takes the operator's first module of the slot's elite form instead (isDiyModule, not a Mod Z), or none
- * when it has no other. Other picks, and the allowed ones, are returned as they are. A new object when
- * something changed.
+ * (Fish Edition) The picks a room fields under its Mod Z rule (shared/rules.js `modZ`: the Mod Z / W ids the host turned
+ * on, at most one per operator; shared/modZ.js). The lobby rule equips them, not the players: every pick of an operator
+ * with a module on fields that module (whatever official module its owner chose). A pick that names a Mod Z / W the room
+ * does not have on (a stale or hand-made one) takes the operator's first module instead (isDiyModule), or none. Other
+ * picks are returned as they are; a new object when something changed.
  * @param {any} picks `{ [slotBaseId]: DiyPick | null }`
  * @param {any} rules the room's lobby rules
  * @param {DiyData} data
  */
-export function modZFallbackPicks(picks, rules, data) {
+export function modZRulePicks(picks, rules, data) {
   if (!isObj(picks)) return picks;
-  const allowed = new Set(Array.isArray(rules?.modZ) ? rules.modZ : []);
+  const on = new Map();
+  for (const id of Array.isArray(rules?.modZ) ? rules.modZ : []) { const z = modZOf(id); if (z && !on.has(z.charId)) on.set(z.charId, z.id); }
   let out = picks;
   for (const [slotId, pick] of Object.entries(picks)) {
-    if (!isObj(pick) || !isModZ(pick.uniEquipId) || allowed.has(pick.uniEquipId)) continue;
-    const slot = diySlot(slotId, data);
-    const form = slot?.golden ? unitForm(backupsOf(data), pick.charId, slot.golden.status) : null;
-    const first = (form?.modules ?? []).find((m) => isDiyModule(m) && !isModZ(m.uniEquipId));
+    if (!isObj(pick) || typeof pick.charId !== 'string') continue;
+    let id = pick.uniEquipId;
+    if (on.has(pick.charId)) id = on.get(pick.charId);
+    else if (isModZ(id)) {
+      const slot = diySlot(slotId, data);
+      const form = slot?.golden ? unitForm(backupsOf(data), pick.charId, slot.golden.status) : null;
+      id = (form?.modules ?? []).find((m) => isDiyModule(m))?.uniEquipId ?? null;
+    }
+    if (id === pick.uniEquipId) continue;
     if (out === picks) out = { ...picks };
-    out[slotId] = { ...pick, uniEquipId: first?.uniEquipId ?? null };
+    out[slotId] = { ...pick, uniEquipId: id };
   }
   return out;
+}
+
+/** Whether the custom-operator list should say "Mod Z available" for `charId` (it has a Mod Z / W; shared/modZ.js). */
+export const hasModZ = (charId) => modZFor(charId).length > 0;
+
+/**
+ * The form of `charId` at `status` that carries module `moduleId`: with its Mod Z / W appended when `moduleId` names one
+ * (shared/modZ.js withModZ: the lobby rule equipped it, modZRulePicks), else the data's form (unitForm). A player's own
+ * choice never lists a Mod Z / W: the custom-operator picker reads unitForm.
+ */
+function formWith(backups, charId, status, moduleId) {
+  const form = unitForm(backups, charId, status);
+  return form && isModZ(moduleId) ? withModZ(charId, form) : form;
 }

@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { MODZ, modZOf, withModZ } from '../shared/modZ.js';
 import { MODZ_INSTALLED } from '../server/sim/content/modZ.js';
-import { modZFallbackPicks, diyRecord } from '../shared/diy.js';
+import { modZRulePicks, diyRecord, checkDiyPick, hasModZ } from '../shared/diy.js';
+import { unitForm } from '../shared/standIn.js';
 import { getDefaultSource } from '../server/sim/simdata.js';
 import { RULES, isRuleValue, normalizeRules, ruleSet } from '../shared/rules.js';
 import { makeBattle, enemyRec } from './helpers/battleHarness.js';
@@ -24,31 +25,46 @@ test('every Mod Z / W has battle effects, a unique id and an operator in the cus
   assert.equal(rule.category, 'cheat');
   assert.deepEqual(rule.options, MODZ.map((m) => m.id), 'one option per module');
   assert.ok(isRuleValue('modZ', ['uniequip_fishz_weedy']) && !isRuleValue('modZ', ['uniequip_002_siege']) && !isRuleValue('modZ', true));
+  assert.ok(!isRuleValue('modZ', ['uniequip_fishz_typhon', 'uniequip_fishw_typhon']), 'one module per operator');
+  assert.deepEqual(normalizeRules({ modZ: ['uniequip_fishw_typhon', 'uniequip_fishz_typhon'] }).modZ, ['uniequip_fishz_typhon'], 'the first in order is kept');
   assert.deepEqual(normalizeRules({ modZ: ['uniequip_fishz_weedy', 'bogus', 'uniequip_fishz_typhon'] }).modZ, ['uniequip_fishz_typhon', 'uniequip_fishz_weedy']);
   assert.ok(ruleSet('modZ', ['uniequip_fishz_weedy']) && !ruleSet('modZ', []));
 });
 
-test('withModZ appends to the elite forms only (forms with modules)', () => {
+test('withModZ appends to the elite forms only (forms with modules); the players\' lists never show them', () => {
   for (const m of MODZ) {
+    assert.ok(hasModZ(m.charId), `${m.charId}: the "Mod Z available" tag`);
     for (const form of Object.values(backups.units[m.charId].forms)) {
       const out = withModZ(m.charId, form);
       if (!form.modules?.length) { assert.equal(out, form); continue; }
-      assert.equal(out.modules.length, form.modules.length + MODZ.filter((x) => x.charId === m.charId).length);
       assert.ok(out.modules.some((x) => x.uniEquipId === m.id && x.fishModZ === m.kind));
+      assert.ok(!(form.modules ?? []).some((x) => x.fishModZ), 'the data form is untouched');
     }
   }
+  const slot = backups.diy.slots[Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6)];
+  const elite = unitForm(backups, 'char_2012_typhon', data.chess[slot.goldenId].status);
+  assert.ok(elite.modules.length > 0 && !elite.modules.some((x) => x.fishModZ), 'unitForm (the picker) has no Mod Z / W');
 });
 
-test('the rule is per module: a Mod Z pick the room does not allow falls back to an official module', () => {
+test('the lobby rule equips the module: every pick of that operator fields it, others keep theirs', () => {
   const slot = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
-  const pick = { charId: 'char_188_helage', skillIndex: 2, uniEquipId: 'uniequip_fishz_helage' };
-  const off = modZFallbackPicks({ [slot]: pick }, {}, data)[slot];
-  assert.ok(off.uniEquipId === null || /^uniequip_\d{3}_/.test(off.uniEquipId), String(off.uniEquipId));
-  assert.deepEqual(modZFallbackPicks({ [slot]: pick }, { modZ: ['uniequip_fishz_helage'] }, data)[slot], pick, 'allowed');
-  const other = modZFallbackPicks({ [slot]: pick }, { modZ: ['uniequip_fishz_typhon'] }, data)[slot];
-  assert.notEqual(other.uniEquipId, pick.uniEquipId, 'another operator\'s module allowed: this one falls back');
-  const rec = diyRecord(slot, pick, { elite: true, data });
-  assert.ok(rec.bonds.includes('raidShip'), 'Hellagur Z grants Raid');
+  const slot2 = Object.keys(backups.diy.slots).filter((id) => backups.diy.slots[id].tier === 6)[1];
+  const hel = { charId: 'char_188_helage', skillIndex: 2, uniEquipId: 'uniequip_002_helage' };
+  const siege = { charId: 'char_112_siege', skillIndex: 2, uniEquipId: null };
+  const picks = { [slot]: hel, [slot2]: siege };
+  assert.equal(modZRulePicks(picks, {}, data), picks, 'no rule: unchanged');
+  const on = modZRulePicks(picks, { modZ: ['uniequip_fishz_helage', 'uniequip_fishz_siege'] }, data);
+  assert.deepEqual(on[slot], { ...hel, uniEquipId: 'uniequip_fishz_helage' }, 'replaces the chosen module');
+  assert.deepEqual(on[slot2], { ...siege, uniEquipId: 'uniequip_fishz_siege' }, 'and "no module" too');
+  const only = modZRulePicks(picks, { modZ: ['uniequip_fishz_siege'] }, data);
+  assert.equal(only[slot], hel, 'an operator without its module on is untouched');
+  const stale = modZRulePicks({ [slot]: { ...hel, uniEquipId: 'uniequip_fishz_helage' } }, {}, data)[slot];
+  assert.ok(stale.uniEquipId === null || /^uniequip_\d{3}_/.test(stale.uniEquipId), `a stale Mod Z pick falls back: ${stale.uniEquipId}`);
+  assert.ok('ok' in checkDiyPick(slot, on[slot], data), 'the equipped pick is legal');
+  const rec = diyRecord(slot, on[slot], { elite: true, data });
+  assert.equal(rec.module.id, 'uniequip_fishz_helage');
+  assert.ok(rec.module.active && rec.bonds.includes('raidShip'), 'Hellagur Z grants Raid');
+  assert.ok(!diyRecord(slot, on[slot], { elite: false, data }).bonds.includes('raidShip'), 'only on the elite');
 });
 
 test('battle smoke: every Mod Z / W fights 60 s without a handler error', () => {
@@ -75,4 +91,19 @@ test('Saileach Z: block 0, Invisible, allied redeploy timers +50 %', () => {
   const left = t.respawnAt - h.b.time;
   h.run(4);
   assert.ok(Math.abs((t.respawnAt - h.b.time) - (left - 6)) < 0.2, `${t.respawnAt - h.b.time} vs ${left - 6}`);
+});
+
+test('in a match: the lobby rule equips Mod Z on a player\'s pick, without it the pick stays as chosen', async () => {
+  const { makeMatch } = await import('./match/harness.js');
+  const slot = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
+  const pick = { charId: 'char_188_helage', skillIndex: 2, uniEquipId: 'uniequip_002_helage' };
+  for (const [modZ, want] of [[['uniequip_fishz_helage'], 'uniequip_fishz_helage'], [[], 'uniequip_002_helage']]) {
+    const h = makeMatch({ mode: 'solo', seed: 21, lobbyRules: { modZ } }).start();
+    h.toPrep(1);
+    const p0 = h.ps('p_0');
+    assert.equal(p0.setDiy({ [slot]: pick }), true);
+    assert.equal(p0.diy[slot].uniEquipId, want);
+    const golden = backups.diy.slots[slot].goldenId;
+    assert.equal(p0.gd.chess(golden)?.module?.id ?? null, want, 'the elite record carries it');
+  }
 });

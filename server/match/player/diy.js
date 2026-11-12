@@ -42,7 +42,7 @@
 
 import { KITTED_CHARS } from '../../sim/content/kits/index.js';
 import { checkDiyPicks } from '../../../shared/protocol.js';
-import { diyRecord, diySlot, diyTokenOwner, modZFallbackPicks } from '../../../shared/diy.js';
+import { diyRecord, diySlot, diyTokenOwner, modZRulePicks } from '../../../shared/diy.js';
 import { atPotential } from '../../../shared/potential.js';
 
 const posIntOr = (v, d) => (Number.isInteger(v) && v > 0 ? v : d);
@@ -152,8 +152,8 @@ export class PlayerDiy {
     if (this.isBot) return false;
     const gd = this.m.gd;
     const data = gd.raw;
-    // (Fish Edition) without the Mod Z rule, a pick naming a Mod Z / W fields the operator's first module (shared/diy.js)
-    const res = checkDiyPicks(modZFallbackPicks(picks, this.m.lobbyRules, data), { data, kitted });
+    // (Fish Edition) the lobby's Mod Z rule equips the Mod Z / W it has on: every pick of that operator fields it
+    const res = checkDiyPicks(modZRulePicks(picks, this.m.lobbyRules, data), { data, kitted });
     if (!res || !('ok' in res)) {
       this.m.log?.warn?.(`[match ${this.m.roomCode}] 自选 picks of ${this.playerId} ignored: ${res && res.detail}`);
       return false;
