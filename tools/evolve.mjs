@@ -6,7 +6,7 @@
 //
 // Usage:
 //   node tools/evolve.mjs --out DIR [--config solo:ABYSS] [--pop 12] [--gens 6] [--train 1-40] [--holdout 101-160]
-//                         [--jobs 8] [--elite 3] [--max-tactics 6] [--pool research,basic,legacy] [--rules R]
+//                         [--jobs 8] [--elite 3] [--max-tactics 6] [--pool research,basic,legacy|tactic ids] [--rules R]
 //                         [--seed 1] [--halving]
 //   node tools/evolve.mjs --out DIR --race [--budget 2400] [--iters 5] [--first 3] [--alpha 0.05] [--train 1-…]
 //                                           iterated racing (irace), the recommended mode: see "--race" below
@@ -48,6 +48,7 @@
 //   half the jobs (up to 4 times); the jobs climb back by 1 after 4 clean chunks.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import os from 'node:os';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,12 +84,15 @@ const blockOf = (gen) => (opt.resample ? [TRAIN[0] + gen * SPAN, TRAIN[1] + gen 
 }
 const RULES = opt.rules || '';
 const SEED = +(opt.seed || 1);
-const JOBS_MAX = +(opt.jobs || 8);
+// --jobs: default from the machine (cores − 2, and about 1.5 GB a worker), so the PC command needs no tuning
+const JOBS_MAX = opt.jobs ? +opt.jobs : Math.max(1, Math.min((os.availableParallelism?.() ?? os.cpus().length) - 2, Math.floor(os.totalmem() / 1.5e9)));
 const POOLS = { research: RESEARCH_TACTICS, basic: BASIC_TACTICS, legacy: LEGACY_TACTICS };
-const POOL = String(opt.pool || 'research,basic').split(',').flatMap((p) => {
-  if (!POOLS[p]) throw new Error(`unknown pool ${p}; known: ${Object.keys(POOLS).join(', ')}`);
-  return POOLS[p];
-});
+// a pool entry is a pool name or a single tactic id (e.g. research,basic,legacy-rules)
+const POOL = [...new Set(String(opt.pool || 'research,basic').split(',').flatMap((p) => {
+  if (POOLS[p]) return POOLS[p];
+  if (TACTICS[p]) return [TACTICS[p]];
+  throw new Error(`unknown pool or tactic ${p}; pools: ${Object.keys(POOLS).join(', ')}`);
+}))];
 
 mkdirSync(join(OUT, 'cache'), { recursive: true });
 const PID = join(OUT, '.pid');
@@ -100,13 +104,14 @@ writeFileSync(PID, String(process.pid));
 process.on('exit', () => { try { rmSync(PID); } catch { /* gone */ } });
 // Ctrl+C: the first stops the running matches (the console sends it to them too) and lets the run write its summary and
 // zip; a second one quits at once. Only the async race can see it between matches (the GA's spawnSync loop exits at once).
-let STOP = false, child = null;
+let STOP = false;
+const children = new Set();
 class Stopped extends Error {}
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => {
   if (STOP || !opt.race) process.exit(130);
   STOP = true;
   console.log('\nstopping: finishing up (summary and zip); Ctrl+C again to quit without them');
-  try { child?.kill(); } catch { /* gone */ }
+  for (const c of children) { try { c.kill(); } catch { /* gone */ } }
 });
 const stopRequested = () => STOP || existsSync(join(OUT, 'STOP'));
 const log = (s) => { const line = `${new Date().toISOString().slice(11, 19)} ${s}`; appendFileSync(join(OUT, 'run.log'), line + '\n'); console.log(line); };
@@ -201,7 +206,7 @@ function runChunk(g, [a, b]) {
   }
 }
 /** runChunk for the race, async so Ctrl+C is seen between (and during) matches. */
-async function runChunkA(g, [a, b]) {
+async function runChunkA(g, [a, b], share = jobs) {
   if (process.env.EVOLVE_FAKE) {
     if (stopRequested()) throw new Stopped();
     if (process.env.EVOLVE_FAKE_STOP_AFTER && fakeSeen.size >= +process.env.EVOLVE_FAKE_STOP_AFTER) writeFileSync(join(OUT, 'STOP'), '');
@@ -214,14 +219,15 @@ async function runChunkA(g, [a, b]) {
   if (!existsSync(prof)) writeFileSync(prof, JSON.stringify({ id: `evo-${h}`, tactics: g }, null, 1));
   for (let tryN = 1; ; tryN++) {
     const tmp = file + '.tmp';
-    const argv = ['tools/botbench.mjs', '--configs', CONFIG, '--seeds', String(b - a + 1), '--seed', String(a), '--jobs', String(jobs),
-      '--profile', prof, '--json', tmp, '--quiet', ...(RULES ? ['--rules', RULES] : [])];
+    const argv = ['tools/botbench.mjs', '--configs', CONFIG, '--seeds', String(b - a + 1), '--seed', String(a), '--jobs', String(Math.max(1, Math.min(share, b - a + 1))),
+      '--profile', prof, '--json', tmp, '--quiet', ...(RULES ? ['--rules', RULES] : []), ...(opt.scenario ? ['--scenario', resolve(String(opt.scenario))] : [])];
     const r = await new Promise((done) => {
       let err = '';
-      child = spawn(process.execPath, argv, { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
+      const child = spawn(process.execPath, argv, { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
+      children.add(child);
       child.stderr.on('data', (d) => { err = (err + d).slice(-4000); });
-      child.on('close', (status, signal) => { child = null; done({ status, signal, stderr: err }); });
-      child.on('error', (e) => { child = null; done({ status: -1, signal: null, stderr: String(e) }); });
+      child.on('close', (status, signal) => { children.delete(child); done({ status, signal, stderr: err }); });
+      child.on('error', (e) => { children.delete(child); done({ status: -1, signal: null, stderr: String(e) }); });
     });
     if (r.status === 0 && existsSync(tmp)) {
       renameSync(tmp, file);
@@ -393,7 +399,17 @@ for (let gen = 0; gen < GENS; gen++) {
 log('done');
 
 // ---- --race: iterated racing (irace) ----
+/** Runs async `tasks` (functions) with at most `k` at a time; the first error (Stopped) wins once all have settled. */
+async function inPool(tasks, k) {
+  let i = 0, err = null;
+  const worker = async () => { while (i < tasks.length) { const t = tasks[i++]; try { await t(); } catch (e) { err ||= e; } } };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(k, tasks.length)) }, worker));
+  if (err) throw err;
+}
 async function raceMain() {
+  // a 10-seed block uses 10 workers at most: with more, several candidates' blocks run at once
+  const PAR = Math.max(1, Math.floor(JOBS_MAX / 10));
+  const SHARE = () => Math.max(1, Math.floor(jobs / PAR));
   const { eliminate, candidatesFor, minSurvivors, pickParent } = RACE;
   const ANY = !!opt.anytime;
   const IB = +(opt['iter-budget'] || 1500);
@@ -412,10 +428,10 @@ async function raceMain() {
   const play = async (g, k) => {
     const blk = blockAt(k);
     if (blk[1] >= HOLD[0] && blk[0] <= HOLD[1]) throw new Error(`the race reached the held-back seeds ${HOLD.join('-')}; lower --budget or move --holdout`);
-    for (const r of await runChunkA([], blk)) base.set(r.seed, score(r));
+    for (const r of await runChunkA([], blk, SHARE())) base.set(r.seed, score(r));
     const h = hashOf(g); if (!scoresOf.has(h)) scoresOf.set(h, new Map());
     const m = scoresOf.get(h);
-    for (const r of await runChunkA(g, blk)) m.set(r.seed, score(r) - base.get(r.seed) - 0.005 * g.length);
+    for (const r of await runChunkA(g, blk, SHARE())) m.set(r.seed, score(r) - base.get(r.seed) - 0.005 * g.length);
   };
   // --anytime: the held-back seeds the best of each iteration has played (cached chunks only, nothing is played here)
   const holdRows = () => {
@@ -473,7 +489,9 @@ async function raceMain() {
       for (; alive.length > SURV + 1 || k < Math.max(FIRST, seen); k++) {
         const fresh = alive.filter((c) => c.g.length && !(scoresOf.get(c.id)?.has(blockAt(k)[0]))).length;
         if (k >= Math.max(FIRST, seen) && spent + fresh > limit) break;
-        for (const c of alive) if (c.g.length) await play(c.g, k); else for (const r of await runChunkA([], blockAt(k))) base.set(r.seed, score(r));
+        // legacy's block first (every candidate's score is paired against it), then the candidates side by side
+        for (const r of await runChunkA([], blockAt(k), SHARE())) base.set(r.seed, score(r));
+        await inPool(alive.filter((c) => c.g.length).map((c) => () => play(c.g, k)), PAR);
         spent += fresh; used += fresh;
         if (k + 1 < FIRST) continue;
         const seeds = new Set(); for (let q = 0; q <= k; q++) for (let s = blockAt(q)[0]; s <= blockAt(q)[1]; s++) seeds.add(s);
@@ -500,7 +518,9 @@ async function raceMain() {
       log(`iter ${j}: ${pop.length} candidates, ${alive.length} survived after ${seen} blocks; best ${best.fit.toFixed(3)} ${describe(best.g)}; ${used * 10}${ANY ? '' : `/${BUDGET}`} matches`);
       if (ANY && best.g.length) {
         // the held-back check grows with the run: 6 blocks, one more each iteration, all 30 at most
-        for (let q = 0; q < Math.min(HOLD_BLOCKS, 6 + j); q++) { await runChunkA([], holdAt(q)); await runChunkA(best.g, holdAt(q)); }
+        const hb = Array.from({ length: Math.min(HOLD_BLOCKS, 6 + j) }, (_, q) => q);
+        await inPool(hb.map((q) => () => runChunkA([], holdAt(q), SHARE())), PAR);
+        await inPool(hb.map((q) => () => runChunkA(best.g, holdAt(q), SHARE())), PAR);
         writeFileSync(join(OUT, 'holdout.md'), holdRows().join('\n') + '\n');
       }
       if (used * 10 >= BUDGET) break;
