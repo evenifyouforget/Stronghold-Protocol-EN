@@ -67,11 +67,30 @@ Racing is better, but not by a different order. A 6-point effect still needs a f
 one (like `sell-singles`) needs far more, whatever the method. Both methods also pick up hitchhikers: tactics with
 no effect that ride along.
 
-## The first real race (queued)
+## The first real race (2026-11-12)
 
-`untracked/queue9-2026-11-12.sh` → `untracked/evolve-2026-11/race1/`: solo Ultimate, pool research + basic, a
-2,400-match budget, then the final elites against legacy on held-back seeds 5001–5300. It runs after queue3's
-rerun, in sp-plan-run4 (ab9b02ee).
+`untracked/queue9-2026-11-12.sh` → `untracked/evolve-2026-11/race1/`: solo Ultimate, pool research + basic, 1,950 of
+2,400 matches over 5 iterations. Then the top three were played against legacy on held-back seeds 5001–5300, which the
+race never saw.
+
+| Profile | Race (seeds 1–140): wins | Fitness | Held-back (300 seeds): wins | Flips vs legacy (+ / −) | p (sign test) |
+|---|---|---|---|---|---|
+| legacy | 52 | 0 | 118 | | |
+| `plan-items(fromRound=5)` | 71 | +0.139 | 112 | +33 / −39 | 0.56 |
+| `plan-items()` | 67 | +0.113 | 120 | +40 / −38 | 0.91 |
+| `sell-singles(maxTier=1)` | 66 | +0.101 | 127 | +38 / −29 | 0.33 |
+
+**The race's lead didn't hold.** On its own seeds, the winner beat legacy by 19 wins of 140. On fresh seeds it lost
+by 6 of 300. This is the winner's curse: out of many candidates, the race keeps the ones that were lucky on its seeds,
+so its best score is biased upward. Only `sell-singles(maxTier=1)` kept a small lead (+9 wins of 300), and that's not
+significant either.
+
+What it means:
+- **Never read the race's own fitness as the effect.** Only the held-back seeds count. That's why the `--anytime` run
+  plays its best on the held-back seeds after every iteration.
+- At this scale, no single tactic is a big win, which matches Fish's "small effects add up". A 3-point effect needs
+  far more matches than 2,000; that's the PC run's job.
+- Next race here: the same pool plus the new tactics (queues 13–17), once they're measured.
 
 ## For Fish's PC
 
