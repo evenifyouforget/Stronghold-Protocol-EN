@@ -112,11 +112,13 @@ We should also look at any other resources that human players have access to but
 - [ ] Add tactics that equip alternate operator skills
 - [x] Add tactics that equip custom operators
       `diy-picks` (c72a5eea): picks at match setup, defaults Ch'en the Dawnstreak S3 + Shu S3 on tier 5; the pieces go
-      into legacy's buy / keep plan (without it bots never bought them). Measuring: queue13.
+      into legacy's buy / keep plan (without it bots never bought them). queue13: no win change (23–27 vs 27); the
+      pieces arrive around round 11, too late.
 - [ ] See if there are other actions/information that humans could use, and try writing tactics that use them
       Found (`ai-players/08` "The economy gap", clean games): humans buy and sell 25.6 operators a game in the same prep
       (bots 3.1), as fuel for per-gain / per-spend stackers (Dusk, Grain Buds, Astgenne); 2× the merges; 13 shop items
-      (bots 0.6); the Isomorph worn with an Alliance item in 60 % of seats (bots 14 %). `cycle-econ` built (queue14).
+      (bots 0.6); the Isomorph worn with an Alliance item in 60 % of seats (bots 14 %). `cycle-econ`: no gain (23–26 wins
+      vs 27, queue14): bots seldom have a stacker deployed for the cycle to feed.
 
 Long-term goals:
 
@@ -169,7 +171,8 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
 - [ ] Kjerag specific: do not have a tile in front (earlier in path) that can be frozen but doesn't generate stacks
 - [ ] Put Civilight behind a stack generating Operator
       Copiers in general (Ptilopsis, Saria, Civilight…): `place-copiers` (6fe043c0) puts a copier on the tile behind
-      a partner, facing it. Humans do this about half the time, legacy 5–15 %. Measuring: queue15.
+      a partner, facing it. Humans do this about half the time, legacy 5–15 %; with it 38 % (Ptilopsis) and 71 % (Saria).
+      Wins unchanged (24 vs `plan-combos` alone 24, legacy 27; queue15).
 - [ ] Kazimierz specific: Fartooth + Blemishine combo (or Fartooth + Degenbrecher is even better)
 - [ ] Aegir specific: build a snake with the dps operator at the back
 - [ ] Aegir specific: can use a non-Aegir dps operator if they are given damazti isomorph + aegir equipment
