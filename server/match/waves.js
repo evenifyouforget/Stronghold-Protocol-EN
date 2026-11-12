@@ -509,17 +509,19 @@ function bountyPlan(gd, round, wave, bounties, playerId, side) {
     const c = b && b.card ? b.card : {};
     if (!gd.enemy(c.enemyKey)) continue;
     const fly = isFlyKey(gd, c.enemyKey);
-    const host = hostAction(gd, wave, { fly });
-    const key = host ? host.index : -1;
-    if (!groups.has(key)) groups.set(key, { host, items: [] });
+    // (fork) an SPA-CC card `atStart` (the Delegation's Degenbrecher, Match.bossSubWave) joins no action: it spawns at
+    // the round's start, on its own
+    const host = c.atStart ? null : hostAction(gd, wave, { fly });
+    const key = c.atStart ? 'start' : host ? host.index : -1;
+    if (!groups.has(key)) groups.set(key, { host, items: [], start: !!c.atStart });
     groups.get(key).items.push({ b, c, fly, count: Math.max(1, Math.min(20, Number.isInteger(c.count) ? c.count : 1)) });
   }
   const specs = [];
   const retime = new Map(); // host action index → { time, step, ownRuns: [{ start, len }] }
   const OWN = 0;
-  for (const { host, items } of groups.values()) {
+  for (const { host, items, start } of groups.values()) {
     const hs = host ? host.s : null;
-    const time = hs ? Math.max(0, Number(hs.time) || 0) : 4;
+    const time = start ? 0 : hs ? Math.max(0, Number(hs.time) || 0) : 4;
     const window = hs ? Math.max(1, Number.isInteger(hs.count) ? hs.count : 1) * Math.max(0, Number(hs.interval) || 0) : 0;
     const act = host ? acts.find((a) => a.index === host.index) : null;
     // the host's own units: only a server-sent action has any (a leader / random-group / invalid host spawns the

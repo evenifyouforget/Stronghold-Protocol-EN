@@ -1,6 +1,6 @@
 // test/sim/risk-junk-vengeance.test.js — the battle side of SPA-CC Junk (the Toxic Waste's carrier ATK −50 %) and
-// Vengeance (Invincible Blade 2 / 3 on the Reids the tag adds: HP / ATK, Status Resistance, damage reduction below half
-// HP, 15 s invulnerable after the revive, +100 ASPD and the immunities at 3), server/sim/content/risk.js and his kit.
+// Vengeance (Invincible Blade 2 / 3 on the Reids the tag adds: ATK, Status Resistance, damage reduction below half HP,
+// 15 s invulnerable after the revive, +100 ASPD below half HP at 3), server/sim/content/risk.js and his kit.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -34,9 +34,10 @@ function reidField(level) {
   return { h, r, plain };
 }
 
-test('Invincible Blade 2: +150 % HP, +50 % ATK, Status Resistance; 30 % less damage below half HP; only the Reids the tag adds', () => {
+test('Invincible Blade 2: +50 % ATK, Status Resistance; 40 % less damage below half HP; no extra HP; only the Reids the tag adds', () => {
   const { h, r, plain } = reidField(2);
-  assert.ok(Math.abs(r.s.maxHp / plain.s.maxHp - (1 + V.hpPct)) < 1e-6);
+  assert.ok(Math.abs(r.s.maxHp - plain.s.maxHp) < 1e-6, 'no extra HP (the balance draft of 2026-11)');
+  assert.ok(Math.abs(r.s.atk / plain.s.atk - (1 + V.atkPct)) < 1e-6);
   assert.ok(r.buffs.some((b) => b.key === 'resist'), 'Status Resistance');
   assert.ok(!plain.buffs.some((b) => b.key === 'risk:vengeance'), 'a bounty Reid is untouched');
   const hit = (u) => { const c = { target: u, dmg: { type: 'phys', mul: 1 } }; h.b.emit('hit', c); return c.dmg.mul; };
@@ -58,15 +59,18 @@ test('Invincible Blade 2: invulnerable for 15 s after his revive', () => {
   assert.ok(!plain.s.flags.invulnerable, 'a bounty Reid keeps his data (none)');
 });
 
-test('Invincible Blade 3: +100 ASPD, 60 % less damage and the immunities below half HP', () => {
+test('Invincible Blade 3: below half HP 80 % less damage and +100 ASPD; no immunities', () => {
   const { h, r } = reidField(3);
   const { r: r2 } = reidField(2);
-  assert.equal(r.s.aspd - r2.s.aspd, V.aspd);
+  assert.equal(r.s.aspd, r2.s.aspd, 'above half HP: no ASPD');
   r.hp = r.s.maxHp * 0.4;
+  h.run(0.3);
+  assert.equal(r.s.aspd - r2.s.aspd, V.aspd, 'below half HP');
   const c = { target: r, dmg: { type: 'arts', mul: 1 } };
   h.b.emit('hit', c);
   assert.ok(Math.abs(c.dmg.mul - (1 - V.lowDr3)) < 1e-9);
-  assert.equal(h.b.applyStatus(r, 'stun', { duration: 3, source: h.allies()[0], force: true }), false, 'stun refused below half');
+  assert.equal(h.b.applyStatus(r, 'stun', { duration: 3, source: h.allies()[0], force: true }), true, 'a stun lands below half too');
   r.hp = r.s.maxHp;
-  assert.equal(h.b.applyStatus(r, 'slow', { duration: 3, source: h.allies()[0] }), true, 'above half: it lands');
+  h.run(0.5);
+  assert.equal(r.s.aspd, r2.s.aspd, 'back above half: the ASPD goes');
 });

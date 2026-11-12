@@ -58,6 +58,7 @@ test('ccFamiglia Cleaner: rounds 10–13, the fewest stacks; a tie goes to the e
     const [b] = h.m.riskBounties(p1);
     assert.equal(b.card.enemyKey, CC.silencers.key);
     assert.equal(b.card.count, CC.silencers.count);
+    assert.equal(CC.silencers.count, 3, 'co-op: 3 (Fish 2026-11-12)');
     assert.equal(b.card.coin, 0);
     assert.equal(h.m.waveBounties(p1).length, p1.bounties.length + 1);
     p1.layers = { yanShip: 30 };
@@ -148,15 +149,24 @@ test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6t
   } finally { h.m.dispose(); }
 });
 
-test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 3 } });
+test('ccPatriot Undying 2: the Shieldguards with the Patriot taken on round 9; Undying 3: the final rounds\' sub-wave once per field, taken or not', () => {
+  for (const level of [1, 2]) {
+    const none = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccPatriot: level } });
+    try { none.m.round = 15; assert.equal(none.m.bossSubWave(['p_0']).size, 0, `Undying ${level}: no final-round sub-wave`); } finally { none.m.dispose(); }
+  }
+  const h2 = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 2 } });
   try {
-    h.m.round = 9;
-    const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
-    h.m.addBounty(p0, h.m.riskPatriotCard());
-    const escort = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
+    h2.m.round = 9;
+    const [p0, p1] = [h2.ps('p_0'), h2.ps('p_1')];
+    h2.m.addBounty(p0, h2.m.riskPatriotCard());
+    const escort = (ps) => h2.m.riskBounties(ps).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
     assert.equal(escort(p0)[0].card.count, CC.patriot.escort.count);
     assert.equal(escort(p1).length, 0, 'only with the one who took him');
+  } finally { h2.m.dispose(); }
+  // Undying 3, nobody took him: the sub-wave still comes
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 3 } });
+  try {
+    assert.ok(!h.m.ccPatriotTaken);
     const sub = h.m.bossSubWave(['p_0', 'p_1']);
     assert.deepEqual([...sub.keys()], ['p_0'], 'one group per field, with its left player');
     const cards = sub.get('p_0');
@@ -165,20 +175,28 @@ test('ccPatriot Undying 3: 5 Shieldguards with the Patriot taken on round 9; the
   } finally { h.m.dispose(); }
 });
 
-test('ccDelegation: the final rounds\' sub-wave once per field, HP × 2 / 3 / 5, ATK × 1.5 from United 2', () => {
-  const wave = (level) => {
+test('ccDelegation: the final rounds\' sub-wave once per field (1 + 2 + 2); the Degenbrecher alone: HP × 1 / 2 / 3 per alive player, ATK × 1.5 from United 2, at the start', () => {
+  const wave = (level, dead = 0) => {
     const h = makeMatch({ mode: 'coop', humans: 2, seed: 3, lobbyRules: { ccDelegation: level } });
-    try { return h.m.bossSubWave(['p_0', 'p_1']); } finally { h.m.dispose(); }
+    try {
+      if (dead) h.ps('p_1').alive = false;
+      return h.m.bossSubWave(['p_0', 'p_1']);
+    } finally { h.m.dispose(); }
   };
   const dg = CC.delegation;
   const byKey = (m) => { assert.deepEqual([...m.keys()], ['p_0']); return Object.fromEntries(m.get('p_0').map((b) => [b.card.enemyKey, b.card])); };
   const u1 = byKey(wave(1));
   assert.equal(u1[dg.degen].count, 1);
-  assert.equal(u1[dg.wave[1].key].count, 5);
-  assert.equal(u1[dg.wave[2].key].count, 5);
-  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2, atkMul: 1 });
-  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 });
-  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 5, atkMul: 1.5 });
+  assert.equal(u1[dg.wave[1].key].count, 2);
+  assert.equal(u1[dg.wave[2].key].count, 2);
+  assert.deepEqual(u1[dg.degen].riskMods, { hpMul: 2 }, '2 alive players × 1');
+  assert.deepEqual(byKey(wave(2))[dg.degen].riskMods, { hpMul: 4, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3))[dg.degen].riskMods, { hpMul: 6, atkMul: 1.5 });
+  assert.deepEqual(byKey(wave(3, 1))[dg.degen].riskMods, { hpMul: 3, atkMul: 1.5 }, 'one alive player');
+  assert.equal(u1[dg.wave[1].key].riskMods, undefined, 'the minions keep the round\'s HP');
+  assert.equal(u1[dg.wave[2].key].riskMods, undefined);
+  assert.equal(u1[dg.degen].atStart, true, 'the Degenbrecher spawns at the start');
+  assert.ok(!u1[dg.wave[1].key].atStart && !u1[dg.wave[2].key].atStart, 'her escort joins the wave as before');
   assert.equal(byKey(wave(3))[dg.degen].count, 1, 'no clones');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 1 } });
   try { h.m.round = 10; assert.equal(h.m.riskBounties(h.ps('p_0')).length, 0, 'not in a normal round'); } finally { h.m.dispose(); }
@@ -230,6 +248,24 @@ test('the sub-wave takes the left-first route of a pair field (left portal, then
   } finally { h.m.dispose(); }
 });
 
+test('ccDelegation: the Degenbrecher spawns at 0 s in both final rounds, apart from the wave; her escort joins it', async () => {
+  const { buildBossWave, bountySpawns } = await import('../../server/match/waves.js');
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccDelegation: 2 } }).start();
+  try {
+    h.toPrep(2);
+    const m = h.m;
+    for (const round of [14, 15]) for (const solo of [false, true]) {
+      const wave = buildBossWave(m.gd, m.rngWaves, m.factions, round, { bossId: round === 15 ? m.hiddenBossId || m.bossId : m.bossId, solo });
+      const specs = bountySpawns(m.gd, round, wave, m.bossSubWave(solo ? ['p_0'] : ['p_0', 'p_1']).get('p_0'), 'p_0', { side: 'L' });
+      const her = specs.filter((s) => s.enemyKey === CC.delegation.degen);
+      assert.equal(her.length, 1, `round ${round}`);
+      assert.equal(her[0].time, 0, `round ${round}`);
+      assert.equal(her[0].actionIndex, undefined, 'joins no action');
+      assert.ok(specs.some((s) => s.enemyKey !== CC.delegation.degen), 'the escort is there');
+    }
+  } finally { h.m.dispose(); }
+});
+
 test('a sub-wave riskMods multiply the round spawn mods', async () => {
   const { bountySpawns } = await import('../../server/match/waves.js');
   const h = makeMatch({ mode: 'solo', seed: 3, lobbyRules: { ccDelegation: 2 } });
@@ -241,8 +277,9 @@ test('a sub-wave riskMods multiply the round spawn mods', async () => {
     const b = bountySpawns(h.m.gd, h.m.round, h.m.wave, plain, ps.playerId);
     assert.ok(a.length > 0 && a.length === b.length);
     for (let i = 0; i < a.length; i++) {
-      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * 3) < 1e-9);
-      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * 1.5) < 1e-9);
+      const degen = a[i].enemyKey === CC.delegation.degen;
+      assert.ok(Math.abs(a[i].mods.hpMul - b[i].mods.hpMul * (degen ? CC.delegation.hpMul.united2 : 1)) < 1e-9);
+      assert.ok(Math.abs(a[i].mods.atkMul - b[i].mods.atkMul * (degen ? CC.delegation.degenAtkMul : 1)) < 1e-9);
     }
   } finally { h.m.dispose(); }
 });
@@ -414,4 +451,14 @@ test('ccVengeance: Reids by the highest active alliance — 1 at 200 stacks, +1 
       assert.equal(boss()[0].card.count, 1, 'the final rounds: always 1');
     } finally { h.m.dispose(); }
   }
+});
+
+test('ccFamiglia Cleaner in solo: CC.silencers.soloCount (2) Silencers', () => {
+  const h = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccFamiglia: 1 } });
+  try {
+    h.m.round = 10;
+    const [b] = h.m.riskBounties(h.ps('p_0'));
+    assert.equal(b.card.enemyKey, CC.silencers.key);
+    assert.equal(b.card.count, 2);
+  } finally { h.m.dispose(); }
 });
