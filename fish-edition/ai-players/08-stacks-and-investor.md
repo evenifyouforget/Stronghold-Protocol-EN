@@ -361,6 +361,26 @@ Each alone changes almost nothing (they act on a few seeds: the key operators ar
 combos and the commitments both pull the plan's buys and keeps, and the bench can't hold all of it. They stay in the
 evolution pool one by one, default off; the race decides whether any pair works.
 
+**`place-copiers` measured** (queue15, 6fe043c0; `untracked/combos-2026-11/`). After the rehearsed layout, it moves a
+copier onto the tile behind its partner. Placement in 30 recorded co-op Ultimate games (seat 0), share of the
+copier's battles with a partner in front:
+
+| | `plan-combos` | `plan-combos` + layout tie-break (`combos-place`) | `plan-combos` + `place-copiers` | Humans |
+|---|---|---|---|---|
+| Ptilopsis | 5 % | 2 % | **38 %** | about 49 % |
+| Saria | 15 % | 25 % | **71 %** | about 50 % |
+
+The placement gap is closed. Wins (botbench 1–40, paired against legacy's 27):
+
+| Profile | Wins | Better / worse seeds | p (McNemar) |
+|---|---|---|---|
+| `copiers` (`place-copiers` + `plan-combos`) | 24 | 4 / 7 | 0.55 |
+| `copiers-only` | 27 | 0 / 0 | 1.00 |
+| `combos-place` (queue12) | 22 | 5 / 10 | 0.30 |
+
+`copiers` wins the same as `plan-combos` alone (24). The placement doesn't cost wins, but doesn't add any either.
+`copiers-only` matches legacy on every seed: without `plan-combos` buying the pairs, the bots seldom own both.
+
 ## Custom operators for bots: `diy-picks` (2026-11-12)
 
 Fish: "I thought I was already asking for bots to use custom operators. yes, 100% I approve". Until now bots never
@@ -450,6 +470,20 @@ fires when gained or sold. Net cost is the price minus the sale (mostly 3 − 1 
 The Alliances most often active while cycling: Elite, Agile, Foresight, Laterano, Solo. queue3's `trade1.5` (legacy's
 own trade at half the bar) was worse; it trades by lineup value, not by trait. A trait-driven cycle is a different
 tactic.
+
+**`cycle-econ` measured** (queue14, 81669c73; `untracked/cycle-2026-11/`, botbench co-op Ultimate 1–40, paired
+against legacy's 27). It buys an operator whose trait pays back and sells it in the same prep:
+
+| Profile | Wins | Better / worse seeds | p (McNemar) | Score diff (t) |
+|---|---|---|---|---|
+| `cycle` (defaults: profit ≥ 0, ½ gold per layer) | 23 | 6 / 10 | 0.45 | −0.080 (−0.71) |
+| `cycle-strict` (profit ≥ 1) | 26 | 0 / 1 | 1.00 | −0.046 (−1.38) |
+| `cycle-free` (no reserve) | 25 | 5 / 7 | 0.77 | −0.043 (−0.44) |
+
+None helps. `cycle-strict` changed the outcome of just one seed, so a profit bar of 1 almost never lets it buy. The
+looser versions cycle and win a little less, but not significantly. Humans cycle where a stacker is deployed (above),
+and the bots seldom have one deployed, so the cycle mostly feeds nothing. It stays in the pool; paired with
+`plan-engines` (which deploys the stackers) is the race's call. `buy-minimalist` (queue17) is the cheapest case.
 
 **Shop items.** Legacy buys an item only to complete an item merge (§37.39). The humans' items are mostly economy:
 Simple Communicator 1.5, Money-Grubbing Doll 1.3, Knightly Savings 1.2, Alliance Coin 1.2, Dispatch Module 0.9,
