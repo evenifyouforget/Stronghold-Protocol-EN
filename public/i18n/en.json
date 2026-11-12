@@ -2908,7 +2908,6 @@
   "推进之王的Z型调整": "Siege's Z Adjustment",
   "棘刺的Z型调整": "Thorns's Z Adjustment",
   "温蒂的Z型调整": "Weedy's Z Adjustment",
-  "自动平衡攻击力与攻击速度（攻击力+1%视为攻击速度+1）；部署10秒后攻击速度+100": "Balances ATK and ASPD automatically (each +1% ATK also counts as +1 ASPD); ASPD +100 from 10 seconds after deployment",
   "攻击使目标寒冷；若目标已冻结，改为使其周围1格内的所有敌人碎冰：解除冻结，晕眩4秒并使其受到的物理伤害+40%，持续4秒": "Attacks inflict Cold; if the target is already Frozen, all enemies within 1 tile of it Shatter instead: Freeze ends, they are Stunned for 4 seconds and take +40% physical damage for 4 seconds",
   "标记受到自身伤害的敌人；技能结束时，技能期间每有1名被标记的敌人倒下，回复17点技力": "Marks enemies she damages; when her skill ends, recovers 17 SP for each marked enemy that fell during it",
   "攻击范围变为自身周围3×3；攻击范围内有敌人时技力自然回复+1/秒；技能开启时，诱导攻击范围内的所有敌人至自身位置，直到技能结束；攻击力每+1，防御力也+1（最多+5000）": "Attack range becomes the 3×3 around her; +1 SP per second while an enemy is in range; when her skill starts, lures every enemy in range to her until it ends; each +1 ATK also gives +1 DEF (up to +5000)",
@@ -2927,5 +2926,13 @@
   "开启后，所有博士的该自选干员都装备这个模组（Fish Edition的自制模组，草案，未经平衡）；每名干员最多开启一个": "When on, this custom operator uses the module for every player (Fish Edition's own modules: drafts, not balanced). One module per operator at most",
   "装备的模组": "Equipped modules",
   "已开启 {n}/{max}名干员": "{n}/{max} operators on",
-  "全部Z型": "All Z"
+  "全部Z型": "All Z",
+  "拖拽装备至该干员以配发（最多 {n} 件）": "Drag Equipment onto this Operator to equip it (up to {n})",
+  "自动平衡攻击力与攻击速度（攻击力+1%视为攻击速度+1；攻击速度最多+500，超出部分保留为攻击力）；部署10秒后攻击速度+100": "Balances ATK and ASPD automatically (each +1% ATK counts as +1 ASPD; ASPD at most +500, the rest stays on ATK); ASPD +100 from 10 seconds after deployment",
+  "薇薇安娜的Z型调整": "Viviana's Z Adjustment",
+  "可施放【微光之触】（冷却12秒，初始冷却0秒）：以任一【卡西米尔】干员攻击范围内的一名敌人为目标（优先首领），7秒后在其所在位置周围菱形2格内爆炸，造成攻击力300%的灼燃损伤和300%的法术伤害；若敌人已处于灼燃损伤爆发状态，法术伤害改为攻击力600%×在场存活的【卡西米尔】干员数；任一敌人受到灼燃损伤爆发时法术抗性永久-2（最多10次，薇薇安娜倒下后仍保留）": "Can cast Glimmering Touch (cooldown 12 seconds, initial cooldown 0): targets an enemy in the range of any [Kazimierz] Operator (Leaders first); 7 seconds later its tile explodes in a 5×5 diamond, dealing Burn equal to 300% of ATK and Arts damage equal to 300% of ATK; on an enemy already in a Burn burst, the Arts damage is 600% of ATK × the living [Kazimierz] Operators instead; whenever an enemy suffers a Burn burst, its RES is permanently −2 (up to 10 times, kept after Viviana falls)",
+  "左乐的Z型调整": "Zuo Le's Z Adjustment",
+  "从增益获得的攻击力翻倍；从自然回复以外的途径获得的技力翻倍；所有技能可多储存1次；造成伤害时额外造成攻击力5%的侵蚀损伤；若敌人防御力已为0，改为造成攻击力5%的灼燃损伤和10%的法术伤害": "ATK gained from buffs is doubled; SP gained from anything but natural recovery is doubled; every skill stores 1 more charge; dealing damage also deals Corrosion equal to 5% of ATK; on an enemy already at 0 DEF, Burn equal to 5% of ATK and Arts damage equal to 10% of ATK instead",
+  "凯尔希·思衡托的Z型调整": "Kal'tsit Esperanta's Z Adjustment",
+  "受到的物理伤害和法术伤害-50%；获得【远见】盟约身份；可携带4件装备；<获得时>立即刷新商店，提供3件装备，优先可用于变形同构体的装备（精英：优先尚未拥有的）": "Physical and Arts damage taken −50%; joins the Foresight Alliance; can carry 4 Equipment; <When obtained> rerolls the shop at once with 3 Equipment, preferring ones an Isomorph can pair with (Elite: ones you don't own yet)"
 }

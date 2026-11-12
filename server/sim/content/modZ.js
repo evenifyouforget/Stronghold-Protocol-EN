@@ -9,11 +9,29 @@
 import { modZOf } from '../../../shared/modZ.js';
 import { up, skillBusy, isMainHit, holdProtect, PROTECT_TICK_HOLD, enemyInRange } from './kits/shared/tier1.js';
 import { installLordArtsAddition } from './kits/shared/lord.js';
+import { memberOf } from './items/battle.js';
+import { ASPD_MAX } from '../constants.js';
 
 const KEY = 'fishModZ';
 const isBursting = (e) => e.buffs.some((b) => typeof b.key === 'string' && b.key.endsWith('Burst'));
 /** ATK above base, as a fraction (0.25 = +25 %). */
 const atkGain = (u) => (u.base.atk > 0 ? Math.max(0, u.s.atk / u.base.atk - 1) : 0);
+
+/**
+ * 提丰 Mod Z: the ATK % bonus (×100) and the ASPD bonus summed and split evenly; ASPD's share at most +500 (and the
+ * engine's ASPD cap), the rest on ATK. A total below 0 (debuffs) is split the same way.
+ */
+export function typhonBalance({ atk, aspd, baseAtk, baseAspd }) {
+  if (!(baseAtk > 0)) return { atk, aspd };
+  const total = (atk / baseAtk - 1) * 100 + (aspd - baseAspd);
+  const sp = Math.min(total / 2, 500, ASPD_MAX - baseAspd);
+  return { atk: baseAtk * (1 + (total - sp) / 100), aspd: baseAspd + sp };
+}
+
+/** 左乐 Mod Z: the ATK he gains from buffs counts twice (a loss is unchanged). */
+export function zuoleDouble({ atk, aspd, baseAtk }) {
+  return { atk: atk > baseAtk ? baseAtk + 2 * (atk - baseAtk) : atk, aspd };
+}
 
 /** Keep buff `key` on `unit` with `mods()` while `cond()` holds, re-evaluated every tick (mods may change). */
 function liveBuff(battle, unit, key, cond, mods, extra = {}) {
@@ -57,12 +75,15 @@ const skillIndex = (u) => {
 };
 
 const INSTALL = {
-  // ATK +1 % counts as ASPD +1; ASPD +100 from 10 s after each deployment
+  // ATK and ASPD balanced (+1 % ATK = +1 ASPD): the ATK % and ASPD bonuses are summed and split evenly, the ASPD half
+  // capped at +500 (the excess stays on ATK); ASPD +100 from 10 s after each deployment (in the sum). Applied last in
+  // the stat stack (units.js fishStatPost), so it follows every buff and debuff as they change.
   uniequip_fishz_typhon(battle, u) {
     let since = Infinity;
     battle.on('deploy', (c) => { if (c.unit === u) since = battle.time; }, { owner: u });
-    liveBuff(battle, u, `${KEY}:typhonZ`, () => true,
-      () => ({ aspd: Math.round(atkGain(u) * 100) + (battle.time - since >= 10 ? 100 : 0) }));
+    liveBuff(battle, u, `${KEY}:typhonZ`, () => battle.time - since >= 10, () => ({ aspd: 100 }));
+    u.fishStatPost = typhonBalance;
+    u.markDirty();
   },
 
   // attacks inflict Cold; on a Frozen target, shatter every enemy within 1 tile: Freeze removed, Stun 4 s, physical
@@ -222,7 +243,85 @@ const INSTALL = {
     u.fishCannonRedeployMul = 1;
     battle.on('tick', () => { if (up(u)) u.fishCannonRedeployMul = 1 - 0.01 * steps(); }, { owner: u });
   },
+  // Glimmering Touch (cooldown 12 s, ready at once): an enemy in the range of any of her player's 卡西米尔 operators
+  // (leaders first) is marked; 7 s later its tile explodes (5×5 diamond): 300 % ATK Burn and 300 % ATK Arts — the Arts
+  // 600 % ATK × the living 卡西米尔 operators on an enemy already in a Burn burst. Any enemy's Burn burst: RES −2,
+  // 10 times at most, kept after she falls (one battle-wide handler). [DRAFT: placeholder fx — the official boss's
+  // effects aren't in the assets; "living" = deployed and alive; the target is the first in sortEnemyTargets order]
+  uniequip_fishz_vvana(battle, u) {
+    installVvanaRes(battle);
+    const kaz = () => battle.units.filter((a) => a.kind === 'op' && a.ownerId === u.ownerId && a.alive && a.deployed && memberOf(battle, a, 'kazimierzShip'));
+    let readyAt = 0;
+    battle.on('tick', () => {
+      if (!up(u) || battle.time < readyAt) return;
+      let pick = null;
+      for (const op of kaz()) {
+        for (const e of battle.enemiesInKeys(op.rangeKeys, op, { canHitFly: true })) {
+          if (!e.alive || (pick && (pick.gaugeMax >= e.gaugeMax))) continue;
+          pick = e;
+        }
+      }
+      if (!pick) return;
+      readyAt = battle.time + 12;
+      const tx = Math.round(pick.x), ty = Math.round(pick.y);
+      battle.fx('zone', { x: tx, y: ty, radius: 2, dur: 7, id: u.id, skill: 'fishVvana' });
+      battle.after(7, () => {
+        if (!u.alive) return;   // [DRAFT: the explosion needs her alive; her ATK at detonation]
+        const n = kaz().length;
+        battle.fx('aoe', { x: tx, y: ty, radius: 2, id: u.id, skill: 'fishVvana' });
+        for (const e of battle.aliveEnemies()) {
+          if (Math.abs(Math.round(e.x) - tx) + Math.abs(Math.round(e.y) - ty) > 2) continue;
+          const burning = !!e.findBuff('burnBurst');
+          battle.dealDamage({ source: u, target: e, amount: u.s.atk * (burning ? 6 * n : 3), type: 'arts',
+            attackType: 'ADDITION', applyWay: 'NONE', calculation: 'precomputed', tags: ['module', 'fishVvana'] });
+          if (e.alive) battle.dealElementDamage({ source: u, target: e, element: 'burn', amount: u.s.atk * 3, tags: ['module', 'fishVvana'] });
+        }
+      }, { owner: u });
+    }, { owner: u });
+  },
+
+  // ATK from buffs ×2 (units.js fishStatPost); SP from anything but natural recovery ×2; every skill +1 charge; each
+  // damage dealt adds 5 % ATK Corrosion — on an enemy at 0 DEF, 5 % ATK Burn and 10 % ATK Arts instead [DRAFT: the
+  // starting SP isn't "gained" (not doubled); the riders follow HP damage only, not element damage]
+  uniequip_fishz_zuole(battle, u) {
+    u.fishStatPost = zuoleDouble;
+    u.markDirty();
+    battle.on('spGain', (c) => { if (c.unit === u && c.reason !== 'time' && c.reason !== 'init' && c.amount > 0) c.amount *= 2; }, { owner: u });
+    const sk = u.skill;
+    if (sk && !sk.noSkill && sk.kind !== 'passive') sk.maxCharges += 1;
+    battle.on('hit', (c) => {
+      if (c.source !== u || c.target?.side !== 'enemy' || !c.dmg || c.dmg.cancel || c.dmg.type === 'element'
+        || c.dmg.tags?.includes('fishZuole')) return;
+      const t = c.target;
+      if (t.s.def > 0) { battle.dealElementDamage({ source: u, target: t, element: 'erosion', amount: u.s.atk * 0.05, tags: ['module', 'fishZuole'] }); return; }
+      battle.dealElementDamage({ source: u, target: t, element: 'burn', amount: u.s.atk * 0.05, tags: ['module', 'fishZuole'] });
+      if (t.alive) battle.dealDamage({ source: u, target: t, amount: u.s.atk * 0.1, type: 'arts', attackType: 'ADDITION',
+        applyWay: 'NONE', calculation: 'precomputed', origin: c.dmg, tags: ['module', 'fishZuole'] });
+    }, { owner: u });
+  },
+
+  // Physical and Arts damage taken −50 %; Foresight membership (the module's bonds); the 4 equipment slots and the
+  // <获得时> shop reroll are the match's (shared/modZ.js equipCapFor, server/match/player/economy.js kalts2Refresh).
+  // [DRAFT: <出售时> (gift her to 2 teammates) left out — a 自选 piece exists only in its owner's own slot]
+  uniequip_fishz_kalts2(battle, u) {
+    battle.addBuff(u, { key: `${KEY}:kalts2`, persist: true, allowDead: true, mods: { physTakenMul: 0.5, artsTakenMul: 0.5 }, tags: ['module'] });
+  },
 };
+
+const VVANA_RES = new WeakSet();
+/** 维娜 Mod Z's RES shred: every enemy Burn burst, RES −2 (10 times at most); installed once per battle, no owner. */
+function installVvanaRes(battle) {
+  if (VVANA_RES.has(battle)) return;
+  VVANA_RES.add(battle);
+  const n = new WeakMap();
+  battle.on('elementBurst', (c) => {
+    const e = c.target;
+    if (c.element !== 'burn' || !e || e.side !== 'enemy' || !e.alive) return;
+    const k = Math.min(10, (n.get(e) ?? 0) + 1);
+    n.set(e, k);
+    battle.addBuff(e, { key: `${KEY}:vvanaRes`, mods: { resFlat: -2 * k }, tags: ['module'] });
+  });
+}
 
 /** Install the Mod Z / W effects of `u`'s active module, if it has one. */
 export function installModZ(battle, u) {

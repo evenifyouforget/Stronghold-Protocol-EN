@@ -2,8 +2,8 @@
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { MODZ, modZOf, withModZ } from '../shared/modZ.js';
-import { MODZ_INSTALLED } from '../server/sim/content/modZ.js';
+import { MODZ, modZOf, withModZ, equipCapFor } from '../shared/modZ.js';
+import { MODZ_INSTALLED, typhonBalance, zuoleDouble } from '../server/sim/content/modZ.js';
 import { modZRulePicks, diyRecord, checkDiyPick, hasModZ } from '../shared/diy.js';
 import { unitForm } from '../shared/standIn.js';
 import { getDefaultSource } from '../server/sim/simdata.js';
@@ -31,12 +31,12 @@ test('every Mod Z / W has battle effects, a unique id and an operator in the cus
   assert.ok(ruleSet('modZ', ['uniequip_fishz_weedy']) && !ruleSet('modZ', []));
 });
 
-test('withModZ appends to the elite forms only (forms with modules); the players\' lists never show them', () => {
+test('withModZ appends to the elite forms only (forms with a module list, possibly empty); the players\' lists never show them', () => {
   for (const m of MODZ) {
     assert.ok(hasModZ(m.charId), `${m.charId}: the "Mod Z available" tag`);
     for (const form of Object.values(backups.units[m.charId].forms)) {
       const out = withModZ(m.charId, form);
-      if (!form.modules?.length) { assert.equal(out, form); continue; }
+      if (!Array.isArray(form.modules)) { assert.equal(out, form); continue; }
       assert.ok(out.modules.some((x) => x.uniEquipId === m.id && x.fishModZ === m.kind));
       assert.ok(!(form.modules ?? []).some((x) => x.fishModZ), 'the data form is untouched');
     }
@@ -106,4 +106,82 @@ test('in a match: the lobby rule equips Mod Z on a player\'s pick, without it th
     const golden = backups.diy.slots[slot].goldenId;
     assert.equal(p0.gd.chess(golden)?.module?.id ?? null, want, 'the elite record carries it');
   }
+});
+
+test('Typhon Z balances ATK % and ASPD both ways (ASPD share at most +500); Zuo Le Z doubles buffed ATK', () => {
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+  let r = typhonBalance({ atk: 1500, aspd: 100, baseAtk: 1000, baseAspd: 100 });   // +50 % ATK → +25 % / +25
+  assert.ok(near(r.atk, 1250) && near(r.aspd, 125), JSON.stringify(r));
+  r = typhonBalance({ atk: 1000, aspd: 200, baseAtk: 1000, baseAspd: 100 });         // +100 ASPD → +50 % / +50
+  assert.ok(near(r.atk, 1500) && near(r.aspd, 150), JSON.stringify(r));
+  r = typhonBalance({ atk: 13000, aspd: 100, baseAtk: 1000, baseAspd: 100 });        // +1200 % → ASPD +500, ATK +700 %
+  assert.ok(near(r.atk, 8000) && near(r.aspd, 600), JSON.stringify(r));
+  r = zuoleDouble({ atk: 1300, aspd: 100, baseAtk: 1000 });
+  assert.equal(r.atk, 1600);
+  assert.equal(zuoleDouble({ atk: 800, aspd: 100, baseAtk: 1000 }).atk, 800, 'a debuff is not doubled');
+});
+
+test('Typhon Z in battle: ATK and ASPD bonuses end up equal', () => {
+  const h = makeBattle({ seed: 3, autoFinish: false, timeLimit: 30, hooks: [],
+    units: [{ diy: { slot: 6, charId: 'char_2012_typhon', skillIndex: 0, uniEquipId: 'uniequip_fishz_typhon' }, elite: true, row: 9, col: 4, dir: 'RIGHT' }] });
+  h.step();
+  const u = h.b.allyUnits[0];
+  h.b.addBuff(u, { key: 'test:atk', mods: { atkPct: 0.6 } });
+  h.run(12);
+  const atkPct = (u.s.atk / (u.base.atk * (u.cultMul?.atk ?? 1)) - 1) * 100;
+  assert.ok(Math.abs(atkPct - (u.s.aspd - u.base.aspd)) < 0.5, `ATK +${atkPct} %, ASPD +${u.s.aspd - u.base.aspd}`);
+  assert.ok(Math.abs(atkPct - 80) < 0.5, `+60 % ATK and +100 ASPD → +80 / +80 (got ${atkPct})`);
+});
+
+test('Zuo Le Z: one more skill charge; Viviana Z: the RES shred stays after she falls', () => {
+  const DEFS = { enemies: { enemy_walk: enemyRec({ key: 'enemy_walk', hp: 90000, atk: 0, def: 0, res: 20, speed: 0.1 }) } };
+  const h = makeBattle({ seed: 3, defs: DEFS, autoFinish: false, timeLimit: 60, hooks: [],
+    units: [{ diy: { slot: 6, charId: 'char_4121_zuole', skillIndex: 2, uniEquipId: 'uniequip_fishz_zuole' }, elite: true, row: 9, col: 4, dir: 'RIGHT' },
+      { diy: { slot: 6, charId: 'char_4098_vvana', skillIndex: 2, uniEquipId: 'uniequip_fishz_vvana' }, elite: true, row: 9, col: 6, dir: 'RIGHT' }],
+    enemies: [{ key: 'enemy_walk', time: 1, count: 3, interval: 1 }] });
+  h.step();
+  const [z, v] = h.b.allyUnits.filter((a) => a.kind === 'op');
+  const base = makeBattle({ seed: 3, autoFinish: false, timeLimit: 5, hooks: [],
+    units: [{ diy: { slot: 6, charId: 'char_4121_zuole', skillIndex: 2, uniEquipId: null }, elite: true, row: 9, col: 4, dir: 'RIGHT' }] });
+  base.step();
+  assert.equal(z.skill.maxCharges, base.b.allyUnits[0].skill.maxCharges + 1);
+  h.run(3);
+  const e = h.b.aliveEnemies()[0];
+  assert.ok(e, 'an enemy on the field');
+  h.b.dealElementDamage({ source: v, target: e, element: 'burn', amount: 99999 });
+  assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.resFlat, -2);
+  h.b.retreat(v, { dying: true });
+  assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.resFlat, -2, 'kept after she falls');
+  h.run(20);
+  assert.deepEqual(h.b.errors.map((x) => `${x.label}: ${x.message}`), []);
+});
+
+test('Kal\'tsit Esperanta Z: a module on her empty list, Foresight, 4 slots, and the shop reroll on gain', async () => {
+  const slot = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
+  const pick = { charId: 'char_1052_kalts2', skillIndex: 2, uniEquipId: null };
+  const on = modZRulePicks({ [slot]: pick }, { modZ: ['uniequip_fishz_kalts2'] }, data)[slot];
+  assert.equal(on.uniEquipId, 'uniequip_fishz_kalts2');
+  assert.ok('ok' in checkDiyPick(slot, on, data), JSON.stringify(checkDiyPick(slot, on, data)));
+  const rec = diyRecord(slot, on, { elite: true, data });
+  assert.ok(rec.module.active && rec.bonds.includes('visiShip'), JSON.stringify(rec.bonds));
+  assert.equal(equipCapFor(rec, { modZ: ['uniequip_fishz_kalts2'] }, 2), 4);
+  assert.equal(equipCapFor(rec, { modZ: [] }, 2), 2);
+  assert.equal(equipCapFor({ charId: 'char_112_siege' }, { modZ: ['uniequip_fishz_kalts2'] }, 2), 2);
+
+  const { makeMatch } = await import('./match/harness.js');
+  const h = makeMatch({ mode: 'solo', seed: 21, lobbyRules: { modZ: ['uniequip_fishz_kalts2'] } }).start();
+  h.toPrep(1);
+  const p0 = h.ps('p_0');
+  assert.equal(p0.setDiy({ [slot]: pick }), true);
+  const k = p0.acquireChess(slot, { fromPool: false });
+  assert.ok(k, 'gained');
+  assert.equal(p0.shop.layout.item, 3, 'the shop offers 3 items');
+  const items = Object.values(p0.gd.shopItemsByTier).flat().filter((id) => p0.gd.item(id)?.itemType === 'EQUIP' && p0.gd.item(id)?.kind === 'passive' && !p0.gd.item(id)?.canGiveBond).slice(0, 4);
+  for (const id of items) {
+    const it = p0.acquireItem(id, { requirePool: false });
+    assert.ok(it, id);
+    const r = p0.equip(it.uid, k.uid);
+    assert.ok(r === true || r?.ok !== false, `${id}: ${JSON.stringify(r)}`);
+  }
+  assert.equal(p0.find(k.uid).piece.items.length, 4, 'four equipped');
 });

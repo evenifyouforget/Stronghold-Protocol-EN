@@ -25,6 +25,7 @@
 //   match    phase known; teamLp / boss pool within range; combat fields match the alive players
 
 import { PHASE, BOND_LAYER_CAP } from '../../shared/constants.js';
+import { equipCapFor } from '../../shared/modZ.js';
 import { morphSlotPolicy, ruleOption } from '../../shared/plugins/rules.js';
 import { FIELD, canPlace, placeClass, positionClass, parseKey } from './board.js';
 import { computeBonds } from './bondsMeta.js';
@@ -103,7 +104,7 @@ export function collectViolations(m, { limit = 25 } = {}) {
         if (!rec) { fail(`${id}: unknown chess ${p.id}`); continue; }
         if (rec.isDiy && !rec.diyFor) fail(`${id}: owns ${p.id}, a 自选 slot it has not filled`);
         const slots = morphSlotPolicy(ruleOption(m.rules, 'morphPairing'), (it) => !!pgd.item(it?.id)?.canGiveBond);
-        if (!Array.isArray(p.items) || slots.slotsUsed(p.items) > slots.slotCap(gd.equipPerChess)) fail(`${id}: ${p.id} carries ${p.items && p.items.length} items`);
+        if (!Array.isArray(p.items) || slots.slotsUsed(p.items) > slots.slotCap(equipCapFor(rec, m.lobbyRules, gd.equipPerChess))) fail(`${id}: ${p.id} carries ${p.items && p.items.length} items`);
         if (ruleOption(m.rules, 'morphPairing') === 'plus' && (p.items || []).filter((it) => pgd.item(it?.id)?.canGiveBond).length > 1) fail(`${id}: ${p.id} carries multiple morphs`);
         for (const it of p.items || []) {
           note(ps, it);

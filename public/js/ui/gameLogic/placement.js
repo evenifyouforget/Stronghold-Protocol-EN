@@ -195,9 +195,10 @@ export function indexPieces(priv) {
  * (`field` = `deployFieldOf(pub, myId)`: the own board, or the player's half of the boss field in a boss round).
  * @param {{ priv:any, stage:any, editable:boolean, field?:'normal'|'bossL'|'bossR', getChess?:(id:string)=>any,
  *   getToken?:(id:string)=>any, getItem?:(id:string)=>any, getEffect?:(id:string)=>any,
- *   morphMode?:'official'|'plus' }} o
+ *   morphMode?:'official'|'plus', equipCap?:(piece:any)=>number }} o  (equipCap: a chess piece's equipment slots, 2 unless
+ *   a Mod Z says otherwise — shared/modZ.js equipCapFor)
  */
-export function placementContext({ priv, stage, editable, field = 'normal', getChess = () => null, getToken = () => null, getItem = () => null, getEffect = () => null, backups = null, morphMode = 'official' }) {
+export function placementContext({ priv, stage, editable, field = 'normal', getChess = () => null, getToken = () => null, getItem = () => null, getEffect = () => null, backups = null, morphMode = 'official', equipCap = () => 2 }) {
   const pieces = indexPieces(priv);
   const boardAt = new Map();
   for (const e of pieces.values()) if (e.area === 'board') boardAt.set(tileKey(e.row, e.col), e);
@@ -213,7 +214,7 @@ export function placementContext({ priv, stage, editable, field = 'normal', getC
   const deploy = field === 'bossL' || field === 'bossR'
     ? deploySets(stage, field, ov)
     : deploySets(effectiveStage(stage, ov));
-  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, morphMode: morphMode === 'plus' ? 'plus' : 'official' };
+  return { priv, pieces, boardAt, handAt, deploy, cap, count, field, editable: !!editable, getChess, getToken, getItem, backups, morphMode: morphMode === 'plus' ? 'plus' : 'official', equipCap };
 }
 
 /**
@@ -426,8 +427,8 @@ export function equipReplaces(ctx, uid, targetPiece) {
     const incoming = ctx.getItem?.(ctx.pieces?.get(uid)?.piece?.id);
     // a morph does not occupy a slot, so it never opens the replace dialog
     if (!policy.occupies(incoming)) return false;
-    if (policy.slotsUsed(items) < policy.slotCap(2)) return false;
-  } else if (!Array.isArray(items) || items.length < 2) return false;
+    if (policy.slotsUsed(items) < policy.slotCap(ctx.equipCap?.(targetPiece) ?? 2)) return false;
+  } else if (!Array.isArray(items) || items.length < (ctx?.equipCap?.(targetPiece) ?? 2)) return false;
   const rec = ctx.getItem(ctx.pieces.get(uid)?.piece?.id);
   if (!consumedOnEquip(rec)) return !equipMerges(ctx, uid);
   const promotes = Array.isArray(rec.buffs) && rec.buffs.some((b) => PROMOTE_KEYS.has(b?.key));

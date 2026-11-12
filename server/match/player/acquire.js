@@ -5,6 +5,7 @@
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
+import { isKalts2Z } from '../../../shared/modZ.js';
 import { hasTraitFor } from '../operatorTraits.js';
 import { pieceDir, parseDir, mergeTile } from '../board.js';
 import { MAX_OFFER_SLOTS } from './common.js';
@@ -59,6 +60,8 @@ export class PlayerAcquire {
     // Silent setup acquisitions are still acquisitions; official gain behavior stays unchanged.
     if (hasTraitFor(this.gd, rec.charId)) this.m.dispatch(this, 'onTraitGain', { piece, kind: 'chess', source });
     if (!silent) this.m.dispatch(this, 'onGain', { piece: owned, kind: 'chess', source });
+    // (Fish Edition) 凯尔希·思衡托's Mod Z <获得时>: the shop rerolls with 3 items (economy.js kalts2Refresh)
+    if (!silent && isKalts2Z(this.gd.chess(owned.id), this.m.lobbyRules)) this.kalts2Refresh(!!this.gd.chess(owned.id)?.isGolden);
     this.recompute();
     return owned;
   }

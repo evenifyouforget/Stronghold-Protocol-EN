@@ -27,7 +27,7 @@ export const MODZ_PREFIX = 'uniequip_fish';
  */
 export const MODZ = Object.freeze([
   { charId: 'char_2012_typhon', code: 'typhon', kind: 'Z', type: 'SIE-Z', attr: { maxHp: 300 },
-    name: N_('提丰的Z型调整'), desc: N_('自动平衡攻击力与攻击速度（攻击力+1%视为攻击速度+1）；部署10秒后攻击速度+100') },
+    name: N_('提丰的Z型调整'), desc: N_('自动平衡攻击力与攻击速度（攻击力+1%视为攻击速度+1；攻击速度最多+500，超出部分保留为攻击力）；部署10秒后攻击速度+100') },
   { charId: 'char_2012_typhon', code: 'typhon', kind: 'W', type: 'SIE-W', attr: { maxHp: 300, atk: 150, aspd: 10 },
     name: N_('提丰的W型调整'), desc: N_('攻击使目标寒冷；若目标已冻结，改为使其周围1格内的所有敌人碎冰：解除冻结，晕眩4秒并使其受到的物理伤害+40%，持续4秒') },
   { charId: 'char_197_poca', code: 'poca', kind: 'Z', type: 'SIE-Z', attr: { atk: 700 },
@@ -50,6 +50,12 @@ export const MODZ = Object.freeze([
     name: N_('棘刺的Z型调整'), desc: N_('攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力10%的法术伤害和5%的神经损伤') },
   { charId: 'char_400_weedy', code: 'weedy', kind: 'Z', type: 'PUS-Z', attr: { maxHp: 250, atk: 100 },
     name: N_('温蒂的Z型调整'), desc: N_('在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%') },
+  { charId: 'char_4098_vvana', code: 'vvana', kind: 'Z', type: 'AFT-Z', attr: { maxHp: 500, atk: 100 },
+    name: N_('薇薇安娜的Z型调整'), desc: N_('可施放【微光之触】（冷却12秒，初始冷却0秒）：以任一【卡西米尔】干员攻击范围内的一名敌人为目标（优先首领），7秒后在其所在位置周围菱形2格内爆炸，造成攻击力300%的灼燃损伤和300%的法术伤害；若敌人已处于灼燃损伤爆发状态，法术伤害改为攻击力600%×在场存活的【卡西米尔】干员数；任一敌人受到灼燃损伤爆发时法术抗性永久-2（最多10次，薇薇安娜倒下后仍保留）') },
+  { charId: 'char_4121_zuole', code: 'zuole', kind: 'Z', type: 'SBL-Z', attr: { maxHp: 400, atk: 100 },
+    name: N_('左乐的Z型调整'), desc: N_('从增益获得的攻击力翻倍；从自然回复以外的途径获得的技力翻倍；所有技能可多储存1次；造成伤害时额外造成攻击力5%的侵蚀损伤；若敌人防御力已为0，改为造成攻击力5%的灼燃损伤和10%的法术伤害') },
+  { charId: 'char_1052_kalts2', code: 'kalts2', kind: 'Z', type: 'WAT-Z', attr: {}, bonds: ['visiShip'],
+    name: N_('凯尔希·思衡托的Z型调整'), desc: N_('受到的物理伤害和法术伤害-50%；获得【远见】盟约身份；可携带4件装备；<获得时>立即刷新商店，提供3件装备，优先可用于变形同构体的装备（精英：优先尚未拥有的）') },
 ].map((m) => Object.freeze({ ...m, id: `${MODZ_PREFIX}${m.kind.toLowerCase()}_${m.code}`, attr: Object.freeze(m.attr), bonds: Object.freeze(m.bonds ?? []) })));
 
 /** @type {Map<string, (typeof MODZ)[number]>} */
@@ -66,19 +72,20 @@ export const modZFor = (charId) => BY_CHAR.get(charId) ?? [];
 
 const CACHE = new WeakMap();
 /**
- * `form` (a backups form of `charId`) with its Mod Z / W appended to `modules` — only a form that carries modules (the
- * elite forms), at that form's stage. The same object for the same form and language (cached), the form itself when
- * the operator has none.
- * @param {string} charId @param {any} form
+ * `form` (a backups form of `charId`) with its Mod Z / W appended to `modules` — only a form that carries a module list
+ * (the elite forms; possibly empty: 凯尔希·思衡托 has no official module), at that form's stage (`level`: the status's
+ * `equipLevel`, else the form's modules' level, else 1). The same object for the same form, level and language
+ * (cached), the form itself when the operator has none.
+ * @param {string} charId @param {any} form @param {number} [level]
  */
-export function withModZ(charId, form) {
+export function withModZ(charId, form, level) {
   const defs = modZFor(charId);
-  if (!defs.length || !form || !Array.isArray(form.modules) || !form.modules.length) return form;
+  if (!defs.length || !form || !Array.isArray(form.modules)) return form;
+  if (!(Number.isInteger(level) && level > 0)) level = form.modules.find((m) => m && Number.isInteger(m.level))?.level ?? 1;
   let byLang = CACHE.get(form);
   if (!byLang) CACHE.set(form, byLang = new Map());
-  const lang = getLang();
+  const lang = `${getLang()}/${level}`;
   if (byLang.has(lang)) return byLang.get(lang);
-  const level = form.modules.find((m) => m && Number.isInteger(m.level))?.level ?? 1;
   const base = form.trait ?? { desc: '', descRaw: '', bb: {}, bbStr: {}, rangeGrid: null };
   const records = defs.map((d) => {
     const desc = t(d.desc);
@@ -94,3 +101,20 @@ export function withModZ(charId, form) {
   byLang.set(lang, out);
   return out;
 }
+
+/** 凯尔希·思衡托's Mod Z (four equipment slots, the shop effects: server/match/player/modZ.js). */
+export const MODZ_KALTS2 = 'uniequip_fishz_kalts2';
+const KALTS2 = 'char_1052_kalts2';
+/** Whether the room's Mod Z rule (shared/rules.js `modZ`) has module `id` on. */
+export const modZOn = (rules, id) => Array.isArray(rules?.modZ) && rules.modZ.includes(id);
+/**
+ * The equipment slots of a piece whose record is `rec` (its `charId`: a 自选 piece's operator): 4 for 凯尔希·思衡托
+ * while the room's rule has her Mod Z on — both forms [DRAFT: Fish's text names "<When obtained (Elite)>" apart, so her
+ * match effects are read as the normal form's too] — else `base` (the version's equipPerChess).
+ * @param {any} rec @param {any} rules @param {number} base
+ */
+export function equipCapFor(rec, rules, base) {
+  return rec?.charId === KALTS2 && modZOn(rules, MODZ_KALTS2) ? Math.max(base, 4) : base;
+}
+/** Whether `rec` is a 凯尔希·思衡托 piece with her Mod Z on in a room with `rules`. */
+export const isKalts2Z = (rec, rules) => rec?.charId === KALTS2 && modZOn(rules, MODZ_KALTS2);

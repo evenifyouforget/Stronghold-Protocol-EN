@@ -107,6 +107,38 @@ export class PlayerEconomy {
   }
 
   /**
+   * (Fish Edition) 凯尔希·思衡托's Mod Z <获得时> (shared/modZ.js isKalts2Z; acquire.js acquireChess): the shop is rerolled
+   * at once and offers 3 items, each preferring an item a 变形同构体 pairs with (a bond item: `giveBondId`); the elite's
+   * prefer bond items of an alliance the player owns no bond item of yet. [DRAFT: the operators are rerolled as a manual
+   * refresh would (frozen ones too); the 3 items replace the level's item slots until the next roll; the preference
+   * holds within the tier the roll drew]
+   * @param {boolean} elite
+   */
+  kalts2Refresh(elite) {
+    const bonds = new Set();
+    for (const list of Object.values(this.gd.shopItemsByTier)) for (const id of list) {
+      const b = this.gd.item(id)?.giveBondId;
+      if (typeof b === 'string') bonds.add(b);
+    }
+    if (elite) {
+      const own = (it) => { const b = it && it.kind === 'item' ? this.gd.item(it.id)?.giveBondId : null; if (b) bonds.delete(b); };
+      for (const p of [...this.hand, ...this.temp]) own(p);
+      for (const c of this.allChess()) for (const it of c.items || []) own(it);
+    }
+    const { chess: nChess } = this.gd.shopSlots(this.shop.level);
+    const slots = [];
+    for (let i = 0; i < nChess; i++) slots.push(this._rollChessSlot());
+    for (let i = 0; i < 3; i++) {
+      const id = this.m.pool.rollItem(this.m.rngShop, this.shop.level, this.m.itemPool, bonds.size ? bonds : null);
+      slots.push(id ? { kind: 'item', id, basePrice: this.gd.itemPrice(id), frozen: false, sold: false } : null);
+    }
+    this.shop.slots = slots;
+    this.shop.layout = { chess: nChess, item: 3 };
+    for (const s of slots) if (s) s.frozen = this.shop.frozen;
+    this.dirty();
+  }
+
+  /**
    * Reroll the shop. keepFrozen → frozen unsold slots survive (round start); otherwise everything is rerolled
    * (manual refresh). Slot counts follow the current level.
    */
