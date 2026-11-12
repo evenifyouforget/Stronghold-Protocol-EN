@@ -30,6 +30,23 @@ Investor ... studying human games may be enlightening."
 - Every core Alliance shows the gap. Humans reach 1.3× (Kjerag) to 3.9× (Laterano: 763 against 196) the bots' medians; Yan is
   562 against 174.
 
+**One Alliance at 200** (Fish: "you shouldn't need anything advanced … just to get 200 stacks of something"). The
+battle specs record each Alliance's stacks at every battle (`untracked/dyy-2026-11/top-bond.mjs` → `top-bond.md`):
+
+| Top single Alliance per seat | Humans (62) | Bots: legacy (111) | Bots: `items-eng` (109) |
+|---|---|---|---|
+| Median at rounds 7 / 10 / 13 | 22 / 98 / 235 | 18 / 50 / 124 | 18 / 50 / 134 |
+| Median best over the match | 292 | 125 | 131 |
+| Seats with one Alliance at 200+ | 53 (85 %) | 15 (14 %) | 29 (27 %) |
+| Seats with two at 200+ | 20 | 0 | 0 |
+
+- Humans reach 200 in one Alliance in 85 % of seats, by round 12; bots in 14 %. `plan-items` doubles that to 27 %.
+- **It isn't spread:** the bots' top Alliance is about two thirds of their total (124 of ~190 at round 13), the
+  humans' about half (235 of 437). The bots don't split their stacks too thinly; they make too few.
+- The gap opens between rounds 7 and 10: the humans' top Alliance gains 76, the bots' 32.
+- The humans' 200+ Alliances: Yan 10, Victoria 9, Laterano 8, then Siracusa, Sargon, Ægir. The bots': Kjerag 4,
+  Siracusa 3.
+
 ## Why: the operators deployed and the items, more than cycling
 
 **Where the stacks come from, rounds 7–13** (`untracked/dyy-2026-11/stack-sources.mjs` → `stack-sources.md`). Each
