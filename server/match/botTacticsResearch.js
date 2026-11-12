@@ -917,23 +917,39 @@ export function placeCopiers(m, ps) {
  * to a core dps operator who is at the start of the snake. like, buff pramanix alter or sakiko to deal tons of damage").
  * In clean human games 37 of 62 seats wore an Isomorph with an Alliance item (bots 16 of 111), mostly Victoria, Kjerag
  * and Ægir on a top attacker. From `fromRound`:
- *   - equipItems: a loose 变形同构体 and a loose Alliance item go on the carry (carryAndFocus: the deployed attacker of
- *     highest value), before legacy's morphPlan; the item is the focus Alliance's (`bond: focus`), else, with `bond: any`,
- *     one for an active Alliance the carry is not in. The carry needs room for both.
- *   - sellJunk: while a 变形同构体 is loose and no focus Alliance item is, that item goes into items.buy, and both into
- *     items.keep (so legacy neither sells nor spends them elsewhere); with `hold`, the Isomorph also goes into
- *     items.hold until the item comes (before the final boss), so legacy's morph rule doesn't put it elsewhere.
+ *   - the carry is planned and kept: once one of the two items is on an operator, that operator stays the carry while it
+ *     is deployed (ps._botCarry); before that, carryAndFocus's main damage dealer;
+ *   - the Alliance item is the focus Alliance's (`bond: focus`), else, with `bond: any`, one for an active Alliance the
+ *     carry is not in;
+ *   - `order: either` (default; Fish 2026-11-12: "humans may equip either item first to reduce inventory pressure, but
+ *     this still requires planning to know who you want your carry dps to be"): whichever of the two is held goes on
+ *     the carry now, if the carry has room for both;
+ *   - `order: hold`: both go on together; until the Alliance item comes, the Isomorph waits in the hand (the plan's
+ *     items.hold, skipped by legacy's equip loops; queue16's version without it never fired, as legacy's morph rule
+ *     equipped the Isomorph the prep it arrived);
+ *   - sellJunk: while the carry still lacks the Alliance item and an Isomorph is held or on the carry, that item goes
+ *     into items.buy; the held pieces into items.keep.
+ * The order the two are worn in doesn't matter to the game: the Isomorph grants the Alliance of a bond item worn with it.
  */
+const isIsoItem = (gd, it) => !!gd.item(it?.id)?.canGiveBond;
+const isBondGift = (gd, it) => { const r = gd.item(it?.id); return !!r && !r.canGiveBond && !!r.giveBondId; };
+/** The planned carry: the one already given a carry item (still deployed), else the main damage dealer. */
+function plannedCarry(m, ps) {
+  const gd = gdOf(m, ps);
+  const { carry, focus } = carryAndFocus(m, ps);
+  const kept = ps._botCarry != null ? [...ps.board.values()].find((q) => q.uid === ps._botCarry && q.kind === 'chess') : null;
+  const wearing = kept || [...ps.board.values()].find((q) => q.kind === 'chess' && (q.items || []).some((it) => isIsoItem(gd, it))
+    && !(q.items || []).some((it) => isBondGift(gd, it)));
+  return { carry: wearing || carry, focus };
+}
 export const CARRY_ISO = defineTactic({
   id: 'carry-iso',
-  describe: 'puts a held Isomorph and an Alliance item (the focus one) on the main damage dealer',
+  describe: 'puts an Isomorph and an Alliance item (the focus one) on a planned main damage dealer, either one first',
   params: {
     fromRound: int(1, 14, 4),
     bond: { type: 'choice', choices: ['focus', 'any'], default: 'focus' },
     buy: { type: 'bool', default: true },
-    // legacy's morph rule equips a new Isomorph in the prep it arrives, before the Alliance item can be bought
-    // (queue16: carry-iso never fired); hold it in the hand (the plan's items.hold) until the item comes, up to the boss
-    hold: { type: 'bool', default: true },
+    order: { type: 'choice', choices: ['either', 'hold'], default: 'either' },
   },
   at: {
     sellJunk(ctx) {
@@ -942,16 +958,18 @@ export const CARRY_ISO = defineTactic({
       if (p.buy && m.round >= p.fromRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
         const gd = gdOf(m, ps);
         const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
-        const iso = loose.filter((q) => gd.item(q.id)?.canGiveBond);
-        const { focus } = carryAndFocus(m, ps);
-        if (iso.length && focus) {
-          const mine = loose.filter((q) => !gd.item(q.id)?.canGiveBond && gd.item(q.id)?.giveBondId === focus);
+        const iso = loose.filter((q) => isIsoItem(gd, q));
+        const { carry, focus } = plannedCarry(m, ps);
+        const worn = carry?.items || [];
+        const needsItem = !worn.some((it) => isBondGift(gd, it));
+        if (focus && needsItem && (iso.length || worn.some((it) => isIsoItem(gd, it)))) {
+          const mine = loose.filter((q) => isBondGift(gd, q) && gd.item(q.id).giveBondId === focus);
           const want = mine.length ? [] : Object.values(gd.shopItemsByTier || {}).flat()
             .filter((id) => { const r = gd.item(id); return r && !r.isGolden && !r.canGiveBond && r.giveBondId === focus; });
           const plan = own?.plan || {};
           const items = plan.items || {};
           const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
-          const hold = p.hold && !mine.length && m.round < (gd.bossRound || 99) ? iso.map((q) => q.id) : [];
+          const hold = p.order === 'hold' && !mine.length && m.round < (gd.bossRound || 99) ? iso.map((q) => q.id) : [];
           ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, items: Object.freeze({ ...items,
             buy: merge(items.buy, want, 8), keep: merge(items.keep, [...iso, ...mine].map((q) => q.id), 32),
             ...(hold.length ? { hold: merge(items.hold, hold, 8) } : {}) }) }) };
@@ -962,26 +980,44 @@ export const CARRY_ISO = defineTactic({
     *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
     equipItems(ctx) {
       const { match: m, player: ps, params: p } = ctx;
-      if (m.round >= p.fromRound && ps.isBot && !ps.autoplay) {
-        const gd = gdOf(m, ps);
-        const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
-        const morph = loose.find((q) => gd.item(q.id)?.canGiveBond);
-        const { carry, focus } = morph ? carryAndFocus(m, ps) : {};
-        if (carry && !(carry.items || []).some((it) => gd.item(it.id)?.canGiveBond)) {
-          const bonds = new Set(gd.chess(carry.id)?.bonds || []);
-          const cand = loose.filter((q) => { const r = gd.item(q.id); return r && !r.canGiveBond && r.giveBondId && !bonds.has(r.giveBondId); });
-          const X = cand.find((q) => gd.item(q.id).giveBondId === focus)
-            || (p.bond === 'any' ? cand.find((q) => ps.bonds?.[gd.item(q.id).giveBondId]?.active) : null);
-          // room for both before anything goes on (an Alliance item alone on the carry is not the point)
-          const after = X && { ...carry, items: [...(carry.items || []), { id: X.id, uid: -1 }] };
-          if (X && itemSlotFree(m, ps, carry, gd.item(X.id)) && itemSlotFree(m, ps, after, gd.item(morph.id))
-            && ok(() => ps.equip(X.uid, carry.uid))) ok(() => ps.equip(morph.uid, carry.uid));
-        }
-      }
+      if (m.round >= p.fromRound && ps.isBot && !ps.autoplay) equipCarry(m, ps, p);
       return ctx.next();
     },
   },
 });
+/** carry-iso's equip step; returns how many items went on. */
+const ANY_BOND_ITEM = 'chess_item_1_01_e_a'; // stands in for "an Alliance item" in the room check (each takes one slot)
+export function equipCarry(m, ps, p) {
+  const gd = gdOf(m, ps);
+  const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
+  const { carry, focus } = plannedCarry(m, ps);
+  if (!carry) return 0;
+  const worn = carry.items || [];
+  const hasIso = worn.some((it) => isIsoItem(gd, it)), hasItem = worn.some((it) => isBondGift(gd, it));
+  if (hasIso && hasItem) return 0;
+  const morph = hasIso ? null : loose.find((q) => isIsoItem(gd, q)) || null;
+  const bonds = new Set(gd.chess(carry.id)?.bonds || []);
+  const cand = hasItem ? [] : loose.filter((q) => isBondGift(gd, q) && !bonds.has(gd.item(q.id).giveBondId));
+  const X = cand.find((q) => gd.item(q.id).giveBondId === focus)
+    || (p.bond === 'any' ? cand.find((q) => ps.bonds?.[gd.item(q.id).giveBondId]?.active) : null) || null;
+  if (!morph && !X) return 0;
+  // hold: both together (or the missing one onto a carry that already wears the other)
+  if (p.order === 'hold' && !(hasIso || hasItem) && !(morph && X)) return 0;
+  // a lone Isomorph waits for an Alliance item: only with a focus whose item sellJunk can buy (or bond: any)
+  if (morph && !X && !hasItem && !focus && p.bond !== 'any') return 0;
+  // room for both: what goes on now and what is still to come
+  const toCome = [...(hasIso ? [] : [morph?.id || ISOMORPH]), ...(hasItem ? [] : [X?.id || ANY_BOND_ITEM])];
+  let cur = carry;
+  for (const id of toCome) {
+    if (!itemSlotFree(m, ps, cur, gd.item(id))) return 0;
+    cur = { ...cur, items: [...(cur.items || []), { id, uid: -1 }] };
+  }
+  let n = 0;
+  if (X && ok(() => ps.equip(X.uid, carry.uid))) n++;
+  if (morph && ok(() => ps.equip(morph.uid, carry.uid))) n++;
+  if (n) ps._botCarry = carry.uid;
+  return n;
+}
 
 /**
  * Always buy Minimalist (至简; Fish's TODO: "He costs 1 and sells for 1, so there's basically no downside … that already

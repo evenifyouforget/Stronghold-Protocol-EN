@@ -413,3 +413,40 @@ test('legacy equipItems leaves an item the plan holds (items.hold) in the hand',
     assert.notEqual(ps.hand[0], iso, 'without the hold, legacy equips it');
   } finally { h.m.dispose(); }
 });
+
+test('carry-iso order either: the Isomorph goes on first, the Alliance item later joins the same carry; hold waits', async () => {
+  const { CARRY_ISO, equipCarry } = await import('../../server/match/botTacticsResearch.js');
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(4);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const carry = ps.newPiece('chess', 'chess_char_1_07_a');
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(carry, r, c)) tiles.push([r, c]);
+    ps.board.set(tileKey(...tiles[0]), carry);
+    ps.hand.fill(null);
+    const iso = ps.newPiece('item', 'chess_item_6_09_e_a');
+    ps.hand[0] = iso;
+    ps.recompute();
+    const params = (o) => ({ ...resolveParams(CARRY_ISO), bond: 'any', ...o });
+    assert.equal(equipCarry(h.m, ps, params({ order: 'hold' })), 0, 'hold: a lone Isomorph waits');
+    assert.equal(equipCarry(h.m, ps, params()), 1, 'either: it goes on now');
+    assert.deepEqual((carry.items || []).map((it) => it.id), ['chess_item_6_09_e_a']);
+    // a stronger attacker arrives; the item still joins the planned carry
+    const big = ps.newPiece('chess', 'chess_char_6_13_a');
+    const t2 = tiles.find((t) => ps._legal(big, t[0], t[1]) && !ps.board.has(tileKey(...t)));
+    ps.board.set(tileKey(...t2), big);
+    const vic = ps.newPiece('item', 'chess_item_1_01_e_a');
+    ps.hand[1] = vic;
+    ps.recompute();
+    ps.bonds = { ...ps.bonds, victoriaShip: { active: true, layers: 0 } };
+    assert.equal(equipCarry(h.m, ps, params()), 1);
+    assert.deepEqual((carry.items || []).map((it) => it.id).sort(), ['chess_item_1_01_e_a', 'chess_item_6_09_e_a']);
+    assert.equal((big.items || []).length, 0);
+    assert.equal(equipCarry(h.m, ps, params()), 0, 'done: both worn');
+  } finally { h.m.dispose(); }
+});
