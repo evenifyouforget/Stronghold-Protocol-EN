@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { allyCastWindup } from '../../server/sim/ai.js';
+import { makeBattle, enemyRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
 
@@ -55,7 +56,7 @@ function done(h) {
   assert.equal(h.b.errors.length, 0, JSON.stringify(h.b.errors[0]));
 }
 /** Start the skill now (SP filled, no enemy needed). */
-function cast(u) { u.skill.gainSp(999); assert.ok(u.skill.activate('test')); }
+function cast(u) { u.skill.gainSp(999); assert.ok(castNow(u, 'test')); }
 
 test('逻各斯 in every 自选 form: his operator kit (all three skills authored), stats + module attributes, 3-1 range, ranged arts that hits air units, targetable by ground enemies, 空 bond, no 特质', () => {
   assert.equal(OPERATOR_KITS[LOGOS], KITS[LOGOS]);
@@ -187,13 +188,13 @@ for (const outcome of ['killed', 'survived', 'no-follow-up']) test(`S1 native ta
   }
 });
 
-test('S2 提喻 (MANUAL, data DEFAULT): 20 s, RES +40 / +50; locks one target with a hit every 0.5 s whatever the attack speed, 35 %→105 % / 50 %→150 % of ATK and its speed down to 40 % over 10 hits; a stun breaks the lock', () => {
+test('S2 提喻 (MANUAL, data SEARCH — official 中坚术师 row ATTACK_RANGE_ENEMY): 20 s, RES +40 / +50; locks one target with a hit every 0.5 s whatever the attack speed, 35 %→105 % / 50 %→150 % of ATK and its speed down to 40 % over 10 hits; a stun breaks the lock', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S2);
     const b = sk.bb;
     const { h, u } = field({ tier, elite, skill: 1, seed: 7 });
-    assert.deepEqual([u.skill.rule, u.skill.kind, sk.duration, b.magic_resistance, b['attack@cooldown'], b['attack@atk_scale_base'], b['attack@atk_scale_delta'], b['attack@move_speed'], b['attack@max_stack_cnt']],
-      ['DEFAULT', 'duration', 20, elite ? 50 : 40, 0.5, elite ? 0.5 : 0.35, elite ? 0.1 : 0.07, -0.06, 10], `T${tier}`);
+    assert.deepEqual([u.skill.rules, u.skill.kind, sk.duration, b.magic_resistance, b['attack@cooldown'], b['attack@atk_scale_base'], b['attack@atk_scale_delta'], b['attack@move_speed'], b['attack@max_stack_cnt']],
+      [['SEARCH'], 'duration', 20, elite ? 50 : 40, 0.5, elite ? 0.5 : 0.35, elite ? 0.1 : 0.07, -0.06, 10], `T${tier}`);
     const e = h.spawn('enemy_dummy', { pos: [10, 7] });
     h.b.addBuff(u, { key: 'test:aspd', mods: { aspd: 300 } });   // the lock ignores the attack speed
     const res0 = u.s.res;
@@ -247,12 +248,12 @@ test('S2 提喻 keeps its lock while another enemy comes first in the order, and
   done(h);
 });
 
-test('S3 延异视阈 (MANUAL, data ACTIVE_RANGE on its 3-4): cast with an enemy on the 3-4 only, 30 s, ATK +160 % / +220 %, 3 targets at once', () => {
+test('S3 延异视阈 (MANUAL, data SEARCH + SKILL_RANGE on its 3-4): cast with an enemy on the 3-4 only, 30 s, ATK +160 % / +220 %, 3 targets at once', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S3);
     const { h, u } = field({ tier, elite, skill: 2 });
-    assert.deepEqual([u.skill.rule, sk.rangeId, sk.duration, sk.bb.atk, sk.bb['attack@max_target'], sk.bb.projectile_move_scale], ['ACTIVE_RANGE', '3-4', 30, elite ? 2.2 : 1.6, 3, 0.05], `T${tier}`);
-    assert.deepEqual(u.skill.triggerGrid, sk.rangeGrid, `T${tier}: the trigger grid is the 3-4`);
+    assert.deepEqual([u.skill.rules, sk.rangeId, sk.duration, sk.bb.atk, sk.bb['attack@max_target'], sk.bb.projectile_move_scale], [['SEARCH', 'SKILL_RANGE'], '3-4', 30, elite ? 2.2 : 1.6, 3, 0.05], `T${tier}`);
+    assert.deepEqual(u.skill.alsoRules[0].grid, sk.rangeGrid, `T${tier}: the SKILL_RANGE grid is the 3-4`);
     u.skill.gainSp(999);
     h.run(1);
     assert.equal(u.skill.activations, 0, `T${tier}: no enemy`);
@@ -261,9 +262,10 @@ test('S3 延异视阈 (MANUAL, data ACTIVE_RANGE on its 3-4): cast with an enemy
     assert.deepEqual(u.liveRangeGrid, sk.rangeGrid, `T${tier}: 3-4 while on`);
     approx(u.s.atk, u.base.atk * (1 + sk.bb.atk), `T${tier}: ATK`);
     const more = [h.spawn('enemy_dummy', { pos: [10, 6] }), h.spawn('enemy_fly', { pos: [9, 7] }), h.spawn('enemy_dummy', { pos: [11, 8] })];
-    const a0 = h.hooksOf('attack').filter((c) => c.attacker === u).length;
+    // an attack whose cast started before these enemies existed has locked its targets without them (official cast → hit)
+    const tMore = h.b.time + allyCastWindup(u) + 1e-6;
     h.run(5);
-    const atks = h.hooksOf('attack').filter((c) => c.attacker === u).slice(a0);
+    const atks = h.hooksOf('attack').filter((c) => c.attacker === u && c.t > tMore);
     assert.ok(atks.length >= 2 && atks.every((c) => c.targets.length === 3), `T${tier}: 3 targets per attack`);
     assert.ok(atks.every((c) => c.targets.every((e) => [far, ...more].includes(e))));
     h.runUntil(() => !u.skill.active, 40);

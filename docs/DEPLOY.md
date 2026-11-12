@@ -205,6 +205,25 @@ node scripts/maintenance.mjs --cancel            # 全部取消，提示条消�
 
 脚本平时的文字输出和玩家提示条的措辞是给人看的，可能会改。我们的工具不会执行 `git pull`，也不会改动你的服务配置；想在它们的基础上开发，从 `server/maintenance.js`（服务器端）、`public/js/ui/maintenance.js`（提示条）和 `docs/design/network.md`（`sys.maintenance` 消息）看起。
 
+### 1.7 实时更新公告（托管服务器，fork）
+
+大厅的“更新”横幅无需发布新版本即可更换。一个公告文件包含所有语言；服务器把它发给每位玩家，在线玩家约 10 秒内看到，无需刷新页面。
+
+```bash
+node scripts/deploy-regions.mjs news --hosts spa,usspa news.json   # 在你的电脑上：所有服务器
+node scripts/deploy-regions.mjs news --hosts spa,usspa --show      # 每台服务器当前显示的内容
+node scripts/deploy-regions.mjs news --hosts spa,usspa --clear     # 恢复版本自带的横幅
+```
+
+在单台服务器上：`sudo -u stronghold node scripts/news.mjs set news.json`（还有 `check`、`show`、`clear`）。
+
+- **文件：** `{ "id": "0.3.4-2", "langs": { "en": { "title": "…", "highlights": ["…"], "points": ["…"] }, "zh": { … }, "ja": { … }, "ko": { … }, "zh-TW": { … } } }`。`highlights` 是加粗的标题行，`points` 是下面的列表。小示例见 `test/news.test.js`。
+- **语言：** 页面的语言，其次是它的后备语言，再其次是文件里的 `en`，都没有时显示版本自带的横幅。
+- **关闭横幅**会记住它的 `id`：新的 `id` 会对所有人重新显示；改错字时保持同一个 `id` 则不会。
+- **格式：** 纯文本，外加游戏自带的颜色标记：`<@ba.vup>蓝</>`、`<@ba.vdown>红</>`、`<@ba.rem>橙</>`、`<@autochess.green>薄荷绿</>`、`<@autochess.gray>灰</>`。不支持 HTML 和链接；其他内容按原样显示。
+- **检查**（命令发送前、服务器使用前各一次）：最多 32 KB，标题最多 60 个字符，最多 8 条标题行和 16 条要点、每条最多 200 个字符，不能有换行或控制字符。被拒绝的文件不会改变任何东西。在服务器上手动改坏的文件会保留上一份有效的公告（服务器日志会写明原因）。
+- `logs/` 由所有服务器版本（generation）共用，所以公告在重启和新版本后仍然有效，直到你清除它。
+
 ## 2. 让不在同一网络的朋友加入
 
 ### 2.1 Tailscale / ZeroTier（推荐给家用小主机）
@@ -279,7 +298,7 @@ server {
 
 **压缩**：服务器自己压缩脚本、样式、数据和 Spine 的 `.skel` / `.atlas`：浏览器支持 brotli 时用 brotli（0.2.6 起，质量 5，比 gzip 快且更小：实测 `.skel` 小约 27%、游戏数据 JSON 小约 26%、前端库小约 14%、脚本小约 5%），否则用 gzip；图片和音频本来就是压缩格式，原样发送。浏览器只在 HTTPS 页面（以及 `localhost`）上声明支持 brotli，所以通过代理或隧道的 https 地址访问时用 brotli，局域网里的 `http://192.168.x.x:3000` 这类地址用 gzip。代理不需要另开压缩（Caddy 的 `encode`、Nginx 的 `gzip` 遇到已经压缩的响应会跳过）。
 
-**Cloudflare 缓存**（命名隧道或自己的域名经过 Cloudflare 时）：Cloudflare 默认只缓存常见扩展名，`.skel`、`.atlas` 和没有扩展名的音频地址 `/media/…` 都不在其中，每个请求都会回到开服的电脑。在 Cloudflare 控制台的「缓存规则」里加一条：主机名是你的游戏域名、且 URI 路径以 `/assets/`、`/fonts/` 或 `/media/` 开头时「符合缓存条件」，边缘 TTL 选「使用源站的 Cache-Control」。0.2.6 起素材清单里的地址带内容哈希（`/assets/~<哈希>/…`），服务器给这类地址一年的 `immutable`，换了内容的文件会换地址，所以长期缓存是安全的；`/data/`、页面和脚本不要加进规则（它们要随服务器更新）。注意：边缘公开缓存官方素材会增加被投诉的风险，大量媒体文件也要留意 Cloudflare 的服务条款；只给自己人玩时不加这条规则也可以。
+**Cloudflare 缓存**（命名隧道或自己的域名经过 Cloudflare 时）：Cloudflare 默认只缓存常见扩展名，`.skel`、`.atlas` 和没有扩展名的音频地址 `/media/…` 都不在其中，每个请求都会回到开服的电脑。在 Cloudflare 控制台的「缓存规则」里加一条：主机名是你的游戏域名、且 URI 路径以 `/assets/`、`/fonts/` 或 `/media/` 开头时「符合缓存条件」，边缘 TTL 选「使用源站的 Cache-Control」。0.2.6 起素材清单里的地址带内容哈希（`/assets/~<哈希>/…`），服务器给这类地址一年的 `immutable`，换了内容的文件会换地址，所以长期缓存是安全的；`/data/`、页面和脚本不要加进规则（它们要随服务器更新）。用零停机分代时，`/_build/<代>/` 下的脚本、样式、`/shared/` 和 `/sim/` 模块带一年的 `immutable`（一代就是一个提交，每次部署都换新的代号），Cloudflare 默认就缓存 `.js` 和 `.css` 并遵守这个头，不需要为它们加规则；只有这一代少量其他类型的文件（翻译 `.json`、前端库的 `.mjs`）要靠规则才能留在边缘，浏览器那边照样会缓存。注意：边缘公开缓存官方素材会增加被投诉的风险，大量媒体文件也要留意 Cloudflare 的服务条款；只给自己人玩时不加这条规则也可以。
 
 https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://同一域名/ws`；http 时用 `ws://`。服务器本身只提供 http，证书由代理 / 隧道负责。代理与服务器在同一台机器或内网时，`TRUST_PROXY=auto` 会信任它的 `X-Forwarded-For` / `X-Real-IP`；代理在公网另一台机器上时设 `TRUST_PROXY=1`（同时确保游戏端口只对代理开放）。
 
@@ -292,7 +311,7 @@ https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://�
 - 只有 **HTTPS** 或 **localhost** 能导入。浏览器只在安全上下文里提供 Service Worker 和可用的 Cache Storage。`http://局域网IP:3000` 可以正常玩游戏，也可以用「下载完整素材」，但不能导入；这时下载的素材只能放进浏览器的 HTTP 缓存（Windows 版 Chrome 最多约 320 MB），放不下完整素材，刷新后会重新下载。HTTPS 或 localhost 下，下载的素材和导入的一样存进站点存储（#725）。按钮下面和导入窗口里都会说明原因，而不是报错。
 - 玩家导入的是自己已经有的文件：维护者另外提供的素材包 `Stronghold-Protocol-v<版本>-assets.zip`（见第 7 节，不在 GitHub Releases 里），setup 得到的 `public/assets`，或完整发布包 zip。校验通过的文件存在这台浏览器里，并且按地址分开：换了域名或端口就要重新导入。整套素材包约 3.1 万个文件，桌面版 Chrome 导入约 1–2 分钟；zip 分段读取，不会整个读进内存。
 - 和服务器清单里 SHA-256 一致的文件不再向这台服务器请求。整套美术大约 1 GB（下载的约 720 MB，加本地提取的场景和官方战斗特效）；玩家第一局真正用到的通常约 20–50 MB。导入能省下的，是这些本来会从你的机器发出去的字节。哈希对不上的旧版本文件会被拒绝，仍走下载。
-- 导入不经过服务器，服务器日志里看不到这些文件。Service Worker 只回答带内容哈希的 `/assets/`、`/fonts/`、`/media/`。页面、脚本、`/data/`、`/sim/` 和 `/ws` 仍每次走网络。
+- 导入不经过服务器，服务器日志里看不到这些文件。Service Worker 只回答带内容哈希的 `/assets/`、`/fonts/`、`/media/`。页面、`/data/` 和 `/ws` 仍每次走网络；普通服务器上脚本、样式和 `/sim/` 也是。用零停机分代（`scripts/generations.mjs`）时，浏览器把一代的脚本、样式和 `/sim/` 按它的 `/_build/<代>/` 地址缓存一年，只有部署之后（换了新地址）才重新请求。
 
 ### 2.6 P2P 公共状态转发（可选，默认关闭）
 
@@ -332,7 +351,7 @@ https / wss 说明：页面通过 https 打开时客户端自动连接 `wss://�
 部署要点：
 
 - 其他服务器的反向代理只需要转发 `/ws`、`/_build/<代>/_/ws`、`/healthz`、`/_build/<代>/_/healthz` 和 `/_peer/`，其余请求跳转到主域名。
-- 页面和服务器必须是同一版本，所以每台服务器要用相同的代号和提交部署。在自己的电脑上运行 `node scripts/deploy-regions.mjs deploy --hosts 主服务器,其他服务器:no-art`：先在所有服务器上准备新的一代，全部成功后再切换。任何一台准备失败，玩家都不受影响。`:no-art` 表示这台服务器不下载美术素材。
+- 页面和服务器必须是同一版本，所以每台服务器要用相同的代号和提交部署。在自己的电脑上运行 `node scripts/deploy-regions.mjs deploy --hosts 主服务器,其他服务器:no-art`：先在所有服务器上准备新的一代，全部成功后再切换。任何一台准备失败，玩家都不受影响。`:no-art` 表示这台服务器不下载美术素材。想先在真实服务器上私下测试，可以分两步：`prepare --hosts …` 在所有服务器上启动新的一代但不把任何人送过去，并打印它的代号和测试地址（`https://主域名/_build/<代号>/`，以及每台其他服务器的 `?region=<编号>`）；`activate <代号> --hosts …` 再切换所有服务器，只要有一台没准备好就拒绝，一台也不切换。准备好却 4 小时内没有激活的一代会被停掉。服务器之间的连接（合计在线人数、跨服务器匹配）在激活之后才开始。
 - 不要在其中一台上单独运行 `generations.mjs deploy` 或 `rollback`：新的一代只存在于这台服务器，来自它的页面就连不上另一台。`generations.mjs status` 和 `deploy` 发现这种情况时会给出警告；再用 `deploy-regions.mjs` 部署一次即可恢复。
 - 公告也要发到每台服务器：`node scripts/deploy-regions.mjs announce --hosts … --minutes 5 "…"`。
 - 服务器之间走带签名的 HTTPS，不需要改防火墙。连接断开时，各服务器只在本地匹配，用密钥加入同盟不受影响。
@@ -449,6 +468,8 @@ volumes:
 **各战场的官方场景**（维护者 2026-10-12 起随完整包提供；精简包和源码安装可以在本机下载）：官方棋盘是每个战场一个做好的场景（11 个战场，其中 9 个是沙地）。提取不全（少了某个战场，或少了共用贴图 `scene/tex`）时，setup 不会把它报成已完成，而是提示已有多少个战场、这一版期望多少。分组都在、但每个战场清单里的 `scene` 记录（kind 为 Scene）不是这一版 `--print-jobs` 的 `scenes.version` 时，同样不算完成：有客户端请重新运行 `node tools/setup.mjs --scenes` 一次，没有客户端则从同一版本的完整包复制。`scene.json` 的网格版本不变，旧场景在重新提取前仍能显示。有客户端时请用 `--scenes` 补；没有客户端时改为从完整包复制，不提示 `--scenes`。已经有一部分战场时，直接回车或等待不会从客户端提取，回答「是」也不会；只有 `--scenes` 或 `--yes` 会。分组都在、只是清单里的场景版本旧了时，仍是这一句提问（默认否，回车和等待不提取）。回答「是」会像第一次一样下载并运行 `extract.py --only scene`；回答「否」会记住，之后不再问。场景包只在赛季开放期间随客户端分发，赛季外的客户端里没有。仓库不存放这些官方文件。有客户端的电脑可以 `node tools/setup.mjs --scenes`（询问或强制下载并提取；`--no-scenes` 跳过）。也可以分两步：`python3 tools/local-extract/fetch_scenes.py`（从官方 CDN 下载赛季版本 `26-04-13-12-31-42_e9b560` 的 33 个场景包，共 22,801,308 字节，放进 `.cache/official-scenes/`；`--list` 只看清单不下载），再用提取环境的 Python 运行 `tools/local-extract/extract.py --only scene`（材质和贴图仍取自本机客户端；`--game` 可指定客户端目录）。没有 Python 3.8+，或 UnityPy / lz4 / Pillow 没装好时，setup 只提示并继续，3D 棋盘用金属地块。没有客户端时贴图取不出来，从同一版本的完整包复制 `public/assets/local/` 和 `data/local-assets.json`。作者估计每个场景在进对局时另下载约 2–7 MB，各场景共用贴图约 3 MB；本机没有跑过提取，完整包因此增加的解压体积没有实测。
 
 **3D 棋盘贴图的下载量**：每位玩家进入对局时都要从开服的电脑下载 3D 棋盘的 12 张贴图。提取时会给这 12 张各写一份 WebP（颜色贴图有损、质量 95，法线和数据贴图无损），清单里列的是 WebP，同名 PNG 留在旁边给裁切工具和 setup 用。这部分下载量从约 6.7 MB 降到约 2 MB，网速慢的远程联机最明显。只有 PNG 的本地素材（例如在这一改动之前提取的）可以用提取时的 Python 环境运行 `tools/local-extract/extract.py --webp` 就地补上，只需要 Pillow，不需要客户端。
+
+**替身的动作外框**（`data/clip-bounds.json`，fork，2026-11-09）：大规模战斗里每个单位都画成一份轻量的替身（impostor），替身的大小取自该模型会播放的每个动作的外框。以前每位玩家的浏览器要在战斗中逐个测量这些外框，现在由服务器提前测好一起发送：`npm run assets` 和 `npm run assets:release-local` 结束时会写出这个文件；**本地客户端提取（`tools/local-extract`，或 `node tools/setup.mjs` 里的提取）之后，或 `public/assets/` 下有其他改动后，运行 `npm run clip-bounds`**（`node tools/assets/clip-bounds.mjs`；在两个素材步骤里设 `SP_NO_CLIP_BOUNDS=1` 可跳过）。它用和浏览器完全相同的方式测量磁盘上的每个 Spine 模型（约 1,440 个骨架，在维护者的电脑上同时有其他任务时约 6 分钟），写出约 270 KB（实际发送时 gzip 约 98 KB、brotli 约 94 KB）。文件由素材生成，不进 git。文件一出现，服务器就以带内容哈希的地址（`/data/h/…`，缓存一年）提供；重新生成后立即换成新的哈希，不用重启。用不停机多代部署（`scripts/generations.mjs`）的服务器上，这个文件在 `app/data/`，每一代都链接它；部署时如果要补下载缺失的素材，会在那里重新生成；本地提取之后，在 `app/` 里运行 `npm run clip-bounds`。文件缺失或比磁盘上的某个模型旧时，`node tools/doctor.mjs` 会给出警告。没有这个文件，或文件里没有某个模型（插件、DIY、之后新增的素材），也不会出错：那个模型照旧在浏览器里测量，只是一群这样的模型在战斗开始的头几秒会比较卡。
 
 **「玩法说明」教程图的下载量**（0.2.6 起）：本地提取的 19 页教程图每页 1.2–1.5 MB，玩家每翻一页都要从开服的电脑下载。提取时同样给每页写一份 WebP（有损，质量 90，放大两倍对比看不出差别），清单列 WebP，PNG 留在旁边；19 页合计从约 25.6 MB 降到约 4.2 MB。看说明时只预载下一页（以前前后两页都预载）。已经提取过的同样用 `tools/local-extract/extract.py --webp` 补上。
 

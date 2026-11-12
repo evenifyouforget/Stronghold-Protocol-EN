@@ -54,16 +54,15 @@
 // likewise (user report after 0.1.0) — FORMS; an operator's form is a 傀儡师's 替身 (GitHub issue #44). A view built later
 // (`info.form` = UnitInfo `form`, the sim's current form, through render/app.js renderInfo) starts in the mode; a dead
 // view keeps the form it died in (`_dieForm`) for a model built while it lies down.
-// Element gauges (b.snap `elem` → sample `el` / `elFill` / `elUntil` / `elDur`), the official form (PRTS 元素: "模型
-// 下部会显示对应的元素图标，并以白条显示剩余的元素值"; enemies "小尺寸图标（不显示元素图标，仅根据元素种类改变背景色）"): a row
-// right under the unit's own HP / SP bars and inside their span — the element's disc at the left (operators with its
-// glyph, enemies smaller and plain) and a white bar of the remaining 元素值 (1 − fill) that runs out right to left
-// like the HP bar above it; during a 爆发冷却 the bar refills over the cooldown (PRTS: "元素条显示缓慢恢复至上限"), drawn in
-// the element's colour with the disc pulsing [ASSUMED look], so a refill never reads as 元素值 still left while the
-// burst's stun / damage / 凋亡 ticks hit the unit. User playtest #6 (report 11): the v2.3 ring right of the bars sat on
-// the next operator's tier chip and bars (drawn under them) and read as that operator's gauge, a shrinking ring reads
-// like a filling progress ring, and its refill was the same white as the 元素值 left. The disc comes from the hudRings
-// atlas, the bars are tinted Texture.WHITE sprites; built on first use and hidden when idle.
+// Element gauges (b.snap `elem` → sample `el` / `elFill` / `elUntil` / `elDur`): (fork) the client's own gauge (EP_GAUGE,
+// prefabs enemy_ep_slider / char_ep_slider in arts/ui/[uc]battlecommon, logic UIFollowEpSlider / UIHudUnitEpSlider) under
+// the unit's feet, where the client's HUD root sits (UIUnitHUD follows Unit.uiPoint with Unit.hudOffset = Vector2.zero;
+// no unit prefab sets a UI mount point): a ring in the element's colour whose white arc is the remaining 元素值 (1 − fill),
+// running clockwise from 12 o'clock; operators carry the element's icon in it and a fading trail of the last drop. During a
+// 爆发冷却 the arc refills over the cooldown at half opacity (SetSliderInRecovery: GUIUtils.SetAlpha 0.5, the trail hidden);
+// an enemy's burst flashes a ring (SetEpBreakAnimation), an operator's every element hit pulses (SetEpHitAnimation). Our
+// HP / SP bars stay over the head. The art is manifest battleUi/slider_ep_* / sprite_ep_*; until it has loaded the gauge is
+// the hudRings element disc with a white arc (the same layout). Built on first use and hidden when idle.
 //
 // ItemView renders hand items as a floating icon plate; DeviceView renders battle devices (crates) as 3D boxes
 // with an HP bar once damaged.
@@ -89,7 +88,7 @@ import { SpineActor } from './spine.js';
 import { skillAttackMode } from './skillAttack.js';
 import { ATTACK_CLIPS } from './vfx/wiring.js';
 import { MANIFOLD, isManifold, manifoldCopyForm, manifoldAttackForm } from './manifold.js';
-import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, cursedFlameTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
+import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, cursedFlameTexture, hudRings, ringArc, downLabel, uiArtTexture, CHARGE_LABEL_STYLE, HUD_DISC, RING_ARC, epRadial, EP_RADIAL_SCALE } from './textures.js';
 import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed, statusValueLabel } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
 import { startAtkInterval, nextAtkInterval, clampAtkInterval } from './attackRate.js';
@@ -258,6 +257,16 @@ export const DOWN_LOOK = Object.freeze({
   size: 0.42, height: 1.02,
 });
 /**
+ * (fork) Stored skill charges over the head (b.snap `charges`: a skill with maxCharges > 1, at least one stored) — the
+ * official auto-skill mark (client UIHudCharSkillMarkPanel `auto_skill_ready`, prefab char_skill_mark_panel in
+ * arts/ui/[uc]battlecommon): a 25 % black disc (ui_battle_new/sprite_circle, 36 of the ring's 50) inside a yellow ring
+ * (ui_battle_new/sprite_auto) with the count in the same yellow (text_skill_cnt, textures.js CHARGE_LABEL_STYLE), colour
+ * (1, 0.851, 0); `digit` is the count's glyph height in ring diameters, centred (measured on a client frame). `size` is the
+ * ring's diameter in tiles with its pixel clamp, `gap` the px above the bars / status icons; `spin` (turns per second)
+ * and the stand-in drawn while the official art is missing (the redeploy ring's disc and full arc) are [ASSUMED].
+ */
+export const CHARGE_MARK = Object.freeze({ color: 0xffd900, fill: '#ffd900', size: 0.36, min: 18, max: 40, gap: 2, disc: 36 / 50, discAlpha: 0.251, digit: 0.42, spin: 0.25 });
+/**
  * An enemy drawn with another enemy's web model because its own is only in the local client (manifest `spineAliasOf`
  * + `spineLocal`: 灼热 / 炽焰源石虫 → the plain 源石虫's skeleton, feedback D3 after 0.1.0): a multiply tint toward its own
  * lava colours (orange / red-orange), so it reads apart from the plain slug where the local art was not extracted
@@ -265,12 +274,38 @@ export const DOWN_LOOK = Object.freeze({
  */
 export const ALIAS_TINT = Object.freeze({ enemy_1305_mhslim: 0xffc48a, enemy_1305_mhslim_2: 0xff9070 });
 /**
- * Element gauge row under the bars (see header): the disc's diameter in tiles and its pixel clamp (enemies × `enemy`),
- * the gap under the bars (px). The white bar is as tall as the SP bar and fills the rest of the bars' width. During a
- * 爆发冷却 the refilling bar takes the element's colour (textures.js ELEMENT_RING `tint`) and the disc's alpha pulses
- * between `pulse` and 1 at `pulseHz` (real time).
+ * (fork) The official element gauge (see header), in the client prefab's own units (a sprite's pixels):
+ *   - `tilePx`: prefab units per tile. The client's HUD (panel_hud under orthogonal_root, a Screen Space - Camera canvas
+ *     with CanvasScaler 1920 x 1080, match width) draws a unit as screen width / 1920 px; under the official battle
+ *     camera (projection.js presetCamera('normal'), left_/right_battle_camera_param) a tile at the field's middle row
+ *     (10.5) is 157.2 px of that 1920 px wide screen, so a unit is 1 / 157.2 tile, at any zoom and on any screen
+ *     (the client keeps it the same size on every row; here it follows the row's perspective, ±8 % over the field);
+ *   - `scale`: ep_slider's localScale; `enemyY` / `charY`: its anchoredPosition, below the HUD root (the unit's feet);
+ *   - layers (bottom up), each its sprite at its own size, centred: enemies slider_ep_back_enemy (51), the element's
+ *     colour slider_ep_color_enemy (its 27 px disc in a 51 rect), the dark slider_ep_fill_back_enemy (17) and the fill
+ *     slider_ep_fill_enemy (12, colour `enemyFill`); operators the hit pulse sprite_ep_hit_spread, slider_ep_back
+ *     (alpha `backAlpha`), the colour sprite_ep_color (28), the trail and the fill slider_ep_fill (28; trail alpha
+ *     `trailAlpha`) and the element's icon (14);
+ *   - `recoverAlpha`: the fill during a 爆发冷却; `hit*`: the operator's hit pulse (EP_ANIM_DURATION 0.3 s, to scale
+ *     EP_ANIM_TO_SCALE 1.3, fading); `break*`: the enemy's burst ring (EP_BREAK_ANIM 0.5 s, scale 0.5 → 1.5, its canvas
+ *     group fading); `trailSpeed` / `trailMin`: UIFollowSlider's back slider (BACK_FOLLOW_SPEED 5, THRESHOLD 0.02);
+ *   - `el`: the prefabs' _elementDatas per ElementType (SANITY 神经, WATER 侵蚀, FIRE 灼燃, DARK 凋亡): the enemy colour and
+ *     burst colour, the operator colour and icon; 坏死 (no official element) shows as 凋亡;
+ *   - `standIn`: the drawn diameters of the hudRings disc and white arc while the art is missing (prefab units).
+ * The tweens' eases are not read from the client [ASSUMED linear].
  */
-export const EL_BAR = Object.freeze({ icon: 0.15, min: 8, max: 15, enemy: 0.8, gap: 1, pulse: 0.45, pulseHz: 1.5 });
+export const EP_GAUGE = Object.freeze({
+  tilePx: 157.2, scale: 1.2, enemyY: 26.5, charY: 25.9, enemyFill: 0xd5d5d5, backAlpha: 0.784, trailAlpha: 0.3, recoverAlpha: 0.5,
+  hitS: 0.3, hitTo: 1.3, breakS: 0.5, breakFrom: 0.5, breakTo: 1.5, trailSpeed: 5, trailMin: 0.02,
+  el: Object.freeze({
+    neural: Object.freeze({ enemy: 0x149882, burst: 0x149882, char: 0x00ffd8, icon: 'sprite_ep_icon' }),
+    erosion: Object.freeze({ enemy: 0x266ad0, burst: 0x266ad0, char: 0x3da1ff, icon: 'sprite_ep_water_icon' }),
+    burn: Object.freeze({ enemy: 0xe3531a, burst: 0xe3531a, char: 0xff4901, icon: 'sprite_ep_fire_icon' }),
+    apoptosis: Object.freeze({ enemy: 0x7c7c7c, burst: 0x1c1c1c, char: 0x474747, icon: 'sprite_ep_dark_icon' }),
+    necrosis: Object.freeze({ enemy: 0x7c7c7c, burst: 0x1c1c1c, char: 0x474747, icon: 'sprite_ep_dark_icon' }),
+  }),
+  standIn: Object.freeze({ enemy: 23, enemyArc: 12, char: 28, charArc: 26 }),
+});
 
 /** The share of a model's height a bar is placed above (the head is not the very top of the silhouette). */
 export const HEAD_TOP_K = 0.92;
@@ -421,6 +456,52 @@ const OBLVNS_S2 = Object.freeze({ piano: oblvnsTimbre('A', 'Skill_2_Start'), org
 /** The timbre an S2 丰川祥子 starts in, before any cast cue names one (view built at deployment). */
 export const oblvnsStartForm = (info, skillIndex) =>
   (info?.side !== 'enemy' && (info?.spine === 'char_4182_oblvns' || info?.diy?.charId === 'char_4182_oblvns') && skillIndex === 1 ? 'piano' : null);
+/**
+ * (fork) 薇薇安娜's (char_4098_vvana) skill clips per cast, which the manifest's roles (one clip set per skill slot) cannot
+ * say. Official, read from the CN client 2026-11-08: charpack/char_4098_vvana.ab Modes `_replaceAnimPairs` — S1 Idle →
+ * Skill_1_Idle; S3_1 Idle → Skill_3_Idle_A, Attack → Skill_3_Attack_A (down Skill_Down_3_Attack_A); S3_2 Idle →
+ * Skill_3_Idle_B, Attack → Skill_3_Attack_B —; [uc]skills.ab skchr_vvana_1: S1_Attack2 (the plain cast) `_animKey` Attack,
+ * S1_Attack (the cast after 蓄力) Skill_1_Attack; skchr_vvana_3 `_beginAnim` Skill_3_Begin_A. Every outfit's skeleton has the
+ * same clips (还愿礼 and 寄自奥格尼斯科 too).
+ * - S1: a cast is the attack it replaces (`keepAttack`: its swing plays out; no Begin). 蓄力 — every charge stored (b.snap
+ *   `charges`, the sim's rule) — is the S1 mode: Skill_1_Begin once, then Skill_1_Idle as her idle (VVANA_STANCE), and her
+ *   next attack — the cast that spends them all — swings Skill_1_Attack (VVANA_STRIKE).
+ * - S3: her first cast of a deployment runs mode S3_1 (the _A clips), every later one S3_2 (Idle / Attack _B). Its
+ *   begin clip is the prefab's `_beginAnim` Skill_3_Begin_A, swapped by the buff templates (config/buff_template_holder,
+ *   ModifyAnimatorHookerReplacePair on the current mode's hooker): vvana_s_3[start] Begin_A → Begin_A on the first cast,
+ *   vvana_s_3[check] Begin_A → Begin_B once the skill was triggered before. No End clip: skchr_vvana_3 is a CastSkill
+ *   without `_endAnim` (only ToggleSkillWithEndAnimation has one; dump 2026-11-08), no template plays one, no code builds
+ *   `…_End` names — the End clips sit unused in the skeleton.
+ * - 蓄力 plays no clip of its own: vvana_s_1[mode]'s graph only switches modes (SwitchMode, sub-buffs, SP), S1's prefab
+ *   has no begin clip, its toggle ability no clip field — the S1 mode's hooker turns her Idle into Skill_1_Idle.
+ */
+const VVANA = 'char_4098_vvana';
+const VVANA_S1 = Object.freeze({ begin: null, loop: 'Attack', end: null, idle: null, via: 'attack', keepAttack: true });
+const VVANA_STANCE = Object.freeze({ change: null, roles: Object.freeze({ idle: 'Skill_1_Idle' }) });
+const VVANA_STRIKE = Object.freeze({ begin: null, loop: 'Skill_1_Attack', end: null });
+/** Real ms after 蓄力 ended within which an attack is still its cast (the snapshot of the spent charges may come first). */
+const VVANA_STRIKE_GRACE_MS = 400;
+/** The clips those roles play beside the manifest's (the impostor box: _clipNames). */
+const VVANA_CLIPS = Object.freeze(['Skill_1_Idle', 'Skill_1_Attack', ...['A', 'B'].flatMap((x) =>
+  [`Skill_3_Begin_${x}`, `Skill_3_Idle_${x}`, `Skill_3_Attack_${x}`]), 'Skill_Down_3_Attack_A']);
+const isVvana = (info) => info?.side !== 'enemy' && (info?.spine === VVANA || info?.diy?.charId === VVANA);
+/** Every charge of a skill with several stored (b.snap `charges` [stored, maximum]). */
+const chargesFull = (c) => Array.isArray(c) && Number(c[1]) > 1 && Number(c[0]) >= Number(c[1]);
+
+/**
+ * (fork) The skill role 薇薇安娜's cast of skill slot `index` plays (VVANA): S1's, or S3's clip set of her `casts`-th cast of
+ * the deployment (`down`: facing down, the A set's down attack where the model has it), else null (the manifest's).
+ * @param {number|null} index
+ * @param {number} casts
+ * @param {boolean} down
+ */
+export function vvanaSkillRole(index, casts, down) {
+  if (index === 0) return VVANA_S1;
+  if (index !== 2) return null;
+  const x = casts > 1 ? 'B' : 'A';
+  return { begin: `Skill_3_Begin_${x}`, loop: down && x === 'A' ? 'Skill_Down_3_Attack_A' : `Skill_3_Attack_${x}`, end: null, idle: `Skill_3_Idle_${x}` };
+}
+
 export const FORMS = Object.freeze({
   [MANIFOLD]: Object.freeze({
     Default: Object.freeze({ roles: { ...clipSet('Idle_1', null, 'Stun', 'Attack'), deploy: 'Start', stun: loop('Stun') } }),
@@ -434,6 +515,12 @@ export const FORMS = Object.freeze({
     doll: Object.freeze({ change: 'Start_B', end: 'Die_B', leave: 'Start_2', roles: dollRoles('Idle_B', 'Die_B_2') }),
   }),
   char_4182_oblvns: OBLVNS_S2,
+  // (fork) 烛煌 T2 绝处重燃 (sim chess_char_5_03-blaze2.js: the 'downed' fx's form 'downed', the 'revive' fx's null): her
+  // charpack's Reborn mode — knocked down on Revive_Begin, kneeling on Revive_Idle (no attack, no skill: the kit disarms
+  // her), standing up on Revive_End (the user's clip RjrtWhMKwAU 0:29–0:34). Her outfits share the clip names.
+  char_1040_blaze2: Object.freeze({
+    downed: Object.freeze({ change: 'Revive_Begin', leave: 'Revive_End', roles: { ...dollRoles('Revive_Idle', 'Die'), stun: loop('Revive_Idle') } }),
+  }),
   char_4016_kazema: Object.freeze({
     doll: Object.freeze({ change: 'Start_B', leave: 'Start', roles: dollRoles('Idle_B', 'Die_B', 'Attack_B') }),
   }),
@@ -821,6 +908,10 @@ export class UnitView {
     this.moteRing = null;
     this.layers = 0;              // hit-negating 护盾 layers (sync; b.snap `layers`: the official layer effect, vfx/talentfx.js)
     this.charges = null;          // [stored, maximum] of a charge skill (sync; b.snap `charges`: vfx/skillfx.js)
+    this.fxs = null;              // (fork) [[buff, src, look]] official buffs it shows the lasting effects of (b.snap `fxs`: vfx/skillfx.js)
+    this.skillCasts = 0;          // (fork) its skill's starts since its deployment (setSkill; VVANA, vfx/skillfx.js CAST_MODES)
+    this.stanceOn = false;        // (fork) 薇薇安娜's 蓄力 shown (VVANA_STANCE), and when it last ended (performance ms)
+    this.stanceOffAt = -Infinity;
     this.flags = 0; this.anim = ANIM.IDLE;
     this.statuses = new Set();
     this.alive = true;
@@ -830,10 +921,11 @@ export class UnitView {
     this.down = null;             // knocked out, waiting to redeploy: { until, total, state } (setDown) — no fade meanwhile
     this.gameT = 0;               // battle game time of the frame (render clock), for the redeploy ring's countdown and the element bar's refill
     this.el = null; this.elFill = 0; this.elUntil = 0; this.elDur = 0;   // shown element gauge (sync)
-    this._elBar = null;           // { root, disc, bg, fill } sprites of the element gauge row, built on first use
+    this._elBar = null;           // the element gauge under the feet (_updateElementGauge), built on first use
     this._wolfPips = null;        // { root, back[], lit[] } diamonds of the 狼影 row, built on first use
     this.ammoCuts = [];           // the thin separators between the ammo bar's cells (_updateAmmoCuts)
     this._downRing = null;        // { disc, track, arc, text } sprites (text: the shared label, textures.js downLabel), built on first use
+    this._chargeMark = null;      // (fork) { disc, ring, text } of the stored-charges mark over the head (CHARGE_MARK), built on first use
     this.alpha = 1; this.fadeIn = this.prep ? 1 : 0;
     this.lunge = 0; this.lungeDir = { x: 1, y: 0 };
     this.flash = 0;
@@ -1123,6 +1215,7 @@ export class UnitView {
       // down with facing UP, §22.1, is built a frame later; a model rebuilt while it is down)
       const f = this._formSpec() || (this.alive ? null : this._dieForm);
       if (f) this.actor.setForm(f.roles);
+      this._castRoles(true);
       // replay current state (a dead model resumes its Die clip where it would be — a knocked-down one holds its end)
       if (!this.alive) {
         const d = this.actor.die();
@@ -1346,7 +1439,8 @@ export class UnitView {
     this.st = s.st || null;
     this.barrier = s.sh > 0 ? s.sh : 0;
     this.energy = s.energy || null;
-    this.layers = s.layers > 0 ? s.layers | 0 : 0; this.charges = s.charges || null;
+    this.layers = s.layers > 0 ? s.layers | 0 : 0; this.charges = s.charges || null; this.fxs = s.fxs || null;
+    if (this.skillIndex === 0 && isVvana(this.info)) this._stance(this.alive && chargesFull(this.charges));
     const prevFlags = this.flags;
     this.flags = s.flags | 0;
     this.anim = s.anim | 0;
@@ -1610,6 +1704,7 @@ export class UnitView {
       this.imp = null;
     }
     this._box = null;
+    this._plane = null;   // (fork) the next model's skin has its own plane depth (_planeDepth)
     this._tint = undefined;   // the next model gets the current tint on its first frame (a knocked-down one its grey)
     const old = this.actor;
     this.actor = null;
@@ -1617,6 +1712,19 @@ export class UnitView {
     if (old) { try { old.destroy(); } catch { /* ignore */ } }
     if (this._actorEntry) this._releaseEntry(this._actorEntry);
     this._actorEntry = null;
+  }
+
+  /**
+   * (fork) This unit's model-plane depth along the camera's view (unitDepthKey): its official skin's (render/vfx index)
+   * once the index is in, else PLANE_DEPTH by side.
+   */
+  _planeDepth() {
+    if (this._plane != null) return this._plane;
+    const skin = this.ctx.skinOfView ? this.ctx.skinOfView(this) : undefined;
+    if (skin === undefined) return this.isEnemy ? PLANE_DEPTH.enemy : PLANE_DEPTH.ally;   // index not loaded yet
+    const d = skinPlaneDepth(skin);
+    this._plane = d ?? (this.isEnemy ? PLANE_DEPTH.enemy : PLANE_DEPTH.ally);
+    return this._plane;
   }
 
   /** An attack was made (b.ev 'atk'). `target` = view or null. */
@@ -1646,7 +1754,7 @@ export class UnitView {
     this.lunge = 1;
     this._shotKind(kind, target);
     if (this.actor) {
-      this.actor.castStrike?.(this._takeStrike(now));
+      this.actor.castStrike?.(this._takeStrike(now) || this._stanceStrike());
       this.actor.attack(this.atkInterval, once); // game seconds: the actor's clock runs in game time
     }
     if (this.imp) this.imp.dirty = true;
@@ -1740,7 +1848,7 @@ export class UnitView {
     if (!this.alive || !this.actor || !this.spineReady) return false;
     this._attackForm(kind);
     this._shotKind(kind, target);
-    this.actor.castStrike?.(this._strikeClip(castSlot));
+    this.actor.castStrike?.(this._strikeClip(castSlot) || this._stanceStrike());
     const ok = this.actor.windUp(clampAtkInterval(interval), lead, !!PROJ[kind]?.once);
     if (!ok) this.actor.castStrike?.(null);
     else this._faceAttack(target);
@@ -1748,10 +1856,38 @@ export class UnitView {
     return ok;
   }
 
+  /**
+   * (fork) An attack cast starts (the sim's ['atkCast', id, windUp], render/app/windup.js windCasts): the attack clip from its
+   * first frame — `elapsed` game s into it when the cast is rendered late —, at the speed that lands its strike frame
+   * `windUp` after the cast start (SpineActor.castAttack), facing `target`. True once started.
+   */
+  castAttack(windUp, elapsed, kind, target = null) {
+    if (!this.alive || !this.actor || !this.spineReady || typeof this.actor.castAttack !== 'function') return false;
+    this._attackForm(kind);
+    this._shotKind(kind, target);
+    this.actor.castStrike?.(this._stanceStrike());
+    const ok = this.actor.castAttack(windUp, elapsed);
+    if (!ok) this.actor.castStrike?.(null);
+    else this._faceAttack(target);
+    if (ok && this.imp) this.imp.dirty = true;
+    return ok;
+  }
+
+  /**
+   * (fork) An attack cast the sim cut (['atkCancel'], render/app/windup.js windCasts): back to rest now, as the official
+   * client's interrupted cast. Nothing while no swing is wound up.
+   */
+  cancelWindUp() {
+    if (this.actor?.cancelWindUp?.() && this.imp) this.imp.dirty = true;
+  }
+
   onHit() { this.flash = 1; }
 
   setSkill(on) {
+    // (fork) a start, once — the event and the snapshot flag both say it (skillCasts)
+    if (on && !this.statuses.has('skill')) this.skillCasts++;
     if (on) this.statuses.add('skill'); else this.statuses.delete('skill');
+    if (on) this._castRoles();
     if (this.actor) this.actor.setSkill(on);
     // a cast whose animation only the Front model has: turn that model round now, the Back one after the clip (or its
     // End) played out — _skillFacesFront / _faceHold
@@ -1839,8 +1975,36 @@ export class UnitView {
     return c && now - c.t >= 0 && now - c.t <= STRIKE_WINDOW ? this._strikeClip(c.index) : null;
   }
 
+  /**
+   * (fork) 薇薇安娜's skill roles on the actor (VVANA): S1's always, S3's for the cast starting now (`build`: a model built
+   * mid-skill takes the running cast's), and 蓄力's clip set while it holds.
+   */
+  _castRoles(build = false) {
+    const a = this.actor;
+    if (!a || typeof a.setCastRole !== 'function' || !isVvana(this.info)) return;
+    const down = this.dir === 'DOWN' && a.has('Skill_Down_3_Attack_A');
+    a.setCastRole(vvanaSkillRole(this.skillIndex, Math.max(1, this.skillCasts), down));
+    if (build && this.stanceOn) a.setForm(VVANA_STANCE.roles);
+  }
+
+  /** (fork) 薇薇安娜's 蓄力 on / off (VVANA_STANCE): its Begin clip and idle, then back to the manifest's idle. */
+  _stance(on) {
+    if (on === this.stanceOn) return;
+    this.stanceOn = on;
+    if (!on) this.stanceOffAt = nowMs();
+    if (this.actor && isVvana(this.info)) this.actor.setForm(on ? VVANA_STANCE.roles : null, on ? VVANA_STANCE.change : null);
+    if (this.imp) this.imp.dirty = true;
+  }
+
+  /** (fork) The clip 薇薇安娜's attack swings in 蓄力 (or just out of it: its cast spent the charges) — VVANA_STRIKE —, else null. */
+  _stanceStrike() {
+    return this.stanceOn || nowMs() - this.stanceOffAt <= VVANA_STRIKE_GRACE_MS ? VVANA_STRIKE : null;
+  }
+
   onDeploy() {
     this.fadeIn = 0;
+    this.skillCasts = 0;
+    this._stance(false);
     if (!this.alive) this.revive();
     this._pendingDeployElapsed = this.actor ? null : 0;
     if (this.actor) this.actor.deploy();
@@ -2058,7 +2222,7 @@ export class UnitView {
     if (lungeK) { const q = cam.project(this.x + lx, this.y + ly, this.z + this.hover + this.lift, LG_P); bx = q.x; by = q.y; }
     this.root.position.set(bx, by);
     this.root.alpha = alpha;
-    this.root.zIndex = unitDepthKey(cam, this.x, this.y, this.lift);
+    this.root.zIndex = unitDepthKey(cam, this.x, this.y, this.lift, this._planeDepth());
     // off-screen: nothing to animate or draw (bounds / hit-testing still follow `screen`)
     if (this._cull(bx, by, s, dt)) return;
     const flip = this.modelFlip();
@@ -2178,7 +2342,7 @@ export class UnitView {
       if (!this.ribbons) this.ribbons = new InvulnRibbons(this.P, this.root, this.body);
       this.ribbons.update(t, s * this.ribbonK, -headTiles * s * RIBBON.centre);
     } else if (this.ribbons) this.ribbons.hide();
-    this._updateHud(dt, s, hx, by - headTiles * s, alpha, t);
+    this._updateHud(dt, s, hx, by - headTiles * s, alpha, t, by);
   }
 
   /**
@@ -2203,7 +2367,7 @@ export class UnitView {
     return off;
   }
 
-  _updateHud(dt, s, x, y, alpha, t) {
+  _updateHud(dt, s, x, y, alpha, t, feetY = y) {
     const prep = this.prep;
     const showBars = !prep && this.alive && this.info.kind !== 'item';
     const damaged = this.hp < this.maxHp - 0.5;
@@ -2296,7 +2460,7 @@ export class UnitView {
       this._updateIconMark(mark, key, ic.position.x, iy, isz, alpha);
     }
     // 狼影 pips under the bars (b.snap `wolves`), then the purses and — 设置「显示弹药与能量数量」 on (off by default) —
-    // the stored energies (b.snap `coins` / `energy`), then the element gauge row under them (b.snap `elem`); redeploy
+    // the stored energies (b.snap `coins` / `energy`); the element gauge (b.snap `elem`) under the feet; redeploy
     // ring above a knocked-down operator (b.snap `down`). The same switch first puts the magazine's count right under
     // the ammo bar, and the rows below move down by its height.
     let rowsTop = cy + bh / 2 + (showSp ? spH + 1.5 : 0);
@@ -2304,9 +2468,14 @@ export class UnitView {
     const wolfH = this._updateWolfPips(showBars && !this.isEnemy && !!this.wolves, x0, rowsTop, s);
     this._updateFever(showBars && !this.isEnemy && !!this.fever, x0 + bw + 2, cy - bh / 2, s, t);
     const coinH = this._updateCoins(showBars && !this.isEnemy && !!this.coins, x0, rowsTop + wolfH, s);
-    const energyH = this._updateEnergy(showBars && !this.isEnemy && !!this.energy && this.ctx.settings?.ammoEnergyCount === true, x0, rowsTop + wolfH + coinH, s);
-    this._updateElementBar(showBars && !!this.el, x0, bw, rowsTop + wolfH + coinH + energyH + 1, spH, s, t);
+    this._updateEnergy(showBars && !this.isEnemy && !!this.energy && this.ctx.settings?.ammoEnergyCount === true, x0, rowsTop + wolfH + coinH, s);
+    this._updateElementGauge(showBars && !!this.el, x, feetY, s, dt);
     this._updateDownRing(!prep && !!this.down && !this.alive, x, this.screen.y - DOWN_LOOK.height * s, s, t);
+    // (fork) stored skill charges over the head (CHARGE_MARK): above the bars, and above the status icons when any show
+    const ch = !this.isEnemy ? this.charges : null;
+    const iconRow = this.icons.some((ic) => ic.visible);
+    this._updateChargeMark(showBars && Array.isArray(ch) && ch[1] > 1 && ch[0] >= 1, x,
+      (iconRow ? iy - isz / 2 : cy - bh / 2) - CHARGE_MARK.gap, s, t);
     // blocked marker at the feet (enemies held by a blocker)
     const blocked = !prep && this.alive && this.isEnemy && (this.flags & UF.BLOCKED);
     this.blockIcon.visible = !!blocked;
@@ -2509,8 +2678,8 @@ export class UnitView {
   }
 
   /**
-   * The share of the element bar drawn (0..1): the remaining 元素值 (1 − fill), or during a 爆发冷却 the part of the
-   * cooldown already run (the bar refills to full, PRTS 元素 "元素条显示缓慢恢复至上限"). 0 without a gauge.
+   * The share of the element gauge's white arc (0..1): the remaining 元素值 (1 − fill), or during a 爆发冷却 the part of
+   * the cooldown already run (the arc refills to full, PRTS 元素 "元素条显示缓慢恢复至上限"). 0 without a gauge.
    */
   elementLeft() {
     if (!this.el) return 0;
@@ -2519,43 +2688,86 @@ export class UnitView {
   }
 
   /**
-   * Element gauge row (see header) under the bars spanning x0 … x0 + bw, its top at `top`: the element's disc at the
-   * left (operators with its glyph; enemies plain, × EL_BAR.enemy) and, beside it to the bars' right end, a bar of
-   * `elementLeft()` on a dark track `h` px tall — white for the 元素值 left; in the element's colour, the disc pulsing
-   * (clock `t`), while it refills over a 爆发冷却. Built on the first gauge, hidden while there is none.
+   * (fork) The element gauge (see header, EP_GAUGE) centred on `x`, its HUD root at the feet `feetY`; one prefab unit is
+   * 1 / EP_GAUGE.tilePx of a tile (`s` px). The client's sprites once their art has loaded (manifest battleUi/…),
+   * else the hudRings element disc with a white arc in the same place (`r.official`). `r.left` is the white arc's share
+   * (elementLeft), `r.trailK` the operator trail's; the hit pulse and the burst ring run on real time (`dt`). Built on the
+   * first gauge, hidden while there is none.
    */
-  _updateElementBar(show, x0, bw, top, h, s, t = 0) {
+  _updateElementGauge(show, x, feetY, s, dt = 0) {
     let r = this._elBar;
-    if (!show) { if (r) r.root.visible = false; return; }
-    const tex = hudRings();
+    if (!show) {
+      if (r) { r.root.visible = false; r.hitT = r.breakT = -1; r.cooling = false; r.lastFill = 0; }
+      return;
+    }
+    const P = this.P, G = EP_GAUGE, enemy = this.isEnemy;
     if (!r) {
-      const P = this.P;
       const root = new P.Container();
-      const bg = bar(P, root, COLORS.hpBack, 0.85);
-      const fill = bar(P, root, 0xffffff);
-      const disc = new P.Sprite(tex.disc.burn);
-      disc.anchor.set(0.5);
-      root.addChild(disc);
-      r = this._elBar = { root, disc, bg, fill };
+      const mk = () => { const sp = new P.Sprite(P.Texture.EMPTY); sp.anchor.set(0.5); root.addChild(sp); return sp; };
+      // bottom up, as the prefabs' siblings: enemies back, colour, fill back, fill, burst ring (its hint ring on top);
+      // operators hit pulse, back, colour, trail, fill, icon
+      r = enemy ? { root, back: mk(), color: mk(), fillBack: mk(), fill: mk(), brk: mk(), hint: mk() }
+        : { root, hit: mk(), back: mk(), color: mk(), trail: mk(), fill: mk(), icon: mk() };
+      Object.assign(r, { left: 1, trailK: 1, lastFill: 0, hitT: -1, breakT: -1, cooling: false, official: false });
+      this._elBar = r;
       this.hud.addChild(root);
     }
-    const d = clamp(s * EL_BAR.icon, EL_BAR.min, EL_BAR.max) * (this.isEnemy ? EL_BAR.enemy : 1);
-    const cy = top + EL_BAR.gap + d / 2;
-    r.disc.texture = (this.isEnemy ? tex.discEnemy : tex.disc)[this.el] || tex.disc.burn;
-    r.disc.width = r.disc.height = d / HUD_DISC;   // the disc fills HUD_DISC of its atlas cell
-    r.disc.position.set(x0 + d / 2, cy);
-    const bx = x0 + d + 2, w = Math.max(4, x0 + bw - bx);
-    r.bg.position.set(bx - 1, cy); r.bg.width = w + 2; r.bg.height = h + 2;
-    const k = this.elementLeft();
-    r.fill.visible = k > 0;
-    r.fill.position.set(bx, cy); r.fill.width = w * k; r.fill.height = h;
-    if (this.elementCooling()) {
-      r.fill.tint = (ELEMENT_RING[this.el] || ELEMENT_RING.burn).tint;
-      r.disc.alpha = EL_BAR.pulse + (1 - EL_BAR.pulse) * (0.5 + 0.5 * Math.cos(t * Math.PI * 2 * EL_BAR.pulseHz));
+    const look = G.el[this.el] || G.el.burn;
+    const left = this.elementLeft(), cooling = this.elementCooling();
+    // an enemy's burst flashes as its 爆发冷却 starts; an operator's gauge pulses on every element hit (元素值 drops)
+    if (enemy && cooling && !r.cooling) r.breakT = 0;
+    if (!enemy && !cooling && this.elFill > r.lastFill + 1e-6) r.hitT = 0;
+    r.cooling = cooling;
+    r.lastFill = cooling ? 0 : this.elFill;
+    // the trail (operators, UIFollowSlider's back slider): up with the arc at once, after a drop it follows it down
+    const gap = r.trailK - left;
+    r.trailK = cooling || gap <= G.trailMin ? left : r.trailK - gap * Math.min(1, G.trailSpeed * dt);
+    r.left = left;
+    const ui = (k) => uiArtTexture(this.ctx.assets?.ui?.(`battleUi/${k}`));
+    const radial = (k, f) => epRadial(this.ctx.assets?.ui?.(`battleUi/${k}`), f);
+    const fillKey = enemy ? 'slider_ep_fill_enemy' : 'slider_ep_fill';
+    const tex = enemy
+      ? { back: ui('slider_ep_back_enemy'), color: ui('slider_ep_color_enemy'), fillBack: ui('slider_ep_fill_back_enemy'),
+        fill: radial(fillKey, left), brk: ui('sprite_ep_break_spread'), hint: ui('sprite_ep_break_hint') }
+      : { hit: ui('sprite_ep_hit_spread'), back: ui('slider_ep_back'), color: ui('sprite_ep_color'), fill: radial(fillKey, left),
+        trail: radial(fillKey, r.trailK), icon: ui(look.icon) };
+    const official = r.official = Object.values(tex).every(Boolean);
+    const at = (sp, t, scale = 1, tint = 0xffffff, alpha = 1, on = true) => {
+      sp.visible = on && !!t;
+      if (!sp.visible) return;
+      sp.texture = t; sp.scale.set(scale); sp.tint = tint; sp.alpha = alpha;
+    };
+    const fillA = cooling ? G.recoverAlpha : 1;
+    const inv = 1 / EP_RADIAL_SCALE;
+    if (official) {
+      at(r.back, tex.back, 1, 0xffffff, enemy ? 1 : G.backAlpha);
+      at(r.color, tex.color, 1, enemy ? look.enemy : look.char);
+      at(r.fill, tex.fill, inv, enemy ? G.enemyFill : 0xffffff, fillA, left > 0);
+      if (enemy) {
+        at(r.fillBack, tex.fillBack);
+        const k = r.breakT >= 0 ? r.breakT / G.breakS : -1;
+        const sc = G.breakFrom + (G.breakTo - G.breakFrom) * k;
+        at(r.brk, tex.brk, sc, look.burst, 1 - k, k >= 0);
+        at(r.hint, tex.hint, sc, 0xffffff, 1 - k, k >= 0);
+      } else {
+        at(r.trail, tex.trail, inv, 0xffffff, G.trailAlpha, !cooling && r.trailK > left);
+        at(r.icon, tex.icon);
+        const k = r.hitT >= 0 ? r.hitT / G.hitS : -1;
+        at(r.hit, tex.hit, 1 + (G.hitTo - 1) * k, look.char, 1 - k, k >= 0);
+      }
     } else {
-      r.fill.tint = 0xffffff;
-      r.disc.alpha = 1;
+      // stand-in until the art has loaded: the element disc (operators with its glyph) and a white arc
+      const rings = hudRings();
+      const D = G.standIn;
+      for (const k of ['back', 'fillBack', 'brk', 'hint', 'hit', 'trail', 'icon']) if (r[k]) r[k].visible = false;
+      at(r.color, (enemy ? rings.discEnemy : rings.disc)[this.el] || rings.disc.burn, (enemy ? D.enemy : D.char) / (rings.size * HUD_DISC));
+      at(r.fill, ringArc(left), (enemy ? D.enemyArc : D.charArc) / (rings.size * RING_ARC), 0xffffff, fillA, left > 0);
     }
+    if (r.hitT >= 0 && (r.hitT += dt) >= G.hitS) r.hitT = -1;
+    if (r.breakT >= 0 && (r.breakT += dt) >= G.breakS) r.breakT = -1;
+    const u = s / G.tilePx;
+    r.root.position.set(x, feetY + (enemy ? G.enemyY : G.charY) * u);
+    r.root.scale.set(u * G.scale);
     r.root.visible = true;
   }
 
@@ -2563,18 +2775,35 @@ export class UnitView {
    * Redeploy ring above a knocked-down operator (see header), centred on (cx, cy): a mint arc filling as its respawn
    * timer runs with the seconds left; a full pulsing amber ring with "DP" / red ring with "!" once it only waits.
    */
+  /**
+   * (fork) A round badge over the head — the redeploy ring and the charge mark share it: one sprite per texture (centred,
+   * in this order) and a label sprite last, on one container in the HUD. `badgeLabel` sets the label.
+   */
+  _headBadge(...textures) {
+    const P = this.P;
+    const root = new P.Container();
+    const mk = (tx) => { const sp = new P.Sprite(tx); sp.anchor.set(0.5); root.addChild(sp); return sp; };
+    const parts = textures.map(mk);
+    const text = mk(P.Texture.EMPTY);
+    this.hud.addChild(root);
+    return { root, parts, text, label: null, fill: null, res: 0 };
+  }
+
+  /** (fork) A head badge's label in `fill` (the shared ring label cache, textures.js downLabel), redrawn on a change only. */
+  _badgeLabel(r, label, fill, style) {
+    const res = this.ctx.renderer?.resolution || 1;
+    if (r.label === label && r.fill === fill && r.res === res) return;
+    r.label = label; r.fill = fill; r.res = res;
+    r.text.texture = downLabel(label, fill, res, style);
+  }
+
   _updateDownRing(show, cx, cy, s, t) {
     let r = this._downRing;
     if (!show) { if (r) r.root.visible = false; return; }
     const tex = hudRings();
     if (!r) {
-      const P = this.P;
-      const root = new P.Container();
-      const mk = (tx) => { const sp = new P.Sprite(tx); sp.anchor.set(0.5); root.addChild(sp); return sp; };
-      const disc = mk(tex.downDisc), track = mk(tex.track), arc = mk(tex.arcs[0]);
-      const text = mk(P.Texture.EMPTY);
-      r = this._downRing = { root, disc, track, arc, text, label: null, res: 0 };
-      this.hud.addChild(root);
+      r = this._downRing = this._headBadge(tex.downDisc, tex.track, tex.arcs[0]);
+      [r.disc, r.track, r.arc] = r.parts;
     }
     const dn = this.down;
     const counting = dn.state === DOWN_STATE.COUNTING;
@@ -2583,18 +2812,50 @@ export class UnitView {
     const color = DOWN_LOOK.ring[dn.state] ?? DOWN_LOOK.ring[DOWN_STATE.COUNTING];
     r.arc.tint = color;
     const label = counting ? String(Math.ceil(left - 1e-6)) : dn.state === DOWN_STATE.WAIT_DP ? 'DP' : '!';
-    const res = this.ctx.renderer?.resolution || 1;
-    if (r.label !== label || r.res !== res) {
-      r.label = label;
-      r.res = res;
-      r.text.texture = downLabel(label, counting ? '#ffffff' : '#' + color.toString(16).padStart(6, '0'), res);
-    }
+    this._badgeLabel(r, label, counting ? '#ffffff' : '#' + color.toString(16).padStart(6, '0'));
     const d = clamp(s * DOWN_LOOK.size, 22, 52);
     const k = d / tex.size;
     r.disc.scale.set(k); r.track.scale.set(k); r.arc.scale.set(k);
     r.text.scale.set((d * (label.length > 2 ? 0.34 : 0.44)) / 32);
     r.root.position.set(cx, cy);
     r.root.alpha = counting ? 1 : 0.72 + 0.28 * Math.sin(t * 5);
+    r.root.visible = true;
+  }
+
+  /**
+   * (fork) The stored skill charges over the head (CHARGE_MARK), its bottom at `bottom`: the official disc, ring and
+   * count once their art has loaded (manifest battleUi/sprite_circle, battleUi/sprite_auto), the redeploy ring's disc
+   * and full arc in the same yellow until then.
+   */
+  _updateChargeMark(show, cx, bottom, s, t) {
+    let r = this._chargeMark;
+    if (!show) { if (r) r.root.visible = false; return; }
+    const rings = hudRings();
+    if (!r) {
+      r = this._chargeMark = this._headBadge(rings.downDisc, ringArc(1));
+      [r.disc, r.ring] = r.parts;
+    }
+    const a = this.ctx.assets;
+    const disc = uiArtTexture(a?.ui?.('battleUi/sprite_circle'));
+    const ring = uiArtTexture(a?.ui?.('battleUi/sprite_auto'));
+    const official = !!(disc && ring);
+    r.disc.texture = official ? disc : rings.downDisc;
+    r.ring.texture = official ? ring : ringArc(1);
+    r.disc.tint = official ? 0x000000 : 0xffffff;
+    r.disc.alpha = official ? CHARGE_MARK.discAlpha : 0.85;
+    r.ring.tint = CHARGE_MARK.color;
+    this._badgeLabel(r, String(this.charges[0] | 0), CHARGE_MARK.fill, CHARGE_LABEL_STYLE);
+    const d = clamp(s * CHARGE_MARK.size, CHARGE_MARK.min, CHARGE_MARK.max);
+    // the official ring sprite (144 px) carries its own margin; the stand-in arc's cell (rings.size) does too
+    r.ring.scale.set(d / (official ? ring.width : rings.size) * (official ? 1 : 1.15));
+    const dd = d * CHARGE_MARK.disc;
+    r.disc.scale.set(official ? dd / disc.width : (dd / (rings.size * HUD_DISC)));
+    r.ring.rotation = -t * Math.PI * 2 * CHARGE_MARK.spin;
+    // the count's canvas is trimmed to its glyph (plus the shadow's offset): scale by its height, anchor 0.5 centres it
+    const sh = CHARGE_LABEL_STYLE.dropShadowDistance * Math.SQRT1_2;
+    r.text.scale.set((d * CHARGE_MARK.digit) / Math.max(1, r.text.texture.height - sh));
+    r.root.position.set(cx, bottom - d / 2);
+    r.root.alpha = 1;
     r.root.visible = true;
   }
 
@@ -2681,6 +2942,8 @@ export class UnitView {
       for (const n of ATTACK_CLIPS[this.info.diy?.charId || this.info.spine || this.info.defId]?.clips || []) {
         if (a.has(n) && !out.has(n)) out.set(n, false);
       }
+      // (fork) 薇薇安娜's per-cast clips (VVANA)
+      if (isVvana(this.info)) for (const n of VVANA_CLIPS) if (a.has(n) && !out.has(n)) out.set(n, false);
     }
     this._clipsOf = a;
     this._clips = out;
@@ -2959,13 +3222,50 @@ const HUD_P = { x: 0, y: 0, s: 0, depth: 0 };
 const ICON_TMP = [];
 
 /**
- * Unit-layer zIndex of a unit / piece whose feet are at (x, y): farther rows first (so raised block rows, keyed by
- * tiles.rowDepthKey, hide units behind them); lifted (dragged) pieces on top; ties broken by column.
+ * (fork) The official sort of units (Unity, client dump 2026-11-08): the battle camera's transparencySortMode is
+ * Orthographic (CameraController._UpdateTransparencySortMode), no battle code sets a sortingOrder, and every model
+ * renderer is sorting layer 0 / order 0 — so units draw by the depth of their model along the camera's view, farthest
+ * first. Each model is a flat Spine mesh on a plane tilted −30° about X (its Graphic node), facing the 30° camera
+ * head-on: every point of it has one depth, its plane's — height, bounds and leaps change nothing. That plane is
+ * offset from the feet by the prefab's Graphic and the skin's FaceSwitcher: along the view, −0.100 for every operator
+ * (233 skins) and most summons, about −0.152 for most enemies (249 skins). So an enemy in an operator's row draws over
+ * her (youtu.be/L1yV18aMIos 0:25: the robot covers her reindeer's antlers).
  */
-export function unitDepthKey(cam, x, y, lift = 0) {
+export const PLANE_DEPTH = Object.freeze({ ally: -0.1, enemy: -0.152 });
+/** The camera's view direction in the Unity battle frame (z = −height): the official 30° pitch. */
+const VIEW_F = [0, Math.sin(Math.PI / 6), Math.cos(Math.PI / 6)];
+
+/**
+ * A skin's model-plane depth from its feet along the camera's view (index.json skins: a point the skin's FaceSwitcher
+ * places on the plane — HitPoint / HeadPoint, whose own offset is in the plane), or null without one.
+ * @param {any} skin
+ */
+export function skinPlaneDepth(skin) {
+  const pts = skin && skin.points;
+  if (!pts) return null;
+  for (const name of ['HitPoint', 'HeadPoint', 'HeadAnchor']) {
+    const e = pts[name], q = e && (e.front || e.all);
+    const p = q && q.pos;
+    if (Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) return p[0] * VIEW_F[0] + p[1] * VIEW_F[1] + p[2] * VIEW_F[2];
+  }
+  return null;
+}
+
+/**
+ * Unit-layer zIndex of a unit / piece whose feet are at (x, y): farther first by the depth of its model plane (`plane`:
+ * skinPlaneDepth, relative to an operator's −0.100 — an enemy's −0.152 puts it 0.052 nearer); lifted (dragged) pieces on
+ * top; ties broken by column. Raised block rows (tiles.rowDepthKey, keyed at a row's back edge) still hide the units
+ * behind them: the plane offset never carries a unit across the edge of its own row (a block is opaque 3D in the
+ * official game, the depth buffer decides there, not this sort).
+ */
+export function unitDepthKey(cam, x, y, lift = 0, plane = PLANE_DEPTH.ally) {
   // +40 (< one row of depth at the official 30° pitch, 100·sin 30° = 50): a lifted piece never ties with the unit one
   // row in front of it (a tie flickers with the column tie-break)
-  return -cam.depthOf(x, y, 0) * 100 + (lift > 0 ? 40 : 0) + x * 0.001;
+  const d = cam.depthOf(x, y, 0);
+  let k = -(d + (plane - PLANE_DEPTH.ally)) * 100;
+  const edge = Math.floor(y - 0.5) + 0.5;   // the back edge of the row in front of it
+  if (y - edge > 0.06) k = Math.min(k, -cam.depthOf(x, edge + 0.06, 0) * 100); else k = -d * 100;
+  return k + (lift > 0 ? 40 : 0) + x * 0.001;
 }
 
 function mixTint(a, b, k) {

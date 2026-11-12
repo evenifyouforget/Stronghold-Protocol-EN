@@ -302,7 +302,7 @@ export const manifestFiles = listedArtFiles;
 
 /**
  * The art of a full package: every file data/assets.json lists, public/fonts, public/assets/local/ and
- * data/local-assets.json (when present); the official effects (public/assets/local/fx/ with data/local-fx.json) only
+ * data/local-assets.json and (fork) data/clip-bounds.json (when present); the official effects (public/assets/local/fx/ with data/local-fx.json) only
  * with `fx` (FULL_ZIP_FX), else they are `fxHeld`. `missing`: listed files not on disk; `orphans`: files under public/assets
  * that nothing lists (left out); `held`: listed files the zip holds back on purpose — the JP voice dub when `jpVoice`
  * (FULL_ZIP_JP_VOICE) is off, the English / Korean / own-language dubs when `optionalVoice` (FULL_ZIP_OPTIONAL_VOICE)
@@ -332,6 +332,8 @@ export function artPlan(root, { lite = false, jpVoice = FULL_ZIP_JP_VOICE, optio
   }
   if (local) files.add('data/local-assets.json');
   if (fx && fxList) files.add('data/local-fx.json');
+  // (fork) the impostor clip bounds of this art (tools/assets/clip-bounds.mjs), when made: a full-zip install has them at once
+  if (isFile(path.join(root, 'data', 'clip-bounds.json'))) files.add('data/clip-bounds.json');
   // without case: on Windows / macOS a file whose name differs only in case is the listed one (fetch-assets orphanFiles)
   const lower = new Set([...files, ...held, ...fxHeld].map((f) => f.toLowerCase()));
   const orphans = listTree(root, 'public/assets').filter((f) => !lower.has(f.toLowerCase()));
@@ -666,9 +668,24 @@ export function packageOutIsUnsafe(out, root = REPO) {
   return inside(r, o) || inside(o, r);
 }
 
+/** The first non-empty line of a tool's stderr: what it refused, before the usage hint tools print after it. */
+const errLine = (text) => String(text || '').trim().split(/\r?\n/).map((l) => l.trim()).filter(Boolean)[0] || '';
+
+/**
+ * Windows' own bsdtar (`%SystemRoot%\System32\tar.exe`, Windows 10+) when this is Windows and it exists, else null.
+ * @param {NodeJS.Platform} [platform] @param {Record<string, string | undefined>} [env]
+ * @param {(file: string) => boolean} [exists] the file check (a test on another OS passes its own: a win32 path is no file there)
+ */
+export function systemTar(platform = process.platform, env = process.env, exists = isFile) {
+  if (platform !== 'win32' || !env.SystemRoot) return null;
+  const exe = path.win32.join(env.SystemRoot, 'System32', 'tar.exe');
+  return exists(exe) ? exe : null;
+}
+
 /**
  * Zip `cwd`/`folder` (FOLDER unless named: the asset pack's folder) into `zipPath`: Info-ZIP `zip`, else a bsdtar
- * `tar --format zip` (Windows 10+, macOS), else the built-in writer (tools/preload-pack.mjs writeZip). bsdtar writes
+ * `tar --format zip` (Windows 10+, macOS; on Windows also the system's tar.exe by its full path, systemTar), else the built-in
+ * writer (tools/preload-pack.mjs writeZip). bsdtar writes
  * the names in UTF-8 (flag bit 11) only when told: its default is the system code page, which loses a name it cannot
  * spell (卫戍 becomes ?? on Windows code page 1252) and leaves no UTF-8 copy for a reader.
  * The built-in writer is for when bsdtar fails: Windows' own tar.exe crashed (exit 3221225477, an access violation) on
@@ -676,29 +693,36 @@ export function packageOutIsUnsafe(out, root = REPO) {
  */
 export function zipFolder(cwd, zipPath, folder = FOLDER) {
   // deflate everything: storing PNG / MP3 as they are made the full zip 8.5 MB larger and saved no real time
-  // the output is kept for the error below (GitHub #28: an intermittent Windows CI failure whose cause never reached the
-  // log); Info-ZIP writes its errors to stdout, tar to stderr
-  const io = { cwd, stdio: ['ignore', 'pipe', 'pipe'], encoding: /** @type {const} */ ('utf8') };
-  const z = spawnSync('zip', ['-q', '-r', '-X', zipPath, folder], io);
-  if (!z.error && z.status === 0) return;
-  // zip adds to an archive that exists: nothing a failed run left may remain in the one tar writes
+  const tarArgs = ['-c', '--format', 'zip', '--options', 'zip:hdrcharset=UTF-8', '-f', zipPath, folder];
+  const attempts = [
+    ['zip', ['-q', '-r', '-X', zipPath, folder]],
+    ['tar', tarArgs],
+  ];
+  // (fork) Windows: Git Bash puts its GNU tar (which writes no zip) ahead of the system's own bsdtar on PATH, so the
+  // bsdtar every Windows 10+ has is asked by its full path when the PATH's tar refused
+  const sysTar = systemTar();
+  if (sysTar) attempts.push([sysTar, tarArgs]);
+  const failed = [];
+  for (const [cmd, args] of attempts) {
+    // a half-written zip from the attempt before must not pass for one this attempt made
+    fs.rmSync(zipPath, { force: true });
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
+    if (!r.error && r.status === 0 && isFile(zipPath)) return;
+    const end = r.status === null && r.signal ? `signal ${r.signal}` : `exit ${r.status}`;
+    const why = r.error ? String(r.error.code || r.error.message) : `${end}${errLine(r.stderr) ? ` (${errLine(r.stderr)})` : ''}`;
+    failed.push({ text: `${cmd}: ${why}`, missing: r.error?.code === 'ENOENT' });
+  }
   fs.rmSync(zipPath, { force: true });
-  // Windows: its own bsdtar, not a GNU tar (no --format zip) that may come first on PATH (Git for Windows)
-  const sys = process.platform === 'win32' && process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : null;
-  const tar = sys && isFile(sys) ? sys : 'tar';
-  const t = spawnSync(tar, ['-c', '--format', 'zip', '--options', 'zip:hdrcharset=UTF-8', '-f', zipPath, folder], io);
-  if (!t.error && t.status === 0 && isFile(zipPath)) return;
-  const said = (r) => `${r.stdout || ''}\n${r.stderr || ''}`.trim().replace(/\s*\n\s*/g, ' | ').slice(-600);
-  const why = (r, name) => `${name}: ${r.error ? r.error.message : `exit ${r.status}${r.signal ? ` (${r.signal})` : ''}`}${said(r) ? ` — ${said(r)}` : ''}`;
-  const tools = `${why(z, 'zip')}; ${why(t, tar)}${!t.error && t.status === 0 ? '; no zip was written' : ''}`;
-  // the built-in writer needs zlib.crc32 (Node ≥ 22.2)
-  if (typeof zlib.crc32 !== 'function') throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${tools}`);
-  fs.rmSync(zipPath, { force: true });
+  // neither tool exists at all: the old hint still says what to do
+  const hint = failed.every((f) => f.missing) ? ' — install `zip` (or a bsdtar `tar`)' : '';
+  const tools = `${failed.map((f) => f.text).join('; ')}${hint}`;
+  // (fork, GitHub #28) the built-in writer, when no tool wrote the zip; it needs zlib.crc32 (Node ≥ 22.2)
+  if (typeof zlib.crc32 !== 'function') throw new Error(`zipping failed: ${tools}`);
   try {
     writeZip(zipPath, folderEntries(cwd, folder));
   } catch (e) {
     fs.rmSync(zipPath, { force: true });
-    throw new Error(`zipping failed: install \`zip\` (or a bsdtar \`tar\`). ${tools}; built-in: ${e?.message || e}`, { cause: e });
+    throw new Error(`zipping failed: ${tools}; built-in: ${e?.message || e}`, { cause: e });
   }
 }
 

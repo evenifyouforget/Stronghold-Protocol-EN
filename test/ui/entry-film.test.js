@@ -430,6 +430,97 @@ test('a phone in portrait when the title is entered does not start the film afte
   }
 });
 
+// ---- (fork) a phone that waits for its first tap (ui/device.js installFirstTapFullscreen) ---------------------------
+const { installFirstTapFullscreen } = await import('../../public/js/ui/device.js');
+/** Arm the first-tap fullscreen as on a phone (412×915 screen, touch first); returns the disarm. */
+function armPhone(media = {}) {
+  const doc = { addEventListener() {}, removeEventListener() {}, fullscreenEnabled: true, fullscreenElement: null, documentElement: { requestFullscreen: async () => {} } };
+  const win = {
+    document: doc, navigator: { maxTouchPoints: 5 }, screen: { width: 412, height: 915 }, localStorage: { getItem: () => null },
+    matchMedia: (q) => ({ matches: /\bcoarse\b/.test(q) || !!media[q], addEventListener() {}, removeEventListener() {} }),
+  };
+  return installFirstTapFullscreen(win, { enter: async () => true });
+}
+const phoneMedia = (extra = {}) => (q) => ({
+  matches: /\bfine\b/.test(String(q)) ? false : /coarse/.test(String(q)) || !!extra[q], addEventListener() {}, removeEventListener() {},
+});
+
+test('(fork) a phone waiting for its fullscreen tap is asked to tap from the first frame, even with sound unlocked', async () => {
+  const disarm = armPhone();
+  const prevCtx = audio.ctx;
+  audio.ctx = runningContext();
+  const { finish } = holdPrefetch();
+  try {
+    const opening = playEntryFilm({ mount: sceneSpy().mount });
+    const card = overlay().querySelector('.spa-entry__gate');
+    assert.ok(card, 'the gate card, not the 加载中-only wait card');
+    assert.equal(card.firstChild.textContent, '点击进入');
+    assert.equal(card.lastChild.textContent, '加载中', 'the files still coming, said under the prompt');
+    finish();
+    await opening;
+    enterRoom();
+  } finally { delete audio.prefetch; audio.ctx = prevCtx; disarm(); }
+});
+
+test('(fork) a portrait phone waiting for its fullscreen tap still gets the film: that tap turns the screen', async () => {
+  const disarm = armPhone();
+  const prevMedia = globalThis.matchMedia, prevW = globalThis.innerWidth, prevH = globalThis.innerHeight;
+  globalThis.matchMedia = phoneMedia();
+  globalThis.innerWidth = 400; globalThis.innerHeight = 800;
+  try {
+    const opening = playEntryFilm({ mount: sceneSpy().mount });
+    assert.ok(overlay(), 'the 点击进入 card over the rotate hint');
+    await opening;
+    enterRoom();
+    assert.equal(overlay(), null);
+  } finally { globalThis.matchMedia = prevMedia; globalThis.innerWidth = prevW; globalThis.innerHeight = prevH; disarm(); }
+});
+
+test('(fork) no film this time, but a phone waiting for its tap: the 点击进入 card alone, gone with its click', async () => {
+  const disarm = armPhone();
+  const prevMedia = globalThis.matchMedia;
+  globalThis.matchMedia = phoneMedia({ '(prefers-reduced-motion: reduce)': true });
+  const tapCard = () => document.body.children.find((c) => c.className === 'spa-entry spa-entry--tap') || null;
+  try {
+    await playEntryFilm({ mount: sceneSpy().mount });
+    assert.equal(overlay(), null, 'no film (reduced motion)');
+    const el = tapCard();
+    assert.ok(el, 'the tap card');
+    assert.equal(el.querySelector('.spa-entry__gate').firstChild.textContent, '点击进入');
+    el.dispatch('click');
+    assert.equal(tapCard(), null);
+    disarm();
+    await playEntryFilm({ mount: sceneSpy().mount });
+    assert.equal(tapCard(), null, 'once the tap happened (or on a desktop): nothing asks');
+  } finally { globalThis.matchMedia = prevMedia; disarm(); }
+});
+
+test('(fork) going fullscreen shows the film again, back above the fullscreen page (Android hid it: sound, no picture)', async () => {
+  const docListeners = new Map();
+  document.addEventListener = (type, fn) => { if (!docListeners.has(type)) docListeners.set(type, new Set()); docListeners.get(type).add(fn); };
+  document.removeEventListener = (type, fn) => { docListeners.get(type)?.delete(fn); };
+  const fire = (type) => { for (const fn of [...(docListeners.get(type) || [])]) fn({ type }); };
+  try {
+    const opening = playEntryFilm({ mount: sceneSpy().mount });
+    const el = overlay();
+    let shown = 0, closed = 0;
+    el.showModal = function () { shown++; this.open = true; };
+    el.close = function () { closed++; this.open = false; };
+    fire('fullscreenchange');
+    assert.equal(shown, 0, 'not fullscreen: nothing to do');
+    document.fullscreenElement = {};
+    fire('fullscreenchange');
+    assert.deepEqual([closed, shown, el.open], [1, 1, true], 'closed and shown again: on top of the top layer');
+    enterRoom();
+    await opening;
+    assert.equal(docListeners.get('fullscreenchange')?.size || 0, 0, 'the film gone: no longer watching');
+  } finally {
+    delete document.fullscreenElement;
+    delete document.addEventListener;
+    delete document.removeEventListener;
+  }
+});
+
 test('(fork) a page load landing in the lobby plays it once per tab session; the login screen plays it every time', async () => {
   const session = new Map();
   globalThis.sessionStorage = { getItem: (k) => (session.has(k) ? session.get(k) : null), setItem: (k, v) => session.set(k, String(v)) };

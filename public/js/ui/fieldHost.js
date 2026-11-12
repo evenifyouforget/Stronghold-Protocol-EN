@@ -16,6 +16,7 @@ import { store } from '../store.js';
 import { needNow } from '../loadLater.js';
 import { settingsStore } from './settings.js';
 import { outfitModelOf } from './outfits.js';
+import { fieldBuildReady } from './fieldBuildHold.js';
 
 const LOAD_TIMEOUT_MS = 12000;
 // [ASSUMED] Two automatic retries; keep the existing two event retries available for a later network/tab recovery.
@@ -48,8 +49,8 @@ export function hudPadding(kind, size) {
 
 /**
  * HUD geometry (rem) the prep cameras keep clear (they mirror the CSS; test/ui/playtest5-ui.test.js checks the rules):
- * the bond scroller's bottom edge (css/screens/game.css .gm__bonds top 1.36rem + a .bslot's disc and name ≈
- * .8rem, or its 44 px arrow height, whichever is taller; negative margins offset the clip padding) and the shop bar's top edge
+ * the bond strip's bottom edge (css/screens/game.css .gm__bonds top 1.36rem + a .bslot's disc and name ≈
+ * .8rem, or its 44 px collapse toggle, whichever is taller; the +N grid floats over the field and is not counted) and the shop bar's top edge
  * above the viewport's bottom (css/screens/game-shop.css .shopbar
  * bottom .2rem + .shopbar__row padding .1rem ×2 + card height 2.24rem, plus its 2 px + 1 px borders). The shop bar
  * sits on the viewport's bottom edge even on a notched phone (css/devices.css, DESIGN §18.1).
@@ -103,7 +104,7 @@ export function hudBands(kind, size, opts) {
     // the HUD layer starts below the top safe-area inset and ends above the bottom one (css/devices.css .gm__hud)
     const hud = document.querySelector('.gm__hud')?.getBoundingClientRect();
     safeTop = Math.max(0, (hud?.top || 0) - oy);
-    // #678 adds 44 px arrows; a native scrollbar can make the strip taller still.
+    // the 44 px collapse toggle can make the band taller than the discs (the strip no longer scrolls: no arrows, no bar).
     // Keep the same minimum band before mount and while collapsed, so toggling cannot shrink it.
     const bonds = document.querySelector('.gm__bonds')?.getBoundingClientRect();
     if (bonds?.height > 0) bondsBottom = Math.max(0, bonds.bottom - oy);
@@ -267,6 +268,10 @@ export async function mountFieldView(host, { signal } = {}) {
       const mod = await withTimeout(needNow(import('../render/app.js')), LOAD_TIMEOUT_MS, 'render engine import', controller.signal);
       checkActive(controller.signal);
       if (typeof mod?.createFieldView !== 'function') throw new Error('createFieldView missing');
+      // (fork) One for All's reveal holds the build until its picks resolve (ui/fieldBuildHold.js); outside the
+      // createFieldView timeout below, which times the build alone
+      await fieldBuildReady(controller.signal);
+      checkActive(controller.signal);
       // A factory that ignores cancellation still belongs to this attempt when it eventually returns.
       const pending = needNow(Promise.resolve(mod.createFieldView(host, { ...opts, signal: controller.signal })).then((view) => {
         if (controller.signal.aborted) dispose(view); else engineView = view;

@@ -107,7 +107,9 @@ export class MatchViews {
       // DESIGN §14: 'client' = battles are simulated by the browsers (b.start specs), 'server' = legacy streaming
       combatMode: this.clientCombat ? 'client' : 'server',
       // solo pause (g.pause, DESIGN §14): the battle, its field clock and every deadline are frozen while true
-      paused: !!this.paused,
+      paused: !!this.paused && !this.pauseQuiet,
+      // (fork) the test harness's battle hold (test/e2e/harnessControl.mjs): the clocks freeze, no 暂停中 plate
+      ...(this.paused && this.pauseQuiet ? { hold: true } : {}),
       players: this.order.map((ps) => ({
         playerId: ps.playerId,
         seat: ps.seat,
@@ -157,7 +159,11 @@ export class MatchViews {
     // 最终攻势 / 隐秘核心: when the overtime drain starts (ms epoch; `deadline` is the level's 120 s countdown)
     if ((this.phase === PHASE.FINAL_ASSAULT || this.phase === PHASE.HIDDEN_CORE) && this.overtimeAt) v.overtimeAt = this.overtimeAt;
     if (this.bossPool) v.bossHp = { hp: Math.max(0, Math.round(this.bossPool.hp)), max: Math.round(this.bossPool.maxHp) };
-    if (this.phase === PHASE.BAND_DRAFT && this.draft) {
+    // (fork) One for All: counts only during the secret vote, the reveal during BATTLE_CHECK (match/oneForAll.js)
+    if (this.draft?.vote && (this.phase === PHASE.BAND_DRAFT || this.phase === PHASE.BATTLE_CHECK)) {
+      const dv = this._voteView();
+      if (dv) v.draft = dv;
+    } else if (this.phase === PHASE.BAND_DRAFT && this.draft) {
       const d = this.draft;
       // turnSeconds: the length of a turn (the countdown gauge's total; 0 when untimed) — deadline = turnDeadline
       v.draft = {

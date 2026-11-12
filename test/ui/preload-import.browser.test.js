@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { startServer } from '../../server/index.js';
 import { writeZip } from '../../tools/preload-pack.mjs';
 import { CHROME, hasChrome } from '../e2e/client.mjs';
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -62,6 +63,8 @@ test('the preload manager imports a preload zip: matching files are saved and se
   const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--mute-audio', '--no-sandbox'] });
   t.after(() => browser.close());
   const page = await browser.newPage();
+  // (fork) a returning player: no entry film (its tap-to-enter card covers the title and the 预载 button) and no release notes
+  await seedReleaseRead(page);
   await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

@@ -104,7 +104,7 @@ export default {
             const m = { target: t, n: 0, alive: true, atk: unit.s.atk };
             unit.mem.lmleeMark = m;
             const dur = num(b2.paper_duration, 5);
-            battle.addBuff(t, { key: markKey(unit), duration: dur + 0.1, mods: tauntLv ? { taunt: tauntLv } : null, source: unit, tags: ['skill'] });
+            battle.addBuff(t, { key: markKey(unit), duration: dur + 0.1, mods: tauntLv ? { taunt: tauntLv } : null, source: unit, tags: ['skill'], fx: 'lmlee_s_2[paper]', fxSrc: unit.id }); // (fork) its glow (b.snap fxs)
             battle.fx('mark', { x: t.x, y: t.y, id: t.id, src: unit.id, skill: 'lmlee_2' });
             battle.after(dur, () => burstMark(battle, unit, m, b2), { owner: unit });
           },
@@ -158,6 +158,9 @@ export default {
         { install(battle, unit) { // 有备无患: pay |extra_cost| for the guard; the guard cancels the next 晕眩 / 冻结
           const pay = Math.abs(num(t1.extra_cost)), stun = num(t1.stun);
           if (!(pay > 0)) return;
+          // (fork) the client's lmlee_tr guard (lmlee_t_2[bounce]): lmlee_buff_02_start on him while it holds, _hit when it
+          // cancels a stun — display only (skills.js STATE_BUFFS looks)
+          battle.fxProbe(unit, 'lmlee_tr', (u) => (u.alive && u.deployed && u.findBuff(GUARD_KEY) ? 'guard' : false));
           battle.on('merchantPay', (ctx) => {
             if (ctx.unit !== unit || ctx.cancel || unit.findBuff(GUARD_KEY)) return;
             const pl = battle.getPlayer(unit.ownerId);
@@ -173,6 +176,7 @@ export default {
             const src = ctx.source;
             if (stun > 0 && src && src.side === 'enemy' && src.alive) battle.applyStatus(src, 'stun', { duration: stun, source: unit });
             battle.fx('counter', { x: unit.x, y: unit.y, id: unit.id });
+            battle.fxState(unit, 'lmlee_tr', true, { look: 'hit', dur: 0.6 });
           }, { owner: unit });
         } },
       ],

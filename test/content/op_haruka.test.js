@@ -57,7 +57,7 @@ function fresh(h, u) {
 const bubbled = (h) => h.b.allyUnits.filter((a) => a.findBuff(BUBBLE)).map((a) => a.uid).sort();
 const heals = (h, u, from = 0) => h.hooksOf('heal').slice(from).filter((x) => x.source === u && !x.opts?.regen);
 
-test('遥 in every 自选 form: her kit (all three skills authored), the form\'s stats + module attributes, y-6, 护佑者 (ranged arts, hits air, blocks 1; BLS-Y 2 targets), S1 / S2 DEFAULT, S3 ACTIVE_RANGE on its y-8, ground-targetable, 空构 bond, no 特质', () => {
+test('遥 in every 自选 form: her kit (all three skills authored), the form\'s stats + module attributes, y-6, 护佑者 (ranged arts, hits air, blocks 1; BLS-Y 2 targets), S1 / S2 [DEFAULT, SEARCH], S3 [DEFAULT, SKILL_RANGE on its y-8] (official 护佑者 row COMBAT_OR_ATTACK + SKILL_RANGE_ENEMY), ground-targetable, 空构 bond, no 特质', () => {
   assert.equal(OPERATOR_KITS[ID], KITS[ID]);
   for (const f of FORMS_ALL) {
     const [tier, elite, mod] = f;
@@ -69,8 +69,10 @@ test('遥 in every 自选 form: her kit (all three skills authored), the form\'s
       assert.deepEqual([u.s.blockCnt, u.profile.attack, u.profile.dmgType, u.profile.canHitFly, u.base.bat], [1, 'ranged', 'arts', true, 1.6], `${label(f)}: 护佑者`);
       assert.equal(u.profile.maxTargets, mod === Y ? 2 : 1, `${label(f)}: targets`);
       assert.deepEqual(u.liveRangeGrid, form.rangeGrid, `${label(f)}: y-6`);
-      assert.equal(u.skill.rule, skill === 2 ? 'ACTIVE_RANGE' : 'DEFAULT', `${label(f)}: trigger`);
-      if (skill === 2) assert.deepEqual(u.skill.triggerGrid, form.skills[2].rangeGrid, `${label(f)}: the y-8 trigger grid`);
+      assert.deepEqual(u.skill.rules, skill === 2 ? ['DEFAULT', 'SKILL_RANGE'] : ['DEFAULT', 'SEARCH'], `${label(f)}: trigger`);
+      assert.deepEqual(form.skills[skill].trigger.official, ['COMBAT_OR_ATTACK', 'SKILL_RANGE_ENEMY'], `${label(f)}: the official row`);
+      assert.equal(u.skill.triggerGrid, null, `${label(f)}: DEFAULT has no grid`);
+      if (skill === 2) assert.deepEqual(u.skill.alsoRules[0].grid, form.skills[2].rangeGrid, `${label(f)}: the y-8 trigger grid`);
       assert.deepEqual([u.def.bonds, u.def.raw.garrisonIds], [['emptyShip'], []], `${label(f)}: bonds / 特质`);
       assert.ok(!u.s.flags.liftoff && !u.s.flags.camou && !u.s.flags.stealth, `${label(f)}: ground enemies target her`);
       done(h);
@@ -273,7 +275,7 @@ test('S2 幽隙栖萤: every heal of hers meanwhile deals heal × 140 % / 200 % 
   }
 });
 
-test('S3 夏末游鳞 (ACTIVE_RANGE): cast with an enemy on its y-8 outside her y-6; range y-8 while on, back after; ATK +25 % / +40 %; interval 1.6 − 0.4 / 0.6 s; heals; her bubbles ×1.4 / ×1.7 (also those given before); an enemy setting one off is 浮空 3 / 4 s (half on 重量 > 3, none when immune) and takes 60 % / 70 % ATK arts each second of it (from 0.5 s)', () => {
+test('S3 夏末游鳞 (DEFAULT + SKILL_RANGE on its y-8): cast with an enemy on its y-8 outside her y-6; range y-8 while on, back after; ATK +25 % / +40 %; interval 1.6 − 0.4 / 0.6 s; heals; her bubbles ×1.4 / ×1.7 (also those given before); an enemy setting one off is 浮空 3 / 4 s (half on 重量 > 3, none when immune) and takes 60 % / 70 % ATK arts each second of it (from 0.5 s)', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S3);
     const form = formOf(tier, elite);
@@ -341,5 +343,29 @@ test('outside S3 a bubble levitates nobody; a bubble outlasts her leaving and st
   assert.equal(h.hooksOf('statusApplied').filter((c) => c.status === 'levitate').length, 0);
   h.run(0.6);
   approx(heals(h, u, n0)[0].amount, atk * 0.28, 'her heal after she left');
+  done(h);
+});
+
+test('display: each S3 levitation tick sends fx tick haruka_skill_03_attack_hit_01 on the floating enemy (haruka_s_3_debuff trigger); a bubble that breaks with a heal sends haruka_talent_02_hit on its holder (haruka_t_1_delay)', () => {
+  const { h, u } = field({ tier: 6, elite: true, skill: 2, others: [ally(2, 11, 6)] });
+  const a = h.unit(2);
+  const sent = [];
+  const fx = h.b.fx.bind(h.b);
+  h.b.fx = (kind, p) => { if (kind === 'tick') sent.push({ ...p }); return fx(kind, p); };
+  u.skill.gainSp(999);
+  h.spawn('enemy_dummy', { pos: [10, 8] });
+  assert.ok(h.runUntil(() => u.skill.active, 3), 'cast');
+  for (const x of h.b.allyUnits) h.b.removeBuff(x, BUBBLE);
+  h.b.addBuff(a, { key: BUBBLE, source: u, data: { v: 0.42, atk: u.s.atk, heal: 0, prob: 0, sp: 0, boom: false } });
+  const e = h.spawn('enemy_dummy', { pos: [12, 9] });
+  h.b.dealDamage(e, a, { amount: 50, type: 'true' });
+  const n0 = h.hooksOf('damaged').length;
+  h.run(2.2);
+  const ticks = h.hooksOf('damaged').slice(n0).filter((c) => c.target === e && c.dmg?.tags?.includes('haruka:float'));
+  const float = sent.filter((p) => p.key === 'haruka_skill_03_attack_hit_01');
+  assert.ok(ticks.length >= 2 && float.length === ticks.length, `${float.length} tick fx for ${ticks.length} ticks`);
+  assert.ok(float.every((p) => p.id === u.id && p.on === e.id && p.skill === 'haruka:s3'));
+  const heals = sent.filter((p) => p.key === 'haruka_talent_02_hit');
+  assert.ok(heals.every((p) => p.id === u.id && p.skill === 'haruka:t1'), 'a talent heal names her');
   done(h);
 });

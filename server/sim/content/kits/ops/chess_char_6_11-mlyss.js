@@ -226,6 +226,8 @@ function mlyss(bb, chess, def) {
             for (const e of battle.unitsInGrid(t, AROUND8, { side: 'enemy' })) pullToward(battle, t, e, num(t.def?.skill?.bb?.force));
             for (const e of t.blocking) if (e.alive) battle.applyStatus(e, 'stun', { duration: pulseIv + 0.1, source: unit });
             battle.fx('pulse', { x: t.x, y: t.y, id: t.id });
+            // mlyss_s_3[token_melee_trigger] ON_BUFF_TRIGGER (PullS3): its range effect on the 流形 + mlyss_s_3[melee_audio]
+            battle.tickFx(unit, t, 'mlyss:s3');
           }
         }, { owner: unit, immediate: true });
       },
@@ -324,7 +326,9 @@ function mlyss(bb, chess, def) {
         battle.on('damaged', (ctx) => { // S3, ranged copies: attacks bind
           const t = ctx.source;
           if (!mine(t) || !t.mem.mlyss?.ranged || !unit.skill?.active || !ctx.dmg?.isAttack || !ctx.target.alive || !(bindDur > 0)) return;
-          battle.applyStatus(ctx.target, 'bind', { duration: bindDur, source: unit });
+          // (fork) the bind's water: mlyss_s_3[token_buff_range] (ON_ABILITY_SPELL_ON) gives the target mlyss_s_3[unmoveable]
+          // (token_10030_mlyss_wtrman_c3_debuff_01) for its duration (b.snap fxs; render/vfx/skills.js STATE_BUFFS)
+          if (battle.applyStatus(ctx.target, 'bind', { duration: bindDur, source: unit })) battle.fxState(ctx.target, 'mlyss_s_3[buff]', true, { src: unit, dur: bindDur });
         }, { owner: unit });
         battle.on('hit', (ctx) => { // module: 援军 / 流形 take less damage from the enemies they block
           const t = ctx.target, s = ctx.source;

@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { installCompat } from '../../public/js/ui/compat.js';
-import { detectFeatures, featureClasses, fullscreen, installDeviceSupport, installScreenWakeLock, isIOS, LONG_PRESS_MS, screenLandscape } from '../../public/js/ui/device.js';
+import { autoFullscreenGates, autoFullscreenWanted, fsTrace, detectFeatures, featureClasses, fullscreen, installDeviceSupport, installFirstTapFullscreen, installPortraitTap, installScreenWakeLock, isIOS, LONG_PRESS_MS, PHONE_MAX_SIDE, screenLandscape, screenShortSide } from '../../public/js/ui/device.js';
 import { checkButtons } from '../../public/js/ui/hud.js';
 import { penPlacement, penZoneTiles, previewEnemyKey, PEN } from '../../public/js/ui/gameLogic.js';
 import { bannerVisible } from '../../public/js/ui/connBanner.js';
@@ -166,6 +166,183 @@ describe('ui/device.js feature detection', () => {
     const none = fakeWindow({ fs: false });
     assert.equal(fullscreen.supported(none.win), false);
     assert.equal(await fullscreen.enter(none.win), false);
+  });
+});
+
+describe('ui/device.js (fork) first-tap fullscreen on touch phones', () => {
+  const PHONE = { '(any-pointer: coarse)': true, '(pointer: coarse)': true };
+  const phoneFeatures = { fullscreen: true, standalone: false, coarse: true, primaryCoarse: true, fine: false, hover: false };
+  /** A fake phone (412×915 screen) with a store; `media` / `screen` / `fs` change it into another device. */
+  const device = ({ media = PHONE, screen = { width: 412, height: 915 }, fs = true, store = new Map() } = {}) => {
+    const f = fakeWindow({ media, touchPoints: 5, fs });
+    f.win.screen = screen;
+    f.win.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+    return { ...f, store };
+  };
+  const tap = (doc, init = {}) => {
+    const target = init.target || new FakeElement('div');
+    doc.dispatch(new FakeEvent('pointerdown', { pointerType: 'touch', target, ...init }));
+    doc.dispatch(new FakeEvent('pointerup', { pointerType: 'touch', target, ...init }));
+    doc.dispatch(new FakeEvent('touchend', { target, ...init }));
+    doc.dispatch(new FakeEvent('click', { target, ...init }));
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  test('only a touch phone with element fullscreen, not installed, not opted out, not already fullscreen', () => {
+    const s = { shortSide: 412 };
+    assert.equal(autoFullscreenWanted(phoneFeatures, s), true, 'Android phone');
+    assert.equal(autoFullscreenWanted({ ...phoneFeatures, coarse: false, primaryCoarse: false, fine: true, hover: true }, { shortSide: 1080 }), false, 'desktop');
+    assert.equal(autoFullscreenWanted({ ...phoneFeatures, primaryCoarse: false, fine: true, hover: true }, s), false, 'touch laptop / phone with a mouse as its main input');
+    assert.equal(autoFullscreenWanted({ ...phoneFeatures, hover: true, fine: true }, s), true, 'a phone whose browser also reports hover / a fine pointer (Samsung Internet)');
+    assert.deepEqual(autoFullscreenGates({ ...phoneFeatures, fullscreen: false }, { shortSide: 390 }).filter((g) => !g.ok).map((g) => g.name), ['element fullscreen available']);
+    assert.equal(autoFullscreenWanted(phoneFeatures, { shortSide: 768 }), false, 'tablet');
+    assert.equal(autoFullscreenWanted(phoneFeatures, { shortSide: PHONE_MAX_SIDE }), false, 'tablet at the limit');
+    assert.equal(autoFullscreenWanted(phoneFeatures, { shortSide: 0 }), false, 'unknown screen');
+    assert.equal(autoFullscreenWanted({ ...phoneFeatures, fullscreen: false }, { shortSide: 390 }), false, 'iPhone Safari');
+    assert.equal(autoFullscreenWanted({ ...phoneFeatures, standalone: true }, s), false, 'installed app');
+    assert.equal(autoFullscreenWanted(phoneFeatures, { ...s, active: true }), false, 'already fullscreen');
+    const d = device();
+    assert.equal(screenShortSide(d.win), 412);
+  });
+
+  test('the first touch tap enters fullscreen once (pointerup, not pointerdown); leaving it is respected', async () => {
+    const d = device();
+    let entered = 0;
+    const off = installFirstTapFullscreen(d.win, { enter: async (w) => { entered++; return fullscreen.enter(w); } });
+    try {
+      d.doc.dispatch(new FakeEvent('pointerdown', { pointerType: 'touch', target: new FakeElement() }));
+      assert.equal(entered, 0, 'pointerdown carries no user activation for a touch');
+      d.doc.dispatch(new FakeEvent('pointerup', { pointerType: 'touch', target: new FakeElement(), isTrusted: false }));
+      d.doc.dispatch(new FakeEvent('pointerup', { pointerType: 'mouse', target: new FakeElement() }));
+      tap(d.doc, { target: new FakeElement('button', { closest: (sel) => (sel.includes('.fsbtn') ? {} : null) }) });
+      tap(d.doc, { target: new FakeElement('input', { closest: (sel) => (sel.includes('input') ? {} : null) }) });
+      assert.equal(entered, 0, 'untrusted, mouse, the ⛶ button itself and text fields wait');
+      tap(d.doc);
+      await flush();
+      assert.equal(entered, 1, 'pointerup + touchend + click of one tap: one request');
+      assert.equal(fullscreen.active(d.win), true);
+      assert.equal(d.doc.count('pointerup') + d.doc.count('touchend') + d.doc.count('click'), 0, 'done for this page');
+      await fullscreen.exit(d.win);           // the player leaves (back gesture)
+      tap(d.doc);
+      await flush();
+      assert.equal(entered, 1, 'not forced back on the next tap');
+      assert.equal(fullscreen.active(d.win), false);
+    } finally { off(); }
+  });
+
+  test('a refused request tries again on the next tap', async () => {
+    const d = device();
+    let calls = 0;
+    const off = installFirstTapFullscreen(d.win, { enter: async () => (++calls === 1 ? false : true) });
+    try {
+      tap(d.doc); await flush();
+      tap(d.doc); await flush();
+      assert.equal(calls, 2);
+      tap(d.doc); await flush();
+      assert.equal(calls, 2, 'stops after it worked');
+    } finally { off(); }
+  });
+
+  test('desktop, tablet and iPhone never listen or request', async () => {
+    const cases = {
+      desktop: device({ media: { '(any-pointer: fine)': true, '(any-hover: hover)': true }, screen: { width: 1920, height: 1080 } }),
+      tablet: device({ screen: { width: 820, height: 1180 } }),
+      iPhone: device({ fs: false, screen: { width: 390, height: 844 } }),
+    };
+    for (const [name, d] of Object.entries(cases)) {
+      let entered = 0;
+      const off = installFirstTapFullscreen(d.win, { enter: async () => { entered++; return true; } });
+      assert.equal(d.doc.count('pointerup') + d.doc.count('touchend'), 0, name);
+      tap(d.doc); await flush();
+      assert.equal(entered, 0, name);
+      off();
+    }
+  });
+
+  test('a click alone (the browser or the page swallowed pointerup / touchend) still enters', async () => {
+    const d = device();
+    let entered = 0;
+    const off = installFirstTapFullscreen(d.win, { enter: async () => { entered++; return true; } });
+    try {
+      d.doc.dispatch(new FakeEvent('click', { target: new FakeElement() }));
+      await flush();
+      assert.equal(entered, 1);
+    } finally { off(); }
+  });
+
+  test('?fsdebug=1 readout: every condition with its value, and the steps so far', async () => {
+    const { fsDebugText } = await import('../../public/js/ui/fsDebug.js');
+    const d = device({ fs: false, screen: { width: 390, height: 844 } });
+    fsTrace.note('probe step');
+    const text = fsDebugText(d.win);
+    assert.match(text, /NO {2}element fullscreen available \(false\)/);
+    assert.match(text, /OK {2}short screen side < 600 \(390\)/);
+    assert.match(text, /probe step/);
+  });
+
+  test('a browser tab in element fullscreen is not the installed app (Chrome matches display-mode: fullscreen then)', () => {
+    const d = device({ media: { ...PHONE, '(display-mode: fullscreen)': true } });
+    assert.equal(detectFeatures(d.win).standalone, true, 'no element in fullscreen: launched as the app');
+    d.doc.fullscreenElement = d.doc.documentElement;
+    assert.equal(detectFeatures(d.win).standalone, false, 'element fullscreen in a tab');
+  });
+
+  test('held upright: the rotate screen asks for a tap, and every tap on it goes fullscreen + landscape', async () => {
+    fullscreen.lastLock = null; // module state: a page has tried no lock yet
+    const d = device();
+    const hint = emitter();
+    d.doc.querySelector = (sel) => (sel === '.rotate-hint' ? hint : null);
+    let entered = 0;
+    const off = installPortraitTap(d.win, { enter: async () => { entered++; fullscreen.lastLock = 'ok'; for (const fn of fullscreen.lockListeners) fn('ok'); return true; } });
+    try {
+      assert.ok(d.classes.has('sp-tap-rotate'), 'the screen shows its tap line');
+      hint.dispatch(new FakeEvent('click', { isTrusted: false }));
+      assert.equal(entered, 0, 'an untrusted click is not a gesture');
+      hint.dispatch(new FakeEvent('click')); await flush();
+      hint.dispatch(new FakeEvent('click')); await flush();
+      assert.equal(entered, 2, 'not only the first time: each time the phone is upright');
+      assert.ok(d.classes.has('sp-tap-rotate'));
+    } finally { off(); fullscreen.lastLock = null; }
+    assert.equal(d.classes.has('sp-tap-rotate'), false);
+  });
+
+  test('held upright, a browser that refuses the lock: the rotate screen asks to turn by hand again', async () => {
+    fullscreen.lastLock = null; // module state: a page has tried no lock yet
+    const d = device();
+    const hint = emitter();
+    d.doc.querySelector = (sel) => (sel === '.rotate-hint' ? hint : null);
+    const off = installPortraitTap(d.win, { enter: async () => { fullscreen.lastLock = 'NotSupportedError'; for (const fn of fullscreen.lockListeners) fn('NotSupportedError'); return true; } });
+    try {
+      hint.dispatch(new FakeEvent('click')); await flush();
+      assert.equal(d.classes.has('sp-tap-rotate'), false);
+    } finally { off(); fullscreen.lastLock = null; }
+  });
+
+  test('iPhone (no fullscreen), tablet and desktop keep the plain rotate screen', () => {
+    fullscreen.lastLock = null; // module state: a page has tried no lock yet
+    for (const d of [device({ fs: false, screen: { width: 390, height: 844 } }), device({ screen: { width: 820, height: 1180 } }),
+      device({ media: { '(any-pointer: fine)': true, '(any-hover: hover)': true }, screen: { width: 1920, height: 1080 } })]) {
+      const hint = emitter();
+      d.doc.querySelector = (sel) => (sel === '.rotate-hint' ? hint : null);
+      const off = installPortraitTap(d.win);
+      assert.equal(d.classes.has('sp-tap-rotate'), false);
+      assert.equal(hint.count('click'), 0);
+      off();
+    }
+  });
+
+  test('the ⛶ button only enters and leaves fullscreen: nothing is remembered', async () => {
+    const d = device();
+    await fullscreen.toggle(d.win);
+    assert.equal(fullscreen.active(d.win), true);
+    await fullscreen.toggle(d.win);
+    assert.equal(fullscreen.active(d.win), false);
+    assert.equal(d.store.size, 0, 'nothing stored');
+    let entered = 0;
+    const off = installFirstTapFullscreen(d.win, { enter: async () => { entered++; return true; } });
+    tap(d.doc); await flush();
+    assert.equal(entered, 1, 'the next page still goes fullscreen on its first tap');
+    off();
   });
 });
 

@@ -102,6 +102,15 @@ function computeBonds(priv) {
     if (S) S.layers[bondId] = layers;
     out.push({ bondId, count, active: tier > 0, tier, layers, ...(plus ? { harmony: plus } : {}), thresholds, countsHand: !!b?.countsHand });
   }
+  // `manybonds` (fork): every other bond of the mode at 1 member too, so the bond strip overflows into its +N grid
+  if (VARIANTS.has('manybonds')) {
+    for (const b of data.list('bonds')) {
+      if (counts.has(b.bondId) || inactive.has(b.bondId)) continue;
+      const layers = S?.layers?.[b.bondId] ?? Math.floor(rnd() * 4);
+      if (S) S.layers[b.bondId] = layers;
+      out.push({ bondId: b.bondId, count: 1, active: false, tier: 0, layers, thresholds: b.thresholds || [2], countsHand: !!b.countsHand });
+    }
+  }
   return out.sort((a, b) => (b.active - a.active) || (b.layers - a.layers));
 }
 
@@ -323,13 +332,32 @@ function setPhase(phase, variant) {
       pub.round = 0; pub.deadline = Date.now() + 9000;
       pub.players.forEach((p) => { p.bandId = null; p.status = 'deciding'; p.ready = false; });
       S.priv.bandId = null;
-      if (!solo) {
+      if (VARIANTS.has('vote')) {
+        // (fork) One for All: a secret room-wide vote — the count only in public, my own vote in private (variant=vote,locked)
+        pub.deadline = Date.now() + 50000;
+        // (the server's exact shape: one-for-all-split.md "Exact vote-mode draft")
+        pub.draft = { mode: 'vote', voters: 8, locked: 3, order: pub.players.filter((x) => !x.isBot).map((x) => x.playerId), picks: {}, turn: null,
+          skipsLeft: {}, turnDeadline: pub.deadline, turnSeconds: 50, untimed: false };
+        S.priv.vote = VARIANTS.has('locked') ? { bandId: 'band_sarkazb', locked: true } : { bandId: null, locked: false };
+        if (VARIANTS.has('locked')) pub.draft.locked = 4;
+      } else if (!solo) {
         pub.draft = { order: ['p3', 'p1', 'ai_2', 'p4'], turn: 'p1', picks: { p3: 'band_sarkazb' }, skipsLeft: { p1: 1, p3: 1, ai_2: 1, p4: 1 }, turnDeadline: Date.now() + 9000 };
         pub.players.find((p) => p.playerId === 'p3').bandId = 'band_sarkazb';
       } else pub.deadline = 0;
       break;
     case PHASE.BATTLE_CHECK:
       pub.round = 0; pub.deadline = Date.now() + 3000;
+      if (VARIANTS.has('ofa')) {
+        // (fork) One for All's reveal (ui/protocolBoot.js, DESIGN §91.9): 8 Doctors, 鸭爵 wins 5–2–1 with one random vote
+        const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+        pub.players = ids.map((playerId, k) => ({ ...pub.players[k % 4], playerId, seat: k, isBot: false, connected: true, name: k < 4 ? pub.players[k].name.replace('AI·', '') : `Doctor·${k + 1}` }));
+        const picks = { p1: 'band_ducklord', p2: 'band_amiya', p3: 'band_ducklord', p4: 'band_bldsk', p5: 'band_ducklord', p6: 'band_amiya', p7: 'band_ducklord', p8: 'band_ducklord' };
+        const counts = {};
+        for (const id of Object.values(picks)) counts[id] = (counts[id] || 0) + 1;
+        pub.deadline = Date.now() + 7500;
+        pub.draft = { mode: 'vote', reveal: { picks, random: ['p7'], counts, winner: 'band_ducklord' } };
+        for (const p of pub.players) p.bandId = 'band_ducklord';
+      }
       break;
     case PHASE.SP_DRAFT: {
       pub.round = 9; pub.deadline = Date.now() + 14000;
@@ -396,7 +424,7 @@ function mockCombatRecords(lineup, rounds) {
 function buildResult(victory) {
   const titles = (data.get('config')?.titles || []).filter((t) => victory || !t.onlyOnWin);
   const pickTitle = (i) => { const t = titles[[0, 3, 5, 2][i] % Math.max(1, titles.length)]; return t ? { id: t.id, name: t.name, picId: t.picId, text: t.text } : null; };
-  return {
+  const res = {
     victory, roundsPassed: victory ? 14 : 11, hiddenReached: false, hiddenCleared: false, reason: victory ? 'victory' : 'defeat',
     bossId: 'boss_5', hiddenBossId: 'boss_8', difficulty: 'HARD', modeId: 'mode_multi_hard', stageId: S.pub.stageId, durationMs: 52 * 60000,
     players: S.pub.players.map((p, i) => ({
@@ -412,6 +440,15 @@ function buildResult(victory) {
       trophies: i === 3 ? 1 : 5, reward: i === 3 ? 170 : 425,
     })),
   };
+  // (fork) ?variant=ga — a Grand Alliance result: 8 seats (the 4 above twice), I sit 6th, off the first screenful
+  if (VARIANTS.has('ga')) {
+    const more = res.players.map((p, i) => ({ ...p, playerId: `ga${i + 5}`, seat: i + 4, name: `Doctor·${i + 5}`, isBot: false }));
+    res.players.push(...more);
+    const me = res.players.find((p) => p.playerId === ME), sixth = res.players.find((p) => p.seat === 5);
+    [me.seat, sixth.seat] = [sixth.seat, me.seat];
+    res.players.sort((x, y) => x.seat - y.seat);
+  }
+  return res;
 }
 
 // ---- combat simulation ------------------------------------------------------------------------------------------------
@@ -615,6 +652,12 @@ async function mockRequest(t, f = {}) {
   switch (t) {
     case 'g.infoReady': { const me = pub.players.find((x) => x.playerId === ME); me.ready = true; me.status = 'ready'; pushPublic(); return {}; }
     case 'g.band': {
+      if (pub.draft?.mode === 'vote') { // One for All: the pick locks my vote; nothing public but the count
+        if (p.vote?.locked) fail('ALREADY');
+        if (!f.bandId) fail('BAD_MSG');
+        p.vote = { bandId: f.bandId, locked: true }; pub.draft.locked = Math.min(pub.draft.voters, (pub.draft.locked || 0) + 1);
+        pushPublic(); refreshPrivate(); return {};
+      }
       p.bandId = f.bandId; const me = pub.players.find((x) => x.playerId === ME); me.bandId = f.bandId;
       if (pub.draft) { pub.draft.picks[ME] = f.bandId; pub.draft.turn = 'ai_2'; pub.draft.turnDeadline = Date.now() + 12000; }
       refreshPrivate(); return {};
@@ -842,7 +885,8 @@ function applyUiVariants() {
 // ---- switcher --------------------------------------------------------------------------------------------------------------
 const SWITCH = [
   ['INFO_CHECK', PHASE.INFO_CHECK, ''], ['BAND_DRAFT', PHASE.BAND_DRAFT, ''], ['BAND_DRAFT solo', PHASE.BAND_DRAFT, 'solo'],
-  ['BATTLE_CHECK', PHASE.BATTLE_CHECK, ''], ['PREP', PHASE.PREP, ''], ['PREP + reward', PHASE.PREP, 'reward'],
+  ['BAND_DRAFT One for All', PHASE.BAND_DRAFT, 'vote'], ['BAND_DRAFT One for All locked', PHASE.BAND_DRAFT, 'vote,locked'],
+  ['BATTLE_CHECK', PHASE.BATTLE_CHECK, ''], ['BATTLE_CHECK One for All', PHASE.BATTLE_CHECK, 'ofa'], ['PREP', PHASE.PREP, ''], ['PREP + reward', PHASE.PREP, 'reward'],
   ['PREP + temp', PHASE.PREP, 'temp'], ['PREP frozen', PHASE.PREP, 'frozen'], ['PREP dead', PHASE.PREP, 'dead'],
   ['PREP boss (L)', PHASE.PREP, 'boss'], ['PREP boss (R)', PHASE.PREP, 'bossR'], ['PREP 标准 同构体 + 调和', PHASE.PREP, 'funny,morph,harmony'],
   ['SP bounty', PHASE.SP_DRAFT, 'bounty'], ['SP supply', PHASE.SP_DRAFT, 'supply'], ['SP shop', PHASE.SP_DRAFT, 'shop'], ['SP tactic', PHASE.SP_DRAFT, 'tactic'], ['SP solo', PHASE.SP_DRAFT, 'solo'],

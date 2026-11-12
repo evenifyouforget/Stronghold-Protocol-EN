@@ -143,9 +143,17 @@ export function normalizeSkill(rec) {
     maxCharges: Math.max(1, num(s.maxChargeTime ?? s.maxCharges ?? s.charges, 1)),
     rangeGrid: toArrayOfPairs(s.rangeGrid),
     // `allies` (data: an ally row, tools/build-data.mjs TRIGGER_ALLY_RULES — 黍 S3) — skills.js `trigger.allies`
-    trigger: typeof trig === 'object' && trig.allies === true ? { rule, grid: trigGrid, allies: true } : { rule, grid: trigGrid },
+    trigger: {
+      ...(typeof trig === 'object' && trig.allies === true ? { rule, grid: trigGrid, allies: true } : { rule, grid: trigGrid }),
+      // an official trigger list's further rules (officialUnitBuilder officialTrigger; skills.js `trigger.also`)
+      ...(typeof trig === 'object' && Array.isArray(trig.also) && trig.also.length ? { also: trig.also.map((e) => ({
+        rule: normTriggerRule(e.rule), grid: toArrayOfPairs(e.customRangeGrid ?? e.rangeGrid ?? e.grid), ...(e.allies === true ? { allies: true } : null),
+      })) } : null),
+    },
     kind: s.kind ?? null,
     bb,
+    // (fork) the begin clip the client plays before the skill starts (tools/build-data.mjs operatorBeginAnims; skills.js)
+    ...(s.beginAnim && num(s.beginAnim.dur, 0) > 0 ? { beginAnim: { clip: String(s.beginAnim.clip ?? ''), dur: num(s.beginAnim.dur, 0) } } : null),
     description: s.description ?? s.desc ?? '',
   };
 }
@@ -205,6 +213,8 @@ export function normalizeChess(rec) {
     canHitFly: rec.canHitFly ?? null,
     targetPriority: rec.targetPriority ?? null,
     splashRadius: rec.splashRadius ?? null,
+    // (fork) its attack clip { dur, hit } (tools/build-data.mjs operatorAttackAnims): ai.js allyCastWindup; null = none known
+    attackAnim: normAttackAnim(rec.attackAnim),
     trait: typeof rec.trait === 'string' ? rec.trait : (rec.trait?.desc ?? rec.traitText ?? ''),
     traitBb: rec.traitBb ?? (rec.trait && typeof rec.trait === 'object' ? { ...(rec.trait.bb || {}) } : flattenBlackboard(rec.traitBlackboard)),
     immune: immuneSet(rec.immunities ?? rec.immune),
@@ -250,12 +260,18 @@ export function immuneSet(v, extra = null) {
   return out;
 }
 
-/** data/enemies.json `attackAnim` → { dur, hit } (hit null = none: half the clip), or null when malformed / absent. */
+/**
+ * data `attackAnim` → { dur, hit, maxScale? } (hit null = none: half the clip; maxScale: the ability's `_maxAnimScale`,
+ * −1 = no cap, absent = not known — ai.js allyCastWindup), or null when malformed / absent.
+ */
 function normAttackAnim(a) {
   const dur = Number(a?.dur);
   if (!(Number.isFinite(dur) && dur > 0)) return null;
   const hit = Number(a.hit);
-  return { dur, hit: a.hit != null && Number.isFinite(hit) ? Math.min(dur, Math.max(0, hit)) : null };
+  const out = { dur, hit: a.hit != null && Number.isFinite(hit) ? Math.min(dur, Math.max(0, hit)) : null };
+  const m = Number(a.maxScale);
+  if (a.maxScale != null && Number.isFinite(m)) out.maxScale = m < 0 ? -1 : m;
+  return out;
 }
 
 /** Normalise an enemy record (research 05 shape or data/enemies.json shape) into an EnemyDef. */
@@ -336,6 +352,7 @@ export function normalizeToken(id, t0, ownerChessId = null, variantOverride = nu
     projectile: t.projectile ?? null,
     canHitFly: t.canHitFly ?? null,
     targetPriority: t.targetPriority ?? null,
+    attackAnim: normAttackAnim(t.attackAnim),   // (fork) ai.js allyCastWindup
     untargetable: t.untargetable ?? /不会受到攻击|不会成为/.test(desc),
     // abnormal effects held from the start (tokens.json `abnormal`, PRTS summon pages): 'healFree' 禁疗, 'isolated' 孤立
     abnormal: Array.isArray(t0.abnormal) ? t0.abnormal.filter((x) => typeof x === 'string') : [],

@@ -12,6 +12,9 @@
 .rt-kw { color: #2fd0ff; }
 .rt-mint { color: var(--mint-400); }
 .rt-hl { color: var(--gold-2); }
+/* (fork) sp.blood / sp.leaf (ui/richText.js): the update news' dark blood red and leaf green */
+.rt-blood { color: #b3121e; }
+.rt-leaf { color: #9be15d; }
 .rt-term { color: #9fd4ff; border-bottom: 1px dotted rgba(159, 212, 255, .6); }
 
 /* ---- unit thumbnail ---- */
@@ -493,6 +496,31 @@ button.bpop__harmony:hover { border-style: solid; color: #fff; }
   :root[data-text="lg"] .spov__bar, :root[data-text="xl"] .spov__bar { display: none; }
   :root[data-text="lg"] .spov__name, :root[data-text="xl"] .spov__name { grid-row: 1; }
   :root[data-text="lg"] .spov__desc, :root[data-text="xl"] .spov__desc { grid-row: 2; grid-column: 1 / -1; align-self: start; }
+}
+/* (fork) … and at every 文字大小 on a phone under 768 px wide: at 中 the official English 「Obtain equipment without spending any
+   funds.」 took one word a line beside the name on 640–740 px phones and ran into 「Your turn to decide」 (§35.56 check, en
+   中 640×360); from 780 px it fits beside the name in two or three lines */
+@media (max-height: 520px) and (max-width: 767.98px) {
+  .spov__bar { display: none; }
+  .spov__name { grid-row: 1; }
+  .spov__desc { grid-row: 2; grid-column: 1 / -1; align-self: start; }
+}
+/* (fork) … and the header a size smaller there (2026-11-09 short-phone pass: the title, its two lines and 当前轮到你决策 over the
+   countdown took about 40 % of a 360 px screen, so the second row of cards lost its last lines): the title at a phone
+   heading's size, the lines and the turn block capped like the band draft's header (draft.css), the countdown shorter.
+   [ASSUMED] the caps */
+@media (max-height: 520px) {
+  .spov .spov__head { gap: .2rem; }
+  .spov .spov__titles { column-gap: .12rem; row-gap: 0; }
+  .spov .spov__title { font-size: min(calc(.56 * var(--t)), calc(21px + var(--t-step))); letter-spacing: .05em; }
+  .spov .spov__desc { font-size: min(calc(.26 * var(--t)), calc(13px + var(--t-step) / 2)); letter-spacing: .02em; }
+  .spov .spov__sub { margin-top: .02rem; }
+  .spov .spov__turn { gap: .16rem; }
+  .spov .spov__turntxt { font-size: min(calc(.24 * var(--t)), calc(13px + var(--t-step) / 2)); }
+  .spov .spov__turntxt .icon, .spov .spov__turntxt.is-other .icon { width: .22rem; height: .22rem; }
+  .spov .spov__tw b { font-size: min(calc(.22 * var(--t)), calc(12px + var(--t-step) / 2)); }
+  .spov .spov__tw small { font-size: min(calc(.17 * var(--t)), calc(10px + var(--t-step) / 2)); }
+  .spov .spov__turn .countdown { --cd-h: .56rem; padding-left: .16rem; }
 }
 .spov__turntxt { display: flex; align-items: center; gap: .08rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: var(--text-md); }
 .spov__turntxt .icon { width: .26rem; height: .26rem; }

@@ -91,7 +91,7 @@ Asset URLs (0.2.6, host bandwidth layer 1): the client takes every art, model an
 
 Enemy preview pen (`render/pen.js`, `render/app/view.js`; research 09 §2): in prep the next round's enemies (`m.private.nextEnemies`; a scouted teammate's from their `m.field`) idle in the pen, rows 14–18 × cols 7–13, no bars, facing left. The pen shows with the prep camera — the own board, its shop-folded framing (the deploy fold included), a scouted teammate's board (their pen), back from the pen view (返回战场) — and with the pen camera (🔍▶▶, `setCamera('pen')`): the 3D board builds the pen block (`boardArea` → `AREAS.normal`: rows 13–18 × cols 6–14, the pen's two red gates (15, 7) / (18, 7) also present), the 2D board draws its rows (`bandFor` / `fieldRows` 6–18: the same pen in both, only the lit rect moves) and its figures show (`showsPen` / `penShown`; `view.stats().penHidden`). At the official prep framing its front rows stand at the top right of the view, beyond the board behind the upper gate, as in the official 休整期 (research 09 §2.1; the maintainer's recording, decision of 2026-10-15), so 🔍▶▶ pans to what is already in view. The battle, 联防, boss and hidden cameras never show it, nor does the Final Assault / Hidden Core prep (its frame ends far below the pen; the round's leader stands on the boss field instead, `leaderShown`). A camera flight keeps both ends' areas and rows and shows the pen when either end does (`restView` / `flightView`), except a flight from the prep camera into a battle camera: the pen goes with the battle start (`enterBattle` also empties its figures) and comes back as the next prep's flight begins. Superseded: user playtest #2 item 6 (2026-09-29) kept the pen to the pen camera ("the battlefield with the waiting enemies above it looked wrong — after 返回战场 and in every battle"); the maintainer's decision of 2026-10-15 reversed that for the prep camera, battles stay as they were (DESIGN §32.14.30). The DOM fallback (simplified view) still shows its pen only behind 🔍▶▶. Gate collection is independent of the pen block and figures: the 3D board keeps S/E gates from the whole grid across ordinary battle cameras (PR #595, §35.69 / §35.110); only `AREAS.boss` limits gates to its own arena. The 2D fallback keeps collecting its wire boxes from drawn rows.
 
-Visuals: oblique perspective board (tilted ~30°, trapezoid tiles), raised highland blocks with side faces, road/floor/forbidden styles per research 07 §7, pulsing red gates, blue objective (3D board: `materials.js gateMaterial` after the client's `Torappu/Particles/Additive` / `AlphaBlend` — 2 · _TintColor · texture on the texture's stored values, alpha clamped; the start box tinted red (1, 0, 0) with alpha 0.134 → 0.229, the objective's additive part blue (0, 0.0897, 1) with 0.16 → 0.097, its alpha-blended part (1, 1, 1, 1), from the client's 2 s clip, `scene.js GATE_TINT` — the clip's keys are cubic segments with flat ends, a smoothstep between the two values (`gatePulse`); before, an untinted texture × a gain tuned by eye left the red box's dashes and glyph white, GitHub PR #571 comments; **[ASSUMED]** which of the clip's two renderers is which box, and white vertex colours), dashed hand pads. Units: Spine (Front/Back rule, feet anchored — flying units hover `FLY_HOVER` 1.3 tiles up, the client's 0.35 in character space, research 12, §25.13.5 — an enemy flyer from the road whatever tile it crosses (GitHub #277) —, shadow sprite on the ground), elite gold outline glow, tier chip, HP bar (green ally / red enemy), SP bar (skill ready glow; while an ammo skill runs it is the magazine instead — a yellow cell per round, emptying from the right, `b.snap ammo`, and the skill draws no standing aura, UnitInfo `ammoSkill`; with 设置「弹药数量」 on, its count `left/magazine` under it, §31.9), 斩业星熊's 我执 pool as a red bar over her drained HP bar (`b.snap neg`), 伺夜's 狼群 count as a row of diamonds under the bars, the lit ones the 狼影 left (`b.snap wolves`; 0.2.2, GitHub PR #303 / #378 / #383), 魔王's 「微尘」 as that many sprites of her own `C_Eff_Moire_B` region circling her at 1.15 tiles and 30°/s (the hidden 5★'s own orbit; S2's `outside_radius` widens it to 2 tiles, `b.snap motes`: 3, six while S2 runs, one less for six seconds after a mote touches an operator — a decoration only: the 4★'s collision is a whole-circle check, and the hidden 5★'s ring is not drawn yet), status icons (each with a ring for the time it has left and its strength — 脆弱 30 %, 减速 50 % … — under it, `b.snap st`), the element gauge row under the bars — icon + white bar of the remaining 元素值, element-coloured refill during a 爆发冷却 (§18.3, §20.8); enemies drawn × their official prefab factor (enemies.json `modelScale`, §20.4); an enemy's mode — the `form` of a sim fx (`shared/protocol.js fxForm`), or UnitInfo `form` for a view built later through `render/app/info.js renderInfo` — switches clip sets (`render/units.js FORMS`: 掠海漂移体 crawl, 暴鸰 bombed, 转译基底's forms, the 逐火 embers, the leaders' 重生, 守墓石像, the 孤岛风云 prisoners' warning and 解放; closing clips timed from the fx `dur`), a one-off cast (`PROJ[kind].once`) plays once, and a local-only model's web alias is tinted (`ALIAS_TINT`: 灼热 / 炽焰源石虫, §21.14); damage numbers (phys orange-white, arts purple, true white, heal green); projectiles drawn per kind, hit sparks and melee slashes, skill activation bursts and auras (§17.3); death fade for enemies, summons and devices — a knocked-out operator stays on its tile in its held Die pose under a redeploy ring (§18.3); leak flash at the objective. Fallback when Spine missing/failed: avatar in a rarity-coloured diamond with bob/lunge tweens — a failed or timed-out model is loaded again (bounded), and a view re-resolves its model and avatar when the asset manifest arrives late or the tab is shown again (§21.27). 60 fps target with ≤ 120 units (a crowd draws its Spine units through the cached atlas, `render/impostor.js`, each refreshed every k-th frame: the refresh turns follow this frame's update order — `ctx.impostorSlot()`, a counter reset at the start of every frame — so a frame refreshes ⌊n/k⌋ or ⌈n/k⌉ of n units instead of whatever random per-unit phases gave, and a unit not refreshed for 2k frames is refreshed regardless; GitHub PR #334 by @Cloudnyco, issue #327 step 1 — its step 2, a time budget by priority, is not done; a model whose pose cannot change — `SpineActor.poseHeld()`: a knocked-out operator in the held end of its Die clip, a frozen model — is neither re-posed nor redrawn, only its clock runs, until a new clip, a revive, a wind-up, a form's closing clip, a clipping switch or a zoom past the impostor's rescale threshold; an impostor's slot is sized from every clip the unit can play — measured once per skeleton, a few frames after the model loads (`render/spine.js clipBounds`, sampled within a 2.5 ms frame budget; until then the unit is drawn directly); no model shows its setup pose (one frozen before its first update — built while stunned without a stun clip — shows its clip's first frame) —, a clip too large for that box (`render/units.js impostorBox`: mostly a deploy drop from above) is drawn directly while it plays, and the atlas draws every slot clipped to its own rectangle (a scissor rect; every batch flush gets its own vertex buffer, which Apple GPUs need), so no pose is cut and nothing is left in another unit's slot (GitHub #542, §31.6); the redeploy rings draw one shared rasterised label per number, `render/textures.js downLabel`, the same pixels as a Text of their own). Picking (which unit a press / hover / dropped item is on) and the drag target follow one rule, `render/pick.js` — the tile under the pointer (§18.1); the Spine store never hands out a skeleton whose unload is in flight (§17.1).
+Visuals: oblique perspective board (tilted ~30°, trapezoid tiles), raised highland blocks with side faces, road/floor/forbidden styles per research 07 §7, pulsing red gates, blue objective (3D board: `materials.js gateMaterial` after the client's `Torappu/Particles/Additive` / `AlphaBlend` — 2 · _TintColor · texture on the texture's stored values, alpha clamped; the start box tinted red (1, 0, 0) with alpha 0.134 → 0.229, the objective's additive part blue (0, 0.0897, 1) with 0.16 → 0.097, its alpha-blended part (1, 1, 1, 1), from the client's 2 s clip, `scene.js GATE_TINT` — the clip's keys are cubic segments with flat ends, a smoothstep between the two values (`gatePulse`); before, an untinted texture × a gain tuned by eye left the red box's dashes and glyph white, GitHub PR #571 comments; **[ASSUMED]** which of the clip's two renderers is which box, and white vertex colours), dashed hand pads. Units: Spine (Front/Back rule, feet anchored — flying units hover `FLY_HOVER` 1.3 tiles up, the client's 0.35 in character space, research 12, §25.13.5 — an enemy flyer from the road whatever tile it crosses (GitHub #277) —, shadow sprite on the ground), elite gold outline glow, tier chip, HP bar (green ally / red enemy), SP bar (skill ready glow; while an ammo skill runs it is the magazine instead — a yellow cell per round, emptying from the right, `b.snap ammo`, and the skill draws no standing aura, UnitInfo `ammoSkill`; with 设置「弹药数量」 on, its count `left/magazine` under it, §31.9), 斩业星熊's 我执 pool as a red bar over her drained HP bar (`b.snap neg`), 伺夜's 狼群 count as a row of diamonds under the bars, the lit ones the 狼影 left (`b.snap wolves`; 0.2.2, GitHub PR #303 / #378 / #383), 魔王's 「微尘」 as that many sprites of her own `C_Eff_Moire_B` region circling her at 1.15 tiles and 30°/s (the hidden 5★'s own orbit; S2's `outside_radius` widens it to 2 tiles, `b.snap motes`: 3, six while S2 runs, one less for six seconds after a mote touches an operator — a decoration only: the 4★'s collision is a whole-circle check, and the hidden 5★'s ring is not drawn yet), status icons (each with a ring for the time it has left and its strength — 脆弱 30 %, 减速 50 % … — under it, `b.snap st`), the element gauge under the feet — the client's own ring (prefabs enemy_ep_slider / char_ep_slider, art battleUi/slider_ep_* / sprite_ep_*, `render/units.js EP_GAUGE`, where the client's HUD root sits: `Unit.hudOffset` zero, no UI mount point): a white arc of the remaining 元素值 running clockwise from 12 o'clock in a ring of the element's colour, operators with the element's icon and a pulse on every hit, an enemy's burst flashing a ring, the arc refilling at half opacity during a 爆发冷却 (§18.3, §20.8); enemies drawn × their official prefab factor (enemies.json `modelScale`, §20.4); an enemy's mode — the `form` of a sim fx (`shared/protocol.js fxForm`), or UnitInfo `form` for a view built later through `render/app/info.js renderInfo` — switches clip sets (`render/units.js FORMS`: 掠海漂移体 crawl, 暴鸰 bombed, 转译基底's forms, the 逐火 embers, the leaders' 重生, 守墓石像, the 孤岛风云 prisoners' warning and 解放; closing clips timed from the fx `dur`), a one-off cast (`PROJ[kind].once`) plays once, and a local-only model's web alias is tinted (`ALIAS_TINT`: 灼热 / 炽焰源石虫, §21.14); damage numbers (phys orange-white, arts purple, true white, heal green); projectiles drawn per kind, hit sparks and melee slashes, skill activation bursts and auras (§17.3); death fade for enemies, summons and devices — a knocked-out operator stays on its tile in its held Die pose under a redeploy ring (§18.3); leak flash at the objective. Fallback when Spine missing/failed: avatar in a rarity-coloured diamond with bob/lunge tweens — a failed or timed-out model is loaded again (bounded), and a view re-resolves its model and avatar when the asset manifest arrives late or the tab is shown again (§21.27). 60 fps target with ≤ 120 units (a crowd draws its Spine units through the cached atlas, `render/impostor.js`, each refreshed every k-th frame: the refresh turns follow this frame's update order — `ctx.impostorSlot()`, a counter reset at the start of every frame — so a frame refreshes ⌊n/k⌋ or ⌈n/k⌉ of n units instead of whatever random per-unit phases gave, and a unit not refreshed for 2k frames is refreshed regardless; GitHub PR #334 by @Cloudnyco, issue #327 step 1 — its step 2, a time budget by priority, is not done; a model whose pose cannot change — `SpineActor.poseHeld()`: a knocked-out operator in the held end of its Die clip, a frozen model — is neither re-posed nor redrawn, only its clock runs, until a new clip, a revive, a wind-up, a form's closing clip, a clipping switch or a zoom past the impostor's rescale threshold; an impostor's slot is sized from every clip the unit can play — measured once per skeleton, a few frames after the model loads (`render/spine.js clipBounds`, sampled within a 2.5 ms frame budget; until then the unit is drawn directly); no model shows its setup pose (one frozen before its first update — built while stunned without a stun clip — shows its clip's first frame) —, a clip too large for that box (`render/units.js impostorBox`: mostly a deploy drop from above) is drawn directly while it plays, and the atlas draws every slot clipped to its own rectangle (a scissor rect; every batch flush gets its own vertex buffer, which Apple GPUs need), so no pose is cut and nothing is left in another unit's slot (GitHub #542, §31.6); the redeploy rings draw one shared rasterised label per number, `render/textures.js downLabel`, the same pixels as a Text of their own). Picking (which unit a press / hover / dropped item is on) and the drag target follow one rule, `render/pick.js` — the tile under the pointer (§18.1); the Spine store never hands out a skeleton whose unload is in flight (§17.1).
 
 Enemy skill clips (§35.19, §35.48): a sim ['cast', id, slot] swaps the unit's `skill` role to its slot's clip
 (`anims.skills[slot]`, `UnitView.setSkillSlot`), which the SKILL anim code right after plays. A slot marked `strike` is an
@@ -136,7 +136,9 @@ history and the open points: DESIGN §32.14.25.
   `effect.js compileEffect`), meshes (`normalizeMesh`: colours written as bytes are read as 0…1) and the WebP textures
   (`tex/half/` on the light tier) as they are needed. At the prep → battle switch the battle's units' keys are loaded
   (`wiring.js begin`; a unit that joins later, at its spawn event: `more`) and their programs and textures go to the
-  GPU a few per frame (`system.js warm`, `WARM_MS` 2 ms); a texture on the GPU is not decoded again.
+  GPU a few per frame (`system.js warm`, `WARM_MS` 2 ms); a texture on the GPU is not decoded again. Where the GL
+  offers `KHR_parallel_shader_compile`, programs build off the main thread (`gl.js program`): the warm-up starts them
+  all at once, and a draw whose program is still building is skipped like one whose texture still loads.
 - **Simulation.** `psys.js` interprets Unity's ParticleSystem: the main module, emission (rate over time and distance,
   bursts with cycles and probability), the shapes, velocity / limit velocity / force / inherit velocity / noise /
   rotation / size / colour over lifetime and by speed, texture sheets, trails, sub-emitters, prewarm, start delay,
@@ -229,7 +231,9 @@ history and the open points: DESIGN §32.14.25.
   (`simFx`): a cast flash on the owner in the frame of the skill start or, tagged with the skill, while its loops play;
   a skill-tagged fx standing for the plan's `pulse` rows (its buff's ticks on the owner, its other hits away from it),
   which play there; and `skills.js FX_BINDINGS` (克莱门莎 S3's 'lock': her skill projectile's mark and three strikes on
-  the tile, which also stand for her 'blast's there). A skill with nothing official (no plan, or none of its rows
+  the tile, which also stand for her 'blast's there; a talent bound under each of the operator's skills, such as 蕾缪安's
+  Wanted mark: the kit's 'wanted' loops `lemuen_talent_buff_01` on the marked enemy, `hold: 'life'`, until the enemy
+  or she is gone; 蕾缪安 S3's lock also holds the aim projectile's `_effectsToTargetWhenStart` beam, one per lock, until its shell lands; a `shot` binding plays a mode sub-ability only a kit fx fires — wiring.js KIT_SHOTS, 蕾缪安 S2's aimed shot on her 'crit', left out of her 'atk's). (fork) A summon's UnitInfo `summonerId` lets its summoner's effects play on it: a skill's CreateBuffToToken rows (`plan.tokens`, SkillFx._tokens) while the skill lasts, a passive ability whose rows all target summons (talents.js summonTargets) and a summon's own kit fx (skillfx.js SUMMON_FX: 缪尔赛思's split). A talent's or ability's buff on other units plays its target rows while a b.snap fxs row of that buff names it (talentfx.js targetRows; STATE_BUFFS looks pick the branch); a kit 'ability' fx naming a client buff template fires the node that template triggers (talents.js triggerKinds `ability:<template>`), or a trait's rows carrying that buff. A skill with nothing official (no plan, or none of its rows
   extracted) keeps the procedural burst and aura. An effect a plan reaches two ways (a buff's `_buffs` and
   `_extraBuffs`) plays once. A skill attack flies its ability's projectile (index v3 `projectileKey`, else the naming
   rule) and the buffs of its attacks last their `life` (LIMITED: its time or the record's blackboard key; INFINITY: the
@@ -241,6 +245,22 @@ history and the open points: DESIGN §32.14.25.
   over, or on the enemy's death or leak. An enemy in a form whose name is one of its modes' attacks in that
   mode and plays that mode's copies of its skills. A summon's skill — its record's, else the only one its unit has —
   plays like an operator's.
+- **Lines and paths** (fork, 2026-11-11, `pathfx.js PathFx`, owned by `SkillFx`; its `PATH_BINDINGS`): the official
+  line effects whose points the game supplies, which `skills.js` leaves unmapped ('path' / 'tiles'). A
+  RangeLineEffectEmitter draws one line per closed outline of a tile set through the tile corners (`edgeLoops`; each
+  corner at its highest tile, the prefab's LineRenderer given the points: `effect.js setLinePoints`). 国度's kingdom
+  (the kit's 'domain' fx, its range every 0.5 s) shows its tile effect on every tile plus that outline, and fades `dur`
+  after the last fx, in place of the procedural field. 予愿安洁莉娜 S3's range line follows her: the 'takeoff' fx's
+  `range` (her deployment tile's 3-9) plus the tiles within `around` of her, re-traced as she flies, until the skill
+  ends. 谬因 S2's AphrisEffectEmitter draws one line from her muzzle through the 'beam' fx's `path` turns (`pathCorners`;
+  waypoints at the fixed height 0.65), with the start, 中继器 and end-point effects, until the skill ends. The sim only
+  added fields to fx it already sent (no event count changes: goldens unchanged). 引星棘刺 S3 (2026-11-12): the kit's
+  'zone' fxs carry the area's hull corners (`poly`, [row, col]…) and a `polyKey` per cast; `polygon { line }` draws
+  thorn2_skill_03_line once per key through those corners, closed (Thorn2S3Renderer), fixed where it was thrown, for
+  the fx `duration`; the zone fxs still land the official projectile per operator. The area itself is
+  server/sim/polygon.js (Thorn2PolygonRange's hull, strip and overlap tests). On the procedural tier (officialFx off)
+  simfx.js sends a 'zone' with `poly` + `polyKey` to zones.js `areaField` instead of a ring: one outline through the
+  corners (a line for 2, a small ring for 1) in domainGfx, once per key.
 - **Talents and abilities** (0.3.0 Phase 3d, `talentfx.js TalentFx`, owned by the wiring; the bindings of `talents.js`,
   DESIGN §33.16, index v3 §33.17). A battle unit's talents in force — an operator's by its record's talents through
   `talentKeys` (a module's with its module, the trait's always, a node valid with one skill only with it), an enemy's
@@ -519,25 +539,71 @@ reading; the size applies on release (`pointerup` or `change`). The reading is d
 their unscaled size, since the text floors and px paddings inside do not shrink (§35.47). `test/ui/ui-size.test.js`
 guards every floor. At 100 % no property is set: the page is the design itself.
 
-干员调配's 卡片视图 (`screens/loadout.js` DeckView / DeckCard / TierMark / DeckBar, optional; PR #811, §35.18) persists
-`sp.pref.loadout.view` — `'list'` (the default, the aligned rows) or `'deck'` — in this browser only. The deck lays the
-干员调配 tab out after the event's 物资调配处: a group per tier scrolling sideways (two rows behind a tall tier marker),
-the 甄选干员 cards of the 自选编队 slots closing tiers 5 and 6 (they open that tab), a bottom bar jumping to a tier, and
-快速配置 — a column of the skills, the elite's modules or the 潜能 / 练度 selects beside every card, with the list rows'
-own handlers. A card's picture is an `OperatorImage` portrait (the owner's picture-only outfit, B6). A card opens the
-list's Detail in a drawer over the deck's left; on that tab Esc closes a popover, 快速配置, the drawer, then the
-overlay, and leaving the tab (干员持有, the 甄选干员 card, `openLoadout(…, tab)`) closes all three, so one Esc there
-closes the overlay. The tier marker is the official `shopLevelSprite/shop_level_tag_N` (data/assets.json) at its
+干员调配's 卡片视图 (`screens/loadout.js` DeckView / DeckCard / TierMark / DeckBar; PR #811, §35.18) is the 干员调配
+tab's only view since the fork's 2026-11-08 change: the list view (aligned rows, PR #301's quick choices), its 自选编队
+tab and that tab's slot overview were removed. The card view's blocks are ONE copy shared with the 自选编队 picker
+(`screens/loadoutDeck.js`: the card DeckOpCard with its column DeckOpSide and 「详情」 panel DeckOpMore, the quick
+choices, the grouped deck's drag / wheel / left-edge group / jump — useGroupDeck, GroupMark, GroupBar(Live) —, the
+drawer DeckDrawer — a pure overlay over the deck's left, the deck never moving for it — and the detail DeckDetail); each screen passes only its own data. The deck lays
+the tab out after the event's 物资调配处: a group per tier scrolling sideways (two rows behind a tall tier marker), one
+card per 自选编队 slot closing tiers 5 and 6 (fork: the pick, or an empty slot to fill — a press opens that slot's
+picker as a page of its own in place of the deck (the deck is not drawn meanwhile), with 清空 for a filled slot; the top
+bar's 干员调配, Esc, 确认 or 取消 bring the deck back where it was, without its opening 转场; 自选编队's 导出 / 导入 / 清空
+are in 更多), and a bottom bar jumping to a tier. The picker is the card view for 自选 operators: its legal operators as
+the same cards grouped by class (a class marker each, the classes in the roster's order) with a bottom bar jumping to a
+class and mouse drag (no header rows of its own: the top bar names the slot's tier, its 筛选 holds the roster's search,
+class and bond filters without the tier row or 仅看已调整, and 「简洁 / 展开」 sits in its bottom bar as in the deck), the 干员调配 detail
+(调配 / 时装 on top — 时装 the full outfit panel —, the head with the dub picker, then 外观, 潜能 / 练度, skills,
+局内数值, modules; no 特质 for a 自选 operator) in the same drawer over the deck's left with 收起, Esc folding the
+drawer, then cancelling; 确认 / 取消 below. Each card (fork) carries its own column at its right: the skills the
+operator has (S1–S3) at its top and the elite's modules (不装备 first) at its bottom — every module a button where the
+screen is taller than 560 px, else one button that steps to the next, pips saying how many and which (a card is about
+140 px tall on a 844 × 390 phone, too short for up to 3 skills and 4 modules at a tappable size). A choice there
+neither opens the drawer nor moves the selection, and a press on the column never reaches the card. A long name wraps
+onto a second line (never cut with …). 「简洁 / 展开」 (`sp.pref.loadout.details`; at the right of the bottom bar of both
+pages, both choices in view, a little card drawing on each — the user's calls of 2026-11-08) unfolds a brief panel beside every
+card — each skill whole with its description (the elite's Lv.7, the Detail's SkillOption), the modules with the chosen
+one's stat bonus and 特性 / 特性追加 lines (whole, never cut with …), no module title or talents: those are one press away, in the
+detail (the user's calls of 2026-11-08). Each panel is laid out on its own (`contain: strict`, sized from outside): a
+change anywhere in the deck laid out every panel again, 61–88 ms in 「展开」 against 15 ms contained, in the user's Vivaldi
+at 2319×1358 ×1.5; 筛选 is a block of its own beside 干员持有. The panels are always drawn but out of layout while folded (display: none — laid out with their
+card, each card scrolling into view laid out its panel's text and scrolling stuttered), and unfolded only those near
+the view are laid out (content-visibility); the toggle adds no element and redraws none: it lives in its own store
+(detailsStore: only the switch redraws). The deck's `is-details` gives every card its unfolded width at once (the
+scrollbar settles with the press), while each card's panel is drawn by its own `data-open` (a card redrawn by Preact
+keeps it): a press draws only the panels near the view — on screen or within half the deck's width beyond either edge
+— and the rest eight at a time while the page is idle, nearest first (the user's call of 2026-11-08: 1–1.8 s from a
+press to its first frame at a 4× slowed CPU, 0.17–0.55 s after, and every read made before the first animation — a
+read after one laid the deck out again per card); folding hides every panel at once. Cards drawn later (a filter, a
+version switch) catch up the same way (useDetailsSync). A panel fades in as it slides out from under its card and
+fades out within the first half of the slide back, clipped to its card only while it slides: a clip on every card made
+the browser regroup the page's compositing layers on every frame of a scroll (a drag's slow frames at a 4× slowed CPU
+133–213 ms with it, 46–67 ms without), and the deck itself scrolls on the compositor (`will-change: scroll-position`:
+Chrome did not promote it on its own, so every step of a drag regrouped the whole page's layers — a drag's slow frames
+in 「展开」 at full speed 12–21 ms before, 4 ms after; at a 4× slowed CPU 8–21 ms, smoother than 「简洁」 was). A mouse drag moves the deck once a frame and, let go, glides on at the pointer's
+speed, slowing like a phone browser's scroll, until a press, a wheel or a touch (useDragScroll; none with reduced
+motion). Nothing on the deck changes while it moves: a class there restyled all ~15 600 elements of 「展开」, 165–187 ms
+each switch, 2–3 a drag (the user's Vivaldi, 2026-11-08); the grabbing hand is a clear sheet over the page instead. A
+press while the deck still moves (it scrolled in the last 120 ms: a glide, a wheel, a jump, a fling) only stops it and
+its click picks nothing, as on a phone (the user's call of 2026-11-08). Picking a card says the operator's select line (选中干员, as a tap in the match does) once per visit (ui/loadoutVoice.js, the user's call of 2026-11-09): a skill or module change counts as opening it (as the first touch it speaks); more clicks on the same operator stay silent until another operator is touched, and each return takes its other line, never the last one; switching to an outfit with its own voice set always speaks in it (its 选中干员 / 部署 lines, else any line of it), any other outfit change is an ordinary interaction, and the newest line cuts the previous one off. The Custom Squad picker shares the rule. While the overlay is open the screen
+under it pauses its animations (the lobby's radar kept a fresh frame coming over the whole deck). The slide is FLIP (slideDetails): the deck takes its final
+layout at once, scrolled so that one card holds its place on screen — the selected card, or when it is off screen the
+card nearest the view's centre (deckAnchor) —, and the cards in view glide from their old places while each panel
+slides out from under its card (transforms only, 240 ms: no layout per frame). Each card has an explicit width and
+`content-visibility: auto`, so a card off screen is skipped: one layout of all 112 cards (~19 000 elements with their
+panels) is ~150 ms on a PC, and a resize or a tap's redraw lays out only the cards in view. A panel redraws only when its own card's inputs change (DeckOpMore, a class component). 潜能 and 练度 are set in the Detail. The fork removed 快速配置 (its skill / module / 潜能 · 练度
+columns). A card's picture is an `OperatorImage` portrait (the owner's picture-only outfit, B6). A card opens
+the Detail in a drawer over the deck's left; on that tab Esc closes a popover, the drawer, then the overlay, and
+leaving the tab (干员持有, `openLoadout(…, tab)`; an old 'diy' tab opens the deck) closes both, so one Esc there closes the overlay. The tier marker is the official `shopLevelSprite/shop_level_tag_N` (data/assets.json) at its
 design size, a CSS marker (NO. and the numeral, no slogan of our own) its fallback; [ASSUMED] that the event screen
 draws this sprite (its name and look; activity_table `shopLevelDisplayDataDict` confirms one group per shop level).
 While the match's loadout is locked the bottom bar carries a 「本局已锁定 · 下一局生效」 chip — the top bar's note is cut
-short or hidden on narrow screens and gives way to the hints in 快速配置. The bar holds the tier at the deck's left edge
-as its own state (DeckBarLive), so a scroll across tiers redraws the bar, not the 112 cards. ⓘ opens 「卡片视图说明」,
-the remake's own tips (the official tutorial chapter keeps the name 调度手册). The opening 转场 is the card view's only
-(maintainer's decision, 2026-10-21): the list keeps its 200 ms `lo-in`, and its ≤1000 px roster / detail toggle replays
-nothing. [ASSUMED], with no screenshot or video of the event screen offline: the card frame and colours, the two-row
-flow, the bottom bar, the 快速配置 columns, the 转场 timings, and ONE combined 甄选干员 card per tier where the official
-data lists two DIY slots (`charChessDiySlotIdList`). Both views read and write the same loadout store, so the room and
+short or hidden on narrow screens. The bar holds the group at the deck's left edge
+as its own state (GroupBarLive), so a scroll across tiers redraws the bar, not the 112 cards. The card view has no guide
+sheet of its own (its ⓘ 「卡片视图说明」 was removed by the user's call of 2026-11-08). The opening 转场 is the card view's
+(maintainer's decision, 2026-10-21). [ASSUMED], with no screenshot or video of the event screen offline: the card frame and colours, the two-row
+flow, the bottom bar, the cards' skill / module column and 「详情」 panel (the remake's own), the picker's class groups, and the 转场 timings; the official data lists two DIY slots
+per tier (`charChessDiySlotIdList`), one card each here. The cards read and write the same loadout store the list did, so the room and
 the server see nothing new. Normal / elite level indicators read each form's `status.phase` and `status.level`:
 `PromotionIcon` uses the official `elite/elite_0..2` sprites (missing art: `E0` / `E1` / `E2`), never a fixed two-bar
 glyph or a phase inferred from shop tier. The tier badge reserves the full square image height above these indicators,
@@ -939,7 +1005,10 @@ oldest one's voice (a 30 ms fade) instead of being dropped, so every landing of 
 the 1.41 s b_char_set; the field view fetches the generic files ahead (`warmLandings`). A piece whose
 Start still plays (on its model, owed to a model still loading, or cued less than a clip ago) keeps it and sounds nothing
 more. Only an idle prep piece lands, never a battle unit or one attacking, dying, dragged or in another clip, and nothing
-lands in a hidden tab. Battle deploys keep the silent `onDeploy`; audio.handleBattleEvents sounds them.
+lands in a hidden tab. Battle deploys keep the silent `onDeploy`; audio.handleBattleEvents sounds them. (fork) A piece put on
+a board tile and the round start's landing play the unit's official deploy effect (FxWiring.birth: its skill's birth row,
+else its default mode's / unit's start effect, else the generic birth; the outfit's twin), the procedural flash only
+without one; the look-up keeps no battle record (`cache: false`).
 
 - Round start (the maintainer's confirmation from official play, 2026-10-13): during 回合开始 the own board's pieces land
   one after another in deployment order — operators by column from the left, top to bottom within a column, then the
@@ -979,7 +1048,7 @@ counts, extra rounds and refills included), centred in the bar's yellow; the row
 height. It hides with the magazine, in the prep view and after death. The simplified board has no ammo bar and so no
 count. The same switch puts a 秘术师's `stored/cap` in the row stack under the purse (`UnitView._updateEnergy`,
 b.snap `energy` from `snapshot.js mysticView`: `trait.stored` against `profile.storeMax`, zero included), in a violet
-orb of its own; the element gauge moves down by its height. Allies only; kits with a store of their own (维伊, 黑键)
+orb of its own; the element gauge, under the feet, does not move. Allies only; kits with a store of their own (维伊, 黑键)
 have no row. The official effect is the default display: with 设置「官方特效」 on, the same readout lights 深靛's
 stored energies on the operator (§9 "Official battle effects", Skills) whatever this setting says.
 
@@ -1097,11 +1166,13 @@ The four-star Theresa mote ring follows the game clock (including pause and spee
 Spine display coordinates, and is recreated on model swaps. Its S2 radius of 2 tiles is [ASSUMED] from outside_radius;
 the hidden five-star orbit is unchanged (PR #576).
 
-The active-bond strip shows every entry in a horizontal scroller, with keyboard focus, touch panning and translated
-arrow controls. Watched owners, harmony counts, morph members and disabled bonds retain their existing behavior (PR #678).
-The strip's .08rem clip padding has matching negative margins to preserve the discs' and names' original height.
-Prep and Final Assault prep reserve the arrows' 44 px floor and any taller measured bounds (including native scrollbars),
-relative to the field host and safe-area insets. The minimum band remains while collapsed; desktop keeps the official
+(fork) The active-bond strip shows as many entries as fit its width, measured on every resize (fewer on phones), with
+no scrolling and no scrollbar; when more remain, a 「+N」 button after the last slot drops them in a compact grid under
+the strip — the same discs, counts and names a step smaller, each opening its popup as in the strip (the grid then
+closes and the button wears the open ring); the button, Esc or an outside press close it (`ui/bondStrip.js` FitStrip;
+the user's pick of 2026-11-10, replacing PR #678's scroller). Watched owners, harmony counts, morph members and disabled
+bonds keep their behavior. Prep and Final Assault prep reserve the collapse toggle's 44 px floor and any taller measured
+bounds, relative to the field host and safe-area insets; the grid floats over the field. The minimum band remains while collapsed; desktop keeps the official
 camera and original 2.16rem band when the strip already fits (§35.110).
 
 Outside presses dismiss match detail cards, bond popups and the selected-piece underframe (PR #792, §35.93).

@@ -32,7 +32,7 @@
 // (triggerKinds: a fatal blow → 'substitute' / 'undying', a stand-in buff's end → 'swap' / 'dollEnd', a skill start, the
 // owner's birth; a point strike — 火力电台's talent 'airstrike' at its spot, POINT_TRIGGERS); `attack` — the attack it adds or replaces only where a kit fx marks it ('extraAttack'), else nothing.
 
-import { planUses, emptyPlan, planKeys, resolveSkill } from './skills.js';
+import { planUses, emptyPlan, planKeys, resolveSkill, KIT_HELD_TALENT_KEYS } from './skills.js';
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const lc = (k) => (typeof k === 'string' && k ? k.toLowerCase() : null);
@@ -77,6 +77,9 @@ export function activeTalentKeys(idx, unitKey, { rec = null } = {}) {
   return out;
 }
 
+/** (fork) A use none of whose keys a kit fx binding plays instead (skills.js KIT_HELD_TALENT_KEYS). */
+const notKitHeld = (u) => !(Array.isArray(u?.keys) && u.keys.length && u.keys.every((k) => KIT_HELD_TALENT_KEYS.has(lc(k))));
+
 /** The equipped skill index of a unit view's info (a 自选 pick's, else its own). */
 const skillIndexOf = (info) => (Number.isInteger(info?.diy?.skillIndex) ? info.diy.skillIndex : Number.isInteger(info?.skillIndex) ? info.skillIndex : null);
 
@@ -102,7 +105,7 @@ export function talentBindings(idx, unitKey, { info = null, rec = null } = {}) {
     (Array.isArray(t.nodes) ? t.nodes : []).forEach((n, i) => {
       if (!isObj(n)) return;
       if (Array.isArray(n.skills) && n.skills.length && !(sk != null && n.skills.includes(sk))) return;
-      const uses = nodeUses(t, i);
+      const uses = nodeUses(t, i).filter(notKitHeld);
       const plan = planUses(idx, emptyPlan(unitKey, key), uses, { mode: null, abilities: t.abilities });
       out.push({
         id: `t:${key}#${i}`, source: 'talent', key, kind: null, node: n.node ?? null, class: n.class ?? null, ability: n.ability ?? null,
@@ -114,7 +117,7 @@ export function talentBindings(idx, unitKey, { info = null, rec = null } = {}) {
   }
   (Array.isArray(unit.abilities) ? unit.abilities : []).forEach((a, i) => {
     if (!isObj(a)) return;
-    const uses = Array.isArray(a.uses) ? a.uses : [];
+    const uses = (Array.isArray(a.uses) ? a.uses : []).filter(notKitHeld);
     const plan = planUses(idx, emptyPlan(unitKey, a.name ?? `ability${i}`), uses, { mode: null, abilities: a.abilities });
     out.push({
       id: `a:${a.name ?? i}#${i}`, source: 'ability', key: a.name ?? null, kind: a.kind ?? null, node: a.node ?? null, class: a.class ?? null,
@@ -150,11 +153,14 @@ export function triggerKinds(b) {
   const out = new Set();
   for (const t of Array.isArray(b?.triggers) ? b.triggers : []) {
     if (!isObj(t)) continue;
+    const n0 = out.size;
     if (t.event === 'ON_BEFORE_TRY_SET_HP_ZERO') for (const k of FATAL) out.add(k);
     else if (t.event === 'ON_BUFF_FINISH' && /standin/i.test(`${t.template || ''} ${t.buff || ''}`)) for (const k of STAND_IN_END) out.add(k);
     else if (t.event === 'ON_SKILL_START') out.add('skill');
     else if (t.event === 'ON_OWNER_BORN') out.add('born');
     else if (POINT_TRIGGERS[t.template]) out.add(POINT_TRIGGERS[t.template]);
+    // (fork) a template no other signal covers: the kit's 'ability' fx naming it (`ability:<template>`, talentfx.js fx)
+    if (out.size === n0 && t.template) out.add(`ability:${t.template}`);
   }
   return [...out];
 }
@@ -253,11 +259,22 @@ export function bindingKeys(b) {
   return b?.plan ? planKeys(b.plan) : [];
 }
 
+/**
+ * (fork) A passive ability whose only rows are on its targets, and every one of them a summon's effect (`token_…` keys:
+ * 凯尔希's tokenEff — token_kalts_skill_0N_buff on Mon3tr —, 鸿雪's TokenEff on her sub-bow): its targets are the owner's
+ * summons (UnitInfo `summonerId`), so it plays on them (talentfx.js `onSummons`).
+ */
+export function summonTargets(b) {
+  const t = b?.plan?.targets || [];
+  return b?.when === 'passive' && t.length > 0 && t.every((e) => /^token_/.test(String(e.key || ''))) ? t : null;
+}
+
 /** Whether a binding can ever play on this client (talentfx.js binds it), with the reason it cannot. */
 export function bindable(b) {
   if (!b || !b.plan) return { ok: false, reason: 'no-plan' };
   const p = b.plan;
   const draws = p.start.length || p.loop.length || p.end.length || p.range.length || p.attacks.some((a) => a.cast.length || a.range.length || a.hit.some((g) => g.length));
+  if (!draws && summonTargets(b)) return { ok: true, reason: null, onSummons: true };
   if (!draws) return { ok: false, reason: p.targets.length ? 'targets-only' : p.unmapped.length ? 'unmapped' : 'no-effects' };
   if (b.when === 'toggle') {
     const probe = toggleOn(b, { flags: 0, hp: 1, maxHp: 1 }, {}, 0);
