@@ -24,10 +24,10 @@ function betacf(a, b, x) {
   return h;
 }
 function lgamma(x) {
-  const g = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+  const g = [76.18009172947146, -86.50532032941678, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
   let y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
   let ser = 1.000000000190015; for (const c of g) ser += c / ++y;
-  return -tmp + Math.log(2.5066282746310005 * ser / x);
+  return -tmp + Math.log(2.5066282746310007 * ser / x);
 }
 function ibeta(x, a, b) {
   if (x <= 0) return 0; if (x >= 1) return 1;

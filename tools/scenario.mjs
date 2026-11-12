@@ -54,7 +54,7 @@ export function applyScenario(m, scenario) {
       for (const ps of m.alivePlayers()) {
         if (!ps.isBot || (g.seats !== 'all' && !g.seats.includes(ps.seat))) continue;
         for (let k = 0; k < g.count; k++) {
-          let ok = false;
+          let ok;
           if (g.kind === 'funds') { ps.funds += g.funds; ok = true; }
           else if (g.kind === 'chess') ok = !!ps.acquireChess(g.id, { source: 'scenario' });
           else ok = !!ps.acquireItem(g.id, { source: 'scenario', requirePool: false });
