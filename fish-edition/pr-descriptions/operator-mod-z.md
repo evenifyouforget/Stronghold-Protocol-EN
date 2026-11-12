@@ -38,7 +38,7 @@ those first, then retarget this PR to `main`.
 | Saileach | BEA-Z | HP +200, RES +30 | Block 0, always Invisible; her DP ×2; her player's redeploy timers +50 % faster (+300 % during her skill) |
 | Shining | PHY-Z | ATK +100, DEF +100 | Healing grants Immortal for 8 s (HP can't fall below 1); cooldown 0 s, +5 s each time it saves someone |
 | Siege | SOL-Z | HP +300, ATK +100 | His DP ×2; DP above 90 is drained, 1 SP to every ally per DP |
-| Thorns | LOR-Z | HP +250, ATK +100, ASPD +10 | Range +1; during his skill range +1, +1 target, Invisible; attacks add 10 % ATK Arts and 5 % ATK Nervous Impairment |
+| Thorns | LOR-Z | HP +250, ATK +100, ASPD +10 | Poison ticks 3× as often; range +1; during his skill range +1, +1 target, Invisible; attacks add 20 % ATK Arts and 5 % ATK Nervous Impairment |
 | Weedy | PUS-Z | HP +250, ATK +100 | Enemies' weight −2 while she is on the field; her damage becomes Corrosion unless the target is bursting; per +10 % ATK: SP +0.02/s and Water Cannon redeploy −1 % |
 | Viviana | AFT-Z | HP +500, ATK +100 | Glimmering Touch (cooldown 12 s, ready at once): an enemy in range of any of her player's Kazimierz operators (Leaders first); 7 s later a 5×5 diamond on its tile takes 300 % ATK Burn and 300 % ATK Arts (600 % ATK × living Kazimierz operators on an enemy already in a Burn burst). Any enemy's Burn burst: RES −2, up to 10 times, kept after she falls |
 | Zuo Le | SBL-Z | HP +400, ATK +100 | ATK from buffs ×2; SP from anything but natural recovery ×2; +1 skill charge; damage adds 5 % ATK Corrosion, or on an enemy at 0 DEF 5 % ATK Burn + 10 % ATK Arts |
@@ -60,6 +60,7 @@ those first, then retarget this PR to `main`.
 - `server/sim/content/modZ.js`: the battle effects, installed after the operator's kit. Weedy's Water Cannon reads her
   redeploy multiplier when it leaves (`kits/ops/op-weedy.js`).
 - Engine edits (small):
+  - Thorns' poison reads `fishPoisonTickMul` for its tick interval (`kits/ops/op-thorns.js`).
   - `units.js _recalc` calls a unit's `fishStatPost` last, after every buff (Typhon Z's balance, Zuo Le Z's doubled
     buffs), so it follows buffs and debuffs as they change and Aegir's devour sees the final ATK.
   - `addDp` multiplies DP gains by the operator's `fishDpMul`. Saileach's kit now names her as the source of her
