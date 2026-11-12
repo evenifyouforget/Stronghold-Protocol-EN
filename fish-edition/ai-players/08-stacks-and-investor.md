@@ -328,7 +328,7 @@ Built on `feature/bot-plan-tactics`; all write legacy's plan, default-off, for t
 | Swire in inventory, don't sell before the boss | `plan-keepers` (`swire`) |
 | Put Archetto behind an operator with good Alliances | legacy's positional value already counts the front piece's active Alliances (§37.37) |
 | 2 Marvel for cheaper refreshes | `plan-bond` with `bond: miraShip` (no new tactic) |
-| Kjerag: Ascalon custom operator + Nevermeltice | not built: bots field no custom operators yet |
+| Kjerag: Ascalon custom operator + Nevermeltice | `diy-picks` (below) fields custom operators; an Ascalon choice and the Nevermeltice pairing are not built yet |
 | The copy combos and 圣约送葬人 (08 above) | `plan-combos` |
 
 **`plan-combos` measured** (queue10, `untracked/combos-2026-11/`): botbench co-op 1–40 against queue2's legacy: wins
@@ -347,8 +347,58 @@ behind it. The second is the 空弦 problem of 09: a copied prep-time trait is i
 combo layout loses to any layout with one more kill. **Queued:** queue12, `plan-combos` with `legacy-arrange`
 `prepTiebreak 1` and `leakAllow 1.5` (records and botbench, after queue11).
 
-**Queued:** queue11 (`commit`, `keepers`, and all three together, botbench co-op 1–40), paired against queue2's
-legacy.
+**`plan-commit` and `plan-keepers` measured** (queue11, `untracked/tweaks-2026-11/`, botbench co-op Ultimate 1–40,
+paired against queue2's legacy; `untracked/paired.mjs`):
+
+| Profile | Wins (legacy 27) | Better / worse seeds | p (McNemar) | Score diff (t) |
+|---|---|---|---|---|
+| `plan-commit` | 27 | 3 / 3 | 1.00 | −0.007 (−0.11) |
+| `plan-keepers` | 27 | 2 / 2 | 1.00 | +0.005 (+0.09) |
+| `plan-combos` (queue10) | 24 | 4 / 7 | 0.55 | −0.067 (−0.75) |
+| all three together | **20** | 1 / 8 | **0.04** | −0.168 (−2.21) |
+
+Each alone changes almost nothing (they act on a few seeds: the key operators are rare). Together they lose: the
+combos and the commitments both pull the plan's buys and keeps, and the bench can't hold all of it. They stay in the
+evolution pool one by one, default off; the race decides whether any pair works.
+
+## Custom operators for bots: `diy-picks` (2026-11-12)
+
+Fish: "I thought I was already asking for bots to use custom operators. yes, 100% I approve". Until now bots never
+had custom operator picks: only a human's seat got them (`PlayerState`: `if (!this.isBot && seat.diy)`).
+
+**What the humans pick.** The records don't store the picks, but the battle specs carry each fielded custom piece.
+Of 269 human seats, 67 fielded one:
+
+| Tier | Pick (seats) |
+|---|---|
+| 6 | Togawa Sakiko S3 (17), Haruka S3 (11), Wang S3 (4), Angelina the Mellow Wish S3 (4) |
+| 5 | Ch'en the Dawnstreak S3 (10), Kal'tsit·Esperanta S2 (5), Wang S3 (5), Angelina the Mellow Wish S2/S3 (7), Leizi the Thunderbringer S1 (3) |
+
+**Built** (`feature/bot-plan-tactics` c72a5eea): a tactic may now declare `diyPicks(params)`. The match calls it for
+each bot seat at setup, before the custom stock is drawn, so it also works once bots run in the browser. `diy-picks`
+params: `t5a`, `t5b`, `t6a`, `t6b` (none, Ch'en the Dawnstreak, Shu, Wang, Kal'tsit, Logos, Sakiko, Haruka,
+Goldenglow; each with the humans' favourite skill and module), and `buy` / `keep`. Defaults: Fish's (05): Ch'en the
+Dawnstreak and Shu on tier 5, nothing on tier 6.
+
+A first smoke run showed the shop offering the pieces in rounds 10–14 and legacy never buying them: with a full board
+it buys a new operator only when the lineup improves, and a lone piece seldom does. So `buy` / `keep` put the slotted
+pieces into legacy's plan (buy +24, keep +18); then they were bought in 2 of 4 seeds, one merged into an elite.
+
+**Queued:** queue13 (after queue12): `diy` (defaults), `diy-saki` (+ Sakiko on tier 6), `diy-nobuy` (picks without the
+plan), botbench co-op Ultimate 1–40, paired against legacy.
+
+**The Isomorph gap (Fish: the custom operator in Ægir is "to give a huge buff to a core dps operator who is at the
+start of the snake").** Morph Isomorph worn with an Alliance item makes its wearer a member of that Alliance. In the
+battle specs:
+
+| | Humans | Bots |
+|---|---|---|
+| Seats that wear an Isomorph | 125 of 269 (46 %) | 16 of 120 (13 %) |
+| Paired with an Alliance item (seat-pairs) | Victoria 82, Indomitable 67, Precision 66, Siracusa 66, Arcane 60, Yan 58, Kjerag 56, … Ægir 42 | Yan 3, Kjerag 1, Sargon 1, Swift 1 |
+
+The humans' Ægir carriers are damage dealers: Pramanix the Prerita, Dusk, Archetto, Exusiai the alter, SilverAsh the
+alter, Togawa Sakiko (custom). Bots mostly wear the Isomorph alone, where it grants no Alliance. Next tactic: put the
+Isomorph and an Alliance item on the main damage dealer, and for Ægir place it where the chain feeds it.
 
 ## Next tactics (not built)
 
