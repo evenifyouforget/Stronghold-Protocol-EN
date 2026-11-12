@@ -55,7 +55,8 @@ those first, then retarget this PR to `main`.
     picker reads the data's form, so it never lists them.
   - The granted Alliances are added to the elite record while the module is active.
   - `hasModZ(charId)` for the picker's tag.
-- `server/sim/content/modZ.js`: the battle effects, installed after the operator's kit.
+- `server/sim/content/modZ.js`: the battle effects, installed after the operator's kit. Weedy's Water Cannon reads her
+  redeploy multiplier when it leaves (`kits/ops/op-weedy.js`).
 - Engine edits (small):
   - `addDp` multiplies DP gains by the operator's `fishDpMul`. Saileach's kit now names her as the source of her
     DP. That only affects the resource numbers, and only for Pioneers / Chargers / Agents, so not her.
@@ -66,7 +67,6 @@ those first, then retarget this PR to `main`.
 ## Ideas that don't fit the code (yet)
 
 - **Eunectes S1 is a passive skill**, so "lure while the skill is active" never starts with S1.
-- **Weedy's cannon redeploy −1 % per step isn't wired:** I found no redeploy timer for her cannon to shorten.
 - **Choices where the text names no number** (marked `[DRAFT]` in the code):
   - Typhon W's Cold lasts 3 s;
   - Siege drains all DP above 90 every 0.5 s;
