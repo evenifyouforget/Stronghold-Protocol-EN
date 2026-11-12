@@ -11,6 +11,8 @@
 //   node tools/evolve.mjs --out DIR --race [--budget 2400] [--iters 5] [--first 3] [--alpha 0.05] [--train 1-…]
 //                                           iterated racing (irace), the recommended mode: see "--race" below
 //   node tools/evolve.mjs --out DIR --holdout-only     score the best candidates and legacy on the held-back seeds
+//   node tools/evolve.mjs --out DIR --anytime [--iter-budget 1500] [--config solo:ABYSS] [--jobs 22]
+//                                           the race with no end: stop it with Ctrl+C whenever (see "--anytime" below)
 // - --resample (recommended): generation g plays a fresh block of seeds (TRAIN's size, right after the previous one),
 //   and a candidate's fitness is the mean over every block it has played. A candidate that got lucky on one block
 //   regresses as it survives; without it, 12 candidates × 6 generations on one fixed block overfit that block (the
@@ -34,14 +36,20 @@
 //   survivors' floor (2 + log2 of the parameters) or when its share of --budget (in matches) is spent; the survivors
 //   are the next elites. Legacy is the control: never dropped, and every fitness is paired against it.
 //   Held-back default for --race: 5001-5300.
+// - --anytime (Fish 2026-11-12: "I ctrl+c to stop it whenever is convenient … whether I have 10 hours or 100 hours it
+//   still is maximally useful"): --race with no budget. Every iteration gets --iter-budget matches (irace's split of
+//   one iteration's share), so the races go on until stopped; after each iteration its best and legacy also play the
+//   held-back seeds (6 blocks, one more per iteration, up to 30), written to DIR/holdout.md. Ctrl+C (or a file
+//   DIR/STOP) stops the matches at once, writes DIR/summary.md and packs DIR into DIR.zip (cache included, so the run
+//   can go on later: the same command resumes from the cache). A second Ctrl+C quits without the zip.
 // - Output: DIR/gen-N.md (the ranking), DIR/best.json (the best profile; botbench --profile takes it), DIR/run.log,
 //   and with --holdout-only DIR/holdout.md: wins, flips against legacy and fitness on seeds no generation saw.
 // - Memory: botbench's workers are threads of one process. A chunk killed by a signal or out of memory is retried at
 //   half the jobs (up to 4 times); the jobs climb back by 1 after 4 clean chunks.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TACTICS } from '../server/match/botStrategies.js';
 import { BASIC_TACTICS } from '../server/match/botTacticsBasic.js';
@@ -56,9 +64,10 @@ for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (!a.startsWith('--')) throw new Error(`unexpected argument ${a}`);
   const k = a.slice(2);
-  if (['halving', 'holdout-only', 'resample', 'race'].includes(k)) opt[k] = true;
+  if (['halving', 'holdout-only', 'resample', 'race', 'anytime'].includes(k)) opt[k] = true;
   else opt[k] = args[++i];
 }
+if (opt.anytime) opt.race = true;
 if (!opt.out) { console.error('usage: node tools/evolve.mjs --out DIR [options] (see the header)'); process.exit(2); }
 const OUT = resolve(opt.out);
 const CONFIG = opt.config || 'solo:ABYSS';
@@ -89,7 +98,17 @@ if (existsSync(PID)) {
 }
 writeFileSync(PID, String(process.pid));
 process.on('exit', () => { try { rmSync(PID); } catch { /* gone */ } });
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(143));
+// Ctrl+C: the first stops the running matches (the console sends it to them too) and lets the run write its summary and
+// zip; a second one quits at once. Only the async race can see it between matches (the GA's spawnSync loop exits at once).
+let STOP = false, child = null;
+class Stopped extends Error {}
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => {
+  if (STOP || !opt.race) process.exit(130);
+  STOP = true;
+  console.log('\nstopping: finishing up (summary and zip); Ctrl+C again to quit without them');
+  try { child?.kill(); } catch { /* gone */ }
+});
+const stopRequested = () => STOP || existsSync(join(OUT, 'STOP'));
 const log = (s) => { const line = `${new Date().toISOString().slice(11, 19)} ${s}`; appendFileSync(join(OUT, 'run.log'), line + '\n'); console.log(line); };
 
 // ---- deterministic RNG (mulberry32) ----
@@ -181,6 +200,59 @@ function runChunk(g, [a, b]) {
     log(`chunk ${h} s${a}-${b}: killed (memory?), retry at ${jobs} jobs`);
   }
 }
+/** runChunk for the race, async so Ctrl+C is seen between (and during) matches. */
+async function runChunkA(g, [a, b]) {
+  if (process.env.EVOLVE_FAKE) {
+    if (stopRequested()) throw new Stopped();
+    if (process.env.EVOLVE_FAKE_STOP_AFTER && fakeSeen.size >= +process.env.EVOLVE_FAKE_STOP_AFTER) writeFileSync(join(OUT, 'STOP'), '');
+    return fakeChunk(g, [a, b]);
+  }
+  const h = hashOf(g), file = join(OUT, 'cache', `${h}.s${a}-${b}.json`);
+  if (existsSync(file)) return JSON.parse(readFileSync(file, 'utf8'));
+  if (stopRequested()) throw new Stopped();
+  const prof = join(OUT, 'cache', `${h}.profile.json`);
+  if (!existsSync(prof)) writeFileSync(prof, JSON.stringify({ id: `evo-${h}`, tactics: g }, null, 1));
+  for (let tryN = 1; ; tryN++) {
+    const tmp = file + '.tmp';
+    const argv = ['tools/botbench.mjs', '--configs', CONFIG, '--seeds', String(b - a + 1), '--seed', String(a), '--jobs', String(jobs),
+      '--profile', prof, '--json', tmp, '--quiet', ...(RULES ? ['--rules', RULES] : [])];
+    const r = await new Promise((done) => {
+      let err = '';
+      child = spawn(process.execPath, argv, { cwd: ROOT, stdio: ['ignore', 'ignore', 'pipe'] });
+      child.stderr.on('data', (d) => { err = (err + d).slice(-4000); });
+      child.on('close', (status, signal) => { child = null; done({ status, signal, stderr: err }); });
+      child.on('error', (e) => { child = null; done({ status: -1, signal: null, stderr: String(e) }); });
+    });
+    if (r.status === 0 && existsSync(tmp)) {
+      renameSync(tmp, file);
+      if (++clean >= 4 && jobs < JOBS_MAX) { jobs++; clean = 0; }
+      return JSON.parse(readFileSync(file, 'utf8'));
+    }
+    rmSync(tmp, { force: true });
+    if (stopRequested()) throw new Stopped();
+    const oom = r.signal || (r.status ?? 0) >= 128 || /out of memory/i.test(r.stderr || '');
+    if (!oom || tryN >= 4) throw new Error(`botbench failed for ${h} s${a}-${b} (exit ${r.status} ${r.signal || ''}): ${(r.stderr || '').slice(-600)}`);
+    jobs = Math.max(1, Math.floor(jobs / 2)); clean = 0;
+    log(`chunk ${h} s${a}-${b}: killed (memory?), retry at ${jobs} jobs`);
+  }
+}
+
+/** DIR.zip next to DIR (Windows 10+: its tar.exe writes zip; elsewhere zip, else a .tar.gz). */
+function pack() {
+  const name = basename(OUT), parent = dirname(OUT);
+  const ex = ['.pid', 'STOP', '*.tmp'];
+  const tries = process.platform === 'win32'
+    ? [['tar', ['-a', '-c', '-f', `${name}.zip`, ...ex.flatMap((e) => ['--exclude', e]), name], `${name}.zip`]]
+    : [['zip', ['-qr', `${name}.zip`, name, '-x', ...ex.map((e) => `*/${e}`), `*/cache/${'*.tmp'}`], `${name}.zip`],
+       ['tar', ['-czf', `${name}.tar.gz`, ...ex.flatMap((e) => ['--exclude', e]), name], `${name}.tar.gz`]];
+  for (const [cmd, argv, out] of tries) {
+    rmSync(join(parent, out), { force: true });
+    const r = spawnSync(cmd, argv, { cwd: parent, stdio: 'ignore' });
+    if (r.status === 0 && existsSync(join(parent, out))) return join(parent, out);
+  }
+  return null;
+}
+
 /**
  * EVOLVE_FAKE=<tactic id>: no matches, a synthetic game for checking the search itself (test/tools/evolve-race.test.js).
  * Each tactic in the profile adds a fixed effect in ±0.04 to a 40 % win chance, the named tactic +0.15 (EVOLVE_FAKE_EFFECT); a seed's luck
@@ -280,7 +352,7 @@ if (opt['holdout-only']) {
   process.exit(0);
 }
 
-if (opt.race) { raceMain(); process.exit(0); }
+if (opt.race) { await raceMain(); process.exit(0); }
 
 const st = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { meta, gens: [] };
 st.meta = meta;
@@ -321,71 +393,123 @@ for (let gen = 0; gen < GENS; gen++) {
 log('done');
 
 // ---- --race: iterated racing (irace) ----
-function raceMain() {
+async function raceMain() {
   const { eliminate, candidatesFor, minSurvivors, pickParent } = RACE;
-  const BUDGET = +(opt.budget || 2400), ITERS = +(opt.iters || 5), FIRST = +(opt.first || 3), ALPHA = +(opt.alpha || 0.05);
+  const ANY = !!opt.anytime;
+  const IB = +(opt['iter-budget'] || 1500);
+  const BUDGET = ANY ? Infinity : +(opt.budget || 2400), ITERS = ANY ? Infinity : +(opt.iters || 5), FIRST = +(opt.first || 3), ALPHA = +(opt.alpha || 0.05);
   const blockAt = (k) => [TRAIN[0] + 10 * k, TRAIN[0] + 10 * k + 9];
+  const holdAt = (k) => [HOLD[0] + 10 * k, Math.min(HOLD[1], HOLD[0] + 10 * k + 9)];
+  const HOLD_BLOCKS = Math.ceil((HOLD[1] - HOLD[0] + 1) / 10);
   const nParams = POOL.reduce((n, t) => n + 1 + Object.keys(t.params).length, 0);
   const SURV = minSurvivors(nParams);
   const st = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { meta, gens: [] };
-  st.meta = { ...meta, race: { budget: BUDGET, iters: ITERS, first: FIRST, alpha: ALPHA } };
-  log(`race: ${CONFIG}, budget ${BUDGET} matches, ${ITERS} iterations, first test after ${FIRST} blocks, alpha ${ALPHA}, survivors ${SURV}, pool ${POOL.length} tactics`);
+  st.meta = { ...meta, race: ANY ? { anytime: true, iterBudget: IB, first: FIRST, alpha: ALPHA } : { budget: BUDGET, iters: ITERS, first: FIRST, alpha: ALPHA } };
+  rmSync(join(OUT, 'STOP'), { force: true });
+  log(`race: ${CONFIG}, ${ANY ? `anytime (${IB} matches an iteration; Ctrl+C to stop)` : `budget ${BUDGET} matches, ${ITERS} iterations`}, first test after ${FIRST} blocks, alpha ${ALPHA}, survivors ${SURV}, pool ${POOL.length} tactics`);
   // per genome: seed → paired score (its score minus legacy's on that seed)
   const scoresOf = new Map(), base = new Map();
-  const play = (g, k) => {
+  const play = async (g, k) => {
     const blk = blockAt(k);
     if (blk[1] >= HOLD[0] && blk[0] <= HOLD[1]) throw new Error(`the race reached the held-back seeds ${HOLD.join('-')}; lower --budget or move --holdout`);
-    for (const r of runChunk([], blk)) base.set(r.seed, score(r));
+    for (const r of await runChunkA([], blk)) base.set(r.seed, score(r));
     const h = hashOf(g); if (!scoresOf.has(h)) scoresOf.set(h, new Map());
     const m = scoresOf.get(h);
-    for (const r of runChunk(g, blk)) m.set(r.seed, score(r) - base.get(r.seed) - 0.005 * g.length);
+    for (const r of await runChunkA(g, blk)) m.set(r.seed, score(r) - base.get(r.seed) - 0.005 * g.length);
+  };
+  // --anytime: the held-back seeds the best of each iteration has played (cached chunks only, nothing is played here)
+  const holdRows = () => {
+    const seenH = new Set(), rows = [];
+    const legacy = new Map(); for (let k = 0; k < HOLD_BLOCKS; k++) for (const r of cachedRecs([], holdAt(k))) legacy.set(r.seed, r);
+    for (const [j, gen] of st.gens.entries()) {
+      const top = gen?.top?.find((r) => r.g.length); if (!top || seenH.has(top.hash)) continue;
+      seenH.add(top.hash);
+      let n = 0, w = 0, lw = 0, up = 0, down = 0, d = 0;
+      for (let k = 0; k < HOLD_BLOCKS; k++) for (const r of cachedRecs(top.g, holdAt(k))) {
+        const y = legacy.get(r.seed); if (!y) continue;
+        n++; if (r.victory) w++; if (y.victory) lw++;
+        if (r.victory && !y.victory) up++; if (!r.victory && y.victory) down++;
+        d += score(r) - score(y);
+      }
+      if (n) rows.push(`| ${j} | ${describe(top.g)} | ${n} | ${w} | ${lw} | +${up} / −${down} | ${d >= 0 ? '+' : ''}${(d / n).toFixed(3)} |`);
+    }
+    return [`# Held-back seeds ${HOLD.join('–')}: each iteration's best against legacy — ${CONFIG}`, '',
+      '| iteration | best | seeds | wins | legacy wins | flips (+ / −) | fitness per match |', '|---|---|---|---|---|---|---|', ...rows];
+  };
+  const finish = (why) => {
+    const last = st.gens.length - 1;
+    const lines = [`# Evolution run — ${CONFIG}`, '', `Stopped: ${why}. ${st.gens.length} iterations finished; ${readdirSync(join(OUT, 'cache')).filter((f) => /\.s\d+-\d+\.json$/.test(f)).length * 10} matches played in all (cache).`,
+      `best.json: ${last >= 0 ? describe(JSON.parse(readFileSync(join(OUT, 'best.json'), 'utf8')).tactics) : '(none yet)'}`, '',
+      ...(last >= 0 ? [readFileSync(join(OUT, `gen-${last}.md`), 'utf8'), ''] : []), ...(ANY ? holdRows() : [])];
+    writeFileSync(join(OUT, 'summary.md'), lines.join('\n') + '\n');
+    if (ANY) writeFileSync(join(OUT, 'holdout.md'), holdRows().join('\n') + '\n');
+    log(`stopped (${why}); summary.md written`);
+    if (ANY || why !== 'done') {
+      try { rmSync(PID, { force: true }); } catch { /* gone */ }
+      const z = pack();
+      log(z ? `packed: ${z} — send this file back` : `could not pack ${OUT}; send the folder instead`);
+    }
   };
   let used = 0, seen = 0, elites = [];
-  for (let j = 0; j < ITERS; j++) {
-    const rng = rngOf(SEED * 1000003 + 7919 * (j + 1));
-    STEP = 0.15 * Math.pow(0.7, j);
-    const { n } = candidatesFor(Math.max(0, BUDGET / 10 - used), j, ITERS, FIRST);
-    const pop = [[], ...elites], hs = new Set(pop.map(hashOf));
-    // the first race screens every pool tactic alone (the space's first design), whatever N_0 is
-    if (j === 0) for (const t of POOL) { const g = [{ tactic: t.id, params: defaults(t) }]; if (!hs.has(hashOf(g))) { hs.add(hashOf(g)); pop.push(g); } }
-    for (let guard = 0; pop.length < Math.max(n, elites.length + 3) && guard < 500; guard++) {
-      let g = j === 0 || !elites.length ? Array.from({ length: 1 + Math.floor(rng() * 2) }, () => newEntry(rng)) : mutate(rng, pickParent(rng, elites));
-      if (j > 0 && rng() < 0.2 && elites.length > 1) g = mutate(rng, crossover(rng, pickParent(rng, elites), pickParent(rng, elites)));
-      const h = hashOf(g); if (!hs.has(h) && g.length) { hs.add(h); pop.push(g); }
+  try {
+    for (let j = 0; j < ITERS; j++) {
+      const rng = rngOf(SEED * 1000003 + 7919 * (j + 1));
+      STEP = 0.15 * Math.pow(0.7, Math.min(j, 6));
+      // anytime: every iteration has its own IB matches (irace's share for one iteration out of one left)
+      const share = () => (ANY ? candidatesFor(IB / 10, j, j + 1, FIRST) : candidatesFor(Math.max(0, BUDGET / 10 - used), j, ITERS, FIRST));
+      const { n } = share();
+      const pop = [[], ...elites], hs = new Set(pop.map(hashOf));
+      // the first race screens every pool tactic alone (the space's first design), whatever N_0 is
+      if (j === 0) for (const t of POOL) { const g = [{ tactic: t.id, params: defaults(t) }]; if (!hs.has(hashOf(g))) { hs.add(hashOf(g)); pop.push(g); } }
+      for (let guard = 0; pop.length < Math.max(n, elites.length + 3) && guard < 500; guard++) {
+        let g = j === 0 || !elites.length ? Array.from({ length: 1 + Math.floor(rng() * 2) }, () => newEntry(rng)) : mutate(rng, pickParent(rng, elites));
+        if (j > 0 && rng() < 0.2 && elites.length > 1) g = mutate(rng, crossover(rng, pickParent(rng, elites), pickParent(rng, elites)));
+        const h = hashOf(g); if (!hs.has(h) && g.length) { hs.add(h); pop.push(g); }
+      }
+      const eliteHs = new Set(elites.map(hashOf));
+      let alive = pop.map((g) => ({ g, id: hashOf(g) }));
+      const limit = share().budget;
+      let spent = 0, k = 0;
+      for (; alive.length > SURV + 1 || k < Math.max(FIRST, seen); k++) {
+        const fresh = alive.filter((c) => c.g.length && !(scoresOf.get(c.id)?.has(blockAt(k)[0]))).length;
+        if (k >= Math.max(FIRST, seen) && spent + fresh > limit) break;
+        for (const c of alive) if (c.g.length) await play(c.g, k); else for (const r of await runChunkA([], blockAt(k))) base.set(r.seed, score(r));
+        spent += fresh; used += fresh;
+        if (k + 1 < FIRST) continue;
+        const seeds = new Set(); for (let q = 0; q <= k; q++) for (let s = blockAt(q)[0]; s <= blockAt(q)[1]; s++) seeds.add(s);
+        const view = alive.map((c) => ({ id: c.id, protected: !c.g.length || (eliteHs.has(c.id) && k < seen),
+          scores: c.g.length ? new Map([...scoresOf.get(c.id)].filter(([s]) => seeds.has(s))) : new Map([...seeds].map((s) => [s, 0])) }));
+        const { drop } = eliminate(view, ALPHA);
+        if (drop.length) { alive = alive.filter((c) => !drop.includes(c.id)); log(`iter ${j} block ${k}: dropped ${drop.length}, ${alive.length} left`); }
+        if (spent >= limit && k + 1 >= Math.max(FIRST, seen)) { k++; break; }
+      }
+      seen = Math.max(seen, k);
+      const mean = (c) => { if (!c.g.length) return 0; const m = scoresOf.get(c.id); let s = 0, n2 = 0; for (const v of m.values()) { s += v; n2++; } return n2 ? s / n2 : -Infinity; };
+      const ranked = alive.filter((c) => c.g.length).sort((x, y) => mean(y) - mean(x));
+      elites = ranked.slice(0, SURV).map((c) => c.g);
+      const rows = [{ g: [], fit: 0 }, ...ranked.map((c) => ({ g: c.g, fit: mean(c) }))].sort((x, y) => y.fit - x.fit);
+      const winsOf = (g) => { let w = 0, n2 = 0; for (let q = 0; q < seen; q++) for (const r of cachedRecs(g, blockAt(q))) { n2++; if (r.victory) w++; } return { wins: w, n: n2 }; };
+      st.gens[j] = { top: rows.slice(0, Math.max(SURV, 5)).map((r) => ({ hash: hashOf(r.g), fit: r.fit, ...winsOf(r.g), g: r.g })) };
+      writeFileSync(statePath, JSON.stringify(st, null, 1));
+      const lines = [`# Race iteration ${j} — ${CONFIG}, seeds ${TRAIN[0]}–${blockAt(seen - 1)[1]} (${seen} blocks), ${pop.length} candidates, ${alive.length} survived; ${used * 10}${ANY ? '' : ` of ${BUDGET}`} matches`, '',
+        '| # | fitness (vs legacy, per match) | wins | seeds | tactics | hash |', '|---|---|---|---|---|---|'];
+      st.gens[j].top.forEach((r, i) => lines.push(`| ${i + 1} | ${r.fit >= 0 ? '+' : ''}${r.fit.toFixed(3)} | ${r.wins} | ${r.n} | ${describe(r.g)} | ${r.hash} |`));
+      writeFileSync(join(OUT, `gen-${j}.md`), lines.join('\n') + '\n');
+      const best = rows.find((r) => r.g.length) || rows[0];
+      writeFileSync(join(OUT, 'best.json'), JSON.stringify({ id: `evo-${hashOf(best.g)}`, tactics: best.g }, null, 1));
+      log(`iter ${j}: ${pop.length} candidates, ${alive.length} survived after ${seen} blocks; best ${best.fit.toFixed(3)} ${describe(best.g)}; ${used * 10}${ANY ? '' : `/${BUDGET}`} matches`);
+      if (ANY && best.g.length) {
+        // the held-back check grows with the run: 6 blocks, one more each iteration, all 30 at most
+        for (let q = 0; q < Math.min(HOLD_BLOCKS, 6 + j); q++) { await runChunkA([], holdAt(q)); await runChunkA(best.g, holdAt(q)); }
+        writeFileSync(join(OUT, 'holdout.md'), holdRows().join('\n') + '\n');
+      }
+      if (used * 10 >= BUDGET) break;
     }
-    const eliteHs = new Set(elites.map(hashOf));
-    let alive = pop.map((g) => ({ g, id: hashOf(g) }));
-    const limit = candidatesFor(Math.max(0, BUDGET / 10 - used), j, ITERS, FIRST).budget;
-    let spent = 0, k = 0;
-    for (; alive.length > SURV + 1 || k < Math.max(FIRST, seen); k++) {
-      const fresh = alive.filter((c) => c.g.length && !(scoresOf.get(c.id)?.has(blockAt(k)[0]))).length;
-      if (k >= Math.max(FIRST, seen) && spent + fresh > limit) break;
-      for (const c of alive) if (c.g.length) play(c.g, k); else for (const r of runChunk([], blockAt(k))) base.set(r.seed, score(r));
-      spent += fresh; used += fresh;
-      if (k + 1 < FIRST) continue;
-      const seeds = new Set(); for (let q = 0; q <= k; q++) for (let s = blockAt(q)[0]; s <= blockAt(q)[1]; s++) seeds.add(s);
-      const view = alive.map((c) => ({ id: c.id, protected: !c.g.length || (eliteHs.has(c.id) && k < seen),
-        scores: c.g.length ? new Map([...scoresOf.get(c.id)].filter(([s]) => seeds.has(s))) : new Map([...seeds].map((s) => [s, 0])) }));
-      const { drop } = eliminate(view, ALPHA);
-      if (drop.length) { alive = alive.filter((c) => !drop.includes(c.id)); log(`iter ${j} block ${k}: dropped ${drop.length}, ${alive.length} left`); }
-      if (spent >= limit && k + 1 >= Math.max(FIRST, seen)) { k++; break; }
-    }
-    seen = Math.max(seen, k);
-    const mean = (c) => { if (!c.g.length) return 0; const m = scoresOf.get(c.id); let s = 0, n2 = 0; for (const v of m.values()) { s += v; n2++; } return n2 ? s / n2 : -Infinity; };
-    const ranked = alive.filter((c) => c.g.length).sort((x, y) => mean(y) - mean(x));
-    elites = ranked.slice(0, SURV).map((c) => c.g);
-    const rows = [{ g: [], fit: 0 }, ...ranked.map((c) => ({ g: c.g, fit: mean(c) }))].sort((x, y) => y.fit - x.fit);
-    const winsOf = (g) => { let w = 0, n2 = 0; for (let q = 0; q < seen; q++) for (const r of (g.length ? cachedRecs(g, blockAt(q)) : runChunk([], blockAt(q)))) { n2++; if (r.victory) w++; } return { wins: w, n: n2 }; };
-    st.gens[j] = { top: rows.slice(0, Math.max(SURV, 5)).map((r) => ({ hash: hashOf(r.g), fit: r.fit, ...winsOf(r.g), g: r.g })) };
-    writeFileSync(statePath, JSON.stringify(st, null, 1));
-    const lines = [`# Race iteration ${j} — ${CONFIG}, seeds ${TRAIN[0]}–${blockAt(seen - 1)[1]} (${seen} blocks), ${pop.length} candidates, ${alive.length} survived; ${used * 10} of ${BUDGET} matches`, '',
-      '| # | fitness (vs legacy, per match) | wins | seeds | tactics | hash |', '|---|---|---|---|---|---|'];
-    st.gens[j].top.forEach((r, i) => lines.push(`| ${i + 1} | ${r.fit >= 0 ? '+' : ''}${r.fit.toFixed(3)} | ${r.wins} | ${r.n} | ${describe(r.g)} | ${r.hash} |`));
-    writeFileSync(join(OUT, `gen-${j}.md`), lines.join('\n') + '\n');
-    const best = rows.find((r) => r.g.length) || rows[0];
-    writeFileSync(join(OUT, 'best.json'), JSON.stringify({ id: `evo-${hashOf(best.g)}`, tactics: best.g }, null, 1));
-    log(`iter ${j}: ${pop.length} candidates, ${alive.length} survived after ${seen} blocks; best ${best.fit.toFixed(3)} ${describe(best.g)}; ${used * 10}/${BUDGET} matches`);
-    if (used * 10 >= BUDGET) break;
+  } catch (e) {
+    if (!(e instanceof Stopped)) throw e;
+    finish('Ctrl+C');
+    return;
   }
   log('race done');
+  finish('done');
 }

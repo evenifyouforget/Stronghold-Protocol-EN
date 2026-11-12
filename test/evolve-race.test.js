@@ -63,3 +63,23 @@ test('evolve --race finds a planted tactic in a synthetic game, within the budge
     assert.ok(readdirSync(out).some((f) => /^gen-\d+\.md$/.test(f)));
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
+
+test('evolve --anytime runs until stopped, then writes a summary and packs the folder', () => {
+  const root = mkdtempSync(join(tmpdir(), 'evo-any-'));
+  const out = join(root, 'run');
+  try {
+    const r = spawnSync(process.execPath, ['tools/evolve.mjs', '--out', out, '--anytime', '--iter-budget', '600', '--holdout', '5001-5060'],
+      { cwd: ROOT, encoding: 'utf8', env: { ...process.env, EVOLVE_FAKE: 'early-roll', EVOLVE_FAKE_STOP_AFTER: '400' } });
+    assert.equal(r.status, 0, r.stderr);
+    const summary = readFileSync(join(out, 'summary.md'), 'utf8');
+    assert.match(summary, /Stopped: Ctrl\+C/);
+    assert.ok(readdirSync(out).some((f) => /^gen-\d+\.md$/.test(f)), 'at least one iteration finished');
+    assert.match(readFileSync(join(out, 'holdout.md'), 'utf8'), /\| 0 \|/);
+    assert.ok(readdirSync(root).some((f) => /^run\.(zip|tar\.gz)$/.test(f)), readdirSync(root).join(','));
+    // the same command resumes from the cache: the finished iterations replay without new matches
+    const before = readFileSync(join(out, 'fake-matches'), 'utf8').trim().split('\n').length;
+    const r2 = spawnSync(process.execPath, ['tools/evolve.mjs', '--out', out, '--anytime', '--iter-budget', '600', '--holdout', '5001-5060'],
+      { cwd: ROOT, encoding: 'utf8', env: { ...process.env, EVOLVE_FAKE: 'early-roll', EVOLVE_FAKE_STOP_AFTER: String(before + 50) } });
+    assert.equal(r2.status, 0, r2.stderr);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
