@@ -347,8 +347,8 @@ behind it. The second is the 空弦 problem of 09: a copied prep-time trait is i
 combo layout loses to any layout with one more kill. **Queued:** queue12, `plan-combos` with `legacy-arrange`
 `prepTiebreak 1` and `leakAllow 1.5` (records and botbench, after queue11).
 
-queue11 (`commit`, `keepers`,
-and all three together, botbench co-op 1–40), paired against queue2's legacy.
+**Queued:** queue11 (`commit`, `keepers`, and all three together, botbench co-op 1–40), paired against queue2's
+legacy.
 
 ## Next tactics (not built)
 
