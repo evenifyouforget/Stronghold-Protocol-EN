@@ -213,12 +213,13 @@ const INSTALL = {
     }, { owner: u });
   },
 
-  // range +1; during the skill range +1 more, +1 target and Invisible; attacks also deal 10 % ATK Arts and 5 % ATK
-  // Nervous Impairment
+  // poison (talent 神经腐蚀) ticks 3× as often (kits/ops/op-thorns.js reads `fishPoisonTickMul`); range +1; during the
+  // skill range +1 more, +1 target and Invisible; attacks also deal 20 % ATK Arts and 5 % ATK Nervous Impairment
   uniequip_fishz_thorns(battle, u) {
     battle.addBuff(u, { key: `${KEY}:thorns`, persist: true, allowDead: true, mods: { rangeExtend: 1 }, tags: ['module'] });
     liveBuff(battle, u, `${KEY}:thornsSkill`, () => skillBusy(u), () => ({ rangeExtend: 1, maxTargets: 1 }), { flags: { stealth: true } });
-    installLordArtsAddition(battle, u, (c) => (isMainHit(c.dmg) ? 0.1 : 0), ['module', 'addition']);
+    u.fishPoisonTickMul = 3;
+    installLordArtsAddition(battle, u, (c) => (isMainHit(c.dmg) ? 0.2 : 0), ['module', 'addition']);
     battle.on('damageCalculate', (c) => {
       if (c.source !== u || !c.target?.alive || c.target.side !== 'enemy' || !isMainHit(c.dmg)) return;
       battle.dealElementDamage({ source: u, target: c.target, element: 'neural', amount: u.s.atk * 0.05, tags: ['module'] });

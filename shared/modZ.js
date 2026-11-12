@@ -47,7 +47,7 @@ export const MODZ = Object.freeze([
   { charId: 'char_112_siege', code: 'siege', kind: 'Z', type: 'SOL-Z', attr: { maxHp: 300, atk: 100 },
     name: N_('推进之王的Z型调整'), desc: N_('自身获得的部署费用翻倍；持续消耗超过90点的部署费用，每消耗1点使所有我方干员获得1点技力') },
   { charId: 'char_293_thorns', code: 'thorns', kind: 'Z', type: 'LOR-Z', attr: { maxHp: 250, atk: 100, aspd: 10 },
-    name: N_('棘刺的Z型调整'), desc: N_('攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力10%的法术伤害和5%的神经损伤') },
+    name: N_('棘刺的Z型调整'), desc: N_('中毒伤害的触发频率变为3倍；攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力20%的法术伤害和5%的神经损伤') },
   { charId: 'char_400_weedy', code: 'weedy', kind: 'Z', type: 'PUS-Z', attr: { maxHp: 250, atk: 100 },
     name: N_('温蒂的Z型调整'), desc: N_('在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%') },
   { charId: 'char_4098_vvana', code: 'vvana', kind: 'Z', type: 'AFT-Z', attr: { maxHp: 500, atk: 100 },
