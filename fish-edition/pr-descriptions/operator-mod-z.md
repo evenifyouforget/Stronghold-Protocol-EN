@@ -28,7 +28,7 @@ those first, then retarget this PR to `main`.
 
 | Operator | Module | Stats | Effect |
 |---|---|---|---|
-| Typhon | SIE-Z | HP +300 | ATK +1 % counts as ASPD +1; ASPD +100 from 10 s after deploying |
+| Typhon | SIE-Z | HP +300 | ATK % and ASPD bonuses summed and split evenly (+1 % ATK = +1 ASPD), ASPD's share at most +500 (the rest stays on ATK); ASPD +100 from 10 s after deploying (in the sum). Applied last in the stat stack |
 | Typhon | SIE-W | HP +300, ATK +150, ASPD +10 | Attacks inflict Cold; on a Frozen target, Shatter within 1 tile: Freeze ends, Stun 4 s, +40 % physical damage taken for 4 s |
 | Rosa | SIE-Z | ATK +700 | Marks enemies she damages; at skill end, 17 SP per marked enemy that fell during the skill |
 | Eunectes | HES-Z | ATK +150, DEF +150 | 3×3 range; SP +1/s with an enemy in range; skill start lures enemies in range to her until it ends; DEF + her ATK gain (max +5000) |
@@ -39,7 +39,10 @@ those first, then retarget this PR to `main`.
 | Shining | PHY-Z | ATK +100, DEF +100 | Healing grants Immortal for 8 s (HP can't fall below 1); cooldown 0 s, +5 s each time it saves someone |
 | Siege | SOL-Z | HP +300, ATK +100 | His DP ×2; DP above 90 is drained, 1 SP to every ally per DP |
 | Thorns | LOR-Z | HP +250, ATK +100, ASPD +10 | Range +1; during his skill range +1, +1 target, Invisible; attacks add 10 % ATK Arts and 5 % ATK Nervous Impairment |
-| Weedy | PUS-Z | HP +250, ATK +100 | Enemies' weight −2 while she is on the field; her damage becomes Corrosion unless the target is bursting; SP +0.02/s per +10 % ATK |
+| Weedy | PUS-Z | HP +250, ATK +100 | Enemies' weight −2 while she is on the field; her damage becomes Corrosion unless the target is bursting; per +10 % ATK: SP +0.02/s and Water Cannon redeploy −1 % |
+| Viviana | AFT-Z | HP +500, ATK +100 | Glimmering Touch (cooldown 12 s, ready at once): an enemy in range of any of her player's Kazimierz operators (Leaders first); 7 s later a 5×5 diamond on its tile takes 300 % ATK Burn and 300 % ATK Arts (600 % ATK × living Kazimierz operators on an enemy already in a Burn burst). Any enemy's Burn burst: RES −2, up to 10 times, kept after she falls |
+| Zuo Le | SBL-Z | HP +400, ATK +100 | ATK from buffs ×2; SP from anything but natural recovery ×2; +1 skill charge; damage adds 5 % ATK Corrosion, or on an enemy at 0 DEF 5 % ATK Burn + 10 % ATK Arts |
+| Kal'tsit Esperanta | WAT-Z | Physical and Arts damage taken −50 %; joins Foresight | Carries 4 Equipment; when gained, the shop rerolls with 3 Equipment, preferring ones an Isomorph pairs with (elite: of Alliances you own no bond item of). The sell gift is left out (below) |
 
 ## How it works
 
@@ -57,7 +60,15 @@ those first, then retarget this PR to `main`.
   - `hasModZ(charId)` for the picker's tag.
 - `server/sim/content/modZ.js`: the battle effects, installed after the operator's kit. Weedy's Water Cannon reads her
   redeploy multiplier when it leaves (`kits/ops/op-weedy.js`).
+- Kal'tsit Esperanta has no official module, so `withModZ` now takes the stage (`equipLevel`) and accepts an empty
+  module list.
+- Her match effects (`shared/modZ.js equipCapFor` / `isKalts2Z`) apply to both forms while the rule has her on:
+  - the slot cap in `server/match/player/items.js`, `invariants.js`, the bot (`bot.js`), and the client (the replace
+    dialog, placement, and the detail panel's "EQUIP n/4");
+  - the shop reroll in `server/match/player/economy.js kalts2Refresh`, called from `acquire.js acquireChess`.
 - Engine edits (small):
+  - `units.js _recalc` calls a unit's `fishStatPost` last, after every buff (Typhon Z's balance, Zuo Le Z's doubled
+    buffs), so it follows buffs and debuffs as they change and Aegir's devour sees the final ATK.
   - `addDp` multiplies DP gains by the operator's `fishDpMul`. Saileach's kit now names her as the source of her
     DP. That only affects the resource numbers, and only for Pioneers / Chargers / Agents, so not her.
   - The Raid jump check reads `fishRaidReady`.
@@ -72,6 +83,18 @@ those first, then retarget this PR to `main`.
   - Siege drains all DP above 90 every 0.5 s;
   - Fiammetta's ammo skills have no time limit.
 - **Phantom's Raid flag hasn't been run in a match with Raid yet.**
+- **Kal'tsit Esperanta's sell gift is left out.** A custom operator exists only in its owner's own custom slot, so a
+  teammate who didn't pick her has no Kal'tsit Esperanta piece to receive. Workable only for teammates who also picked
+  her, or with a new "foreign custom piece" kind; both are bigger than a draft.
+- **Kal'tsit's match effects work on her normal form too.** Fish's text has a separate "<When obtained (Elite)>", so I
+  read the slots and the shop reroll as both forms'. Her DR and Foresight come with the module, which, like every
+  module, is active on the elite only.
+- **Choices for Viviana, Zuo Le and Kal'tsit** (marked `[DRAFT]`):
+  - Viviana's explosion needs her alive at detonation and uses her ATK then; the target is the first enemy in range,
+    a Leader replacing a non-Leader;
+  - Zuo Le's starting SP isn't doubled, everything else but natural recovery is;
+  - Kal'tsit's reroll rerolls the operators too and replaces the level's item slots with 3 until the next roll;
+  - Viviana's effects are placeholders (the generic zone / AoE fx). The boss's effects aren't in our assets.
 
 ## Tests
 
@@ -83,19 +106,29 @@ those first, then retarget this PR to `main`.
     pick falls back; the equipped pick is legal and its elite record has the module and Hellagur's Raid;
   - in a match: with the rule, the player's Hellagur fields Mod Z; without it, the module the player chose;
   - every module fights 60 s without a handler error;
-  - Saileach Z: block 0, Invisible, allied redeploy +50 %.
-- `test/ui/rules-modz.e2e.test.js` (browser, `SP_E2E=1`): the five tabs, one tab at a time, the 12 buttons, turning
+  - Saileach Z: block 0, Invisible, allied redeploy +50 %;
+  - Typhon Z: the balance numbers (+50 % ATK → +25 / +25, the +500 ASPD cap), and in battle +60 % ATK with the
+    +100 ASPD ends at +80 / +80; Zuo Le Z doubles a buff, not a debuff;
+  - Zuo Le Z's extra charge; Viviana Z's RES shred stays after she falls;
+  - Kal'tsit Esperanta Z: her pick gets the module, Foresight, 4 slots (4 items equipped in a match), and gaining her
+    rerolls the shop with 3 items.
+- `test/ui/rules-modz.e2e.test.js` (browser, `SP_E2E=1`): the five tabs, one tab at a time, the 15 buttons, turning
   on two modules updates the room's rules, the tab count and the chip, Typhon W replaces his Z, turning one off. Passed
   here with Chromium.
 - `test/ui/diy-ui.test.js`: Siege's choices have no Mod Z; his card has the "Mod Z available" tag, Sharp's doesn't.
 - Smoke runs (not committed):
   - 72 solo battles: no errors;
   - Shining's Immortal saved 8 times in 60 s;
-  - Eunectes' lure works on S2 / S3.
+  - Eunectes' lure works on S2 / S3;
+  - Viviana Z / Zuo Le Z vs. no module, 60 s, four 60k HP 0 DEF test enemies: Viviana 186k vs 34k (15 Burn bursts),
+    Zuo Le 240k vs 114k.
 - Lint and typecheck clean; the custom-operator, rules, match and changelog tests pass; i18n strict check passes.
 - Full suite: CI.
 
 ## Known issues
 
-- Balance: Rosa Z (S3) and Weedy Z look very strong in the smoke runs. Estimates come next.
+- Balance: estimates for Weedy and Rosa are in Fish's notes; the others aren't benched yet.
+- Viviana Z: her own 300 % ATK Burn fills a normal enemy's gauge (1000) by itself, so every explosion bursts the
+  normal enemies it hits. The 600 % path still needs another burst source, since a burst lasts 10 s and the cooldown
+  is 12 s.
 - Placeholder icons until Fish's SVGs.
