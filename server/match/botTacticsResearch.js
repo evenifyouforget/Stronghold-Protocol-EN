@@ -938,7 +938,7 @@ export function plannedCarry(m, ps) {
   const gd = gdOf(m, ps);
   const { carry, focus } = carryAndFocus(m, ps);
   const kept = ps._botCarry != null ? [...ps.board.values()].find((q) => q.uid === ps._botCarry && q.kind === 'chess') : null;
-  const wearing = kept || [...ps.board.values()].find((q) => q.kind === 'chess' && (q.items || []).some((it) => isIsoItem(gd, it))
+  const wearing = kept || [...ps.board.values()].find((q) => q.kind === 'chess' && gd.baseIdOf(q.id) !== MUELSYSE && (q.items || []).some((it) => isIsoItem(gd, it))
     && !(q.items || []).some((it) => isBondGift(gd, it)));
   return { carry: wearing || carry, focus };
 }

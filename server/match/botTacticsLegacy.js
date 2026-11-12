@@ -121,10 +121,11 @@ export const LEGACY_FREEZE = defineTactic({ id: 'legacy-freeze', describe: "lega
 
 export const LEGACY_EQUIP = defineTactic({
   id: 'legacy-equip',
-  describe: "legacy's items: the weight of a wanted item, and the tier an elite item waits for",
-  params: { wantedItem: num(0, 100, L.WANTED_ITEM), eliteItemTier: int(1, 6, L.ELITE_ITEM_TIER) },
+  describe: "legacy's items: the weight of a wanted item, the tier an elite item waits for, and whether 缪尔赛思 may take an Isomorph",
+  params: { wantedItem: num(0, 100, L.WANTED_ITEM), eliteItemTier: int(1, 6, L.ELITE_ITEM_TIER),
+    morphOnMuelsyse: { type: 'bool', default: L.MORPH_ON_MUELSYSE } },
   at: pass('equipItems'),
-  tunables: (p) => ({ WANTED_ITEM: p.wantedItem, ELITE_ITEM_TIER: p.eliteItemTier }),
+  tunables: (p) => ({ WANTED_ITEM: p.wantedItem, ELITE_ITEM_TIER: p.eliteItemTier, MORPH_ON_MUELSYSE: p.morphOnMuelsyse }),
 });
 
 export const LEGACY_ARRANGE = defineTactic({

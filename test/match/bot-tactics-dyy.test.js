@@ -170,3 +170,26 @@ test('carry-hologram: 博士投影 on the planned carry, or (target stacker) on 
     } finally { m.dispose(); }
   }
 });
+
+test('iso-not-muelsyse: legacy equips a loose Isomorph anywhere but on 缪尔赛思; carry-iso never takes her as the carry', async () => {
+  const { equipItems, withLegacyTunables, carryAndFocus } = await import('../../server/match/bot.js');
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  const { ISO_NOT_MUELSYSE } = await import('../../server/match/botTacticsDyy.js');
+  assert.deepEqual(ISO_NOT_MUELSYSE.tunables(resolveParams(ISO_NOT_MUELSYSE)), { MORPH_ON_MUELSYSE: false });
+  const { m, ps } = prep({ round: 9, funds: 0 });
+  try {
+    const gd = m.gd;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const mu = ps.newPiece('chess', 'chess_char_6_11_a');
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(mu, r, c)) tiles.push([r, c]);
+    ps.board.set(tileKey(...tiles[0]), mu);
+    ps.recompute();
+    assert.equal(carryAndFocus(m, ps).carry, null, 'she is never the carry');
+    assert.ok(ps.acquireItem('chess_item_6_09_e_a', { source: 'test', requirePool: false }));
+    withLegacyTunables({ MORPH_ON_MUELSYSE: false }, () => equipItems(m, ps));
+    assert.ok(!(mu.items || []).some((it) => gd.item(it.id)?.canGiveBond), 'no Isomorph on her');
+    assert.ok([...ps.hand, ...ps.temp].some((q) => q?.id === 'chess_item_6_09_e_a'), 'it waits in the hand');
+    checkInvariants(m);
+  } finally { m.dispose(); }
+});

@@ -357,7 +357,22 @@ export const CARRY_HOLOGRAM = defineTactic({
   },
 });
 
-export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM]);
+/**
+ * No Isomorph on 缪尔赛思 (Fish 2026-11-13: "you're not supposed to isomorph muelsyse yourself. you use it to gain
+ * alliance membership for other operators, activate more alliances overall, and give key operators membership in
+ * alliances useful for them"). Switches off legacy's §37.41 / §37.43 conversion (bot.js MORPH_ON_MUELSYSE: her bond item
+ * and the 变形同构体 on her for "9 炎 with 8 deployed", her value as two focus members) and keeps morphPlan and the
+ * general item loop from choosing her. Any band. (In this file for the same reason as carry-hologram.)
+ */
+export const ISO_NOT_MUELSYSE = defineTactic({
+  id: 'iso-not-muelsyse',
+  describe: "no Isomorph on 缪尔赛思: legacy's conversion of her off (it goes on other operators)",
+  params: { morphHer: { type: 'bool', default: false } },
+  at: { sellJunk: (ctx) => ctx.next() },
+  tunables: (p) => ({ MORPH_ON_MUELSYSE: p.morphHer }),
+});
+
+export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM, ISO_NOT_MUELSYSE]);
 
 /** Opt-in: Fish's Du Yaoye list, legacy below. Plays as legacy for every other Strategy. */
 export const DYY_PROFILES = Object.freeze([
@@ -365,5 +380,5 @@ export const DYY_PROFILES = Object.freeze([
   // DYYBot, the draft of step 3 (ai-players/05): the economy list (human schedule), the Isomorph engine (plan-iso from
   // level 5, the Muelsyse clone, the carry), and the stack items (简易通讯机 and co.)
   defineProfile({ id: 'dyybot', tactics: [DYY_MUELSYSE, DYY_SHOP, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } },
-    { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, CARRY_HOLOGRAM, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
+    { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, CARRY_HOLOGRAM, ISO_NOT_MUELSYSE, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
 ]);

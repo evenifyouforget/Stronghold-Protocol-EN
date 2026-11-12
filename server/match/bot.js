@@ -1015,7 +1015,7 @@ function bondValue(m, c, owned, focus, second = null) {
     else if (th.some((t) => t > n + 1 && t - (n + 1) <= 1)) v += 3 * w;
     if (bond.thresholdTemplate === 'count_threshold_downward') v -= n > 0 ? 12 : 0; // 独行 breaks with a second member
     // §37.41: 调和 (缪尔赛思) with the held bond item of a focus whose top tier needs her: two members (调和 + the conversion)
-    if (bond.activeType === 'MANI' && owned.ps && (owned.counts.get(focus) || 0) >= 1 && topAboveCap(m, owned.ps, focus) && holdsBondItem(m, owned.ps, focus)) {
+    if (MORPH_ON_MUELSYSE && bond.activeType === 'MANI' && owned.ps && (owned.counts.get(focus) || 0) >= 1 && topAboveCap(m, owned.ps, focus) && holdsBondItem(m, owned.ps, focus)) {
       const fn = owned.counts.get(focus) || 0, fth = m.gd.bond(focus).thresholds;
       v += 28 + 10 + (fth.some((t) => t > fn && t <= fn + 2) ? 14 : 0) + (fn >= 2 && fn < fth[fth.length - 1] ? CORE_MEMBER : 0);
     }
@@ -3252,6 +3252,10 @@ let AROUND_VALUE = 0;
  */
 let LEAK_ALLOW = 0;
 let LEAK_ALLOW_LP = 20;
+// (fork) §37.43's 缪尔赛思 conversion: false = a 变形同构体 never goes on her (Fish 2026-11-13: "you're not supposed to
+// isomorph muelsyse yourself. you use it to gain alliance membership for other operators, activate more alliances overall,
+// and give key operators membership in alliances useful for them"); true (upstream) keeps §37.41 / §37.43 as they are.
+let MORPH_ON_MUELSYSE = true;
 const LEAK_ALLOW_FROM = 6, LEAK_ALLOW_TO = 11;
 
 const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
@@ -4166,6 +4170,8 @@ function dollItem(m, ps, id) {
 /** A loose piece: a bond item (giveBondId, not a 变形同构体) / a 变形同构体 (canGiveBond). */
 const isBondItem = (gd, p) => !!p && p.kind === 'item' && !!gd.item(p.id)?.giveBondId && !gd.item(p.id)?.canGiveBond;
 const isMorph = (gd, p) => !!p && p.kind === 'item' && !!gd.item(p.id)?.canGiveBond;
+/** 缪尔赛思: a member of 调和 (the MANI Alliance). */
+const isHarmony = (m, ps, p) => !!p && (chessRec(m, p.id, ps)?.bonds || []).some((b) => (ps.gd || m.gd).bond(b)?.activeType === 'MANI');
 /** The bond's top threshold exceeds the deploy cap (炎 9 > 8): only 调和 plus a conversion reaches it. */
 const topAboveCap = (m, ps, bond) => { const th = bond ? (ps.gd || m.gd).bond(bond)?.thresholds : null; return Array.isArray(th) && th.length > 0 && th[th.length - 1] > ps.deployCap; };
 /** A held (loose) bond item of `bond`. */
@@ -4246,6 +4252,7 @@ function morphPlan(m, ps, morph, ctx) {
   const morphRec = gd.item(morph.id);
   let best = null;
   for (const P of cur.set) {
+    if (!MORPH_ON_MUELSYSE && isHarmony(m, ps, P)) continue;
     const saved = P.items;
     const items = saved || [];
     if (items.some((it) => gd.item(it.id)?.canGiveBond) || !policy.accepts(items, morphRec)) continue;
@@ -4273,7 +4280,8 @@ export function carryAndFocus(m, ps) {
   let best = null, bestV = -Infinity;
   for (const p of ps.board.values()) {
     const c = p.kind === 'chess' ? chessRec(m, p.id, ps) : null;
-    if (!c || isHealer(c) || c.attackKind === 'none') continue;
+    // (fork) never 缪尔赛思: the Isomorph she brings is for the others (Fish 2026-11-13)
+    if (!c || isHealer(c) || c.attackKind === 'none' || isHarmony(m, ps, p)) continue;
     const v = pieceValue(m, ps, p, ctx);
     if (v > bestV || (v === bestV && p.uid < best.uid)) { bestV = v; best = p; }
   }
@@ -4472,7 +4480,7 @@ export function equipItems(m, ps) {
     const mctx = context(m, ps);
     // §37.43 [ASSUMED]: with such a focus 缪尔赛思 takes its bond item and the 变形同构体 wherever she stands (one slot, two
     // members of the focus) — morphPlan only looks at the current lineup, which she is rarely in before her conversion
-    if (mctx.focus && topAboveCap(m, ps, mctx.focus)) {
+    if (MORPH_ON_MUELSYSE && mctx.focus && topAboveCap(m, ps, mctx.focus)) {
       const her = ps.allChess().find((p) => (chessRec(m, p.id, ps)?.bonds || []).some((b) => gd.bond(b)?.activeType === 'MANI')
         && !(p.items || []).some((it) => gd.item(it.id)?.canGiveBond));
       const X = [...ps.hand, ...ps.temp].find((p) => isBondItem(gd, p) && gd.item(p.id).giveBondId === mctx.focus);
@@ -4511,6 +4519,7 @@ export function equipItems(m, ps) {
     if (faHuntDefers(m, ps) && faItemMods(rec)) continue;
     const target = itemTarget(m, ps, item, ctx);
     if (!target) continue;
+    if (!MORPH_ON_MUELSYSE && isMorph(gd, item) && isHarmony(m, ps, target)) continue;
     if (!tryDo(() => ps.equip(item.uid, target.uid)) && advisorPlan(m, ps)?.items?.equip?.length) {
       const fallback = itemTarget(m, ps, item, ctx, false);
       if (fallback && fallback.uid !== target.uid) tryDo(() => ps.equip(item.uid, fallback.uid));
@@ -4787,12 +4796,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, MORPH_ON_MUELSYSE, RULES,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, MORPH_ON_MUELSYSE, RULES } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the
