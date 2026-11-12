@@ -14,6 +14,7 @@
 // with no loadout. Sim kits are keyed by base chess id (server/sim/content/index.js setupUnitKit): a stand-in keeps the
 // chess's ids, so its kit must be looked up by its `charId`, never by `baseId` (that is the replaced operator's kit).
 
+import { withModZ } from './modZ.js';
 import { composeStats, composeTalents } from './loadoutRecord.js';
 import { stripPotential } from './potential.js';
 
@@ -35,7 +36,9 @@ export const IDENTITY_FIELDS = Object.freeze([
 /** The form of `charId` at a chess `status`, or null. */
 export function unitForm(backups, charId, status) {
   const forms = backups?.units?.[charId]?.forms;
-  return (forms && Object.prototype.hasOwnProperty.call(forms, statusKey(status)) && forms[statusKey(status)]) || null;
+  const form = (forms && Object.prototype.hasOwnProperty.call(forms, statusKey(status)) && forms[statusKey(status)]) || null;
+  // (Fish Edition) Mod Z / W: an elite form's module list ends with the operator's custom modules (shared/modZ.js)
+  return form ? withModZ(charId, form) : null;
 }
 
 const byNatural = (a, b) => String(a).localeCompare(String(b), 'en', { numeric: true });
@@ -71,7 +74,8 @@ export function composeUnitRecord(identity, unit, form, { skillIndex, moduleId =
   const known = new Set(form.tokens || []);
   const tokenIds = new Set([...(form.displayTokens || []), skill?.overrideTokenKey, ...(talents || []).map((t) => t?.tokenKey)]
     .filter((id) => id && known.has(id)));
-  const info = moduleId ? unit.moduleNames?.[moduleId] ?? null : null;
+  // (Fish Edition) a Mod Z / W has no moduleNames entry: its own record names it
+  const info = moduleId ? unit.moduleNames?.[moduleId] ?? (mod?.fishModZ ? { name: mod.name, typeName: mod.typeName } : null) : null;
   const golden = !!identity.isGolden;
   const a = unit.assets || {};
   Object.assign(out, {

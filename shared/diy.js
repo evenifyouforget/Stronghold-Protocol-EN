@@ -25,6 +25,7 @@
 // Which operators have a kit (a pick without one is not offered) is the sim's kit registry
 // (server/sim/content/kits/index.js KITTED_CHARS), passed in as `kitted`.
 
+import { modZOf, isModZ } from './modZ.js';
 import { composeUnitRecord, unitForm, statusKey } from './standIn.js';
 import { atPotential } from './potential.js';
 
@@ -217,6 +218,10 @@ export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
   const rec = composeUnitRecord(slot, unit, proto ? form : atPotential(form, potential),
     { skillIndex, moduleId: uniEquipId, bonds: diyOf(data)?.operators?.[charId]?.bonds ?? null });
   if (!rec || !rec.skill) return null;
+  // (Fish Edition) a Mod Z / W that grants alliances (shared/modZ.js `bonds`): on the elite, the module being active;
+  // they replace 协防干员 (emptyShip, "no alliance")
+  const z = rec.module?.active ? modZOf(rec.module.id) : null;
+  if (z && z.bonds.length) rec.bonds = [...new Set([...(rec.bonds ?? []).filter((b) => b !== 'emptyShip'), ...z.bonds])];
   rec.diyFor = slot.baseId ?? slot.chessId;
   if (proto) rec.diyProto = true;
   return rec;
@@ -285,4 +290,27 @@ export function validateDiyPicks(picks, { data, kitted = null } = { data: null }
     out[slotId] = c.pick;
   }
   return { ok: true, picks: out };
+}
+
+/**
+ * (Fish Edition) The picks a room without the Mod Z rule fields (shared/rules.js `modZ`, shared/modZ.js): a pick naming
+ * a Mod Z / W takes the operator's first module of the slot's elite form instead (isDiyModule, not a Mod Z), or none
+ * when it has no other. Other picks, and every pick with the rule on, are returned as they are. A new object when
+ * something changed.
+ * @param {any} picks `{ [slotBaseId]: DiyPick | null }`
+ * @param {any} rules the room's lobby rules
+ * @param {DiyData} data
+ */
+export function modZFallbackPicks(picks, rules, data) {
+  if (!isObj(picks) || rules?.modZ === true) return picks;
+  let out = picks;
+  for (const [slotId, pick] of Object.entries(picks)) {
+    if (!isObj(pick) || !isModZ(pick.uniEquipId)) continue;
+    const slot = diySlot(slotId, data);
+    const form = slot?.golden ? unitForm(backupsOf(data), pick.charId, slot.golden.status) : null;
+    const first = (form?.modules ?? []).find((m) => isDiyModule(m) && !isModZ(m.uniEquipId));
+    if (out === picks) out = { ...picks };
+    out[slotId] = { ...pick, uniEquipId: first?.uniEquipId ?? null };
+  }
+  return out;
 }

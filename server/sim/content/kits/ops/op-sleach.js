@@ -113,7 +113,7 @@ function dpOverTime({ total, step = 1, iv, first = iv }) {
       while (d.t + 1e-9 >= d.next && d.given + stepN <= total + 1e-9 && guard++ < STEP_PER_TICK) { // loop-cap: stepOf interval/cost
         d.given += stepN;
         d.next += stepIv;
-        battle.addDp(unit.ownerId, stepN);
+        battle.addDp(unit.ownerId, stepN, unit);   // source: Mod Z doubles her DP (content/modZ.js)
       }
     },
     end(battle, unit, reason) {
