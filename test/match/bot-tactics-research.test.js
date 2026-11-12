@@ -386,3 +386,30 @@ test('diy-picks: Ascalon takes a tier-6 slot, and while she is owned the Neverme
     assert.ok(ps._botSelf.plan.items.buy.includes('chess_item_5_02_e_a'));
   } finally { h.m.dispose(); }
 });
+
+test('legacy equipItems leaves an item the plan holds (items.hold) in the hand', async () => {
+  const { equipItems } = await import('../../server/match/bot.js');
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(6);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const carry = ps.newPiece('chess', 'chess_char_1_07_a');
+    let t = null;
+    for (let r = -5; r <= 20 && !t; r++) for (let c = -5; c <= 20 && !t; c++) if (inField(r, c) && ps._legal(carry, r, c)) t = [r, c];
+    ps.board.set(tileKey(...t), carry);
+    ps.hand.fill(null);
+    const iso = ps.newPiece('item', 'chess_item_6_09_e_a');
+    ps.hand[0] = iso;
+    ps.recompute();
+    ps._botSelf = { round: h.m.round, plan: Object.freeze({ items: Object.freeze({ hold: Object.freeze([iso.id]) }) }) };
+    equipItems(h.m, ps);
+    assert.equal(ps.hand[0], iso, 'held');
+    ps._botSelf = null;
+    equipItems(h.m, ps);
+    assert.notEqual(ps.hand[0], iso, 'without the hold, legacy equips it');
+  } finally { h.m.dispose(); }
+});

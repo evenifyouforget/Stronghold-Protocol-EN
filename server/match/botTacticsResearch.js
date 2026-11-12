@@ -921,7 +921,8 @@ export function placeCopiers(m, ps) {
  *     highest value), before legacy's morphPlan; the item is the focus Alliance's (`bond: focus`), else, with `bond: any`,
  *     one for an active Alliance the carry is not in. The carry needs room for both.
  *   - sellJunk: while a 变形同构体 is loose and no focus Alliance item is, that item goes into items.buy, and both into
- *     items.keep (so legacy neither sells nor spends them elsewhere).
+ *     items.keep (so legacy neither sells nor spends them elsewhere); with `hold`, the Isomorph also goes into
+ *     items.hold until the item comes (before the final boss), so legacy's morph rule doesn't put it elsewhere.
  */
 export const CARRY_ISO = defineTactic({
   id: 'carry-iso',
@@ -930,6 +931,9 @@ export const CARRY_ISO = defineTactic({
     fromRound: int(1, 14, 4),
     bond: { type: 'choice', choices: ['focus', 'any'], default: 'focus' },
     buy: { type: 'bool', default: true },
+    // legacy's morph rule equips a new Isomorph in the prep it arrives, before the Alliance item can be bought
+    // (queue16: carry-iso never fired); hold it in the hand (the plan's items.hold) until the item comes, up to the boss
+    hold: { type: 'bool', default: true },
   },
   at: {
     sellJunk(ctx) {
@@ -947,8 +951,10 @@ export const CARRY_ISO = defineTactic({
           const plan = own?.plan || {};
           const items = plan.items || {};
           const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
+          const hold = p.hold && !mine.length && m.round < (gd.bossRound || 99) ? iso.map((q) => q.id) : [];
           ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, items: Object.freeze({ ...items,
-            buy: merge(items.buy, want, 8), keep: merge(items.keep, [...iso, ...mine].map((q) => q.id), 32) }) }) };
+            buy: merge(items.buy, want, 8), keep: merge(items.keep, [...iso, ...mine].map((q) => q.id), 32),
+            ...(hold.length ? { hold: merge(items.hold, hold, 8) } : {}) }) }) };
         }
       }
       return ctx.next();

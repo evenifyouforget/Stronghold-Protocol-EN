@@ -4463,9 +4463,12 @@ export function equipItems(m, ps) {
   // §37.42: one that arrived another way (a transformation, a copy, a purchase) is sold here
   if (RULES.sellMorphBringers) sellMorphBringers(m, ps);
   const tried = new Set();
+  // (fork) the plan's items.hold: items that wait in the hand this prep (carry-iso holds an Isomorph for its carry)
+  const hold = advisorPlan(m, ps)?.items?.hold;
   // §37.41: a 变形同构体 goes where its granted bond gains most (morphPlan, with the bond item the plan names); without such a
   // carrier it waits for a focus whose top tier needs it (topAboveCap), else the usual target below takes it
   for (const morph of RULES.morphPlan ? [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p)) : []) {
+    if (planContains(m, hold, morph.id)) continue;
     const mctx = context(m, ps);
     // §37.43 [ASSUMED]: with such a focus 缪尔赛思 takes its bond item and the 变形同构体 wherever she stands (one slot, two
     // members of the focus) — morphPlan only looks at the current lineup, which she is rarely in before her conversion
@@ -4490,7 +4493,7 @@ export function equipItems(m, ps) {
     const item = [...ps.hand, ...ps.temp].find((p) => p && p.kind === 'item' && canUseItem(m, ps, p) && !tried.has(p.uid));
     if (!item) break;
     tried.add(item.uid);
-    if (planContains(m, advisorPlan(m, ps)?.items?.keep, item.id)) continue;
+    if (planContains(m, advisorPlan(m, ps)?.items?.keep, item.id) || planContains(m, hold, item.id)) continue;
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
