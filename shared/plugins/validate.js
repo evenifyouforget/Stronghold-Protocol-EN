@@ -76,7 +76,9 @@ export function validateReferences(f, { officialOwnedSkills = true } = {}) {
           if (!f) { err(`DIY slot ${rec.chessId}: owned pick ${p} has no form ${statusKey(rec.status)}`); continue; }
           if (officialOwnedSkills && f.skills.length !== 3) err(`DIY slot ${rec.chessId}: owned pick ${p} has ${f.skills.length} skills at ${statusKey(rec.status)}`);
           const ids = Object.keys(u.moduleNames).filter((m) => u.moduleNames[m].typeName !== 'ORIGINAL');
-          if (rec.status.equipLevel > 0 && JSON.stringify(f.modules.map((m) => m.uniEquipId)) !== JSON.stringify(ids)) err(`DIY slot ${rec.chessId}: owned pick ${p} modules ${f.modules.map((m) => m.uniEquipId)} ≠ ${ids}`);
+          // (Fish Edition) the Mod Z / W records unitForm appends (shared/modZ.js) are code, not data: not checked here
+          const dataMods = (f.modules ?? []).filter((m) => !m.fishModZ).map((m) => m.uniEquipId);
+          if (rec.status.equipLevel > 0 && JSON.stringify(dataMods) !== JSON.stringify(ids)) err(`DIY slot ${rec.chessId}: owned pick ${p} modules ${dataMods} ≠ ${ids}`);
           for (const t of f.tokens) if (!backups.tokens?.[t]?.variants?.[`${p}@${statusKey(rec.status)}`]) err(`DIY pick ${p}@${statusKey(rec.status)}: summon ${t} has no variant in backups.json tokens`);
         }
       }

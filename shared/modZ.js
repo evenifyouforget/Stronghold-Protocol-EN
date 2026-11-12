@@ -52,6 +52,7 @@ export const MODZ = Object.freeze([
     name: N_('温蒂的Z型调整'), desc: N_('在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%') },
 ].map((m) => Object.freeze({ ...m, id: `${MODZ_PREFIX}${m.kind.toLowerCase()}_${m.code}`, attr: Object.freeze(m.attr), bonds: Object.freeze(m.bonds ?? []) })));
 
+/** @type {Map<string, (typeof MODZ)[number]>} */
 const BY_ID = new Map(MODZ.map((m) => [m.id, m]));
 const BY_CHAR = new Map();
 for (const m of MODZ) BY_CHAR.set(m.charId, [...(BY_CHAR.get(m.charId) ?? []), m]);

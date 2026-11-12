@@ -7,6 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { withModZ } from '../shared/modZ.js';
 import { readFileSync } from 'node:fs';
 import { diyPool, diySlot, diySlotIds, checkDiyPick, diyRecord, diyRecordOf, validateDiyPicks, lockedSelection, diyTokenOwner, isDiyModule, DIY_TIERS } from '../shared/diy.js';
 import { unitForm, composeUnitRecord } from '../shared/standIn.js';
@@ -152,7 +153,7 @@ test('diyRecord: the slot\'s identity (tier, price, merge, status), no 特质, d
       assert.deepEqual(r.trait, m?.traitOverride ?? form.trait, `${label}: trait`);
       assert.equal(!!r.module?.active, !!m, `${label}: module active`);
       if (m) assert.equal(r.module.level, stage, `${label}: stage ${stage}`);
-      if (elite) assert.deepEqual(r.modules.map((x) => [x.uniEquipId, x.level, x.isDefault]), form.modules.map((x) => [x.uniEquipId, stage, x.uniEquipId === mod]), label);
+      if (elite) assert.deepEqual(r.modules.map((x) => [x.uniEquipId, x.level, x.isDefault]), withModZ(SIEGE, form).modules.map((x) => [x.uniEquipId, stage, x.uniEquipId === mod]), `${label} (+ his Mod Z)`);
       assert.equal(r.assets.avatar, elite ? `${SIEGE}_2` : SIEGE, `${label}: E2 art on the elite`);
       // chess-shaped: the loadout machinery and the sim read it unchanged
       assert.equal(loadoutRecord(r, resolveLoadout(r, null)), r);
