@@ -10,6 +10,7 @@ import { defineTactic, defineProfile, PASS } from './botTactics.js';
 import { freeSlot, parseKey, tileKey, FIELD } from './board.js';
 import { PLAN_ISO, CARRY_ISO, PLAN_ITEMS, listedItemsFirst, plannedCarry } from './botTacticsResearch.js';
 import { itemSlotFree } from './bot.js';
+import { tierFor } from './bondsMeta.js';
 
 const DYY = 'band_duyaoy';
 const YAN = 'yanShip';
@@ -426,7 +427,139 @@ export const ISO_NOT_MUELSYSE = defineTactic({
   tunables: (p) => ({ MORPH_ON_MUELSYSE: p.morphHer }),
 });
 
-export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM, ISO_NOT_MUELSYSE]);
+/**
+ * Isomorphs paired with an Alliance item (ai-players/05, 2026-11-13). A 变形同构体 grants the Alliance of another item
+ * worn beside it (an item with giveBondId: 维式重锤 → Victoria, and 35 more), and nothing alone. Clean HARD / ABYSS human
+ * seats wore 79 % of their Isomorphs with one (114 of 144) and gained 6.8 Alliance items a seat (5.4 bought); legacy with
+ * the Muelsyse clone (mu-scroll scenario, 10 games) 23 % (5 of 22) and 1.1, because §37.39 keeps it from buying shop
+ * equipment and an Isomorph with no partner goes on alone (itemTarget).
+ * While the seat has more Isomorphs that grant nothing (loose, or worn with no Alliance item) than useful Alliance items
+ * in the hand, every shop the buy loop sees (after each refresh too) is searched for an Alliance item worth it
+ * (memberGain > 0; `reserve` funds kept), and the held ones are kept from legacy's sales and lone equips. Then each goes
+ * on a deployed operator wearing a lone Isomorph (not already of that Alliance; the biggest gain first). Loose Isomorphs
+ * are left to legacy's morphPlan, which pairs them with a held Alliance item; with `hold`, a loose Isomorph waits in the
+ * hand while there is none. Any band.
+ */
+const isIso = (gd, id) => !!gd.item(id)?.canGiveBond;
+const grantOf = (gd, id) => { const r = gd.item(id); return r && !r.canGiveBond && r.giveBondId ? r.giveBondId : null; };
+const looseItems = (ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
+/**
+ * What one more deployed member of Alliance `b` is worth: 1 when it is active (the member gets its effect), plus 2 per tier
+ * it adds (4 for a core Alliance); 0 when it would lose a tier (独行), the mode has no such Alliance, or no deployed
+ * operator could join it (all already members, or wearing an Isomorph: a 杜遥夜 board is mostly Yan, so a Yan item is
+ * worth nothing there). Two copies of an Alliance item merge into its + version, so an Alliance gains one member this
+ * way (Victoria: one per item kind).
+ */
+function memberGain(gd, ps, b) {
+  const bond = gd.bond(b), st = ps.bonds?.[b];
+  if (!bond || !st) return 0;
+  if (![...ps.board.values()].some((q) => q.kind === 'chess' && gd.baseIdOf(q.id) !== MUELSYSE && !bondsOf(gd, q.id).includes(b)
+    && !(q.items || []).some((it) => isIso(gd, it.id)))) return 0;
+  const up = tierFor(bond, st.count + 1) - st.tier;
+  if (up < 0) return 0;
+  return (st.active ? 1 : 0) + up * (bond.isCore ? 4 : 2);
+}
+/** Deployed operators wearing an Isomorph with no Alliance item beside it. */
+const loneIsoCarriers = (gd, ps) => [...ps.board.values()].filter((q) => q.kind === 'chess'
+  && (q.items || []).some((it) => isIso(gd, it.id)) && !(q.items || []).some((it) => grantOf(gd, it.id)));
+/** Isomorphs granting nothing, minus the useful Alliance items held for them. */
+function partnersNeeded(gd, ps) {
+  const unpaired = looseItems(ps).filter((q) => isIso(gd, q.id)).length + loneIsoCarriers(gd, ps).length;
+  const held = looseItems(ps).filter((q) => grantOf(gd, q.id) && memberGain(gd, ps, grantOf(gd, q.id)) > 0).length;
+  return unpaired - held;
+}
+function* buyPartners(m, ps, p) {
+  const gd = gdOf(m, ps);
+  for (let guard = 0; guard < 4 && partnersNeeded(gd, ps) > 0; guard++) {
+    const best = ps.shop.slots.map((sl, i) => ({ sl, i })).filter(({ sl }) => sl && !sl.sold && sl.kind === 'item' && grantOf(gd, sl.id))
+      .map((x) => ({ ...x, g: memberGain(gd, ps, grantOf(gd, x.sl.id)) })).filter((x) => x.g > 0 && ps.funds - ps.priceOf(x.sl) >= p.reserve)
+      .sort((a, b) => b.g - a.g)[0];
+    if (!best || freeSlot(ps.hand) < 0 || !ok(() => ps.buy(best.i))) return;
+    keepPartners(m, ps);
+    yield;
+  }
+}
+/** The plan keeps the held Alliance items (legacy neither sells them nor equips them alone) while Isomorphs need them. */
+function keepPartners(m, ps) {
+  const gd = gdOf(m, ps);
+  const own = ps._botSelf;
+  if (own && own.round !== m.round) return;
+  // both versions: two copies of an item merge into its + version
+  const ids = looseItems(ps).filter((q) => grantOf(gd, q.id)).flatMap((q) => [q.id.replace(/_b$/, '_a'), q.id.replace(/_a$/, '_b')]);
+  if (!ids.length) return;
+  const plan = own?.plan || {};
+  const items = plan.items || {};
+  if (ids.every((id) => (items.keep || []).includes(id))) return;
+  ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan,
+    items: Object.freeze({ ...items, keep: Object.freeze([...new Set([...(items.keep || []), ...ids])].slice(0, 32)) }) }) };
+}
+const pairing = (m, ps, p) => ps.isBot && !ps.autoplay && m.round >= p.fromRound;
+export const ISO_PAIR = defineTactic({
+  id: 'iso-pair',
+  describe: 'Isomorphs paired with an Alliance item: buy Alliance items for lone Isomorphs (after every refresh), put them beside them; then legacy',
+  params: {
+    fromRound: { type: 'int', min: 1, max: 14, default: 1 },
+    reserve: { type: 'int', min: 0, max: 30, default: 2 },
+    hold: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (pairing(m, ps, p) && partnersNeeded(gdOf(m, ps), ps) >= 0) keepPartners(m, ps);
+      return ctx.next();
+    },
+    *buyLoopSteps(ctx) {
+      const { match: m, player: ps, params: p, args: [opts] } = ctx;
+      if (!pairing(m, ps, p) || opts?.fillOnly) return yield* ctx.next();
+      yield* buyPartners(m, ps, p);
+      // legacy's loop, with the shop searched again after each of its steps (a refresh brings new items)
+      const it = ctx.next();
+      for (;;) {
+        const r = it.next();
+        if (r.done) return r.value;
+        yield r.value;
+        yield* buyPartners(m, ps, p);
+      }
+    },
+    equipItems(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (pairing(m, ps, p)) {
+        const gd = gdOf(m, ps);
+        for (const P of loneIsoCarriers(gd, ps)) {
+          const mine = new Set(bondsOf(gd, P.id));
+          const X = looseItems(ps).filter((q) => grantOf(gd, q.id) && !mine.has(grantOf(gd, q.id)) && itemSlotFree(m, ps, P, gd.item(q.id)))
+            .map((q) => ({ q, g: memberGain(gd, ps, grantOf(gd, q.id)) })).filter((x) => x.g > 0).sort((a, b) => b.g - a.g)[0];
+          if (X) ok(() => ps.equip(X.q.uid, P.uid));
+        }
+        // a loose Isomorph with a held Alliance item: both on a deployed operator not of that Alliance (the planned carry
+        // first, then elites and higher tiers; never 缪尔赛思), the item first
+        const carry = plannedCarry(m, ps).carry;
+        for (const iso of looseItems(ps).filter((q) => isIso(gd, q.id))) {
+          const Xs = looseItems(ps).filter((q) => grantOf(gd, q.id)).map((q) => ({ q, b: grantOf(gd, q.id), g: memberGain(gd, ps, grantOf(gd, q.id)) }))
+            .filter((x) => x.g > 0).sort((x, y) => y.g - x.g);
+          const X = Xs[0];
+          if (!X) break;
+          const P = [...ps.board.values()].filter((q) => q.kind === 'chess' && gd.baseIdOf(q.id) !== MUELSYSE && !bondsOf(gd, q.id).includes(X.b)
+            && !(q.items || []).some((it) => isIso(gd, it.id)) && (gd.equipPerChess || 0) - (q.items || []).length >= 2)
+            .sort((x, y) => ((y === carry) - (x === carry)) || (gd.isGolden(y.id) - gd.isGolden(x.id)) || ((gd.tierOf(y.id) || 0) - (gd.tierOf(x.id) || 0)) || (x.uid - y.uid))[0];
+          if (!P || !ok(() => ps.equip(X.q.uid, P.uid))) break;
+          ok(() => ps.equip(iso.uid, P.uid));
+        }
+        const isos = looseItems(ps).filter((q) => isIso(gd, q.id));
+        const own = ps._botSelf;
+        if (p.hold && isos.length && m.round < gd.bossRound && !looseItems(ps).some((q) => grantOf(gd, q.id)) && (!own || own.round === m.round)) {
+          const plan = own?.plan || {};
+          const items = plan.items || {};
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan,
+            items: Object.freeze({ ...items, hold: Object.freeze([...new Set([...(items.hold || []), ...isos.map((q) => q.id)])]) }) }) };
+        }
+      }
+      return ctx.next();
+    },
+  },
+});
+
+export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM, ISO_NOT_MUELSYSE, ISO_PAIR]);
 
 /** Opt-in: Fish's Du Yaoye list, legacy below. Plays as legacy for every other Strategy. */
 export const DYY_PROFILES = Object.freeze([

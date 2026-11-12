@@ -218,3 +218,36 @@ test('dyy-muelsyse: no 画卷 by default (left to legacy); the packaging cycle b
   ps.shop.slots = shop0; // the test's own shop of banned operators
   checkInvariants(m);
 });
+
+test('iso-pair: buys the Alliance item one more member would raise a tier (not a Yan item on a Yan board), then pairs it with the loose Isomorph', async () => {
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  const { ISO_PAIR } = await import('../../server/match/botTacticsDyy.js');
+  const { m, ps } = prep({ round: 9, funds: 20 });
+  const shop0 = ps.shop.slots;
+  try {
+    const gd = m.gd;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    // 2 Victoria (3 activate it) and 1 Yan operator deployed
+    const pieces = ['chess_char_1_06_a', 'chess_char_2_10_a', YAN_T1].map((id) => ps.newPiece('chess', id));
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(pieces[0], r, c)) tiles.push([r, c]);
+    pieces.forEach((p, i) => ps.board.set(tileKey(...tiles[i]), p));
+    ps.recompute();
+    assert.equal(ps.bonds.victoriaShip.count, 2);
+    assert.ok(ps.acquireItem('chess_item_6_09_e_a', { source: 'test', requirePool: false }));
+    const VIC = 'chess_item_1_01_e_a', YAN_ITEM = 'chess_item_3_04_e_a';
+    const slot = (id) => ({ kind: 'item', id, basePrice: gd.item(id).price, sold: false });
+    ps.shop.slots = [slot(YAN_ITEM), slot(VIC)];
+    drain(ISO_PAIR.at.buyLoopSteps(ctxOf(ISO_PAIR, m, ps, [{}], () => [].values())));
+    const held = [...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item').map((q) => q.id);
+    assert.ok(held.includes(VIC), `the Victoria item bought: ${held}`);
+    assert.ok(!held.includes(YAN_ITEM), 'not the Yan item: it would make a Yan member Yan');
+    ISO_PAIR.at.equipItems(ctxOf(ISO_PAIR, m, ps));
+    const yan = pieces[2];
+    assert.deepEqual((yan.items || []).map((it) => it.id).sort(), ['chess_item_6_09_e_a', VIC].sort(), 'both on the Yan operator');
+    ps.recompute();
+    assert.equal(ps.bonds.victoriaShip.count, 3, 'Victoria now has 3 members');
+    ps.shop.slots = shop0;
+    checkInvariants(m);
+  } finally { m.dispose(); }
+});
