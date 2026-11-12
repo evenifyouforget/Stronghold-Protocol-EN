@@ -496,3 +496,28 @@ In the same 10 games it pairs 6 of 20 (from 5 of 22) and buys 1.2 Alliance items
 a Du Yaoye board is mostly Yan, so the Yan item is worth nothing, and two copies of an item merge into its + version,
 so an Alliance gains one member this way (Victoria: one per item kind). The Isomorph pays only where another Alliance
 is one member short or active. Queue26 measures it anyway (mu-scroll 1–80, normal 1–160).
+
+## Queue25: dyybot minus one tactic at a time (2026-11-13)
+
+Solo Ultimate, Du Yaoye forced, paired by seed against the full dyybot (`loo-full`, the profile as a file: it plays
+dyybot3's 160 normal games seed for seed). Code 1c88dbaa.
+
+| Without | mu-scroll, 80 seeds (full: 8; legacy 19) | p | Normal, 160 seeds (full: 17) | p |
+|---|---|---|---|---|
+| dyy-muelsyse | 14 (+6 / −0) | 0.03 | 17 (+2 / −2) | 1.00 |
+| dyy-level (human schedule) | 11 (+8 / −5) | 0.58 | 13 (+7 / −11) | 0.48 |
+| plan-iso | 9 (+4 / −3) | 1.00 | 21 (+6 / −2) | 0.29 |
+| carry-iso | 12 (+5 / −1) | 0.22 | 16 (+0 / −1) | 1.00 |
+| carry-hologram | 8 (no seed changes) | – | 17 (no seed changes) | – |
+| plan-items | 8 (+3 / −3) | 1.00 | 17 (+5 / −5) | 1.00 |
+| **dyy-shop** | 13 (+10 / −5) | 0.30 | **33 (+27 / −11)** | **0.01** |
+
+- **`dyy-shop` costs half the wins in normal games.** Without it dyybot wins 33 of 160 (legacy: 20 in the 05
+  baseline; queue26 reruns legacy on this code). The difference opens at round 11: board value 39 vs 35 (round 13: 49
+  vs 42), elites 2.3 vs 1.8 (3.6 vs 3.0), deployed 7.7 vs 7.0 at round 13, Final Assault leaks 4.4 vs 6.6. Buying every
+  Yan operator not yet owned, and selling Bench pieces for them, costs merges. Queue28 turns its three parts off one
+  at a time (side-Alliance buys, selling for room, the Yan hunt).
+- **The Muelsyse clone is what loses in the scenario** (+6 / −0 without it); in normal games she rarely comes, so it
+  changes 4 seeds.
+- `carry-hologram` never acted (博士投影 is Muelsyse's Strategy item; it seldom reaches a Du Yaoye seat).
+- The rest are within noise.
