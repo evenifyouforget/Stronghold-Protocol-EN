@@ -151,7 +151,7 @@ Small tweaks may be possible:
 - [ ] Other tactics that make better use of specific Operators
 - [ ] From the economy gap (`ai-players/08`): `cycle-econ` buys and sells in the same prep to feed stackers
       (queue14); still to draft: shop items beyond `plan-items` (Alliance Coin, Mimic Matter, Originium Solvent),
-      and an Isomorph + Alliance item on the main carry
+      and an Isomorph + Alliance item on the main carry (`carry-iso`, queue16)
 
 Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
 How it works, and each idea against legacy and the records: `ai-players/09`.
@@ -166,7 +166,8 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
 - [ ] Aegir specific: build a snake with the dps operator at the back
 - [ ] Aegir specific: can use a non-Aegir dps operator if they are given damazti isomorph + aegir equipment
       (Fish 2026-11-12: the point is a huge buff for the carry at the start of the snake. Humans' Ægir carriers:
-      Pramanix the Prerita, Exusiai the alter, Archetto, Sakiko. Next tactic.)
+      Pramanix the Prerita, Exusiai the alter, Archetto, Sakiko. `carry-iso` (fc1bc1d2) puts a held Isomorph + the focus
+      Alliance item on the main damage dealer; measuring: queue16. Placing that carry at the snake's start is still to do.)
 - [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
 ## Mod Z
