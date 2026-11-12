@@ -331,7 +331,23 @@ Built on `feature/bot-plan-tactics`; all write legacy's plan, default-off, for t
 | Kjerag: Ascalon custom operator + Nevermeltice | not built: bots field no custom operators yet |
 | The copy combos and 圣约送葬人 (08 above) | `plan-combos` |
 
-**Queued:** queue10 (`plan-combos`: records seeds 1–30 and botbench co-op 1–40) and queue11 (`commit`, `keepers`,
+**`plan-combos` measured** (queue10, `untracked/combos-2026-11/`): botbench co-op 1–40 against queue2's legacy: wins
+27 → 24 (7 lost / 4 gained, p 0.55), team stacks at round 13 703 → 706, leader damage 12.6 → 13.0 M; LP 36.8 → 29.3.
+The records (seeds 1–30) show why nothing changes: **the pieces are bought, the combos don't form.**
+
+| | legacy records | `plan-combos` records | Humans |
+|---|---|---|---|
+| 白面鸮 deployed (battles) / with a prep-start stacker in front | 53 / 6 % | 69 / 4 % | 103 / 59 % |
+| 塞雷娅 deployed / with a prep-end stacker in front | 6 / 0 % | 41 / 17 % | 83 / 60 % |
+| 白面鸮 battles with 空弦 also on the board; adjacent | — | 23 of 69; 6 | — |
+| 塞雷娅 battles with a prep-end stacker on the board; adjacent | — | 36 of 41; 19 | — |
+
+Two failures: the lineup often benches the partner, and when both are fielded the placement rarely puts the copier
+behind it. The second is the 空弦 problem of 09: a copied prep-time trait is invisible to the rehearsal, so the
+combo layout loses to any layout with one more kill. **Queued:** queue12, `plan-combos` with `legacy-arrange`
+`prepTiebreak 1` and `leakAllow 1.5` (records and botbench, after queue11).
+
+queue11 (`commit`, `keepers`,
 and all three together, botbench co-op 1–40), paired against queue2's legacy.
 
 ## Next tactics (not built)
