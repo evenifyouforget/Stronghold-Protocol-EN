@@ -305,17 +305,22 @@ Solo Ultimate, Du Yaoye forced, seeds 1–160, paired, from `feature/fish-dyy-pr
 **Why legacy never clones her:** legacy sells a normal 缪尔赛思 as soon as she arrives (§37.42 `sellMorphBringers`: the
 Isomorph she brought stays, she goes back to the pool). So no Muelsyse is held when a clone item comes.
 
-**The clone:** 画卷 (`chess_item_6_02_m`, a tier-6 Art) copies the operator on its tile, and the copy counts as a gain:
-one more 变形同构体 (2 for an elite, repeated under Investor). 拟态物质 is not a clone of one Muelsyse: it gives the third
-copy only with 2 normal copies held, otherwise a random operator of her Alliances.
+**The clones** (Fish, 2026-11-13: "a few different items capable of cloning muelsyse"). In our engine:
+- 画卷 (`chess_item_6_02_m`, a tier-6 Art): copies the operator on its tile, elite status included; any shop level.
+- 拟态物质: her third copy with 2 normal ones held, else a random operator of her Alliances (only her); any level.
+- 简易通讯机, 寻呼模块 (an offer; she is picked), 商业包装方案 (a copy every 8 sales while it stays on her): operators of
+  her Alliances, but only up to the shop level, so only from level 6 (she is tier 6).
+- 博士投影: promotes her in place. That is not a gain (no Isomorph), but every later copy of an elite is elite: 2
+  Isomorphs each. Used first.
 
-`dyy-muelsyse` (`server/match/botTacticsDyy.js`, c2b1b386): while fewer than `maxIso` (6) Isomorphs are owned and a
-Muelsyse is held:
-- keeps her (`keep: clone`: only while a 画卷 is held or shown; `always`);
-- lists 画卷 for buying and keeps it from legacy's own Art rule;
-- uses a held 画卷 on her (moving her onto the board first if needed);
-- levels to 6 by Fish's rule (`level6: clone`: she is held and a 画卷 is held or shown; `held`; `off`).
-From 6 Isomorphs on it stops, and legacy sells her.
+`dyy-muelsyse` (`server/match/botTacticsDyy.js`, 473851a7; c2b1b386 had 画卷 only): while fewer than `maxIso` (6)
+Isomorphs are owned and a Muelsyse is held:
+- keeps her (`keep: clone`: while a clone item is held or shown, or the packaging plan is on her; `always`);
+- lists the clone items for buying and keeps them from legacy's own item rules;
+- uses them on her: 博士投影, 画卷 (moving her onto the board first if needed), 拟态物质, then from level 6 the printers;
+  the printers only on a Muelsyse without an Isomorph (it would add another Alliance to roll from);
+- levels to 6 by Fish's rule (`level6: clone`: she is held and a clone item is held or shown; `held`; `off`).
+From 6 Isomorphs on it stops, and legacy sells her and uses the items its own way.
 
 **`dyybot`** (the step-3 draft): dyy-muelsyse, dyy-shop, dyy-freeze, dyy-level (`human`), plan-iso from shop level 5,
 carry-iso, plan-items (stack items: 简易通讯机 and co.). Queue21: solo Ultimate, Du Yaoye forced, seeds 1–160, against
