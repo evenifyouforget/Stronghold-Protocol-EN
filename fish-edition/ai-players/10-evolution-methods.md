@@ -101,7 +101,7 @@ share for one iteration), and the races go on until stopped. After each iteratio
 held-back seeds 5001–5300: 6 blocks at first, one more each iteration, all 30 at most (`holdout.md`). So the
 held-back check is already in the zip.
 
-    node tools/evolve.mjs --out race-pc --anytime --config solo:ABYSS --jobs 22
+    node tools/evolve.mjs --out race-pc --anytime --config solo:ABYSS --pool research,basic,legacy-rules
 
 - **Stop:** Ctrl+C. The running matches stop at once, then `summary.md` is written and the folder is packed into
   `race-pc.zip` next to it (Windows' own tar.exe writes the zip). Tested here: 1 second from Ctrl+C to the zip. A second
@@ -110,6 +110,8 @@ held-back check is already in the zip.
 - **Go on later:** the same command in the same folder resumes. The finished iterations replay from the cache
   without playing again.
 - At about 1,000 matches an hour: 10 hours ≈ 6 iterations, 100 hours ≈ 60.
+- The job count comes from the machine (cores − 2, about 1.5 GB a worker), and several candidates' 10-seed blocks run
+  side by side, so all cores stay busy. The weekend run of 2026-11-13: draft PR #137.
 
 ## Sources
 

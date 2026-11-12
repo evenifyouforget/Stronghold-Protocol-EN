@@ -190,6 +190,8 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
 Possibly useful for testing:
 
 - [ ] Set up a scenario where the game already starts with 1 Muelsyse (or gifts it on round 7), to see if the bots know how to scale from there (like how human games clone Muelsyse to make many Damazti Isomorph)
+      `botbench --scenario FILE` (d083044b, `tools/scenario.mjs`): gifts of operators, items or funds at a round's prep
+      start, through the game's own gain path (Muelsyse's on-gain Isomorph arrives too). The Muelsyse run is next.
 - [ ] Other scenario tests, which make it possible to test if a tactic is useful even if it would only be relevant to 5% of games happening by chance
 
 ## Mod Z
