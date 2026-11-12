@@ -4264,6 +4264,24 @@ function morphPlan(m, ps, morph, ctx) {
 }
 
 /**
+ * (fork, carry-iso, fish-edition/ai-players/08) The main damage dealer: the deployed non-healer attacker of highest
+ * pieceValue (ties: lower uid), and the bot's focus Alliance. Humans put the Isomorph with an Alliance item on such a
+ * carry (Fish: "buff Pramanix the Prerita or Sakiko to deal tons of damage").
+ */
+export function carryAndFocus(m, ps) {
+  const ctx = context(m, ps);
+  let best = null, bestV = -Infinity;
+  for (const p of ps.board.values()) {
+    const c = p.kind === 'chess' ? chessRec(m, p.id, ps) : null;
+    if (!c || isHealer(c) || c.attackKind === 'none') continue;
+    const v = pieceValue(m, ps, p, ctx);
+    if (v > bestV || (v === bestV && p.uid < best.uid)) { bestV = v; best = p; }
+  }
+  return { carry: best, focus: ctx.focus || null };
+}
+export { slotFree as itemSlotFree };
+
+/**
  * Whom the bot injects with 突变细胞 (after the battle its carrier — deployed or on the bench: every owned carrier's item
  * hooks run — is destroyed and a random operator one tier higher joins the bench, PlayerState.transformChess; the next
  * prep's lineup step deploys it like any owned unit, so a deployed carrier only costs a re-placement): a normal operator

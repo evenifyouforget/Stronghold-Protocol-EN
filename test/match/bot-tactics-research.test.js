@@ -276,3 +276,35 @@ test('place-copiers moves Ptilopsis onto the tile behind a deployed prep-start p
     assert.equal(placeCopiers(h.m, ps), 0, 'already paired: no move');
   } finally { h.m.dispose(); }
 });
+
+test('carry-iso puts a loose Isomorph and an Alliance item on the main attacker, from fromRound on', async () => {
+  const { CARRY_ISO } = await import('../../server/match/botTacticsResearch.js');
+  const { carryAndFocus } = await import('../../server/match/bot.js');
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(4);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const gd = h.m.gd;
+    const carry = ps.newPiece('chess', 'chess_char_1_07_a');
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(carry, r, c)) tiles.push([r, c]);
+    ps.board.set(tileKey(...tiles[0]), carry);
+    ps.hand.fill(null);
+    const iso = ps.newPiece('item', 'chess_item_6_09_e_a'), vic = ps.newPiece('item', 'chess_item_1_01_e_a');
+    ps.hand[0] = iso; ps.hand[1] = vic;
+    ps.recompute();
+    ps.bonds = { ...ps.bonds, victoriaShip: { active: true, layers: 0 } };
+    assert.equal(carryAndFocus(h.m, ps).carry, carry);
+    const params = { ...resolveParams(CARRY_ISO), bond: 'any' };
+    const run = (round) => CARRY_ISO.at.equipItems({ match: { ...h.m, round, gd, rules: h.m.rules }, player: ps, params, next: () => null });
+    run(2);
+    assert.equal((carry.items || []).length, 0, 'before fromRound: nothing');
+    run(4);
+    assert.deepEqual((carry.items || []).map((it) => it.id).sort(), ['chess_item_1_01_e_a', 'chess_item_6_09_e_a']);
+    assert.ok(gd.item(iso.id).canGiveBond);
+  } finally { h.m.dispose(); }
+});

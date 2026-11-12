@@ -8,7 +8,7 @@
 // Each acts through PlayerState's validated intents only, and stays cheap and deterministic: no RNG draw, no rehearsal,
 // so a profile of them plays the same in the browser.
 import { defineTactic, PASS } from './botTactics.js';
-import { bountyKillChance, gainCountLayers, acquireLayers } from './bot.js';
+import { bountyKillChance, gainCountLayers, acquireLayers, carryAndFocus, itemSlotFree } from './bot.js';
 import { freeSlot, parseKey, tileKey, inField, pieceDir } from './board.js';
 
 const ok = (fn) => { try { const r = fn(); return !!(r && r.ok); } catch { return false; } };
@@ -900,5 +900,70 @@ export function placeCopiers(m, ps) {
   return moved;
 }
 
+/**
+ * The Isomorph on the carry (fish-edition/ai-players/08, "The Isomorph gap"; Fish 2026-11-12: "it's to give a huge buff
+ * to a core dps operator who is at the start of the snake. like, buff pramanix alter or sakiko to deal tons of damage").
+ * In clean human games 37 of 62 seats wore an Isomorph with an Alliance item (bots 16 of 111), mostly Victoria, Kjerag
+ * and Ægir on a top attacker. From `fromRound`:
+ *   - equipItems: a loose 变形同构体 and a loose Alliance item go on the carry (carryAndFocus: the deployed attacker of
+ *     highest value), before legacy's morphPlan; the item is the focus Alliance's (`bond: focus`), else, with `bond: any`,
+ *     one for an active Alliance the carry is not in. The carry needs room for both.
+ *   - sellJunk: while a 变形同构体 is loose and no focus Alliance item is, that item goes into items.buy, and both into
+ *     items.keep (so legacy neither sells nor spends them elsewhere).
+ */
+export const CARRY_ISO = defineTactic({
+  id: 'carry-iso',
+  describe: 'puts a held Isomorph and an Alliance item (the focus one) on the main damage dealer',
+  params: {
+    fromRound: int(1, 14, 4),
+    bond: { type: 'choice', choices: ['focus', 'any'], default: 'focus' },
+    buy: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (p.buy && m.round >= p.fromRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
+        const iso = loose.filter((q) => gd.item(q.id)?.canGiveBond);
+        const { focus } = carryAndFocus(m, ps);
+        if (iso.length && focus) {
+          const mine = loose.filter((q) => !gd.item(q.id)?.canGiveBond && gd.item(q.id)?.giveBondId === focus);
+          const want = mine.length ? [] : Object.values(gd.shopItemsByTier || {}).flat()
+            .filter((id) => { const r = gd.item(id); return r && !r.isGolden && !r.canGiveBond && r.giveBondId === focus; });
+          const plan = own?.plan || {};
+          const items = plan.items || {};
+          const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, items: Object.freeze({ ...items,
+            buy: merge(items.buy, want, 8), keep: merge(items.keep, [...iso, ...mine].map((q) => q.id), 32) }) }) };
+        }
+      }
+      return ctx.next();
+    },
+    *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
+    equipItems(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (m.round >= p.fromRound && ps.isBot && !ps.autoplay) {
+        const gd = gdOf(m, ps);
+        const loose = [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item');
+        const morph = loose.find((q) => gd.item(q.id)?.canGiveBond);
+        const { carry, focus } = morph ? carryAndFocus(m, ps) : {};
+        if (carry && !(carry.items || []).some((it) => gd.item(it.id)?.canGiveBond)) {
+          const bonds = new Set(gd.chess(carry.id)?.bonds || []);
+          const cand = loose.filter((q) => { const r = gd.item(q.id); return r && !r.canGiveBond && r.giveBondId && !bonds.has(r.giveBondId); });
+          const X = cand.find((q) => gd.item(q.id).giveBondId === focus)
+            || (p.bond === 'any' ? cand.find((q) => ps.bonds?.[gd.item(q.id).giveBondId]?.active) : null);
+          // room for both before anything goes on (an Alliance item alone on the carry is not the point)
+          const after = X && { ...carry, items: [...(carry.items || []), { id: X.id, uid: -1 }] };
+          if (X && itemSlotFree(m, ps, carry, gd.item(X.id)) && itemSlotFree(m, ps, after, gd.item(morph.id))
+            && ok(() => ps.equip(X.uid, carry.uid))) ok(() => ps.equip(morph.uid, carry.uid));
+        }
+      }
+      return ctx.next();
+    },
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO]);
