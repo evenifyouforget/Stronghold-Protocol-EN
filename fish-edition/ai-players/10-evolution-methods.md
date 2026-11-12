@@ -75,12 +75,22 @@ rerun, in sp-plan-run4 (ab9b02ee).
 
 ## For Fish's PC
 
-One command, once the first race looks right:
+Fish (2026-11-12): "I ctrl+c to stop it whenever is convenient, wait hopefully not longer than a minute for it to clean
+up, and then I have a zip file I can send back. that way whether I have 10 hours or 100 hours it still is maximally
+useful". So the PC run is `--anytime` (c6552626): the race with no budget. Each iteration gets 1,500 matches (irace's
+share for one iteration), and the races go on until stopped. After each iteration, its best and legacy also play the
+held-back seeds 5001–5300: 6 blocks at first, one more each iteration, all 30 at most (`holdout.md`). So the
+held-back check is already in the zip.
 
-    node tools/evolve.mjs --out race-pc --race --config solo:ABYSS --budget 20000 --jobs 22
-    node tools/evolve.mjs --out race-pc --race --config solo:ABYSS --holdout-only
+    node tools/evolve.mjs --out race-pc --anytime --config solo:ABYSS --jobs 22
 
-At about 1,000 matches an hour that's about 20 hours. It's resumable after a restart. Zip `race-pc` back.
+- **Stop:** Ctrl+C. The running matches stop at once, then `summary.md` is written and the folder is packed into
+  `race-pc.zip` next to it (Windows' own tar.exe writes the zip). Tested here: 1 second from Ctrl+C to the zip. A second
+  Ctrl+C quits without packing. Creating a file `race-pc/STOP` stops it the same way.
+- **Send back:** `race-pc.zip`. It holds the cache (about 7 KB per match before compression), so nothing is lost.
+- **Go on later:** the same command in the same folder resumes. The finished iterations replay from the cache
+  without playing again.
+- At about 1,000 matches an hour: 10 hours ≈ 6 iterations, 100 hours ≈ 60.
 
 ## Sources
 

@@ -382,8 +382,17 @@ A first smoke run showed the shop offering the pieces in rounds 10–14 and lega
 it buys a new operator only when the lineup improves, and a lone piece seldom does. So `buy` / `keep` put the slotted
 pieces into legacy's plan (buy +24, keep +18); then they were bought in 2 of 4 seeds, one merged into an elite.
 
-**Queued:** queue13 (after queue12): `diy` (defaults), `diy-saki` (+ Sakiko on tier 6), `diy-nobuy` (picks without the
-plan), botbench co-op Ultimate 1–40, paired against legacy.
+**Measured** (queue13, co-op Ultimate, 40 seeds, paired against legacy's 27 wins):
+
+| Profile | Wins | Better / worse seeds | p (McNemar) |
+|---|---|---|---|
+| `diy` (Ch'en the Dawnstreak S3 + Shu S3, bought and kept) | 23 | 5 / 9 | 0.42 |
+| `diy-saki` (+ Sakiko S3 on tier 6) | 27 | 8 / 8 | 1.00 |
+| `diy-nobuy` (picks only) | 27 | 6 / 6 | 1.00 |
+
+No significant change. The pieces do arrive: in 8 recorded `diy` games, 18 of 32 bot seats owned one. But they
+arrived late, between round 7 and 14 (usually about round 11), and fought in 1–5 battles each. Tier-5 pieces need the
+shop level the bots reach late. So the picks work, but too late to change much. Kept in the pool.
 
 **The Isomorph gap (Fish: the custom operator in Ægir is "to give a huge buff to a core dps operator who is at the
 start of the snake").** Morph Isomorph worn with an Alliance item makes its wearer a member of that Alliance. In the

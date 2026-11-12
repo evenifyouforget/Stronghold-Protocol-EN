@@ -133,8 +133,12 @@ Long-term goals:
 
 Small tweaks may be possible:
 
+- [x] Always buy Minimalist. He costs 1 and sells for 1, so there's basically no downside? Just sell him if you want your 1 Funds back. You can even do it immediately, and that already adds 1 buy counter for buy triggers and 1 sell counter for sell triggers.
+      `buy-minimalist` (c28b9878): every Minimalist shown is bought; `mode: cycle` sells him at once, `merge` keeps a
+      pair for the merge. Measuring: queue17.
 - [ ] Kjerag: take Ascalon as custom operator with skill 2, give her Kjerag Nevermeltice to trigger a lot of Frozen
-      (`diy-picks` can field custom operators now; an Ascalon choice and the Nevermeltice pairing are next)
+      `diy-picks` `t6a: ascalon` (1db55e37): Ascalon S2 on tier 6; while she is owned, Kjeragi Nevermeltice goes into
+      legacy's item buy / keep list (its freeze chance is a global buff, so the carrier doesn't matter). Measuring: queue17.
 - [x] Commit to Aegir if got Gladiia
 - [x] Commit to Laterano if got Mostima or Executor the Ex Foedore
 - [x] Executor Alter > Ines on field if Foresight is active
@@ -144,8 +148,9 @@ Small tweaks may be possible:
       The six above: `plan-commit` / `plan-keepers` (76694da7). Alone each is neutral (27 → 27 wins of 40); all three
       tweak tactics together lose (20, p 0.04). In the evolution pool one by one (`ai-players/08`).
 - [ ] Activate 2 Marvel if we have space, to make refreshes much more efficient (especially for Siracusa)
-      (`plan-bond` with `bond: miraShip` covers it without a new tactic; not measured yet)
+      (`plan-bond` with `bond: miraShip` covers it without a new tactic; measuring: queue17)
 - [ ] Put Archetto behind an operator with desirable alliances (this is a lowroll method compared to more efficient stack generators)
+      (legacy's layout already scores this trait, `positionTraitsOf` `pos`; to check in the records how often it lands)
 - [x] Yan/Investor: Have Swire in inventory and don't sell unless it's the boss round. Her passive income is great
       (`plan-keepers` `swire`)
 - [ ] Other tactics that make better use of specific Operators
@@ -156,7 +161,10 @@ Small tweaks may be possible:
 Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
 How it works, and each idea against legacy and the records: `ai-players/09`.
 
-- [ ] Laterano specific: put Mostima next to an ammo user
+- [x] Laterano specific: put Mostima next to an ammo user
+      `place-ammo` (1b9d63b8): after the rehearsed layout, Mostima moves beside the most operators with ammo skills
+      (7 in the game, 5 of them Laterano); legacy's layout couldn't see this battle-time trait. Measuring: queue17.
+- - [ ] and also Civilight next to Mostima if both are available
 - [ ] Kjerag specific: maximize overlap between freeze area and "on freeze, + stack" range
 - [ ] Kjerag specific: do not have a tile in front (earlier in path) that can be frozen but doesn't generate stacks
 - [ ] Put Civilight behind a stack generating Operator
