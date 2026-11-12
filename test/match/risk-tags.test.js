@@ -58,6 +58,7 @@ test('ccFamiglia Cleaner: rounds 10–13, the fewest stacks; a tie goes to the e
     const [b] = h.m.riskBounties(p1);
     assert.equal(b.card.enemyKey, CC.silencers.key);
     assert.equal(b.card.count, CC.silencers.count);
+    assert.equal(CC.silencers.count, 3, 'co-op: 3 (Fish 2026-11-12)');
     assert.equal(b.card.coin, 0);
     assert.equal(h.m.waveBounties(p1).length, p1.bounties.length + 1);
     p1.layers = { yanShip: 30 };
@@ -148,17 +149,24 @@ test('ccPatriot Undying 1: the round-9 Improv shows the card (in place of the 6t
   } finally { h.m.dispose(); }
 });
 
-test('ccPatriot Undying 2: the Shieldguards with the Patriot taken on round 9; the final rounds\' sub-wave once per field', () => {
-  const none = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccPatriot: 1 } });
-  try { none.m.round = 15; assert.equal(none.m.bossSubWave(['p_0']).size, 0, 'Undying 1: no sub-wave'); } finally { none.m.dispose(); }
-  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 2 } });
+test('ccPatriot Undying 2: the Shieldguards with the Patriot taken on round 9; Undying 3: the final rounds\' sub-wave once per field, taken or not', () => {
+  for (const level of [1, 2]) {
+    const none = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccPatriot: level } });
+    try { none.m.round = 15; assert.equal(none.m.bossSubWave(['p_0']).size, 0, `Undying ${level}: no final-round sub-wave`); } finally { none.m.dispose(); }
+  }
+  const h2 = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 2 } });
   try {
-    h.m.round = 9;
-    const [p0, p1] = [h.ps('p_0'), h.ps('p_1')];
-    h.m.addBounty(p0, h.m.riskPatriotCard());
-    const escort = (ps) => h.m.riskBounties(ps).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
+    h2.m.round = 9;
+    const [p0, p1] = [h2.ps('p_0'), h2.ps('p_1')];
+    h2.m.addBounty(p0, h2.m.riskPatriotCard());
+    const escort = (ps) => h2.m.riskBounties(ps).filter((b) => b.card.enemyKey === CC.patriot.escort.key);
     assert.equal(escort(p0)[0].card.count, CC.patriot.escort.count);
     assert.equal(escort(p1).length, 0, 'only with the one who took him');
+  } finally { h2.m.dispose(); }
+  // Undying 3, nobody took him: the sub-wave still comes
+  const h = makeMatch({ mode: 'coop', humans: 2, seed: 4, lobbyRules: { ccPatriot: 3 } });
+  try {
+    assert.ok(!h.m.ccPatriotTaken);
     const sub = h.m.bossSubWave(['p_0', 'p_1']);
     assert.deepEqual([...sub.keys()], ['p_0'], 'one group per field, with its left player');
     const cards = sub.get('p_0');
@@ -443,4 +451,14 @@ test('ccVengeance: Reids by the highest active alliance — 1 at 200 stacks, +1 
       assert.equal(boss()[0].card.count, 1, 'the final rounds: always 1');
     } finally { h.m.dispose(); }
   }
+});
+
+test('ccFamiglia Cleaner in solo: CC.silencers.soloCount (2) Silencers', () => {
+  const h = makeMatch({ mode: 'solo', seed: 4, lobbyRules: { ccFamiglia: 1 } });
+  try {
+    h.m.round = 10;
+    const [b] = h.m.riskBounties(h.ps('p_0'));
+    assert.equal(b.card.enemyKey, CC.silencers.key);
+    assert.equal(b.card.count, 2);
+  } finally { h.m.dispose(); }
 });

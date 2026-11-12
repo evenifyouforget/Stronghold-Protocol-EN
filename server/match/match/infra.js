@@ -109,11 +109,12 @@ export class MatchInfra {
    * A player's bounties for this round's wave plus the SPA-CC Risk tag extras (shared/rules.js; numbers: CC). Every wave
    * builder takes its bounties from here; `boss`: the wave of a final boss round (Final Assault / Hidden Core).
    *   ccFamiglia Cleaner   rounds 10–13: the alive player with the fewest stacks in all (Σ of its alliance layers; a tie:
-   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty; Unending 3 /
+   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人 (solo: soloCount), no
+   *                        bounty; Unending 3 /
    *                        Seasonal 3: and Zaaro (his leak costs CC.famiglia.zaaro.leakLp, riskLoss)
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
-   *                        Undying 2: 2 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
-   *                        Patriot and his escort come again, once per field (bossSubWave)
+   *                        Undying 2: 2 Guerrilla Shieldguards join the Patriot who took it; Undying 3: in the final boss
+   *                        rounds Patriot and his escort come again, once per field, taken or not (bossSubWave)
    *   ccDelegation         the final boss rounds: Degenbrecher (at the round's start), 2 Delegation Shieldbearers and 2
    *                        Delegation Centurion Champions once per field (bossSubWave); the Degenbrecher's HP × 1 / 2 / 3
    *                        per alive player, her ATK × 1.5 from United 2
@@ -155,7 +156,7 @@ export class MatchInfra {
   }
 
   /**
-   * The SPA-CC sub-waves of a final boss round's field (Patriot Undying 2: Patriot and his escort; Delegation: the
+   * The SPA-CC sub-waves of a final boss round's field (Patriot Undying 3: Patriot and his escort; Delegation: the
    * Degenbrecher, Shieldbearers and Centurion Champions with their multipliers) — once per field, not per player, every
    * unit on a route that goes to the left portal first and then the right (Fish 2026-10-15; waves.js `leftFirst`). They
    * go with the field's first living player (left). Map playerId → bounty cards.
@@ -168,7 +169,7 @@ export class MatchInfra {
     if (!first) return out;
     const cards = [];
     const pt = CC.patriot;
-    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying2') && this.gd.enemy(pt.key)) {
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.key)) {
       cards.push(riskCard('risk:patriot', pt.key, 1, { leftFirst: true }));
       if (this.gd.enemy(pt.escort.key)) cards.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count, { leftFirst: true }));
     }
@@ -197,7 +198,7 @@ export class MatchInfra {
     let low = alive[0];
     for (const p of alive) if (stackTotal(p) < stackTotal(low)) low = p;
     if (low !== ps) return [];
-    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: this.isSolo ? s.soloCount : s.count, coin: 0, payout: 'kill', rounds: 1 } }];
     // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave
     const z = CC.famiglia.zaaro;
     if ((tagHas(this.lobbyRules, 'ccFamiglia', 'unending3') || tagHas(this.lobbyRules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {

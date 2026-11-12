@@ -67,7 +67,8 @@ export const CC = Object.freeze({
   ozPhys: Object.freeze({ share: 0.5, def: 5000 }),   // … as Physical
   lockout: Object.freeze({ every: Object.freeze([0, 0.68, 0.28, 0.18]), seconds: 10 }), // invulnerable 10 game s per step
   // Famiglia: Cleaner — rounds 10–13, the fewest stacks
-  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 3, rounds: Object.freeze([10, 11, 12, 13]) }),
+  // (Fish's balance draft 2026-11: was 5; 3 in co-op, 2 in solo)
+  silencers: Object.freeze({ key: 'enemy_1283_sgkill_2', count: 3, soloCount: 2, rounds: Object.freeze([10, 11, 12, 13]) }),
   // Famiglia Unending / Seasonal — the Blood Ledger (血债账款) of every battle (arknights.wiki.gg Blood_Ledger): it fills
   // perSec per game second (+zaaroPerSec while Zaaro lives, + his Furious Howl, data skill WildCalling), and at max an
   // Asset Liquidation (清算时刻): every enemy ATK +atkPct, DEF +defPct; the Silencers also their data Passive (ATK / DEF
@@ -105,11 +106,12 @@ export const CC = Object.freeze({
     howl: Object.freeze({ icd: 5, cd: 40, duration: 5.5, perSec: 35 }),
   }),
   // Patriot: Undying 1 — the round-9 Improv always offers him (no bounty); nobody taking him: the final boss +200 % HP
-  // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — 2 Guerrilla Shieldguards join him, the
-  // sub-wave comes again in the final boss rounds (once per field); Marching Stance: 90 % less Physical / Arts damage
-  // from operators not blocking him. Undying 3 — +200 % HP, the listed statuses cannot touch him in Marching Stance,
-  // never slower than his base speed. (Fish's balance draft 2026-11: the HP, the immunities and the speed floor were
-  // Undying 2's; Undying 3 had 5 Shieldguards and every enemy +40 % move speed, +40 ASPD while he lived.)
+  // (Undying 2: also +100 % ATK); he costs leakLp when he leaks. Undying 2 — 2 Guerrilla Shieldguards join him;
+  // Marching Stance: 90 % less Physical / Arts damage from operators not blocking him. Undying 3 — +200 % HP, the listed
+  // statuses cannot touch him in Marching Stance, never slower than his base speed; he and his escort come again in the
+  // final boss rounds (once per field), whether he was taken or not. (Fish's balance draft 2026-11: the HP, the
+  // immunities, the speed floor and the final-round sub-wave were Undying 2's; Undying 3 had 5 Shieldguards and every
+  // enemy +40 % move speed, +40 ASPD while he lived.)
   patriot: Object.freeze({
     key: 'enemy_1506_patrt', round: 9, leakLp: 5, skipHp: 2, skipAtk: 1, // Level 1 stats (data enemies.json level1)
     marchDr: 0.9, hpPct: 2,

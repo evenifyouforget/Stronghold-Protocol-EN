@@ -73,6 +73,30 @@ function lastLineText() {
  * Alliance and enemy names come from the data.
  */
 export function riskText(key, level) {
+  const out = riskTextOf(key, level);
+  return balanceAlpha(key, level) ? { ...out, short: `${out.short} α` } : out;
+}
+
+/**
+ * (Fish's balance update of 2026-11) the tag levels whose game it changed carry "α" after their name, so players see
+ * which tags are new (Fish: "add α to the end of all tag names that were affected"). A level counts when what it puts
+ * in force changed, its own effect or an included level's: every Famiglia level includes Cleaner 1 (fewer Silencers),
+ * every Delegation level United 1 (a smaller sub-wave). Unchanged: Suffocation 1, Undying 1, Invincible Blade 1.
+ */
+const BALANCE_ALPHA = Object.freeze({
+  ccSpRecovery: Object.freeze([2, 3]),
+  ccVengeance: Object.freeze([2, 3]),
+  ccFamiglia: Object.freeze(['cleaner', 'unending2', 'seasonal2', 'unending3', 'seasonal3']),
+  ccPatriot: Object.freeze(['undying2', 'undying3']),
+  ccDelegation: Object.freeze(['united1', 'united2', 'united3']),
+});
+export function balanceAlpha(key, level) {
+  const list = BALANCE_ALPHA[key];
+  if (!list) return false;
+  return typeof list[0] === 'number' ? list.includes(level) : list.includes(nodeOf(key, level));
+}
+
+function riskTextOf(key, level) {
   const enemyName = (k) => data.lookup('enemies', k)?.name || k;
   switch (key) {
     case 'ccInvestorBench': return level >= 2
@@ -124,7 +148,7 @@ function famigliaText(node, enemyName) {
   const F = CC.famiglia;
   const zaaro = enemyName(F.zaaro.key), silencer = enemyName(F.summonKey);
   switch (node) {
-    case 'cleaner': return { short: t('家族：清道夫 1'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】', { n: CC.silencers.count, name: enemyName(CC.silencers.key) }) };
+    case 'cleaner': return { short: t('家族：清道夫 1'), full: t('第10~13回合，盟约层数之和最少的博士（并列时座位靠前者）的作战中额外出现{n}名【{name}】（单人模式{m}名）', { n: CC.silencers.count, m: CC.silencers.soloCount, name: enemyName(CC.silencers.key) }) };
     case 'unending2': return { short: t('家族：无尽 2'), full: t('每场作战全程处于清算时刻：敌人攻击力+{atk}%，防御力+{def}%（不会因此出现【{silencer}】）', { atk: pct(F.atkPct), def: pct(F.defPct), silencer }) };
     case 'seasonal2': return { short: t('家族：季节 2'), full: t('每场作战都有血债账款：从0开始，每秒+{n}，达到{max}时触发清算时刻（敌人攻击力+{atk}%，防御力+{def}%，出现1名【{silencer}】，{s}秒内归零）；从第{r}回合起开始时为{late}%', { n: F.perSec, max: F.max, atk: pct(F.atkPct), def: pct(F.defPct), silencer, s: F.drainSeconds, r: F.lateFrom, late: pct(F.lateShare) }) };
     case 'unending3':
@@ -138,8 +162,8 @@ function patriotText(node, enemyName) {
   const name = enemyName(pt.key), escort = enemyName(pt.escort.key);
   switch (node) {
     case 'undying1': return { short: t('爱国者：不死 1'), full: t('第{r}回合的机变必定提供【{name}】（1级属性，无赏金，漏过时扣除{lp}点目标生命）；若无人选择，最终领袖最大生命值+{hp}%', { r: pt.round, name, lp: pt.leakLp, hp: pct(pt.skipHp) }) };
-    case 'undying2': return { short: t('爱国者：不死 2'), full: t('{n}名【{escort}】随【{name}】出现，最终领袖回合再次出现（每个战场1组）；【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { n: pt.escort.count, escort, name, dr: pct(pt.marchDr), atk: pct(pt.skipAtk) }) };
-    case 'undying3': return { short: t('爱国者：不死 3'), full: t('【{name}】最大生命值+{hp}%，处于行军姿态时免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导，移动速度不会低于基础值', { name, hp: pct(pt.hpPct) }) };
+    case 'undying2': return { short: t('爱国者：不死 2'), full: t('{n}名【{escort}】随【{name}】出现；【{name}】处于行军姿态时，受到未阻挡他的单位造成的物理与法术伤害-{dr}%；若无人选择【{name}】，最终领袖攻击力还+{atk}%', { n: pt.escort.count, escort, name, dr: pct(pt.marchDr), atk: pct(pt.skipAtk) }) };
+    case 'undying3': return { short: t('爱国者：不死 3'), full: t('【{name}】最大生命值+{hp}%，处于行军姿态时免疫减速、晕眩、束缚、寒冷、冻结、战栗、沉睡、恐惧、浮空与诱导，移动速度不会低于基础值；无论是否有人选择，【{name}】与{n}名【{escort}】都会在最终领袖回合出现（每个战场1组）', { name, hp: pct(pt.hpPct), n: pt.escort.count, escort }) };
     default: return { short: '?', full: '?' };
   }
 }
