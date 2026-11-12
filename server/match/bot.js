@@ -201,6 +201,18 @@ let BOT_MAX_LEVEL = 5;
  * levelled one round earlier for the step that opens a slotted tier (levelUp).
  */
 export let DIY_PIECE_BONUS = 12;
+/**
+ * (fork) Legacy's named rules, each one switchable (botTacticsLegacy.js legacy-rules; fish-edition/ai-players/02): all
+ * on is legacy. Off, the rule's step is skipped and the rest of legacy plays as before, so the evolution race can test
+ * legacy without it, or with a research tactic in its place. RNG draws are unchanged while all are on.
+ *   trade (§37.35 tradeOnce), layerRefresh (§37.35), pager (§37.69 杰西卡's members first), diyEarlyLevel (自选 slot one
+ *   round earlier), bandStep / coreStep (§35.63 a missing focus member bought without a lineup gain), fullBoardGate (a new
+ *   operator for a full board must raise the lineup), shopItemsMergeOnly (§37.39), sellMorphBringers (§37.42),
+ *   morphPlan (§37.41 the 变形同构体's carrier), holdBondItemForMorph (§37.41), faItemHunt (§37.67).
+ */
+let RULES = Object.freeze({ trade: true, layerRefresh: true, pager: true, diyEarlyLevel: true, bandStep: true, coreStep: true,
+  fullBoardGate: true, shopItemsMergeOnly: true, sellMorphBringers: true, morphPlan: true, holdBondItemForMorph: true, faItemHunt: true });
+export const LEGACY_RULE_NAMES = Object.freeze(Object.keys(RULES));
 const TIER_POWER = [0, 10, 12.5, 15, 18, 21.5, 25];
 /** Prep-side 特质 that keep adding bond layers every round / every refresh (a player's main layer engine). */
 const RECURRING_TRAIT_EVENTS = new Set(['SERVER_PREP_START', 'SERVER_PREP_FIN', 'SERVER_REFRESH_SHOP']);
@@ -2550,7 +2562,7 @@ export function levelUp(m, ps, { spare = false, policy = null } = {}) {
     let want = price === 0;
     if (!want && ps.shop.level < target && (boardReady || r >= 6)) want = true;
     // a human's 自选 slots of the next level (AI 托管): that step one round earlier (DIY_PIECE_BONUS)
-    if (!want && boardReady && ps.shop.level < nextTarget && diyOpensAt(ps, ps.shop.level + 1)) want = true;
+    if (!want && RULES.diyEarlyLevel && boardReady && ps.shop.level < nextTarget && diyOpensAt(ps, ps.shop.level + 1)) want = true;
     if (!want && ps.shop.level < nextTarget && price <= 2 && boardReady) want = true;
     if (!want && spare && ps.funds >= price + 1 + fundsReserve(m, ps) && ps.shop.level < nextTarget + 1 && boardReady) want = true;
     if (!want && ps.funds >= price + 14) want = true;
@@ -2638,6 +2650,7 @@ function plannedLevelFunds(m, ps) {
  * or a member).
  */
 function pagerBuy(m, ps) {
+  if (!RULES.pager) return false;
   const h = pagerPlan(m, ps);
   if (!h) return false;
   const gd = ps.gd || m.gd;
@@ -2718,8 +2731,8 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
     if (guard > 0) yield;
     // §37.69: the 杰西卡 seat's missing 谢拉格 members come first
     if (!policy && pagerBuy(m, ps)) { memo = null; continue; }
-    if (!policy && !fillOnly && tradeOnce(m, ps, () => context(m, ps))) continue;
-    if (!policy && !fillOnly && layerRefresh(m, ps)) { refreshes++; continue; }
+    if (!policy && !fillOnly && RULES.trade && tradeOnce(m, ps, () => context(m, ps))) continue;
+    if (!policy && !fillOnly && RULES.layerRefresh && layerRefresh(m, ps)) { refreshes++; continue; }
     if (policy) takeOffers(m, ps, policy); // a merge reward can enable another merge before upgrading
     if (customPolicy && !fillOnly && policy.canLevel(m, ps)) {
       const oldLevel = ps.shop.level;
@@ -2767,7 +2780,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         const merges = ps.completesChessMerge(s.id);
         const base = gd.baseIdOf(s.id);
         // §37.35: before the level-up, a new member of the opening strategy's core bond is bought like a merge
-        const bandStep = fillOnly && !merges && !customPolicy && ctx.focus && ctx.focus === bandMain(m, ps)
+        const bandStep = RULES.bandStep && fillOnly && !merges && !customPolicy && ctx.focus && ctx.focus === bandMain(m, ps)
           && !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
           && !!coreGap(m, ctx.focus, ctx.owned, ps)
           // §37.69: the 杰西卡 seat's member before the level-up only with the level-up's funds kept
@@ -2789,9 +2802,9 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         sc = buyScore(m, ps, s.id, ctx) - price;
         // §35.63: a missing member of the focus core bond is bought even when one swap does not raise the lineup yet,
         // while the bench keeps room for it and the members a later swap withdraws (3 free hand slots)
-        const coreStep = !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
+        const coreStep = RULES.coreStep && !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
           && !!coreGap(m, ctx.focus, ctx.owned, ps);
-        if (boardFull && !merges && !planBuyTarget(m, ps, s.id) && !coreStep) {
+        if (RULES.fullBoardGate && boardFull && !merges && !planBuyTarget(m, ps, s.id) && !coreStep) {
           if (!ctx.copies.get(base)) {
             // with a full board a new operator must improve the lineup
             if (!cur) {
@@ -2818,7 +2831,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         // strategy bots) keeps its own equipment rule. §37.41: the elite items, the dolls and the bond item of a focus whose
         // top tier needs 缪尔赛思 are bought too (shopItemWanted).
         const wanted = !customPolicy && shopItemWanted(m, ps, s.id, ctx);
-        if (!customPolicy && !requested && !wanted && !ps.completesItemMerge(s.id)) return;
+        if (RULES.shopItemsMergeOnly && !customPolicy && !requested && !wanted && !ps.completesItemMerge(s.id)) return;
         if (requested && !wanted && !ps.completesItemMerge(s.id) && !planItemRoom(m, ps, s)) return;
         if (customPolicy && (policy.canLevel(m, ps) || (canRefresh && freeSlot(ps.hand) >= 0
           && policy.searchTargets(m, ps).some(t => ps.funds >= refreshCost
@@ -4430,11 +4443,11 @@ function useArt(m, ps, item, ctx) {
 export function equipItems(m, ps) {
   const gd = ps?.gd || m.gd;
   // §37.42: one that arrived another way (a transformation, a copy, a purchase) is sold here
-  sellMorphBringers(m, ps);
+  if (RULES.sellMorphBringers) sellMorphBringers(m, ps);
   const tried = new Set();
   // §37.41: a 变形同构体 goes where its granted bond gains most (morphPlan, with the bond item the plan names); without such a
   // carrier it waits for a focus whose top tier needs it (topAboveCap), else the usual target below takes it
-  for (const morph of [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p))) {
+  for (const morph of RULES.morphPlan ? [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p)) : []) {
     const mctx = context(m, ps);
     // §37.43 [ASSUMED]: with such a focus 缪尔赛思 takes its bond item and the 变形同构体 wherever she stands (one slot, two
     // members of the focus) — morphPlan only looks at the current lineup, which she is rarely in before her conversion
@@ -4469,7 +4482,7 @@ export function equipItems(m, ps) {
     if (itemEffect(rec) === 'use_equip_upgrade_char' && m.round < gd.bossRound && !planEquips(m, ps, item.id)
       && ![...ps.board.values()].some((p) => p.kind === 'chess' && !gd.isGolden(p.id) && gd.tierOf(p.id) >= ELITE_ITEM_TIER)) continue;
     // §37.41: one bond item of a focus whose top tier needs 缪尔赛思 waits for her 变形同构体 until the Final Assault prep
-    if (!heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
+    if (RULES.holdBondItemForMorph && !heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
       heldNine = true;
       continue;
     }
@@ -4634,6 +4647,7 @@ function faModDps(rec, model, mod, T) {
  * advisor plan's seat too — the hunt keeps the pieces the plan protects and the items it keeps.
  */
 function faHunts(m, ps) {
+  if (!RULES.faItemHunt) return false;
   return m.round === (ps?.gd || m.gd).bossRound && !!ps.isBot && !ps.autoplay;
 }
 /** A damage item obtained before the hunt waits for it. */
@@ -4752,12 +4766,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the

@@ -7,7 +7,7 @@
 // The tunables apply to the whole seat (botTactics.js defineProfile): a constant that legacy also reads at another
 // decision point follows this parameter there too. The grouping by decision point is where each one mainly acts.
 import { defineTactic, defineProfile } from './botTactics.js';
-import { LEGACY_TUNABLES as L } from './bot.js';
+import { LEGACY_TUNABLES as L, LEGACY_RULE_NAMES } from './bot.js';
 
 const num = (min, max, def) => ({ type: 'number', min, max, default: def });
 const int = (min, max, def) => ({ type: 'int', min, max, default: def });
@@ -158,8 +158,20 @@ export const LEGACY_ARRANGE = defineTactic({
 });
 
 /** legacy's decision points in its own order: draft, economy, placement. */
+/**
+ * Legacy's named rules (bot.js RULES), one switch each: all on is legacy. Off, the rule's step is skipped, so a race can
+ * test legacy without it, or with a research tactic in its place (Fish 2026-11-12: "a less monolithic legacy bot").
+ */
+export const LEGACY_RULES = defineTactic({
+  id: 'legacy-rules',
+  describe: "legacy's named rules, each switchable: trade, layer refresh, the pager seat, the 自选 level step, focus steps, the full-board gate, shop items, the Isomorph rules, the Final Assault item hunt",
+  params: Object.fromEntries(LEGACY_RULE_NAMES.map((k) => [k, { type: 'bool', default: true }])),
+  at: pass('sellJunk'),
+  tunables: (p) => ({ RULES: Object.freeze(Object.fromEntries(LEGACY_RULE_NAMES.map((k) => [k, p[k]]))) }),
+});
+
 export const LEGACY_TACTICS = Object.freeze([LEGACY_BAND, LEGACY_CARD, LEGACY_BOUNTY, LEGACY_OFFERS, LEGACY_SELL,
-  LEGACY_BUY, LEGACY_LEVEL, LEGACY_SPEND, LEGACY_FREEZE, LEGACY_EQUIP, LEGACY_ARRANGE]);
+  LEGACY_BUY, LEGACY_LEVEL, LEGACY_SPEND, LEGACY_FREEZE, LEGACY_EQUIP, LEGACY_ARRANGE, LEGACY_RULES]);
 
 /** The registered id of the layered legacy bot (SP_BOT_STRATEGY, botbench --bot). */
 export const LEGACY_PROFILE_ID = 'legacy-layered';
