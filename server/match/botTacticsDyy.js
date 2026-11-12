@@ -7,7 +7,8 @@
 // level on a fixed schedule, and keep 远见 (Foresight) / 奇迹 (Marvel) / 投资人 (Investor) active: Swire, Record Keeper
 // and Swire the Elegant Wit are Yan members of those Alliances.
 import { defineTactic, defineProfile, PASS } from './botTactics.js';
-import { freeSlot } from './board.js';
+import { freeSlot, parseKey, tileKey, FIELD } from './board.js';
+import { PLAN_ISO, CARRY_ISO, PLAN_ITEMS, listedItemsFirst } from './botTacticsResearch.js';
 
 const DYY = 'band_duyaoy';
 const YAN = 'yanShip';
@@ -164,10 +165,109 @@ export const DYY_FREEZE = defineTactic({
   },
 });
 
-export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE]);
+/**
+ * The Muelsyse engine (fish-edition/ai-players/05 "Tactics that are likely to be consistent": "Can upgrade barge to level
+ * 6 AND Muelsyse in inventory AND less than 6 Damazti Isomorph owned in total AND (cloning item in inventory OR cloning
+ * item in shop): Upgrade barge"; "Can clone Muelsyse AND less than 6 …: Clone Muelsyse"; "Muelsyse in inventory and 6
+ * or more Damazti Isomorph owned in total: Sell Muelsyse"). 缪尔赛思 brings 1 变形同构体 when gained (2 as an elite;
+ * Investor repeats it), so every copy of her is an Isomorph. The clone is 画卷 (chess_item_6_02_m, a tier-6 Art): it
+ * copies the operator on its tile, and the copy is a gain.
+ * Legacy sells a normal 缪尔赛思 as she arrives (§37.42 sellMorphBringers: the Isomorph stays, she goes back to the pool),
+ * so it never clones her. While fewer than `maxIso` Isomorphs are owned (hand, temp hand, worn), this tactic:
+ *   - keeps her (plan.keep), with `keep: clone` only while a 画卷 is held or in the shop, with `keep: always` always;
+ *   - lists 画卷 in items.buy and keeps it from legacy's own Art rule (which copies the most valuable operator);
+ *   - uses a held 画卷 on her (moving her onto a free tile first if she's on the Bench and the board has room);
+ *   - levels to 6 (`level6`): `clone` = Fish's rule (she is held and a 画卷 is held or shown), `held` = she is held,
+ *     `off` = never. Tier 6 (画卷, more copies of her) only shows from shop level 6; legacy stops at 5.
+ * From maxIso on, it does nothing: legacy sells her.
+ * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics.
+ */
+const MUELSYSE = 'chess_char_6_11_a';
+const SCROLL = 'chess_item_6_02_m';
+const isoCount = (gd, ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
+  + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
+const heldMuelsyse = (gd, ps) => ps.allChess().filter((q) => gd.baseIdOf(q.id) === MUELSYSE);
+const heldScrolls = (ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && q.id === SCROLL);
+const shopShows = (ps, id) => ps.shop.slots.some((sl) => sl && !sl.sold && sl.id === id);
+
+function muelsyseActive(m, ps, p) {
+  if (!ps.isBot || ps.autoplay || (p.dyyOnly && ps.bandId !== DYY)) return false;
+  const gd = gdOf(m, ps);
+  return isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
+}
+
+function muelsyseLevel(m, ps, p) {
+  if (p.level6 === 'off' || ps.shop.level !== 5 || !muelsyseActive(m, ps, p)) return;
+  if (p.level6 === 'clone' && !heldScrolls(ps).length && !shopShows(ps, SCROLL)) return;
+  ok(() => ps.levelUp());
+}
+
+/** 画卷 on 缪尔赛思: her board tile, or a free tile she moves to first. */
+function cloneMuelsyse(m, ps) {
+  const gd = gdOf(m, ps);
+  for (let guard = 0; guard < 2; guard++) {
+    const scroll = heldScrolls(ps)[0];
+    if (!scroll || freeSlot(ps.hand) < 0) return;
+    let at = [...ps.board.entries()].find(([, q]) => q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE)?.[0];
+    if (!at) {
+      const mu = ps.hand.find((q) => q && q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE);
+      if (!mu) return;
+      for (let r = FIELD.r0; r <= FIELD.r1 && !at; r++) for (let c = FIELD.c0; c <= FIELD.c1 && !at; c++) {
+        if (ps.board.has(tileKey(r, c))) continue;
+        if (ok(() => ps.move(mu.uid, { area: 'board', row: r, col: c }))) at = [...ps.board.entries()].find(([, q]) => q.uid === mu.uid)?.[0];
+      }
+      if (!at) return;
+    }
+    const [r, c] = parseKey(at);
+    if (!ok(() => ps.useArt(scroll.uid, r, c))) return;
+  }
+}
+
+export const DYY_MUELSYSE = defineTactic({
+  id: 'dyy-muelsyse',
+  describe: 'Du Yaoye: keep 缪尔赛思 and copy her with 画卷 for more Isomorphs; level 6 for her; then legacy',
+  params: {
+    maxIso: { type: 'int', min: 1, max: 8, default: 6 },
+    keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
+    level6: { type: 'choice', choices: ['clone', 'held', 'off'], default: 'clone' },
+    dyyOnly: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (muelsyseActive(m, ps, p) && (!own || own.round === m.round)) {
+        muelsyseLevel(m, ps, p);
+        const gd = gdOf(m, ps);
+        const scroll = heldScrolls(ps).length > 0 || shopShows(ps, SCROLL);
+        const plan = own?.plan || {};
+        const items = plan.items || {};
+        const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
+        const keep = p.keep === 'always' || scroll ? heldMuelsyse(gd, ps).map((q) => q.id) : [];
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, keep: merge(plan.keep, keep, 32),
+          items: Object.freeze({ ...items, buy: merge(items.buy, [SCROLL], 8), keep: merge(items.keep, [SCROLL], 32) }) }) };
+      }
+      return ctx.next();
+    },
+    levelUp(ctx) {
+      muelsyseLevel(ctx.match, ctx.player, ctx.params);
+      return ctx.next();
+    },
+    *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
+    equipItems(ctx) {
+      if (muelsyseActive(ctx.match, ctx.player, ctx.params)) cloneMuelsyse(ctx.match, ctx.player);
+      return ctx.next();
+    },
+  },
+});
+
+export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE]);
 
 /** Opt-in: Fish's Du Yaoye list, legacy below. Plays as legacy for every other Strategy. */
 export const DYY_PROFILES = Object.freeze([
   defineProfile({ id: 'fish-dyy', tactics: [DYY_SHOP, DYY_FREEZE, DYY_LEVEL] }),
+  // DYYBot, the draft of step 3 (ai-players/05): the economy list (human schedule), the Isomorph engine (plan-iso from
+  // level 5, the Muelsyse clone, the carry), and the stack items (简易通讯机 and co.)
+  defineProfile({ id: 'dyybot', tactics: [DYY_MUELSYSE, DYY_SHOP, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } },
+    { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
 ]);
-

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOT_STRATEGIES } from '../../server/match/botStrategies.js';
 import { PASS, profileOf, resolveParams } from '../../server/match/botTactics.js';
-import { DYY_LEVEL, DYY_SHOP, DYY_FREEZE } from '../../server/match/botTacticsDyy.js';
+import { DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE } from '../../server/match/botTacticsDyy.js';
 import { makeMatch, checkInvariants } from './harness.js';
 
 const YAN_T1 = 'chess_char_1_03_a'; // 惊蛰 / Leizi: 炎, tier 1
@@ -84,4 +84,41 @@ test('dyy-shop: buys an unowned Yan operator, hunts with at most the 2 special r
     assert.ok(handed, "legacy's buy loop follows");
     checkInvariants(m);
   } finally { m.dispose(); }
+});
+
+test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with it (one more Isomorph), levels to 6; stops at maxIso', () => {
+  const { m, ps } = prep({ round: 9, funds: 60 });
+  const gd = m.gd;
+  const isos = () => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
+    + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
+  const mus = () => ps.allChess().filter((q) => gd.baseIdOf(q.id) === 'chess_char_6_11_a').length;
+  for (let k = 0; k < 4 && ps.shop.level < 5; k++) { ps.funds = 60; ps.levelUp(); }
+  assert.equal(ps.shop.level, 5);
+  ps.funds = 60;
+  assert.ok(ps.acquireChess('chess_char_6_11_a', { source: 'test' }));
+  const iso0 = isos();
+  assert.ok(iso0 >= 1, 'she brings an Isomorph');
+  // no 画卷: nothing kept (keep: clone), no level 6
+  const own0 = ps._botSelf;
+  DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.equal(ps.shop.level, 5, 'no 画卷: no level 6');
+  assert.ok(!(ps._botSelf?.plan?.keep || []).includes('chess_char_6_11_a'), 'not kept without a clone');
+  ps._botSelf = own0;
+  assert.ok(ps.acquireItem('chess_item_6_02_m', { source: 'test', requirePool: false }));
+  DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.equal(ps.shop.level, 6, 'Fish\'s rule: level 6 with her and a 画卷');
+  assert.ok(ps._botSelf.plan.keep.includes('chess_char_6_11_a'));
+  assert.ok(ps._botSelf.plan.items.keep.includes('chess_item_6_02_m'));
+  assert.ok(ps._botSelf.plan.items.buy.includes('chess_item_6_02_m'));
+  const mu0 = mus();
+  DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.ok(mus() > mu0 || isos() > iso0, `copied: ${mu0} → ${mus()} Muelsyse, ${iso0} → ${isos()} Isomorphs`);
+  assert.ok(isos() > iso0, 'the copy brought an Isomorph');
+  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.id === 'chess_item_6_02_m').length, 0, 'the 画卷 is used');
+  checkInvariants(m);
+  // at maxIso: passes everything to legacy
+  const p1 = { ...resolveParams(DYY_MUELSYSE), maxIso: isos() };
+  ps._botSelf = null;
+  DYY_MUELSYSE.at.sellJunk({ ...ctxOf(DYY_MUELSYSE, m, ps), params: p1 });
+  assert.equal(ps._botSelf, null, 'at maxIso: no plan written');
 });

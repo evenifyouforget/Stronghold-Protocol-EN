@@ -419,7 +419,7 @@ export const PLAN_COMBOS = defineTactic({
 });
 
 /** The plan's listed shop items (items.buy) the shop shows, bought before legacy's buy loop (above params.reserve). */
-function* listedItemsFirst(ctx) {
+export function* listedItemsFirst(ctx) {
   const { match: m, player: ps, params: p, args: [opts] } = ctx;
   const want = ps._botSelf?.round === m.round ? ps._botSelf.plan?.items?.buy : null;
   if (!opts?.fillOnly && want?.length && ps.isBot && !ps.autoplay) {
