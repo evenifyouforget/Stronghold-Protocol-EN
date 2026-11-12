@@ -83,3 +83,33 @@ test('evolve --anytime runs until stopped, then writes a summary and packs the f
     assert.equal(r2.status, 0, r2.stderr);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('evolve --anytime --fresh: every iteration on new seeds, past the held-back ones, and it resumes', () => {
+  const root = mkdtempSync(join(tmpdir(), 'evo-fresh-'));
+  const out = join(root, 'run');
+  const args = ['tools/evolve.mjs', '--out', out, '--anytime', '--fresh', '--iter-budget', '300', '--min-blocks', '4', '--holdout', '61-90'];
+  try {
+    const r = spawnSync(process.execPath, args,
+      { cwd: ROOT, encoding: 'utf8', env: { ...process.env, EVOLVE_FAKE: 'early-roll', EVOLVE_FAKE_STOP_AFTER: '900' } });
+    assert.equal(r.status, 0, r.stderr);
+    const gens = readdirSync(out).filter((f) => /^gen-\d+\.md$/.test(f)).sort((a, b) => parseInt(a.slice(4)) - parseInt(b.slice(4)));
+    assert.ok(gens.length >= 3, gens.join(','));
+    let last = 0;
+    for (const f of gens) {
+      const head = readFileSync(join(out, f), 'utf8').split('\n')[0];
+      const [, a, b] = head.match(/seeds (\d+)–(\d+)/).map(Number);
+      assert.ok(a > last, `${f}: seeds ${a}–${b} after ${last}`);
+      assert.ok(b < 61 || a > 90 || /past the held-back 61–90/.test(head), head);
+      last = b;
+    }
+    assert.ok(last > 90, `the stream should have passed the held-back seeds (last ${last})`);
+    assert.match(readFileSync(join(out, 'holdout.md'), 'utf8'), /\| 0 \|/);
+    // resuming without --fresh is refused; with it, the finished iterations replay from the cache
+    const r2 = spawnSync(process.execPath, args.filter((a) => a !== '--fresh'), { cwd: ROOT, encoding: 'utf8', env: { ...process.env, EVOLVE_FAKE: 'early-roll' } });
+    assert.notEqual(r2.status, 0);
+    assert.match(r2.stderr, /--fresh/);
+    const before = readFileSync(join(out, 'fake-matches'), 'utf8').trim().split('\n').length;
+    const r3 = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8', env: { ...process.env, EVOLVE_FAKE: 'early-roll', EVOLVE_FAKE_STOP_AFTER: String(before + 50) } });
+    assert.equal(r3.status, 0, r3.stderr);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
