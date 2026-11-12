@@ -243,6 +243,7 @@ import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
 import { setupMatchWaves } from './waves.js';
 import { getBotStrategy, getBotStrategySeats } from './botStrategies.js';
+import { profileOf } from './botTactics.js';
 import { GAME_SPEED, HEADLESS_SLICE_MS } from './fields.js';
 import { MatchPlatform } from './match/platform.js';
 import { MatchInfra } from './match/infra.js';
@@ -554,6 +555,11 @@ export class Match {
     this.itemPool = new SharedItemPool(this.gd, () => this.order, this.roomScale);
     // 自选编队 (0.2.0): each human's slotted DIY pieces get their own stock — none for one whose bonds are all off this
     // match (player/diy.js initDiyStock); no randomness is drawn here
+    // (fork) a bot seat's picks: its profile's diy-picks tactic (botTactics.js), none for legacy
+    for (const ps of this.order) {
+      const picks = ps.isBot ? profileOf(this.botFor(ps))?.diyPicks : null;
+      if (picks) ps.setDiy(picks, { bot: true, ...(this.diyKitted ? { kitted: this.diyKitted } : {}) });
+    }
     const off = new Set([...bans.drawn, ...bans.staticOff]);
     for (const ps of this.order) ps.initDiyStock(off);
 

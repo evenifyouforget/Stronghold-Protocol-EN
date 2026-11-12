@@ -663,5 +663,67 @@ export const PLAN_KEEPERS = defineTactic({
   },
 });
 
+/**
+ * 自选 (custom operators) for a bot seat (Fish 2026-11-12: "I thought I was already asking for bots to use custom
+ * operators"; ai-players/05 "Chen the Dawnstreak and Shu on tier 5, nothing on tier 6"). The picks are made at match
+ * setup (botTactics.js diyPicks → Match.js → PlayerState setDiy); legacy already buys a slotted piece (DIY_PIECE_BONUS).
+ * Each choice is the human records' favourite skill and module (ai-players/08: tier 6 Togawa Sakiko S3 and Haruka S3,
+ * tier 5 Ch'en the Dawnstreak S3, Kal'tsit S2, Wang S3). An owned operator fills one slot: a repeat is skipped.
+ */
+export const DIY_CHOICES = Object.freeze({
+  chen: Object.freeze({ charId: 'char_1050_chen3', skillIndex: 2, uniEquipId: 'uniequip_002_chen3' }),
+  shu: Object.freeze({ charId: 'char_2025_shu', skillIndex: 2, uniEquipId: 'uniequip_002_shu' }),
+  wang: Object.freeze({ charId: 'char_2027_wang', skillIndex: 2, uniEquipId: 'uniequip_002_wang' }),
+  kaltsit: Object.freeze({ charId: 'char_1052_kalts2', skillIndex: 1, uniEquipId: null }),
+  logos: Object.freeze({ charId: 'char_4133_logos', skillIndex: 2, uniEquipId: 'uniequip_002_logos' }),
+  sakiko: Object.freeze({ charId: 'char_4182_oblvns', skillIndex: 2, uniEquipId: 'uniequip_002_oblvns' }),
+  haruka: Object.freeze({ charId: 'char_4202_haruka', skillIndex: 2, uniEquipId: 'uniequip_002_haruka' }),
+  goldenglow: Object.freeze({ charId: 'char_377_gdglow', skillIndex: 2, uniEquipId: 'uniequip_002_gdglow' }),
+});
+const DIY_OPTIONS = ['none', ...Object.keys(DIY_CHOICES)];
+export const DIY_PICKS = defineTactic({
+  id: 'diy-picks',
+  describe: 'fills the custom operator (自选) slots at match setup: two picks per tier 5 and 6',
+  params: {
+    t5a: { type: 'choice', choices: DIY_OPTIONS, default: 'chen' },
+    t5b: { type: 'choice', choices: DIY_OPTIONS, default: 'shu' },
+    t6a: { type: 'choice', choices: DIY_OPTIONS, default: 'none' },
+    t6b: { type: 'choice', choices: DIY_OPTIONS, default: 'none' },
+    // legacy buys a new operator for a full board only when the lineup gains, which a lone custom piece seldom does
+    // (smoke: shown R10-R14, never bought): the slotted pieces go into legacy's plan to buy, and the owned ones to keep
+    buy: { type: 'bool', default: true },
+    keep: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (ps.isBot && !ps.autoplay && ps.diyStock?.entries.size && (p.buy || p.keep) && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const slots = new Set(ps.diyStock.entries.keys());
+        const owned = ps.allChess().filter((q) => slots.has(gd.baseIdOf(q.id)));
+        const buy = p.buy ? [...ps.diyStock.entries].filter(([id, e]) => e.left > 0 && !owned.some((q) => gd.isGolden(q.id) && gd.baseIdOf(q.id) === id)).map(([id]) => id) : [];
+        const keep = p.keep ? owned.map((q) => q.id) : [];
+        if (buy.length || keep.length) {
+          const plan = own?.plan || {};
+          const merge = (a, b) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, 32));
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, ...(buy.length ? { buy: merge(plan.buy, buy) } : {}), ...(keep.length ? { keep: merge(plan.keep, keep) } : {}) }) };
+        }
+      }
+      return ctx.next();
+    },
+  },
+  diyPicks(p) {
+    const out = {};
+    const used = new Set();
+    for (const [slot, key] of [['chess_char_5_diy1_a', p.t5a], ['chess_char_5_diy2_a', p.t5b], ['chess_char_6_diy1_a', p.t6a], ['chess_char_6_diy2_a', p.t6b]]) {
+      if (key === 'none' || used.has(key)) continue;
+      used.add(key);
+      out[slot] = { ...DIY_CHOICES[key] };
+    }
+    return Object.keys(out).length ? out : null;
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS]);

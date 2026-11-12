@@ -69,15 +69,20 @@ function checkSpec(tid, name, spec) {
 /**
  * `tunables(params)`: optional, the values of legacy's tunables (bot.js LEGACY_TUNABLES) this tactic's parameters
  * set. A profile with any such tactic plays every hook with them (see defineProfile).
+ * `diyPicks(params)`: optional, the seat's 自选 (custom operator) picks for the match, `{ [slotBaseId]: { charId,
+ * skillIndex, uniEquipId } }` or null; the topmost tactic that returns picks sets them, at match setup (Match.js,
+ * PlayerState setDiy). A tactic with diyPicks needs no decision point.
  * @param {{ id: string, describe?: string, params?: Record<string, object>,
- *   at: Partial<Record<keyof typeof DECISION_POINTS, Function>>, tunables?: (params: object) => object }} def
+ *   at?: Partial<Record<keyof typeof DECISION_POINTS, Function>>, tunables?: (params: object) => object,
+ *   diyPicks?: (params: object) => object|null }} def
  */
 export function defineTactic(def) {
   if (!def || typeof def !== 'object') throw new TypeError('Tactic: object required');
-  const { id, describe = '', params = {}, at, tunables = null } = def;
+  const { id, describe = '', params = {}, at = {}, tunables = null, diyPicks = null } = def;
   if (typeof id !== 'string' || !ID.test(id) || id === 'legacy') throw new TypeError(`Tactic: bad id ${JSON.stringify(id)}`);
-  for (const key of Object.keys(def)) if (!['id', 'describe', 'params', 'at', 'tunables'].includes(key)) throw new TypeError(`Tactic ${id}: unknown field ${key}`);
-  if (!at || typeof at !== 'object' || !Object.keys(at).length) throw new TypeError(`Tactic ${id}: at least one decision point`);
+  for (const key of Object.keys(def)) if (!['id', 'describe', 'params', 'at', 'tunables', 'diyPicks'].includes(key)) throw new TypeError(`Tactic ${id}: unknown field ${key}`);
+  if (diyPicks !== null && typeof diyPicks !== 'function') throw new TypeError(`Tactic ${id}: diyPicks must be a function`);
+  if (!at || typeof at !== 'object' || (!Object.keys(at).length && !diyPicks)) throw new TypeError(`Tactic ${id}: at least one decision point`);
   for (const [point, fn] of Object.entries(at)) {
     const dp = DECISION_POINTS[point];
     if (!dp) throw new TypeError(`Tactic ${id}: unknown decision point ${point}`);
@@ -88,7 +93,7 @@ export function defineTactic(def) {
   if (tunables !== null && typeof tunables !== 'function') throw new TypeError(`Tactic ${id}: tunables must be a function`);
   const specs = {};
   for (const [name, spec] of Object.entries(params)) specs[name] = checkSpec(id, name, spec);
-  const tactic = Object.freeze({ id, describe, params: Object.freeze(specs), at: Object.freeze({ ...at }), tunables });
+  const tactic = Object.freeze({ id, describe, params: Object.freeze(specs), at: Object.freeze({ ...at }), tunables, diyPicks });
   if (tunables) tunablesOf(tactic, resolveParams(tactic)); // the defaults must map to known tunables
   return tactic;
 }
@@ -208,8 +213,15 @@ export function defineProfile({ id, tactics = [] } = {}) {
       if (!list.includes(e.tactic.id)) list.push(e.tactic.id);
     }
   }
+  // the 自选 picks: the topmost tactic that has any
+  let diyPicks = null;
+  for (const e of entries) {
+    const picks = e.tactic.diyPicks ? e.tactic.diyPicks(e.params) : null;
+    if (picks && Object.keys(picks).length) { diyPicks = Object.freeze(picks); break; }
+  }
   PROFILES.set(id, Object.freeze({
     tunables: tuned,
+    ...(diyPicks ? { diyPicks } : {}),
     tactics: Object.freeze(entries.map((e) => Object.freeze({ tactic: e.tactic.id, params: e.params }))),
     slots: Object.freeze({ draft: Object.freeze(slots.draft), economy: Object.freeze(slots.economy), placement: Object.freeze(slots.placement) }),
   }));

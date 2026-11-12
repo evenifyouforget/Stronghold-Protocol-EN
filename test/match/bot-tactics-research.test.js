@@ -204,3 +204,25 @@ test("plan-commit writes the key operator's Alliance into legacy's plan bonds an
   assert.deepEqual(ex.keep, ['chess_char_5_01_a'], 'Foresight (2 members) active: 圣约送葬人 kept, not 伊内丝');
   assert.ok(TACTICS['plan-commit'] && TACTICS['plan-keepers'], 'registered');
 });
+
+test('diy-picks fills a bot seat\'s custom operator slots at setup; legacy and a repeat pick stay empty', async () => {
+  const { DIY_PICKS } = await import('../../server/match/botTacticsResearch.js');
+  assert.deepEqual(Object.keys(DIY_PICKS.diyPicks(resolveParams(DIY_PICKS))), ['chess_char_5_diy1_a', 'chess_char_5_diy2_a']);
+  assert.equal(DIY_PICKS.diyPicks(resolveParams(DIY_PICKS, { t5a: 'none', t5b: 'none' })), null);
+  // an owned operator fills one slot: the repeat is skipped
+  assert.deepEqual(Object.keys(DIY_PICKS.diyPicks(resolveParams(DIY_PICKS, { t5b: 'chen', t6a: 'chen', t6b: 'sakiko' }))), ['chess_char_5_diy1_a', 'chess_char_6_diy2_a']);
+  const bot = profileFromData({ id: 't-diy-setup', tactics: [{ tactic: 'diy-picks', params: { t6a: 'sakiko' } }] });
+  for (const [strategy, slots] of [[bot, ['chess_char_5_diy1_a', 'chess_char_5_diy2_a', 'chess_char_6_diy1_a']], ['legacy', []]]) {
+    const h = soloBot({ botStrategy: strategy, seed: 7 });
+    try {
+      h.start();
+      const ps = h.m.order[0];
+      assert.deepEqual(Object.keys(ps.diy || {}).sort(), slots);
+      assert.equal([...(ps.diyStock?.entries.keys() ?? [])].length, slots.length);
+      assert.equal(ps.gd !== h.m.gd, slots.length > 0, 'the picks give the seat its own data view');
+      h.runToEnd();
+      checkInvariants(h.m);
+      assert.deepEqual(h.logs.error, []);
+    } finally { h.m.dispose(); }
+  }
+});
