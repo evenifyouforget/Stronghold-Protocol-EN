@@ -313,6 +313,27 @@ the same on 40 seeds, and the funds cost some defence (more leaks, less LP). In 
 against `eng-pos`'s 11 on the same code; that's suggestive, not significant. Next: the items' split (stack against
 coin) and a reserve, so the defence cost shrinks.
 
+## Fish's small tweaks (TODO, 2026-11-12): `plan-commit`, `plan-keepers`, `plan-combos`
+
+Built on `feature/bot-plan-tactics`; all write legacy's plan, default-off, for the evolution pool:
+
+| TODO item | Tactic (param) |
+|---|---|
+| Commit to Ægir if got Gladiia | `plan-commit` (`gladiia`): 歌蕾蒂娅 owned → Ægir into the plan bonds at `priority` (4) |
+| Commit to Laterano if got Mostima or Executor | `plan-commit` (`laterano`) |
+| Commit to Yan or Arcane if got Dusk | `plan-commit` (`dusk`): the one with more members owned |
+| Commit to Kjerag if got SilverAsh Alter and 3 Kjerag | `plan-commit` (`silverash`) |
+| Executor Alter over Ines if Foresight is active | `plan-keepers` (`executor`): 圣约送葬人 kept, 伊内丝 not |
+| Take Yu and field Yu | `plan-keepers` (`yu`): taken from merge rewards (tier 6), kept |
+| Swire in inventory, don't sell before the boss | `plan-keepers` (`swire`) |
+| Put Archetto behind an operator with good Alliances | legacy's positional value already counts the front piece's active Alliances (§37.37) |
+| 2 Marvel for cheaper refreshes | `plan-bond` with `bond: miraShip` (no new tactic) |
+| Kjerag: Ascalon custom operator + Nevermeltice | not built: bots field no custom operators yet |
+| The copy combos and 圣约送葬人 (08 above) | `plan-combos` |
+
+**Queued:** queue10 (`plan-combos`: records seeds 1–30 and botbench co-op 1–40) and queue11 (`commit`, `keepers`,
+and all three together, botbench co-op 1–40), paired against queue2's legacy.
+
 ## Next tactics (not built)
 
 1. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
