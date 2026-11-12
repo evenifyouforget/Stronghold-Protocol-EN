@@ -27,6 +27,8 @@ function startAmmo(mod, layers) {
   const u = h.unit('chess_char_6_01_a');
   h.step(1);
   u.skill.activate('test', { free: true });
+  // a skill with a begin clip starts when the clip ends (sim/skills.js activate, Yuri d3ec5ccc): the ammo is set then
+  h.runUntil(() => u.skill.active, 5);
   return u.skill.ammoMax;
 }
 
