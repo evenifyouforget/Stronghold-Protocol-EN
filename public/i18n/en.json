@@ -2896,7 +2896,6 @@
   "已投票给「{name}」": "Voted for \"{name}\"",
   "投票已结束": "Voting has ended",
   "Z型/W型模组（草案）": "Mod Z / Mod W (draft)",
-  "自选干员可以选择Z型/W型模组（Fish Edition的自制模组，草案，未经平衡）；关闭时选择了Z型/W型模组的自选干员改用其第一个模组": "Custom operators may use Mod Z / Mod W (Fish Edition's own modules: a draft, not balanced). When off, a custom operator set to a Mod Z / W uses its first module instead",
   "提丰的Z型调整": "Typhon's Z Adjustment",
   "提丰的W型调整": "Typhon's W Adjustment",
   "早露的Z型调整": "Rosa's Z Adjustment",
@@ -2920,5 +2919,10 @@
   "治疗友方单位时使其获得【不朽】：8秒内受到致命伤害时生命值不会低于1（不可叠加）；赋予【不朽】的冷却初始为0秒，每次【不朽】实际生效后+5秒": "Healing an ally grants Immortal: for 8 seconds, lethal damage cannot bring its HP below 1 (does not stack); granting Immortal has a cooldown that starts at 0 seconds and grows by 5 seconds each time an Immortal takes effect",
   "自身获得的部署费用翻倍；持续消耗超过90点的部署费用，每消耗1点使所有我方干员获得1点技力": "DP he earns is doubled; DP above 90 is drained continuously, each 1 DP drained giving 1 SP to every allied operator",
   "攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力10%的法术伤害和5%的神经损伤": "Attack range +1; during his skill, range +1 more, +1 target, and Invisible; attacks also deal Arts damage equal to 10% of ATK and Nervous Impairment equal to 5% of ATK",
-  "在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%": "While she is on the field, every enemy's weight −2; her damage to a target not in an elemental burst all becomes Corrosion; for each +10% ATK she has (up to 99 stacks), SP recovery +0.02 per second and the cannon's redeploy time −1%"
+  "在场时所有敌人重量-2；目标未处于元素爆发状态时，自身造成的伤害全部转为侵蚀损伤；自身攻击力每提升10%（最多计99层），技力自然回复+0.02/秒，水炮再部署时间-1%": "While she is on the field, every enemy's weight −2; her damage to a target not in an elemental burst all becomes Corrosion; for each +10% ATK she has (up to 99 stacks), SP recovery +0.02 per second and the cannon's redeploy time −1%",
+  "Z型/W型模组（草案）：{list}": "Mod Z / W (draft): {list}",
+  "自选干员可以选择允许的Z型/W型模组（Fish Edition的自制模组，草案，未经平衡）；选择了未允许模组的自选干员改用其第一个模组": "Custom operators may use the Mod Z / Mod W allowed here (Fish Edition's own modules: drafts, not balanced). A custom operator set to one that is not allowed uses its first module instead",
+  "允许的模组": "Allowed modules",
+  "已选 {n}/{max}": "{n}/{max} selected",
+  "Z型/W型模组": "Mod Z / W"
 }

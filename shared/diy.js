@@ -293,19 +293,20 @@ export function validateDiyPicks(picks, { data, kitted = null } = { data: null }
 }
 
 /**
- * (Fish Edition) The picks a room without the Mod Z rule fields (shared/rules.js `modZ`, shared/modZ.js): a pick naming
- * a Mod Z / W takes the operator's first module of the slot's elite form instead (isDiyModule, not a Mod Z), or none
- * when it has no other. Other picks, and every pick with the rule on, are returned as they are. A new object when
+ * (Fish Edition) The picks a room fields under its Mod Z rule (shared/rules.js `modZ`: the allowed Mod Z / W ids,
+ * shared/modZ.js): a pick naming a Mod Z / W the room does not allow takes the operator's first module of the slot's elite form instead (isDiyModule, not a Mod Z), or none
+ * when it has no other. Other picks, and the allowed ones, are returned as they are. A new object when
  * something changed.
  * @param {any} picks `{ [slotBaseId]: DiyPick | null }`
  * @param {any} rules the room's lobby rules
  * @param {DiyData} data
  */
 export function modZFallbackPicks(picks, rules, data) {
-  if (!isObj(picks) || rules?.modZ === true) return picks;
+  if (!isObj(picks)) return picks;
+  const allowed = new Set(Array.isArray(rules?.modZ) ? rules.modZ : []);
   let out = picks;
   for (const [slotId, pick] of Object.entries(picks)) {
-    if (!isObj(pick) || !isModZ(pick.uniEquipId)) continue;
+    if (!isObj(pick) || !isModZ(pick.uniEquipId) || allowed.has(pick.uniEquipId)) continue;
     const slot = diySlot(slotId, data);
     const form = slot?.golden ? unitForm(backupsOf(data), pick.charId, slot.golden.status) : null;
     const first = (form?.modules ?? []).find((m) => isDiyModule(m) && !isModZ(m.uniEquipId));

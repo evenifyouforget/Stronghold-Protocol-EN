@@ -6,7 +6,7 @@ import { MODZ, modZOf, withModZ } from '../shared/modZ.js';
 import { MODZ_INSTALLED } from '../server/sim/content/modZ.js';
 import { modZFallbackPicks, diyRecord } from '../shared/diy.js';
 import { getDefaultSource } from '../server/sim/simdata.js';
-import { RULES } from '../shared/rules.js';
+import { RULES, isRuleValue, normalizeRules, ruleSet } from '../shared/rules.js';
 import { makeBattle, enemyRec } from './helpers/battleHarness.js';
 
 const ds = getDefaultSource();
@@ -20,7 +20,12 @@ test('every Mod Z / W has battle effects, a unique id and an operator in the cus
     assert.ok(backups.units[m.charId], m.charId);
     assert.equal(modZOf(m.id), m);
   }
-  assert.ok(RULES.some((r) => r.key === 'modZ' && r.category === 'cheat'), 'a cheat rule');
+  const rule = RULES.find((r) => r.key === 'modZ');
+  assert.equal(rule.category, 'cheat');
+  assert.deepEqual(rule.options, MODZ.map((m) => m.id), 'one option per module');
+  assert.ok(isRuleValue('modZ', ['uniequip_fishz_weedy']) && !isRuleValue('modZ', ['uniequip_002_siege']) && !isRuleValue('modZ', true));
+  assert.deepEqual(normalizeRules({ modZ: ['uniequip_fishz_weedy', 'bogus', 'uniequip_fishz_typhon'] }).modZ, ['uniequip_fishz_typhon', 'uniequip_fishz_weedy']);
+  assert.ok(ruleSet('modZ', ['uniequip_fishz_weedy']) && !ruleSet('modZ', []));
 });
 
 test('withModZ appends to the elite forms only (forms with modules)', () => {
@@ -34,12 +39,14 @@ test('withModZ appends to the elite forms only (forms with modules)', () => {
   }
 });
 
-test('without the rule, a Mod Z pick falls back to an official module; with it, the pick stays', () => {
+test('the rule is per module: a Mod Z pick the room does not allow falls back to an official module', () => {
   const slot = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
   const pick = { charId: 'char_188_helage', skillIndex: 2, uniEquipId: 'uniequip_fishz_helage' };
   const off = modZFallbackPicks({ [slot]: pick }, {}, data)[slot];
   assert.ok(off.uniEquipId === null || /^uniequip_\d{3}_/.test(off.uniEquipId), String(off.uniEquipId));
-  assert.deepEqual(modZFallbackPicks({ [slot]: pick }, { modZ: true }, data)[slot], pick);
+  assert.deepEqual(modZFallbackPicks({ [slot]: pick }, { modZ: ['uniequip_fishz_helage'] }, data)[slot], pick, 'allowed');
+  const other = modZFallbackPicks({ [slot]: pick }, { modZ: ['uniequip_fishz_typhon'] }, data)[slot];
+  assert.notEqual(other.uniEquipId, pick.uniEquipId, 'another operator\'s module allowed: this one falls back');
   const rec = diyRecord(slot, pick, { elite: true, data });
   assert.ok(rec.bonds.includes('raidShip'), 'Hellagur Z grants Raid');
 });
