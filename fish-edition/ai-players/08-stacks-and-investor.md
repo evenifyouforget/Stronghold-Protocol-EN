@@ -490,6 +490,30 @@ Simple Communicator 1.5, Money-Grubbing Doll 1.3, Knightly Savings 1.2, Alliance
 Mimic Matter 0.6, Originium Solvent 0.6, Budget-Savvy Doll 0.5, then Alliance items (Victorian Hammer 0.5, Arcane Arts
 Circle 0.4, …).
 
+## Fish's TODO tactics, measured (queues 16–17, 2026-11-12)
+
+botbench co-op Ultimate 1–40, paired against legacy's 27 wins (`untracked/carryiso-2026-11/`, `untracked/todo-2026-11/`):
+
+| Profile | TODO item | Wins | Better / worse seeds | p (McNemar) | Score diff (t) |
+|---|---|---|---|---|---|
+| `carry-iso` | Isomorph + Alliance item on the carry | 27 | 0 / 0 | 1.00 | 0 |
+| `carry-iso-any` | the same, any active Alliance | 27 | 0 / 0 | 1.00 | 0 |
+| `carry-iso-buy` | + `plan-iso` | 23 | 1 / 5 | 0.22 | −0.102 (−1.58) |
+| `marvel` | 2 Marvel (`plan-bond miraShip`) | 23 | 3 / 7 | 0.34 | −0.112 (−1.28) |
+| `minimalist` | always buy Minimalist, sell at once | 26 | 2 / 3 | 1.00 | −0.015 (−0.25) |
+| `minimalist-merge` | always buy Minimalist, keep a pair | 29 | 5 / 3 | 0.73 | +0.054 (+0.69) |
+| `ammo` | Mostima next to an ammo user | 29 | 2 / 0 | 0.50 | +0.064 (+1.58) |
+| `ascalon` | Ascalon S2 + Nevermeltice | 29 | 9 / 7 | 0.80 | +0.046 (+0.43) |
+
+- **`carry-iso` never fired:** identical to legacy on every seed. Legacy's own Isomorph rule (morphPlan) equips a new
+  Isomorph in the same prep it arrives, before the Alliance item `carry-iso` asks for can be bought. To work, it has to
+  hold the Isomorph until the item comes; that needs a switch in legacy's morph loop (next). `carry-iso-buy`'s loss is
+  `plan-iso`'s merge-reward picks (05).
+- **Three small positives:** `minimalist-merge`, `ammo` and `ascalon` each win 2 more than legacy. None is
+  significant, and `ammo` changed only 2 seeds (Mostima with an ammo user is rare). Into the race pool.
+- **`marvel`:** 4 fewer wins, not significant. Like `plan-bond` for Investor, a forced Alliance plan pulls the
+  buys away from the lineup.
+
 ## Next tactics (not built)
 
 1. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
