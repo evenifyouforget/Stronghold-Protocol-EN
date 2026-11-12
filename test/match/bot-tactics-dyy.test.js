@@ -98,7 +98,8 @@ test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with i
   assert.ok(ps.acquireChess('chess_char_6_11_a', { source: 'test' }));
   const iso0 = isos();
   assert.ok(iso0 >= 1, 'she brings an Isomorph');
-  // no 画卷: nothing kept (keep: clone), no level 6
+  // no clone item held or shown: nothing kept (keep: clone), no level 6
+  for (const sl of ps.shop.slots) if (sl && sl.kind === 'item') sl.sold = true;
   const own0 = ps._botSelf;
   DYY_MUELSYSE.at.sellJunk(ctxOf(DYY_MUELSYSE, m, ps));
   assert.equal(ps.shop.level, 5, 'no 画卷: no level 6');
@@ -110,6 +111,7 @@ test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with i
   assert.ok(ps._botSelf.plan.keep.includes('chess_char_6_11_a'));
   assert.ok(ps._botSelf.plan.items.keep.includes('chess_item_6_02_m'));
   assert.ok(ps._botSelf.plan.items.buy.includes('chess_item_6_02_m'));
+  assert.ok(ps._botSelf.plan.items.buy.length <= 8);
   const mu0 = mus();
   DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
   assert.ok(mus() > mu0 || isos() > iso0, `copied: ${mu0} → ${mus()} Muelsyse, ${iso0} → ${isos()} Isomorphs`);
@@ -121,4 +123,23 @@ test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with i
   ps._botSelf = null;
   DYY_MUELSYSE.at.sellJunk({ ...ctxOf(DYY_MUELSYSE, m, ps), params: p1 });
   assert.equal(ps._botSelf, null, 'at maxIso: no plan written');
+});
+
+test('dyy-muelsyse: 拟态物质 and, from shop level 6, 简易通讯机 print her again (her only Alliance); 博士投影 promotes her first', () => {
+  const { m, ps } = prep({ round: 10, funds: 80 });
+  const gd = m.gd;
+  const isos = () => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
+    + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
+  const mus = () => ps.allChess().filter((q) => gd.baseIdOf(q.id) === 'chess_char_6_11_a');
+  for (let k = 0; k < 6 && ps.shop.level < 6; k++) { ps.funds = 80; ps.levelUp(); }
+  assert.equal(ps.shop.level, 6);
+  assert.ok(ps.acquireChess('chess_char_6_11_a', { source: 'test' }));
+  for (const id of ['chess_item_5_06_e_b', 'chess_item_5_05_e_a', 'chess_item_2_06_e_a']) assert.ok(ps.acquireItem(id, { source: 'test', requirePool: false }), id);
+  const iso0 = isos();
+  DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
+  assert.ok(mus().some((q) => gd.isGolden(q.id)), 'promoted');
+  assert.ok(mus().length >= 3, `printed twice: ${mus().map((q) => q.id)}`);
+  assert.ok(isos() >= iso0 + 2, `${iso0} → ${isos()} Isomorphs`);
+  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item' && ['chess_item_5_05_e_a', 'chess_item_2_06_e_a', 'chess_item_5_06_e_b'].includes(q.id)).length, 0, 'all used');
+  checkInvariants(m);
 });

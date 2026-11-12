@@ -170,62 +170,112 @@ export const DYY_FREEZE = defineTactic({
  * 6 AND Muelsyse in inventory AND less than 6 Damazti Isomorph owned in total AND (cloning item in inventory OR cloning
  * item in shop): Upgrade barge"; "Can clone Muelsyse AND less than 6 …: Clone Muelsyse"; "Muelsyse in inventory and 6
  * or more Damazti Isomorph owned in total: Sell Muelsyse"). 缪尔赛思 brings 1 变形同构体 when gained (2 as an elite;
- * Investor repeats it), so every copy of her is an Isomorph. The clone is 画卷 (chess_item_6_02_m, a tier-6 Art): it
- * copies the operator on its tile, and the copy is a gain.
- * Legacy sells a normal 缪尔赛思 as she arrives (§37.42 sellMorphBringers: the Isomorph stays, she goes back to the pool),
- * so it never clones her. While fewer than `maxIso` Isomorphs are owned (hand, temp hand, worn), this tactic:
- *   - keeps her (plan.keep), with `keep: clone` only while a 画卷 is held or in the shop, with `keep: always` always;
- *   - lists 画卷 in items.buy and keeps it from legacy's own Art rule (which copies the most valuable operator);
- *   - uses a held 画卷 on her (moving her onto a free tile first if she's on the Bench and the board has room);
- *   - levels to 6 (`level6`): `clone` = Fish's rule (she is held and a 画卷 is held or shown), `held` = she is held,
- *     `off` = never. Tier 6 (画卷, more copies of her) only shows from shop level 6; legacy stops at 5.
- * From maxIso on, it does nothing: legacy sells her.
+ * Investor repeats it), so every copy of her is an Isomorph. Legacy sells a normal one as she arrives (§37.42
+ * sellMorphBringers: the Isomorph stays, she goes back to the pool), so it never clones her.
+ * The clones (Fish 2026-11-13: "simple communicator always gives muelsyse since she's the only harmony alliance operator.
+ * same with all the other same alliance printers. commercial packaging plan as well. mimic matter should work as well.
+ * doctor hologram technically isn't cloning but it gets a similar effect"):
+ *   - 画卷 (Art): copies the operator on its tile — her, with her elite status;
+ *   - 拟态物质: her third copy with 2 normal ones held, else a random operator of her Alliances (her), any tier;
+ *   - 简易通讯机 / 寻呼模块 (an offer: she is picked) / 商业包装方案 (one of her Alliances every 8 (elite 7) sales, while it
+ *     stays on her): operators of her Alliances up to the shop level, so only from level 6 (she is tier 6);
+ *   - 博士投影: promotes her; the next copies of an elite are elite (2 Isomorphs each). Used first.
+ * The printers need her own Alliances only: one wearing an Isomorph is not used for them.
+ * While fewer than `maxIso` Isomorphs are owned (hand, temp hand, worn) and she is held, this tactic:
+ *   - keeps her (`keep: clone`: while a clone item is held or shown, or the packaging plan is on her; `always`);
+ *   - lists the clone items for buying and keeps them from legacy's own item rules;
+ *   - uses the held ones on her (moving her onto the board first for 画卷);
+ *   - levels to 6 (`level6`): `clone` = Fish's rule (she is held and a clone item is held or shown), `held` = she is held,
+ *     `off` = never. Tier 6 only shows from shop level 6; legacy stops at 5.
+ * From maxIso on, it does nothing: legacy sells her and uses the items its own way.
  * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics.
  */
 const MUELSYSE = 'chess_char_6_11_a';
 const SCROLL = 'chess_item_6_02_m';
+const MIMIC = ['chess_item_5_05_e_a', 'chess_item_5_05_e_b'];
+const PRINTERS = ['chess_item_2_06_e_a', 'chess_item_2_06_e_b', 'chess_item_4_01_e_a', 'chess_item_4_01_e_b'];
+const PACKAGING = ['chess_item_5_07_e_a', 'chess_item_5_07_e_b'];
+const HOLOGRAM = ['chess_item_5_06_e_a', 'chess_item_5_06_e_b'];
+const CLONE_ITEMS = Object.freeze([SCROLL, ...MIMIC, ...PRINTERS, ...PACKAGING, ...HOLOGRAM]);
 const isoCount = (gd, ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
   + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
 const heldMuelsyse = (gd, ps) => ps.allChess().filter((q) => gd.baseIdOf(q.id) === MUELSYSE);
-const heldScrolls = (ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && q.id === SCROLL);
-const shopShows = (ps, id) => ps.shop.slots.some((sl) => sl && !sl.sold && sl.id === id);
+const loose = (ps, ids) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && ids.includes(q.id));
+const shopShows = (ps, ids) => ps.shop.slots.some((sl) => sl && !sl.sold && ids.includes(sl.id));
+const packed = (gd, ps) => heldMuelsyse(gd, ps).some((q) => (q.items || []).some((it) => PACKAGING.includes(it.id)));
 
 function muelsyseActive(m, ps, p) {
   if (!ps.isBot || ps.autoplay || (p.dyyOnly && ps.bandId !== DYY)) return false;
   const gd = gdOf(m, ps);
   return isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
 }
+const cloneSource = (ps) => loose(ps, CLONE_ITEMS).length > 0 || shopShows(ps, CLONE_ITEMS);
 
 function muelsyseLevel(m, ps, p) {
   if (p.level6 === 'off' || ps.shop.level !== 5 || !muelsyseActive(m, ps, p)) return;
-  if (p.level6 === 'clone' && !heldScrolls(ps).length && !shopShows(ps, SCROLL)) return;
+  if (p.level6 === 'clone' && !cloneSource(ps)) return;
   ok(() => ps.levelUp());
 }
 
-/** 画卷 on 缪尔赛思: her board tile, or a free tile she moves to first. */
-function cloneMuelsyse(m, ps) {
+/** Her piece for an item: the board one first (an elite before a normal one), else the Bench. */
+function herPiece(gd, ps, { morphFree = false } = {}) {
+  const all = heldMuelsyse(gd, ps).filter((q) => !morphFree || !(q.items || []).some((it) => gd.item(it.id)?.canGiveBond));
+  const onBoard = new Set([...ps.board.values()]);
+  return all.sort((a, b) => (onBoard.has(b) - onBoard.has(a)) || (gd.isGolden(b.id) - gd.isGolden(a.id)) || a.uid - b.uid)[0] || null;
+}
+
+/** Puts the clone items on her: 博士投影, then the copies (画卷, 拟态物质), then the printers from shop level 6. */
+function cloneMuelsyse(m, ps, p) {
   const gd = gdOf(m, ps);
-  for (let guard = 0; guard < 2; guard++) {
-    const scroll = heldScrolls(ps)[0];
-    if (!scroll || freeSlot(ps.hand) < 0) return;
-    let at = [...ps.board.entries()].find(([, q]) => q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE)?.[0];
+  const stillActive = () => isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
+  // 博士投影 on a normal her (not while an elite is held already)
+  for (const it of loose(ps, HOLOGRAM)) {
+    const her = herPiece(gd, ps);
+    if (!her || gd.isGolden(her.id) || heldMuelsyse(gd, ps).some((q) => gd.isGolden(q.id))) break;
+    ok(() => ps.equip(it.uid, her.uid));
+  }
+  for (let guard = 0; guard < 2 && stillActive(); guard++) {
+    const scroll = loose(ps, [SCROLL])[0];
+    if (!scroll || freeSlot(ps.hand) < 0) break;
+    let at = [...ps.board.entries()].filter(([, q]) => q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE)
+      .sort(([, a], [, b]) => gd.isGolden(b.id) - gd.isGolden(a.id))[0]?.[0];
     if (!at) {
-      const mu = ps.hand.find((q) => q && q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE);
-      if (!mu) return;
+      const mu = herPiece(gd, ps);
+      if (!mu) break;
       for (let r = FIELD.r0; r <= FIELD.r1 && !at; r++) for (let c = FIELD.c0; c <= FIELD.c1 && !at; c++) {
         if (ps.board.has(tileKey(r, c))) continue;
         if (ok(() => ps.move(mu.uid, { area: 'board', row: r, col: c }))) at = [...ps.board.entries()].find(([, q]) => q.uid === mu.uid)?.[0];
       }
-      if (!at) return;
+      if (!at) break;
     }
     const [r, c] = parseKey(at);
-    if (!ok(() => ps.useArt(scroll.uid, r, c))) return;
+    if (!ok(() => ps.useArt(scroll.uid, r, c))) break;
+  }
+  for (const it of loose(ps, MIMIC)) {
+    const her = stillActive() && freeSlot(ps.hand) >= 0 ? herPiece(gd, ps, { morphFree: true }) : null;
+    if (!her) break;
+    ok(() => ps.equip(it.uid, her.uid));
+  }
+  if (ps.shop.level < 6) return;
+  for (const it of loose(ps, PRINTERS)) {
+    const her = stillActive() && freeSlot(ps.hand) >= 0 ? herPiece(gd, ps, { morphFree: true }) : null;
+    if (!her || !ok(() => ps.equip(it.uid, her.uid))) continue;
+    // 寻呼模块: the offer of her Alliances — take her
+    for (let g2 = 0; g2 < 2 && ps.offers?.length; g2++) {
+      const i = ps.offers[0].slots.findIndex((sl) => sl && !sl.sold && gd.baseIdOf(sl.id) === MUELSYSE);
+      if (i < 0 || !ok(() => ps.pickReward(i))) break;
+    }
+  }
+  if (!packed(gd, ps)) {
+    const it = loose(ps, PACKAGING)[0];
+    const her = it && stillActive() ? herPiece(gd, ps, { morphFree: true }) : null;
+    if (her) ok(() => ps.equip(it.uid, her.uid));
   }
 }
 
 export const DYY_MUELSYSE = defineTactic({
   id: 'dyy-muelsyse',
-  describe: 'Du Yaoye: keep 缪尔赛思 and copy her with 画卷 for more Isomorphs; level 6 for her; then legacy',
+  describe: 'Du Yaoye: keep 缪尔赛思 and clone her (画卷, 拟态物质, the same-Alliance printers, 博士投影) for more Isomorphs; level 6 for her; then legacy',
   params: {
     maxIso: { type: 'int', min: 1, max: 8, default: 6 },
     keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
@@ -239,13 +289,12 @@ export const DYY_MUELSYSE = defineTactic({
       if (muelsyseActive(m, ps, p) && (!own || own.round === m.round)) {
         muelsyseLevel(m, ps, p);
         const gd = gdOf(m, ps);
-        const scroll = heldScrolls(ps).length > 0 || shopShows(ps, SCROLL);
         const plan = own?.plan || {};
         const items = plan.items || {};
         const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
-        const keep = p.keep === 'always' || scroll ? heldMuelsyse(gd, ps).map((q) => q.id) : [];
+        const keep = p.keep === 'always' || cloneSource(ps) || packed(gd, ps) ? heldMuelsyse(gd, ps).map((q) => q.id) : [];
         ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, keep: merge(plan.keep, keep, 32),
-          items: Object.freeze({ ...items, buy: merge(items.buy, [SCROLL], 8), keep: merge(items.keep, [SCROLL], 32) }) }) };
+          items: Object.freeze({ ...items, buy: merge(items.buy, CLONE_ITEMS.filter((id) => !id.endsWith('_b')), 8), keep: merge(items.keep, CLONE_ITEMS, 32) }) }) };
       }
       return ctx.next();
     },
@@ -255,7 +304,7 @@ export const DYY_MUELSYSE = defineTactic({
     },
     *buyLoopSteps(ctx) { return yield* listedItemsFirst(ctx); },
     equipItems(ctx) {
-      if (muelsyseActive(ctx.match, ctx.player, ctx.params)) cloneMuelsyse(ctx.match, ctx.player);
+      if (muelsyseActive(ctx.match, ctx.player, ctx.params)) cloneMuelsyse(ctx.match, ctx.player, ctx.params);
       return ctx.next();
     },
   },
