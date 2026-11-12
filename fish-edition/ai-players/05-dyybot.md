@@ -391,7 +391,9 @@ paired with legacy in the same scenario (19 wins):
 |---|---|---|---|
 | legacy + iso-not-muelsyse | 15 | 1 / 5 | 0.22 |
 | + dyy-muelsyse, 画卷 on her | 4 | 1 / 16 | < 0.001 |
-| + dyy-muelsyse, no 画卷 | 12 | 2 / 9 (1 / 4 against the line above it… against iso-not-muelsyse: p 0.38) | 0.07 |
+| + dyy-muelsyse, no 画卷 | 12 | 2 / 9 | 0.07 |
+
+Against legacy + iso-not-muelsyse, the clone without 画卷 is 1 / 4 (p 0.38).
 
 - **画卷 on Muelsyse is a clear loss** (19 → 4): the copy of the best operator is worth far more than one Isomorph. The
   default is now off (783d0ae7), as the humans play it.
