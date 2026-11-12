@@ -333,3 +333,14 @@ branch doesn't have #131 yet (it's on main), so in its benches a promoted carry 
 carry-iso, carry-hologram, plan-items (stack items: 简易通讯机 and co.). Queue21: solo Ultimate, Du Yaoye forced, seeds 1–160, against
 the baseline above; `dyybot` without dyy-muelsyse; and the scenario `mu-scroll` (Muelsyse and a 画卷 at round 9, a
 second 画卷 at round 11), legacy against dyybot, seeds 1–80.
+
+**No Isomorph on Muelsyse** (Fish, 2026-11-13: "you're not supposed to isomorph muelsyse yourself. you use it to gain
+alliance membership for other operators, activate more alliances overall, and give key operators membership in
+alliances useful for them"). Legacy did it on purpose: §37.41 / §37.43 (the upstream maintainer's "9 Yan with 8
+deployed") put a Yan item and the Isomorph on her whenever the focus Alliance's top tier is above the deploy cap, and
+valued her as two focus members. The records showed it 3 times in 20 seats. d044f278:
+- legacy tunable `MORPH_ON_MUELSYSE` (upstream: true, so legacy is unchanged; a `legacy-equip` parameter);
+- `iso-not-muelsyse` (in the DYY file, in `dyybot`) sets it false: no conversion, no double value, and neither morphPlan
+  nor the general item loop puts an Isomorph on her (it waits in the hand);
+- carry-iso's carry is never her (`carryAndFocus`, `plannedCarry`).
+Queue21 ran before this (a0bd1b85). Queue22: dyybot again, and with carry-iso's buying off.
