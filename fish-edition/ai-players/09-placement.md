@@ -115,6 +115,30 @@ Back pieces of the snakes: humans 深巡 13, 幽灵鲨 10, 归溟幽灵鲨 7, �
 - Only 7 human seats, so this says little about which snake is best. Fish's version (the dealer at the back) is a
   candidate to test in the rehearsal, not something the records already show.
 
+## Ægir seats (`untracked/dyy-2026-11/aegir-seats.mjs` → `aegir-seats.md`)
+
+Seats with Ægir active in 2+ battles of rounds 4–13 (6 human seats, 10 bot seats: small samples):
+
+| | Humans | Bots |
+|---|---|---|
+| Ægir stacks at rounds 7 / 10 / 13 (median) | 2 / 107 / 228 | 8 / 45 / 107 |
+| First round Ægir is active (median) | 7 | 8 |
+| Ægir members on the board (per battle) | 4.8 | 4.1 |
+| Seats reaching the 5-member tier | 6 of 6 | 7 of 10 |
+| Elite Ægir operators deployed (per battle) | 1.5 | 1.1 |
+| Devours per battle; mean tier eaten; share eating an Ægir | 3.0; 3.2; 72 % | 2.6; 3.2; 71 % |
+| 歌蕾蒂娅 deployed (share of Ægir battles) | 72 % | 41 % |
+| 深巡 (tier 1) deployed | 43 % | 71 % |
+
+- **The bots get the structure right:** the same tiers, about the same devours, the same prey (斯卡蒂, 幽灵鲨 first on
+  both sides). Fish's "easy to play" holds for activating it.
+- **The stacks still halve from round 7 to 10.** In battle, Ægir gives humans 31 stacks a round while active,
+  bots 22 (08, replayed battles). The visible differences are 歌蕾蒂娅 (a free 斯卡蒂, 幽灵鲨 or 深巡 each prep
+  with 3 operators in her row: more members, merges and elites), one more member on the board, and more elites.
+  The bots fill with 深巡 instead.
+- Next: why a round of the bots' Ægir gives fewer stacks. Replaying their battles with the stack events logged
+  (devour, 幽灵鲨 knock-outs, 斯卡蒂 kills, the 5-member revives) would split the 31 against 22.
+
 ## Proposed experiments, in order
 
 1. **A leak allowance for the positional candidate:** built (7766a87d), behind `legacy-arrange`'s `leakAllow`

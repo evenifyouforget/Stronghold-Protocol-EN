@@ -318,8 +318,10 @@ coin) and a reserve, so the defence cost shrinks.
 1. **Investor timing:** hold Tin Man and Swire EW on the Bench from early on, and look for the tier-5 member at
    level 5.
 2. **Cycling:** from round 7, buy the cheapest operator that feeds an active 获得时 or engine rule and sell it next
-   prep. Lower priority after the split above. queue3's `trade1.5` (legacy's own trade at half the bar) tests the
-   cheap version first; it now runs last (`queue3-late`), after queue5.
+   prep. Lower priority after the split above. queue3's `trade1.5` (legacy's own trade at half the bar,
+   co-op Ultimate seeds 1–40, paired) tested the cheap version: **worse.** Wins 27 → 23 (8 lost / 4 gained, p 0.39),
+   round-13 team stacks 703 → 650, leader damage 12.6 M → 10.4 M. With Investor at priority 5 it is clearly worse
+   (17 wins, p 0.03; stacks 534). Trading more with legacy's trade rule churns the board without feeding a stacker.
 
 **Queue order** (log `untracked/queue-2026-11-12.log`): the balance sweep and the DYY baseline → queue2 (Investor) →
 queue6 (DYY Isomorph, 05) → queue4 (`plan-engines`) → queue5 (`plan-items`) → queue3 (`trade1.5`) → queue7 (the
