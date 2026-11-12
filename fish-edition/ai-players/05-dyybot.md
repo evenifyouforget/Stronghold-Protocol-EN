@@ -360,3 +360,26 @@ The scenario `mu-scroll` (Muelsyse and a 画卷 at round 9, a second 画卷 at r
 - **dyybot: 9 → 6** (2 / 5, p 0.45). It spends the 画卷 on Muelsyse (one more Isomorph) and pays for level 6.
 - dyybot's board is weaker from round 4 on (value 11.8 against legacy's 19.8: the early levels), so the two can't be
   compared directly; queue23 tests the clone alone on legacy, with and without 画卷 (`scroll`, 65af52fa).
+
+## How the humans with 6+ Isomorphs got them (2026-11-13)
+
+Fish: "rather than ask me, just see what the very high scoring human games do". `untracked/dyy-2026-11/iso6.mjs` →
+`iso6.md`: 131 clean HARD / ABYSS human seats that passed round 10, 17 with 4+ Isomorphs, 7 with 6+.
+
+- **The top three (11–12 Isomorphs, Paganini, solo Ultimate) ran a sell engine.** 商业包装方案 on one Muelsyse (a copy of
+  one of her Alliances, so her, every 8 sales; 7 elite), then dozens of cheap operators sold per round from round 11–12.
+  Every printed Muelsyse is sold at once: her Isomorph stays, and she goes back to the pool for the next print. All
+  their Isomorphs arrived during sales.
+- **The Du Yaoye seat (9):** level 6 at round 12, then 简易通讯机 ×2 on Muelsyse.
+- **Others (6–7):** mostly merge rewards (Muelsyse picked from the offer), plus a 简易通讯机 or 寻呼模块 on her.
+- **画卷 was never used** by a clean human seat. 博士投影 went on Muelsyse once in 31 uses.
+- Clone items on Muelsyse: 简易通讯机 12, 商业包装方案 7, 寻呼模块 5, 拟态物质 2 (most of each went elsewhere).
+- Level 6 came at rounds 12–15.
+
+So `dyy-muelsyse` (783d0ae7) now: no 画卷 by default (legacy keeps its own copy rule); one Muelsyse holder (the packed
+one, else an elite, else the oldest), every other normal copy sold; while 商业包装方案 is on her, a sale cycle of
+operators of price ≤ 2 (`cycle` 24 sales a prep, `reserve` 2). Queue24 tests it, with a packaging scenario (Muelsyse
+at round 10, 商业包装方案 at round 11).
+
+**Queue22** (d044f278): dyybot with iso-not-muelsyse 17 of 160, exactly as queue21's (0 seeds change), with carry-iso's
+buying on or off. In the mu-scroll scenario: 4 of 80 (legacy 19), the 画卷 spent on Muelsyse.
