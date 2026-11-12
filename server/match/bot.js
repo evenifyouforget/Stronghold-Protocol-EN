@@ -113,7 +113,6 @@ import { bodyKeys, normHitArea } from '../sim/body.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
 import { simMeter } from './simMeter.js';
 import { cultivateMul } from '../../shared/potential.js';
-import { equipCapFor } from '../../shared/modZ.js';
 import { morphSlotPolicy, ruleOption } from '../../shared/plugins/rules.js';
 
 /**
@@ -4032,7 +4031,7 @@ function slotFree(m, ps, p, incoming = null) {
   const gd = ps?.gd || m.gd;
   const policy = morphSlotPolicy(ruleOption(m?.rules, 'morphPairing'), (it) => !!gd.item(it?.id)?.canGiveBond);
   const items = p?.items || [];
-  return policy.accepts(items, incoming) && (!policy.occupies(incoming) || policy.slotsUsed(items) < policy.slotCap(equipCapFor(p ? gd.chess(p.id) : null, m?.lobbyRules, gd.equipPerChess)));
+  return policy.accepts(items, incoming) && (!policy.occupies(incoming) || policy.slotsUsed(items) < policy.slotCap(gd.equipPerChess));
 }
 
 /** What an item does: the key of its first buff (data/items.json `buffs`, e.g. use_equip_reward_char_chess). */
@@ -4170,7 +4169,7 @@ function morphPlan(m, ps, morph, ctx) {
     const saved = P.items;
     const items = saved || [];
     if (items.some((it) => gd.item(it.id)?.canGiveBond) || !policy.accepts(items, morphRec)) continue;
-    const free = policy.slotCap(equipCapFor(gd.chess(P.id), m?.lobbyRules, gd.equipPerChess)) - policy.slotsUsed(items) - (policy.occupies(morphRec) ? 1 : 0);
+    const free = policy.slotCap(gd.equipPerChess) - policy.slotsUsed(items) - (policy.occupies(morphRec) ? 1 : 0);
     const options = [];
     if (free >= 0 && items.some((it) => gd.item(it.id)?.giveBondId)) options.push(null);
     if (free >= 1) for (const X of loose) options.push(X);

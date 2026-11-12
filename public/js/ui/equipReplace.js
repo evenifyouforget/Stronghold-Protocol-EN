@@ -43,10 +43,10 @@ export function replaceRequest(ctx, intent, getChess = () => null, getItem = () 
   if (ctx?.morphMode === 'plus') {
     const policy = morphSlotPolicy('plus', (it) => !!rec(typeof it === 'string' ? it : it?.id)?.canGiveBond);
     if (!policy.occupies(rec(item.id))) return null;
-    if (policy.slotsUsed(equipped) < policy.slotCap(ctx.equipCap?.(target) ?? 2)) return null;
+    if (policy.slotsUsed(equipped) < policy.slotCap(2)) return null;
     options = equipped.filter((it) => policy.occupies(rec(it.id)));
     if (!options.length) return null;
-  } else if (equipped.length < (ctx?.equipCap?.(target) ?? 2)) return null;
+  } else if (equipped.length < 2) return null;
   const shown = getChess(target.id) || null;
   return {
     targetUid: target.uid,

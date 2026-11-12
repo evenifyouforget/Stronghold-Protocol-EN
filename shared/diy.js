@@ -333,5 +333,5 @@ export const hasModZ = (charId) => modZFor(charId).length > 0;
  */
 function formWith(backups, charId, status, moduleId) {
   const form = unitForm(backups, charId, status);
-  return form && isModZ(moduleId) ? withModZ(charId, form, status?.equipLevel) : form;
+  return form && isModZ(moduleId) ? withModZ(charId, form) : form;
 }

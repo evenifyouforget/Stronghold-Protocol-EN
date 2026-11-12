@@ -299,13 +299,6 @@ const INSTALL = {
         applyWay: 'NONE', calculation: 'precomputed', origin: c.dmg, tags: ['module', 'fishZuole'] });
     }, { owner: u });
   },
-
-  // Physical and Arts damage taken −50 %; Foresight membership (the module's bonds); the 4 equipment slots and the
-  // <获得时> shop reroll are the match's (shared/modZ.js equipCapFor, server/match/player/economy.js kalts2Refresh).
-  // [DRAFT: <出售时> (gift her to 2 teammates) left out — a 自选 piece exists only in its owner's own slot]
-  uniequip_fishz_kalts2(battle, u) {
-    battle.addBuff(u, { key: `${KEY}:kalts2`, persist: true, allowDead: true, mods: { physTakenMul: 0.5, artsTakenMul: 0.5 }, tags: ['module'] });
-  },
 };
 
 const VVANA_RES = new WeakSet();

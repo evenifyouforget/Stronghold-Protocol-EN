@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { MODZ, modZOf, withModZ, equipCapFor } from '../shared/modZ.js';
+import { MODZ, modZOf, withModZ } from '../shared/modZ.js';
 import { MODZ_INSTALLED, typhonBalance, zuoleDouble } from '../server/sim/content/modZ.js';
 import { modZRulePicks, diyRecord, checkDiyPick, hasModZ } from '../shared/diy.js';
 import { unitForm } from '../shared/standIn.js';
@@ -31,12 +31,12 @@ test('every Mod Z / W has battle effects, a unique id and an operator in the cus
   assert.ok(ruleSet('modZ', ['uniequip_fishz_weedy']) && !ruleSet('modZ', []));
 });
 
-test('withModZ appends to the elite forms only (forms with a module list, possibly empty); the players\' lists never show them', () => {
+test('withModZ appends to the elite forms only (forms with modules); the players\' lists never show them', () => {
   for (const m of MODZ) {
     assert.ok(hasModZ(m.charId), `${m.charId}: the "Mod Z available" tag`);
     for (const form of Object.values(backups.units[m.charId].forms)) {
       const out = withModZ(m.charId, form);
-      if (!Array.isArray(form.modules)) { assert.equal(out, form); continue; }
+      if (!form.modules?.length) { assert.equal(out, form); continue; }
       assert.ok(out.modules.some((x) => x.uniEquipId === m.id && x.fishModZ === m.kind));
       assert.ok(!(form.modules ?? []).some((x) => x.fishModZ), 'the data form is untouched');
     }
@@ -154,34 +154,4 @@ test('Zuo Le Z: one more skill charge; Viviana Z: the RES shred stays after she 
   assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.resFlat, -2, 'kept after she falls');
   h.run(20);
   assert.deepEqual(h.b.errors.map((x) => `${x.label}: ${x.message}`), []);
-});
-
-test('Kal\'tsit Esperanta Z: a module on her empty list, Foresight, 4 slots, and the shop reroll on gain', async () => {
-  const slot = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
-  const pick = { charId: 'char_1052_kalts2', skillIndex: 2, uniEquipId: null };
-  const on = modZRulePicks({ [slot]: pick }, { modZ: ['uniequip_fishz_kalts2'] }, data)[slot];
-  assert.equal(on.uniEquipId, 'uniequip_fishz_kalts2');
-  assert.ok('ok' in checkDiyPick(slot, on, data), JSON.stringify(checkDiyPick(slot, on, data)));
-  const rec = diyRecord(slot, on, { elite: true, data });
-  assert.ok(rec.module.active && rec.bonds.includes('visiShip'), JSON.stringify(rec.bonds));
-  assert.equal(equipCapFor(rec, { modZ: ['uniequip_fishz_kalts2'] }, 2), 4);
-  assert.equal(equipCapFor(rec, { modZ: [] }, 2), 2);
-  assert.equal(equipCapFor({ charId: 'char_112_siege' }, { modZ: ['uniequip_fishz_kalts2'] }, 2), 2);
-
-  const { makeMatch } = await import('./match/harness.js');
-  const h = makeMatch({ mode: 'solo', seed: 21, lobbyRules: { modZ: ['uniequip_fishz_kalts2'] } }).start();
-  h.toPrep(1);
-  const p0 = h.ps('p_0');
-  assert.equal(p0.setDiy({ [slot]: pick }), true);
-  const k = p0.acquireChess(slot, { fromPool: false });
-  assert.ok(k, 'gained');
-  assert.equal(p0.shop.layout.item, 3, 'the shop offers 3 items');
-  const items = Object.values(p0.gd.shopItemsByTier).flat().filter((id) => p0.gd.item(id)?.itemType === 'EQUIP' && p0.gd.item(id)?.kind === 'passive' && !p0.gd.item(id)?.canGiveBond).slice(0, 4);
-  for (const id of items) {
-    const it = p0.acquireItem(id, { requirePool: false });
-    assert.ok(it, id);
-    const r = p0.equip(it.uid, k.uid);
-    assert.ok(r === true || r?.ok !== false, `${id}: ${JSON.stringify(r)}`);
-  }
-  assert.equal(p0.find(k.uid).piece.items.length, 4, 'four equipped');
 });

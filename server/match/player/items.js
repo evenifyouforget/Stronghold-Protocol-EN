@@ -11,7 +11,6 @@ import { offsetTile } from '../../sim/dir.js';
 import { itemKey } from '../gamedata.js';
 import { OK, fail } from './common.js';
 import { CC, BOOSTER, BOOSTER_NAME, ITEM_BOOSTER, ITEM_BOOSTER_NAME } from '../../../shared/ruleData.js';
-import { equipCapFor } from '../../../shared/modZ.js';
 
 /** The item a full carrier loses by default: the oldest that is not the Toxic Waste (SPA-CC Junk). */
 const replaceableIndex = (items) => Math.max(0, items.findIndex((x) => x.id !== CC.junk.itemId));
@@ -59,7 +58,7 @@ export class PlayerItems {
     if (!policy.accepts(target.items || [], rec)) return fail(ERR.BAD_TARGET, 'morph already equipped');
     // SPA-CC Junk: the Toxic Waste is never the replaced (destroyed) item
     if (replaceUid != null && (target.items || []).some((x) => x.uid === replaceUid && x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be replaced');
-    if ((target.items || []).length >= this._equipCap(target) && (target.items || []).every((x) => x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be replaced');
+    if ((target.items || []).length >= this.gd.equipPerChess && (target.items || []).every((x) => x.id === CC.junk.itemId)) return fail(ERR.BAD_TARGET, 'the Toxic Waste cannot be replaced');
     const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
     if (consume) {
       const key = 'item:' + itemKey(item.id);
@@ -112,11 +111,6 @@ export class PlayerItems {
    * Attach an item. With both slots used the item `replaceUid` names (the player's pick) is replaced, else the oldest;
    * the replaced item is destroyed.
    */
-  /** (Fish Edition) The equipment slots of chess piece `piece`: equipPerChess, 4 for a Mod Z 凯尔希·思衡托 (shared/modZ.js). */
-  _equipCap(piece) {
-    return equipCapFor(piece ? this.gd.chess(piece.id) : null, this.m.lobbyRules, this.gd.equipPerChess);
-  }
-
   /** The room's equip-slot policy. Official returns the shared frozen singleton, so the numbers stay today's. */
   _slotPolicy() {
     return morphSlotPolicy(ruleOption(this.m?.rules, 'morphPairing'), (it) => !!this.gd.item(it?.id)?.canGiveBond);
@@ -126,7 +120,7 @@ export class PlayerItems {
     target.items = target.items || [];
     const policy = this._slotPolicy();
     const rec = this.gd.item(item.id);
-    const cap = policy.slotCap(this._equipCap(target));
+    const cap = policy.slotCap(this.gd.equipPerChess);
     // A plus morph does not occupy a slot, so this while does not run for it. Official occupies() is always true
     // and slotsUsed is items.length, so the comparison and the splice index stay today's.
     while (policy.occupies(rec) && policy.slotsUsed(target.items) >= cap) { // loop-cap: splices one item each pass
@@ -148,7 +142,7 @@ export class PlayerItems {
     const policy = this._slotPolicy();
     // A plus morph does not replace anyone. Official occupies() is always true.
     if (incoming && !policy.occupies(incoming)) return null;
-    if (policy.slotsUsed(target.items) < policy.slotCap(this._equipCap(target))) return null;
+    if (policy.slotsUsed(target.items) < policy.slotCap(this.gd.equipPerChess)) return null;
     const idx = replacedIndex(policy, target.items, replaceUid);
     const [piece] = target.items.splice(idx, 1);
     return { piece, idx };

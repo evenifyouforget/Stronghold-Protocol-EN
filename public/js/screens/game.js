@@ -84,7 +84,6 @@ import { AiTakeoverPanel } from '../ui/aiTakeover.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { PHASE, GEO } from '../../../shared/constants.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
-import { equipCapFor } from '../../../shared/modZ.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';
 import { useGameData, GIcon } from '../ui/gameComponents.js';
 import { useFieldView } from '../ui/fieldHost.js';
@@ -414,14 +413,11 @@ function MatchScreen() {
   const ownShown = (id) => { const c = ownChess(id); return ownStandIn(c, live.current.priv, data.get('backups')) || c; };
   // `data.locale()`: getChess reads the localized record. Without it a language switch mid-match keeps this context,
   // and anything that memoizes on it keeps the previous language's placement (GitHub #676).
-  const placeCtx = useMemo(() => {
-    const getChess = (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; };
-    return placementContext({
-      priv, stage: gd.stage(pub?.stageId), editable, field: deployField, getChess,
-      getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
-      equipCap: (piece) => equipCapFor(piece ? getChess(piece.id) : null, roomRules, 2),
-    });
-  }, [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode, roomRules]);
+  const placeCtx = useMemo(() => placementContext({
+    priv, stage: gd.stage(pub?.stageId), editable, field: deployField,
+    getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
+    getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
+  }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
   live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, metricsOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
@@ -1948,7 +1944,7 @@ function MatchScreen() {
 
       ${resolved ? html`<${DetailPanel} detail=${resolved} snapHp=${snapHp} onClose=${() => { setDetail(null); setSel(null); }}
         bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} bondTimers=${bondTimers} voice=${true}
-        morphMode=${morphMode} unequipAllowed=${unequipAllow} rules=${roomRules}
+        morphMode=${morphMode} unequipAllowed=${unequipAllow}
         onUnequip=${editable && unequipAllow ? (itemUid) => actions.unequip(itemUid) : null}
         onBond=${(id) => openBond(id, detailOwner, 'detail')} />` : null}
 

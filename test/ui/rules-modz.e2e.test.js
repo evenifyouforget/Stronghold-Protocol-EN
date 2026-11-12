@@ -37,7 +37,7 @@ test('rules dialog: tabs with in-force counts; Mod Z / W equipped per operator, 
     const tab = (label) => page.evaluate((l) => [...document.querySelectorAll('.rules-dialog .rules-tabs [role=tab]')].find((b) => b.textContent.trim().startsWith(l)).click(), label);
     await tab('Mod Z');
     await page.waitForSelector('.rules-dialog [data-modz]');
-    assert.equal((await page.$$('.rules-dialog [data-modz]')).length, 15, 'one button per module');
+    assert.equal((await page.$$('.rules-dialog [data-modz]')).length, 14, 'one button per module');
     await page.click('.rules-dialog [data-modz="uniequip_fishz_weedy"]');
     await page.waitForFunction(() => (globalThis.__SP__.store.get().room?.rules?.modZ ?? []).includes('uniequip_fishz_weedy'), { timeout: 10000 });
     await page.click('.rules-dialog [data-modz="uniequip_fishz_typhon"]');
