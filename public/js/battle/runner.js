@@ -55,6 +55,7 @@
 //                              uniteLeft, bondLayers } | null
 //   battleRunner.stats()  → { ticks, stepMs, avgTickMs, maxFrameMs, catchups, errors, battles }
 //   battleRunner.stepPaused(n) → (fork) paused: step the battle on screen n ticks (the dev sandbox's frame step)
+//   battleRunner.setSpeed(s) → (fork) the battle on screen goes on at speed s from the tick it reached (the dev sandbox)
 //   battleRunner.unitStats(unitId, fieldId?) → the live stats of a unit of the battle on screen (shared/protocol.js
 //                           unitStatsEntry: current HP, effective max HP / ATK / DEF / RES / interval / block / move
 //                           speed next to its base; an ally also its live attack range `range` — unit.liveRangeGrid,
@@ -212,7 +213,18 @@ export function createBattleRunner(deps) {
       combatHistory.set(e.battleId, record);
     }
   };
-  const forgetCombat = () => { combatHistory.clear(); combatOrder.clear(); combatSeq = 0; };
+  const forgetCombat = () => { combatHistory.clear(); combatOrder.clear(); combatSeq = 0; combatMatch = null; };
+  // (fork) the match the kept snapshots belong to: a battleId's first part (`<seed36>[-<matchNo36>]`, server/match/Match.js),
+  // the same for every battle of a match and different in the room's next one
+  let combatMatch = null;
+  const matchOf = (battleId) => /^([0-9a-z]+(?:-[0-9a-z]+)?)\.\d+\./.exec(String(battleId))?.[1] ?? null;
+  /** A b.start of another match than the kept snapshots' starts the totals over (the store may not show the change). */
+  const noteMatch = (battleId) => {
+    const m = matchOf(battleId);
+    if (m == null) return;
+    if (combatMatch != null && m !== combatMatch) forgetCombat();
+    combatMatch = m;
+  };
   // (fork) a battle's snapshot tagged with its round (the spec's), so the results chart can split a bar by round
   const readCombat = (e) => {
     const record = e.combatMetrics();
@@ -641,6 +653,23 @@ export function createBattleRunner(deps) {
     return true;
   }
 
+  /**
+   * (fork) Change the speed of the battle on screen while it runs (the dev sandbox's 1× / 2× / 4×): its clock keeps the
+   * tick it has reached, only the pace from there on changes — the sim and its result are the same at any speed.
+   * False when there is no battle or the speed is not a positive number / the current one.
+   */
+  function setSpeed(speed) {
+    const e = cur;
+    const s = Number(speed);
+    if (!e || !(s > 0) || s === e.speed || e.t0 == null) return false;
+    const at = clock();
+    e.t0 = at - ((at - e.t0) * e.speed) / s;
+    e.speed = s;
+    publishState();
+    schedule();
+    return true;
+  }
+
   /** Advance one entry to its clock (bounded); render it when it is on screen. */
   function advance(e, t, render) {
     if (e.battle.finished) { if (!e.done) finished(e); return; }
@@ -759,6 +788,7 @@ export function createBattleRunner(deps) {
   async function onStart(msg) {
     if (!msg || typeof msg !== 'object' || !msg.spec || typeof msg.battleId !== 'string') return;
     const speed = Number(msg.speed) > 0 ? Number(msg.speed) : 2;
+    noteMatch(msg.battleId);
     const seq = ++startSeq;
     const prep = pending.get(msg.battleId);
     const existing = entries.get(msg.battleId) || prep;
@@ -1010,19 +1040,20 @@ export function createBattleRunner(deps) {
   }
   // phase changes: combat fields live until the next prep; leaving the match drops everything
   let lastPhase = null;
-  let lastRound = 0;
   let simWarmQueued; // the content set a queued warm-up is for (null = the original); undefined: none queued
   if (store && typeof store.subscribe === 'function') {
     offs.push(store.subscribe((s) => {
       const pub = s && s.match && s.match.public ? s.match.public : null;
-      const round = Number(pub?.round) || 0;
-      // a fresh match (m.public gone), a rewound round or a return to a lobby-like phase resets the combat totals
-      const resetMetrics = (!pub && lastPhase != null) || round < lastRound
-        || (pub?.phase !== lastPhase && ['LOBBY', 'INFO_CHECK', 'BAND_DRAFT', 'BATTLE_CHECK'].includes(pub?.phase));
+      // (fork) only a new match resets the combat totals: its opening phases (they come only before round 1), or a b.start
+      // of another match (onStart, matchOf). An m.public that went empty or showed a lower round mid-match (a reconnect's
+      // restore, a resync) used to reset them too, and the results chart then kept only the battle still running
+      // (user report 2026-11-10, Grand Alliance: only round 13 showed); a return to the room keeps them for the
+      // settlement's report.
+      const resetMetrics = pub?.phase !== lastPhase && ['INFO_CHECK', 'BAND_DRAFT', 'BATTLE_CHECK'].includes(pub?.phase);
       if (resetMetrics) forgetCombat();
-      lastRound = round;
-      // solo pause (DESIGN §14): the local battle clocks follow m.public.paused
-      setPaused(!!(pub && pub.paused));
+      // solo pause (DESIGN §14): the local battle clocks follow m.public.paused; (fork) and the browser test harness's
+      // battle hold, m.public.hold (test/e2e/harnessControl.mjs: frozen the same way, without the 暂停中 plate)
+      setPaused(!!(pub && (pub.paused || pub.hold)));
       const phase = pub ? pub.phase : null;
       if (phase === lastPhase && !resetMetrics) return;
       lastPhase = phase;
@@ -1158,7 +1189,7 @@ export function createBattleRunner(deps) {
     _entries: entries,
     _frame: frame,
     _pump: pump,
-    onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused, stepPaused,
+    onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused, stepPaused, setSpeed,
     dispose() {
       clear();
       releaseParked();

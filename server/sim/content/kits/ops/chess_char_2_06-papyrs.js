@@ -4,6 +4,9 @@
 import { bodyInRange } from '../../../body.js';
 import { num, talentBb, up, alliesInGridOf, instantKind, batMod } from '../shared/tier1.js';
 
+/** (fork) S2's mode buff, whose derived papyrs_s_2[target] marks the lock (render/vfx/skills.js STATE_BUFFS look 'mark'). */
+const PAPYRS_S2_FX = 'papyrs_s_2[switch_mode]';
+
 export default {
   // ---------------------------------------------------------------------------------------------------------------
   // 2_06 莎草 巧思乍现 (AUTO, 2 charges): the next heal is heal_scale × ATK (chain jumps included) and the talent
@@ -25,6 +28,7 @@ export default {
       if (unit.mem.papyrsHeal) { unit.profile.heal = unit.mem.papyrsHeal; unit.mem.papyrsHeal = null; }
       if (unit.mem.papyrsHook) battle.off(unit.mem.papyrsHook);
       unit.mem.papyrsHook = null;
+      if (unit.mem.papyrsLock) battle.fxState(unit.mem.papyrsLock, PAPYRS_S2_FX, false);
       unit.mem.papyrsLock = null;
       unit.mem.papyrsAbort = false;
     };
@@ -39,6 +43,8 @@ export default {
             // (only reachable when a runtime bypasses the activate guard below, e.g. a copied skill: undo on the next tick)
             if (!lock) { unit.mem.papyrsAbort = true; return; }
             unit.mem.papyrsLock = lock;
+            // (fork) the official lock mark (papyrs_s_2[target]: papyrs_skill2_mark_01) on it; her own glow is content/fxStates.js
+            battle.fxState(lock, PAPYRS_S2_FX, true, { src: unit, look: 'mark' });
             const h = unit.profile.heal;
             if (h && extra > 0) { unit.mem.papyrsHeal = h; unit.profile.heal = { ...h, count: Math.max(1, h.count || 3) + extra }; }
             unit.mem.papyrsHook = battle.on('beforeAttack', (ctx) => {
@@ -64,6 +70,8 @@ export default {
       },
       talents: [{ install(battle, unit) {
         const sk = unit.skill;
+        // (fork) the client's papyrs_s_1[fx_ctrl]: papyrs_skill1_buff_01 on her while S1 has a charge ready — display only
+        if (sk && sk.id === 'skchr_papyrs_1') battle.fxProbe(unit, 'papyrs_s_1[fx_ctrl]', (u) => !!(up(u) && u.skill?.ready && !u.skill.active));
         if (sk && sk.id === 'skchr_papyrs_2' && !Object.prototype.hasOwnProperty.call(sk, 'activate')) {
           // "无法可选单位时无法开启技能": every activation path (DEFAULT heal trigger, carried skill, content) is refused
           // while no ally can be locked — the charge stays, nothing starts (non-enumerable: never serialised)

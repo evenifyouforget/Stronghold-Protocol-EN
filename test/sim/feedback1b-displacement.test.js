@@ -18,7 +18,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, chessRec, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, chessRec, enemyRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { hasGeneratedData, getDefaultSource, spawnsFromTemplate } from '../../server/sim/simdata.js';
 import { PUSH_TILES, PULL_STOP_RADIUS } from '../../server/sim/constants.js';
 
@@ -280,7 +280,7 @@ test('B5 audit: 缪尔赛思 S3 — a melee 流形 copy\'s pulse reaches air uni
     assert.equal(u.skill.id, 'skchr_mlyss_3');
     const t = tok();
     const e = h.spawn(key, { routeIndex: route, pos: [10, 7], mods: STILL });
-    assert.ok(u.skill.activate('test', { free: true }), 'S3 on');
+    assert.ok(castNow(u, 'test', { free: true }), 'S3 on');
     h.step(2);
     const end = endOf(h.b, e);   // where the pull's slide ends (the copy then blocks a ground one inside its tile and
     // shifts it to the tile's edge: block shifting, GitHub #61)

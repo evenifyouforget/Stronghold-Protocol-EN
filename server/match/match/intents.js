@@ -77,6 +77,7 @@ export class MatchIntents {
       case 'b.botBattleResult': this._onBotBattleResult(ps, msg); return OK;
       // (fork) a bot seat's prep played in this browser (match/botTasks.js): reports too
       case 'b.botReceived': return this._onBotReceived(ps, msg);
+      case 'b.botLoaded': return this._onBotLoaded(ps, msg);
       case 'b.botMoves': return this._onBotMoves(ps, msg);
       case 'b.botHidden': return this._onBotHidden(ps, msg);
       default: return fail(ERR.BAD_MSG);
@@ -108,6 +109,7 @@ export class MatchIntents {
     if (!ps.botControlled || this.ended) return;
     this.offersChanged();
     if (this.phase === PHASE.INFO_CHECK && !ps.infoReady) { ps.infoReady = true; this.markPublic(); this.maybeEndInfo(); }
+    else if (this.phase === PHASE.BAND_DRAFT && this.draft?.vote) this._maybeCloseVote(); // (fork) One for All: not waited for
     else if (this.phase === PHASE.BAND_DRAFT && this.draftTurn(ps.playerId) === ps.playerId) this.scheduleBandBot(ps.playerId);
     else if (this.phase === PHASE.SP_DRAFT && this.spTurn(ps.playerId) === ps.playerId) this.scheduleSpBot(ps.playerId);
     else if (this.phase === PHASE.PREP && ps.alive && !ps.ready) this.scheduleBotPrep(ps, 0);

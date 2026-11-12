@@ -10,7 +10,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { noteChatKills, settleChatWallet } from '../chatWallet.js';
 import { buildBossWave, bountySpawns } from '../waves.js';
-import { pairPlayers, bossPairSalt, bossPoolHp, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
+import { pairPlayers, bossPairSalt, bossPoolHp, bossPoolSeats, SharedBossPool, CreditPool, hiddenEligible, BOSS_HIT_STEPS } from '../finalAssault.js';
 import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_TICKS_PER_INTERVAL } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
 import { bossRiskConfig } from '../../sim/bossRisk.js';
@@ -53,7 +53,7 @@ export class MatchBoss {
     const hitSteps = new Map();
     // SPA-CC: ccPatriot Undying 1 — nobody took the round-9 Patriot (riskPatriotSkipped); the boss-pool tags (bossRisk.js)
     const patriotSkipped = this.riskPatriotSkipped();
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.lobbyRules, { patriotSkipped }), {
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, this.lobbyRules, { patriotSkipped, seats: bossPoolSeats(this) }), {
       risk: bossRiskConfig(this.lobbyRules),
       onRisk: (changes) => this._bossRisk(changes),
       onHit: (pid, dmg) => {

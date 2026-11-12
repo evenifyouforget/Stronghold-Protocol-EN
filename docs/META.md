@@ -108,6 +108,9 @@ player moves to the end of the order; refused when nobody is left to pass to). T
 no other unpicked player remains; finished players stay in the published order but are not skip targets. A strategy a teammate already took is
 refused (队友已选); band must list the mode type in `modeTypeList`. A single human (co-op with AI teammates only):
 untimed. Solo: free pick, no timer, no skip. Starting LP = `bands[id].totalHp` (a seat gone before its pick keeps 0, §37.65).
+(fork) One for All (DESIGN §91.9): one room-wide secret vote instead of turns — `g.band` locks the vote, `m.public.draft`
+carries only `mode: 'vote'`, `voters` and `locked` counts until `reveal { picks, random, counts, winner }` in
+BATTLE_CHECK (7.5 s), and `m.private.vote { bandId, locked }` is the player's own vote.
 
 ### 1.2 机变 (SP draft)
 Family = weighted pick from `choices.schedule[modeId].rounds[r].families`; cards: co-op 6 shared (each player takes 1,
@@ -1083,6 +1086,9 @@ Hidden-Core trophy row only for the players still in when it was cleared — a t
 gets the table value of its own rounds. `onEnd(summary)` receives the same object (without `t`, plus `errors`).
 
 `m.chat { p, x }` / `g.chat { x }`: the fork's match chat, DESIGN "Match chat" (docs/design/network.md), `server/match/chatWallet.js`.
+The text rules, the line cap and the spam limits are shared with room chat: DESIGN "Chat text", "Chat line", "Chat limits" (`shared/text.js`, `server/chatLimit.js`).
+
+`room.chat { x }` → `room.chat { id, n, x }` · `room.emote { id }` → `room.emote { id, e }` · `room.chatPause { ms }` · `room.chatLog { lines }`: the fork's room chat in the room screen, DESIGN "Room chat", `server/lobby.js` `roomChat`.
 
 `m.emote { playerId, id }`: `id` must be one of `shared/constants.js EMOTES` (`BAD_MSG` otherwise, also when `handle()`
 is called without protocol validation); 1 per second per player (`RATE`).

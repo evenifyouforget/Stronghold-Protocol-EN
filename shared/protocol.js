@@ -18,6 +18,8 @@ import { isRoomBot, isFillPreset } from './botProfiles.js';
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
 const isStr = (v, max = 64) => typeof v === 'string' && v.length <= max;
+/** (fork) the longest chat frame text accepted at all (UTF-16 units): a real line is at most 300 code points, 600 units */
+const CHAT_FRAME_MAX = 600;
 const isBool = (v) => typeof v === 'boolean';
 const isId = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64 && /^[A-Za-z0-9_\-.:]+$/.test(v);
 const isUid = (v) => isInt(v, 1, 2 ** 31);
@@ -535,9 +537,15 @@ export const C2S = {
   // default create stays the message it was.
   'room.create': { mode: (v) => v === 'solo' || v === 'coop', difficulty: (v) => DIFFICULTIES.includes(v), test: (v) => v === true, version: isVersionId, soloUnlimited: isBool,
     // (fork) capacity: 8 makes a large room (shared/largeRoom.js; refused unless the server allows them)
-    capacity: (v) => ROOM_CAPACITIES.includes(v), $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'capacity'] },
+    capacity: (v) => ROOM_CAPACITIES.includes(v),
+    // (fork) password: a Grand Alliance created private (私密), its 4 letters
+    password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v),
+    // (fork) oneForAll: a Grand Alliance created in the One for All strategy mode (one secret room-wide strategy vote;
+    // refused on a room that is not large: BAD_MSG)
+    oneForAll: isBool, $optional: ['test', 'difficulty', 'version', 'soloUnlimited', 'capacity', 'password', 'oneForAll'] },
   // password: (fork) a locked Grand Alliance room's 4 letters (shared/largeRoom.js)
-  'room.join': { $optional: ['testAck', 'ticket', 'password'], testAck: (v) => v === true, ticket: (v) => isStr(v, 512), password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
+  // squad: (fork) with a ticket, the Grand Alliance squad room.move named (0 = seats 1–4, 1 = seats 5–8)
+  'room.join': { $optional: ['testAck', 'ticket', 'password', 'squad'], testAck: (v) => v === true, ticket: (v) => isStr(v, 512), password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), squad: (v) => v === 0 || v === 1, code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'p2p.enable': { enabled: isBool },
   'p2p.signal': { epoch: isId, to: isId, description: isPeerDescription, candidate: isPeerCandidate, $optional: ['description', 'candidate'] },
   'p2p.ready': { epoch: isId, ready: isBool, seq: (v) => Number.isSafeInteger(v) && v >= 0 },
@@ -569,11 +577,15 @@ export const C2S = {
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused
   'room.kick': { seat: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1), playerId: isId },
-  // (fork) Grand Alliance rooms (shared/largeRoom.js): move to an empty seat (any member), swap two seats (the host), lock
-  // the room with a 4-letter password or unlock it (the host)
-  'room.moveSeat': { seat: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1) },
+  // (fork) Grand Alliance rooms (shared/largeRoom.js): move to the other squad (any member: `squad`, or an old page's
+  // `seat` naming a seat of it), swap two seats of different squads (the host), lock the room with a 4-letter password
+  // or unlock it (the host)
+  'room.moveSeat': { $optional: ['seat', 'squad'], seat: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1), squad: (v) => v === 0 || v === 1 },
   'room.swapSeats': { a: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1), b: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1) },
   'room.setLock': { on: isBool, password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), $optional: ['password'] },
+  // (fork) the Grand Alliance strategy mode「Free pick | One for All」(host, before the match, large rooms only; un-readies
+  // nobody, a searching room restarts its search): room.state.oneForAll
+  'room.setOneForAll': { on: isBool },
   // (fork) the room browser of Grand Alliance rooms: rooms.watch { on } — while on, the server sends rooms.list on every change
   'rooms.watch': { on: isBool },
   'room.start': {},
@@ -593,6 +605,10 @@ export const C2S = {
   // 名片干员 (PR #643 split 6): the operator whose portrait fills the player's seat card in the waiting room — an
   // operator charId ('' for none; the server keeps only a visible charId of the room's chess.json); cosmetic, any room phase
   'room.card': { charId: (v) => v === '' || isCharId(v) },
+  // (fork) room chat (docs/design/network.md "Room chat"): a seated player's line in the room screen, cleaned and cut by
+  // the lobby like match chat's, under the same spam limits (server/chatLimit.js); and an emote. Both without a rid.
+  'room.chat': { x: (v) => isStr(v, CHAT_FRAME_MAX) },
+  'room.emote': { id: (v) => EMOTES.includes(v) },
   // operator ownership (干员持有, 0.2.0 补位): stored per session / seat; a match takes the list its seat had when it
   // started (an out-of-match setting — during a match it is stored for the next one: ROOM_STARTED)
   'room.ownership': { notOwned: isNotOwnedList },
@@ -610,7 +626,9 @@ export const C2S = {
   // 搜寻队友 (DESIGN §90): the host of a co-op room turns the search on or off
   'room.search': { on: isBool },
   // 单人匹配 (DESIGN §90): queue from the lobby without a room; queue.ai once queue.state's aiAt has passed
-  'queue.join': { difficulty: (v) => DIFFICULTIES.includes(v) },
+  // (fork) versions: the official versions to be matched for (left out: 第二期下半); large: may also sit in a Grand Alliance;
+  // oneForAll: with large, may also sit in a One for All Grand Alliance (ignored without large)
+  'queue.join': { difficulty: (v) => DIFFICULTIES.includes(v), versions: (v) => isList(v, 8, isVersionId) && v.length > 0, large: isBool, oneForAll: isBool, $optional: ['versions', 'large', 'oneForAll'] },
   'queue.leave': {},
   'queue.ai': { lang: (v) => isStr(v, 16), $optional: ['lang'] },
   // the room's plugins (DESIGN §32, P1a; host, before the match — like a difficulty change it un-readies the others):
@@ -664,9 +682,10 @@ export const C2S = {
   'g.offerRefresh': { offerId: isId, pluginId: isId, seq: (v) => isInt(v, 0, 1000000), cardId: optional(isId), idx: (v) => isInt(v, 0, PLUGIN_OFFER_SLOTS - 1) },
   'g.ready': { ready: isBool },
   'g.emote': { id: (v) => EMOTES.includes(v) },
-  // (fork) match chat: `x` is what the player typed. Any string passes here: the match cleans it and chops it to the
-  // player's kill wallet instead of refusing it (server/match/chatWallet.js). The page sends it without a rid.
-  'g.chat': { x: (v) => typeof v === 'string' },
+  // (fork) match chat: `x` is what the player typed. The match cleans it and chops it to the player's kill wallet and the
+  // line cap instead of refusing it (server/match/chatWallet.js); only a frame far past any line is refused here (a line
+  // is at most 300 code points, 600 UTF-16 units). The page sends it without a rid.
+  'g.chat': { x: (v) => isStr(v, CHAT_FRAME_MAX) },
   // playerId: the player tapped in the team panel (a 联防 / boss pair field shows two) — what an eliminated viewer or a
   // spectator seat follows from then on (Match.watchPref; community report of 2026-10-06, item 56)
   'g.watch': { fieldId: (v) => isStr(v, 32), playerId: isId, $optional: ['playerId'] },
@@ -725,11 +744,14 @@ export const C2S = {
     $optional: ['result', 'timeline', 'error'],
   },
   // (fork) A bot seat's prep played in this browser (docs/host-browser-bots.md B2): b.botReceived says the page has the
-  // S2C 'b.botTask' frame; b.botMoves carries a batch of the seat's moves, `plan` (answered by b.botAck) and then `final`
+  // S2C 'b.botTask' frame, with `starting: true` when its Worker is still coming up, and b.botLoaded then says the Worker can
+  // take it (the plan window starts there, under its own cap); b.botMoves carries a batch of the seat's moves, `plan`
+  // (answered by b.botAck) and then `final`
   // with the bot's own memo, or `error: true` when this browser could not play it. Each move is checked again where it is
   // applied (server/match/match/botTasks.js). b.botHidden reports a hidden tab, which phones freeze. A stale task or another
   // sender is ignored.
-  'b.botReceived': { taskId: isId },
+  'b.botReceived': { taskId: isId, starting: (v) => v === undefined || v === true, $optional: ['starting'] },
+  'b.botLoaded': { taskId: isId },
   'b.botMoves': {
     taskId: isId, batch: (v) => v === 'plan' || v === 'final', moves: (v) => isList(v, BOT_MOVES_MAX, isPlain), memo: isPlain,
     error: (v) => v === undefined || v === true, $optional: ['batch', 'moves', 'memo', 'error'],
@@ -753,6 +775,12 @@ export const S2C = [
   // (fork) m.chat { p, x } — a player's chat line: `p` the sender's seat, `x` the cleaned text. To everyone in the room
   // but the sender (the page shows its own line itself); ephemeral, never replayed on resync.
   'm.chat',
+  // (fork) room chat: room.chat { id, n, x } — a line in the room screen (`id` the sender's playerId, `n` their name then,
+  // `x` the cleaned text), to the room's members but the sender · room.emote { id, e } — an emote there · room.chatPause
+  // { ms, busy? } — the sender's line started a spam pause of `ms` (to the sender, once a pause), or with `busy` the
+  // server-wide chat budget dropped it (at most every 3 s) · room.chatLog { lines: [{ id, n,
+  // x, ago }] } — on a reconnect, the lines this member got before (server memory only; never on disk)
+  'room.chat', 'room.emote', 'room.chatPause', 'room.chatLog',
   // m.layer { playerId, bondId, add } — own live prep layer gain; ephemeral, never replayed on resync.
   'm.layer',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
@@ -767,6 +795,8 @@ export const S2C = [
   // b.rehearsalCancel { taskId } — the server dropped that task (it timed out, the host changed, the prep ended):
   // the executor drops it too, and only a running simulation (the Worker) is really stopped
   'b.rehearsal', 'b.rehearsalCancel',
+  // (fork) b.rehearsalWarm {} — delegated rehearsals will come this match: start the rehearsal Worker once the screen has settled
+  'b.rehearsalWarm',
   // (fork) a bot field's real battle (docs/host-browser-bots.md B13): b.botBattle { battleId, spec } — run it in a Worker and
   // answer with a C2S b.botBattleResult · b.botBattleCancel { battleId } — the server no longer waits for it
   'b.botBattle', 'b.botBattleCancel',
@@ -780,6 +810,8 @@ export const S2C = [
   'b.snap', 'b.ev',
   // sys.notice { id, text, until } — operator notice (server/announce.js)
   'sys.notice',
+  // (fork) sys.news { news } — the lobby's live update news (server/news.js, shared/news.js), null = the release's own
+  'sys.news',
   // sys.retire { gen } — a newer server generation took over: go to `/` once no match is on screen (server/generation.js)
   'sys.retire',
   // sys.maintenance { at, closed, serverNow } — planned maintenance (server/maintenance.js): the countdown target (ms,
@@ -790,7 +822,7 @@ export const S2C = [
   'sys.online',
   // queue.state { queued, difficulty?, since?, aiAt?, placed? } — 单人匹配 (server/lobby.js sendQueue)
   'queue.state',
-  // (fork) rooms.list { rooms: [{ code, host, seats, capacity, difficulty, squads: [a, b], locked? }] } — the open Grand
+  // (fork) rooms.list { rooms: [{ code, host, seats, capacity, difficulty, squads: [a, b], locked?, oneForAll? }] } — the open Grand
   // Alliance rooms (server/lobby.js roomList), while the page watches them (rooms.watch)
   'rooms.list',
 ];
@@ -831,6 +863,12 @@ export const EV = Object.freeze({
   RATE: 'rate',
   // ['resource', id, 'cost'|'sp', actual signed delta, source reason]: optional live-display receipts (#657).
   RESOURCE: 'resource',
+  // (fork) ['atkCast', id, windUp, targetId] - an operator's attack cast starts (server/sim/ai.js startAllyCast, the
+  // official cast → hit order): its hit (the 'atk') lands `windUp` game s later. The renderer starts the attack clip
+  // from its first frame now, at the speed that brings its strike frame to the hit (render/app/windup.js).
+  ATK_CAST: 'atkCast',
+  // (fork) ['atkCancel', id] - that cast was cut (a stun, 缴械, its targets gone): no hit; the clip goes back to rest
+  ATK_CANCEL: 'atkCancel',
 });
 
 /**

@@ -93,16 +93,16 @@ test('the energy HUD counts stored/cap in its own violet orb and hides when its 
   } finally { v.destroy(); }
 });
 
-test('the rows stack: the energy count sits under the purse and pushes the element gauge down', () => {
+test('the rows stack: the energy count sits under the purse; the element gauge under the feet keeps its place', () => {
   const v = energyOn();
   try {
     const el = { el: 'burn', elFill: 0.5, elUntil: 0, elDur: 0 };
     v.sync(sample({ coins: [2, 10], ...el }), 0); v.update(0.02, cam(), 0);
-    const first = v._elBar.bg.position.y;
+    const first = v._elBar.root.position.y;
     v.sync(sample({ coins: [2, 10], energy: [1, 3], ...el }), 1); v.update(0.02, cam(), 1);
     assert.equal(v.coinHud.root.visible, true, 'the purse keeps its row');
     assert.equal(v.energyHud.root.visible, true);
-    assert.ok(v._elBar.bg.position.y > first, 'the gauge moves down by the energy row\'s height');
+    assert.equal(v._elBar.root.position.y, first, 'the gauge sits under the feet, not in the rows under the bars');
   } finally { v.destroy(); }
 });
 
@@ -113,14 +113,14 @@ test('the energy count is an option, off by default: no row and no gap until 设
   try {
     const el = { el: 'burn', elFill: 0.5, elUntil: 0, elDur: 0 };
     v.sync(sample({ ...el }), 0); v.update(0.02, cam(), 0);
-    const bare = v._elBar.bg.position.y;
+    const bare = v._elBar.root.position.y;
     v.sync(sample({ energy: [2, 3], ...el }), 1); v.update(0.02, cam(), 1);
     assert.ok(!v.energyHud || v.energyHud.root.visible === false, 'off by default');
-    assert.equal(v._elBar.bg.position.y, bare, 'the gauge keeps its place');
+    assert.equal(v._elBar.root.position.y, bare, 'the gauge keeps its place');
     v.ctx.settings.ammoEnergyCount = true;
     v.update(0.02, cam(), 1);
     assert.equal(v.energyHud?.text.text, '2/3');
-    assert.ok(v._elBar.bg.position.y > bare);
+    assert.equal(v._elBar.root.position.y, bare, 'the count\'s row does not move the gauge under the feet');
     v.ctx.settings.ammoEnergyCount = false;
     v.update(0.02, cam(), 1);
     assert.equal(v.energyHud.root.visible, false);
@@ -370,7 +370,7 @@ describe('UnitView: 伺夜\'s 狼影 pips', () => {
     e.destroy();
   });
 
-  test('the element gauge row moves down below the pips (and below the SP bar when there is one)', () => {
+  test('the pips do not move the element gauge: it sits under the feet, below the pips', () => {
     const plain = view();
     plain.sync(sample({ el: 'burn', elFill: 0.4, elUntil: 0, elDur: 0 }));
     frames(plain);
@@ -378,8 +378,8 @@ describe('UnitView: 伺夜\'s 狼影 pips', () => {
     v.sync(sample({ wolves: [2, 3], el: 'burn', elFill: 0.4, elUntil: 0, elDur: 0 }));
     frames(v);
     const pipsBottom = v._wolfPips.back[0].position.y + (v._wolfPips.back[0].width * Math.SQRT2) / 2;
-    assert.ok(v._elBar.bg.position.y - v._elBar.bg.height / 2 >= pipsBottom - 1e-6, 'the gauge row starts under the pips');
-    assert.ok(v._elBar.bg.position.y > plain._elBar.bg.position.y + 4, 'and so sits lower than without pips');
+    assert.ok(v._elBar.root.position.y > pipsBottom, 'the gauge lies below the pips');
+    assert.equal(v._elBar.root.position.y, plain._elBar.root.position.y, 'where it is without pips');
     plain.destroy();
     v.destroy();
   });
@@ -470,7 +470,7 @@ describe('an ammo skill has no standing aura', () => {
 });
 
 describe('the chain: sim → snapshot → SnapshotBuffer → UnitView', () => {
-  test('隐现 S2: 14 cells, 13 after the first round, one more gone per attack; no aura; the plain SP bar after the last round', () => {
+  test('隐现 S2: 14 full cells at the cast, 13 after the first round, one more gone per attack; no aura; the plain SP bar after the last round', () => {
     const h = makeBattle({
       defs: { enemies: { enemy_dummy: enemyRec({ key: 'enemy_dummy', hp: 1e7, speed: 0 }) } },
       units: [{ chessId: 'chess_char_1_01_a', row: 10, col: 3 }],
@@ -478,7 +478,11 @@ describe('the chain: sim → snapshot → SnapshotBuffer → UnitView', () => {
       timeLimit: 200, seed: 7,
     });
     const u = h.unit('chess_char_1_01_a');
-    assert.ok(h.runUntil(() => u.skill.active, 80));
+    // (fork) the cast plays its begin clip before the skill starts (skills.js activate); the attack that waited for it
+    // is held a little past the start, so the readout is seen with the magazine still full
+    assert.ok(h.runUntil(() => !!u.skill.starting, 80));
+    u.atkCd = u.skill.beginDur + 0.2;
+    assert.ok(h.runUntil(() => u.skill.active, 2));
     const v = new UnitView(fakeViewCtx(fake.P, { cam }), renderInfo(unitInfo(u)));
     const buffer = new SnapshotBuffer({ delay: 0 });
     const show = () => {
@@ -489,9 +493,18 @@ describe('the chain: sim → snapshot → SnapshotBuffer → UnitView', () => {
     };
     show();
     const bw = barWidth(v);
-    assert.equal(u.skill.ammoLeft, 13, 'the activation tick already fired the first round');
+    // the official sniper row (ATTACK_RANGE_ENEMY or SKILL_RANGE_ENEMY: SEARCH, checked every tick — the live client's
+    // 0.2 s auto-trigger, AutoChessBattleTrigger) casts between attacks, so the cast tick fires no round yet: the
+    // magazine is full, every cell lit, its 13 separators drawn
+    assert.deepEqual(u.skill.rules, ['SEARCH']);
+    assert.equal(u.skill.ammoLeft, 14, 'the cast tick fires no round: the magazine is full');
+    assert.ok(Math.abs(v.spFill.width - bw) < 1e-9, 'all 14 cells lit');
+    assert.equal(v.ammoCuts.filter((c) => c.visible).length, 13, 'one separator at each of the 13 round boundaries');
+    assert.ok(h.runUntil(() => u.skill.ammoLeft < 14 && u.skill.active, 1));
+    show();
+    assert.equal(u.skill.ammoLeft, 13, 'the first round');
     assert.ok(Math.abs(v.spFill.width - bw * 13 / 14) < 1e-9);
-    assert.equal(v.ammoCuts.filter((c) => c.visible).length, 13);
+    assert.equal(v.ammoCuts.filter((c) => c.visible).length, 13, 'the separators stay: they mark the magazine, not the rounds left');
     const left = u.skill.ammoLeft;
     assert.ok(h.runUntil(() => u.skill.ammoLeft < left && u.skill.active, 10));
     show();

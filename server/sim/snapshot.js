@@ -2,7 +2,7 @@
 //
 // b.snap  = { fieldId, t, units: [[id, x, y, hp, maxHp, sp, spMax, flags, anim]], dp, killed, total, resolved }
 //   (hp of a countdown summon — unit.countdown, content/tokens.js startCountdown — is maxHp × the share of its life left)
-// UnitInfo = { id, kind, side, ownerId, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, motion?, boss?, uid?,
+// UnitInfo = { id, kind, side, ownerId, summonerId?, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, motion?, boss?, uid?,
 //   form?, skillIndex?, ammoSkill?, moduleId?, items?, standInFor?, diy?, skin? }  (ammoSkill = an ally whose skill is an ammo
 //   magazine: the HP bar shows its rounds as cells, b.snap `ammo`; standInFor = the replaced operator's charId of a 补位
 //   stand-in; diy = a 自选 piece's pick { charId, skillIndex, uniEquipId } — defId is its slot, spine / avatar the operator's;
@@ -38,6 +38,9 @@ export function unitInfo(u) {
     kind: u.kind,
     side: u.side,
     ownerId: u.ownerId ?? null,
+    // (fork) the unit that summoned it (units.js ownerUnit), a summon only — the client plays its summoner's effects for
+    // its summons on it (render/vfx/skillfx.js tokens, talentfx.js onSummons)
+    ...(u.ownerUnit?.id != null ? { summonerId: u.ownerUnit.id } : null),
     defId: u.defId,
     name: u.name,
     tier: d.tier ?? (d.rank === 'BOSS' ? 3 : d.rank === 'ELITE' ? 2 : 1),
@@ -275,6 +278,42 @@ export function chargeView(u) {
   const sk = u.skill;
   if (u.side !== 'ally' || !sk || sk.noSkill || !(sk.maxCharges > 1)) return null;
   return [Math.max(0, Math.min(sk.maxCharges, Math.floor(sk.charges || 0))), sk.maxCharges];
+}
+
+/**
+ * (fork) `fxStateView(u)` = `[[buff, src, look], …]` — the official buffs whose lasting effects a unit carries now, by the
+ * client's buff key (buff_template_holder; index.json uses' `buff`), or null: the moments the client never sees (a
+ * condition the official buff graph checks every tick, a would-die, a kill …) that a kit models in the sim
+ * (Battle.fxState, Battle.fxProbe — read here —, or a sim buff tagged `fx`). `src` is the unit whose skill or talent made it (null: the carrier
+ * itself), `look` the official branch the kit reached (null: every effect of that buff) — render/vfx/skillfx.js plays
+ * that buff's plan entries (skills.js STATE_BUFFS) on the carrier while the row lasts. Display only: no sim state reads
+ * it, and the golden canon leaves it out. A state set in an earlier deployment of the unit (`seq`), or past its `until`
+ * (battle time `t`), is not shown.
+ */
+export function fxStateView(u, t = 0) {
+  let out = null;
+  if (u.fxStates) {
+    for (const [buff, s] of u.fxStates) {
+      if (s.seq === u.deploySeq && !(t >= s.until)) (out || (out = [])).push([buff, s.src ?? null, s.look ?? null]);
+    }
+  }
+  if (u.fxProbes) {
+    for (const p of u.fxProbes) {
+      const v = p.probe(u);
+      if (v == null || v === false) continue;
+      // (fork) the unit that gave it: the probe's src(u) (a summon's owner), else an object's { src, look? }; the carrier: null
+      const obj = typeof v === 'object';
+      const by = p.src ? p.src(u) : obj ? v.src : null;
+      const src = (by && typeof by === 'object' ? by.id : by) ?? null;
+      if (!(out && out.some((r) => r[0] === p.buff))) (out || (out = [])).push([p.buff, src === u.id ? null : src, v === true ? null : obj ? v.look ?? null : v]);
+    }
+  }
+  for (const b of u.buffs) {
+    if (typeof b.fx !== 'string' || !b.fx) continue;
+    if (out && out.some((r) => r[0] === b.fx && r[1] === (b.fxSrc ?? null))) continue;
+    (out || (out = [])).push([b.fx, b.fxSrc ?? null, b.fxLook ?? null]);
+  }
+  return out;
 }
 
 /**

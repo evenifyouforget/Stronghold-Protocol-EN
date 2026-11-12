@@ -104,7 +104,7 @@ import { itemKey } from './gamedata.js';
 import { computeBonds, pieceBonds } from './bondsMeta.js';
 import { isFlyKey, bountySpawns } from './waves.js';
 import { previewPlayer } from './preview.js';
-import { bossPoolHp, SharedBossPool } from './finalAssault.js';
+import { bossPoolHp, bossPoolSeats, SharedBossPool } from './finalAssault.js';
 import { GEO, REHEARSAL_MAX_CANDIDATES } from '../../shared/constants.js';
 import { mitigate } from '../sim/attack.js';
 import { HOVER_KEYS } from '../sim/content/enemies.js';
@@ -1935,7 +1935,7 @@ function bossCandidateOpts(m, ps, byUid, plan) {
     if (Array.isArray(ev.spawns)) spawns = ev.spawns;
     if (Array.isArray(ev.routes)) routes = ev.routes;
   }
-  const hp = bossPoolHp(m.gd, bossId, alive.length);
+  const hp = bossPoolHp(m.gd, bossId, alive.length, null, { seats: bossPoolSeats(m) });
   return {
     seed: faRehearsalSeed(m, ps),
     kind,
@@ -3258,9 +3258,10 @@ export function positionTraitsOf(m, ps, c) {
   return out;
 }
 
-/** §37.37 A plan as a board: piece per tile key, tile and facing per uid. */
-function planView(plan, pieces) {
-  const at = new Map(), keyOf = new Map(), dirOf = new Map(), byUid = new Map(pieces.map((p) => [p.uid, p]));
+/** §37.37 A plan as a board: piece per tile key, tile and facing per uid. `byUid`: (fork) the pieces by uid, when the caller
+ *  keeps it across the plans it tries (read-only here and in every reader of the view). */
+function planView(plan, pieces, byUid = new Map(pieces.map((p) => [p.uid, p]))) {
+  const at = new Map(), keyOf = new Map(), dirOf = new Map();
   for (const [uid, key] of plan) {
     const p = byUid.get(uid);
     if (!p) continue;
@@ -3630,10 +3631,11 @@ export function* positionPlanSteps(m, ps, chosen, base, ctx, { devourOnly = fals
     return layout.value();
   };
   // §37.77 a feeding candidate (devourFeedSteps): leader damage alone, no layout floor: the boss rehearsal judges it
+  const chessByUid = new Map(chess.map((p) => [p.uid, p]));
   const feedCtx = feed ? { recs, unit, share: leaderShareOf(m, ps), armor: model.armor, T: faFightSeconds(m) } : null;
   const score = feed ? (plan) => feedDps(plan, chess, dm, feedCtx)
-    : devourOnly ? (plan) => devourValue(planView(plan, chess), dm, W('egirShip'))
-      : (plan) => positionValue(m, ps, planView(plan, chess), W, final, dm);
+    : devourOnly ? (plan) => devourValue(planView(plan, chess, chessByUid), dm, W('egirShip'))
+      : (plan) => positionValue(m, ps, planView(plan, chess, chessByUid), W, final, dm);
   if (rate) return score(base);
   const floor = feed ? -Infinity : (() => { const v = layoutValue(base); return v - POSITION_TOLERANCE * Math.abs(v); })();
   let cur = new LayoutPlan(base);
@@ -3650,7 +3652,8 @@ export function* positionPlanSteps(m, ps, chosen, base, ctx, { devourOnly = fals
   // move `uid` to `key` facing `dir`; the occupant (if any) takes the vacated tile when it may stand there
   const moved = (plan, uid, key, dir) => {
     const from = plan.get(uid);
-    const occ = [...plan.entries()].find(([u, k]) => k === key && u !== uid)?.[0];
+    let occ = null; // (fork) the first other piece on `key`, without copying the plan's entries for every move tried
+    for (const [u, k] of plan) if (k === key && u !== uid) { occ = u; break; }
     if (occ != null && !legal.get(occ)?.has(from)) return null;
     const next = new LayoutPlan(plan);
     for (const [u, d] of plan.dirs) next.dirs.set(u, d);

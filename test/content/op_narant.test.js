@@ -6,6 +6,7 @@
 // boomerang flight it relies on (ai.js throwBoomerang: `boomerangCaught`, a profile's `boomerangOnward`).
 // Run: node --test test/content/op_narant.test.js
 
+import { allyCastWindup } from '../../server/sim/ai.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -99,17 +100,18 @@ test('trait 回环射手 (engine): one boomerang out at 15 and back at 3.75 tile
   const d = 3;
   const flight = d / PROJECTILE_SPEEDS.boomerang + d / BOOMERANG_RETURN_SPEED;
   approx(caught[0].t - hits[0].t, d / BOOMERANG_RETURN_SPEED, 'back at 3.75 tiles/s', 0.1);
-  approx(hits[1].t - hits[0].t, flight, 'she waits for it (longer than her 1 s interval)', 0.1);
+  // the next cast starts when the boomerang is caught and its throw lands one wind-up later (official cast → hit, ai.js allyCastWindup)
+  approx(hits[1].t - hits[0].t, flight + allyCastWindup(u), 'she waits for it (longer than her 1 s interval), then the wind-up', 0.1);
   assert.ok(h.eventsOf('atk').filter((e) => e[1] === u.id).every((e) => e[3] === 'boomerang'));
   done(h);
 });
 
-test('S1 旋刃 (切换: on until she leaves; data DEFAULT): range −1 (the far column of y-7), 140 % / 160 % ATK, then up to 3 bounces (radius 1.7, an enemy this attack has not hit first, then the nearest; 6 tiles/s), then back; a lone enemy: no bounce', () => {
+test('S1 旋刃 (切换: on until she leaves; data SEARCH = official SNIPER row): range −1 (the far column of y-7), 140 % / 160 % ATK, then up to 3 bounces (radius 1.7, an enemy this attack has not hit first, then the nearest; 6 tiles/s), then back; a lone enemy: no bounce', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S1);
     const { h, u } = field({ tier, elite, skill: 0 });
     assert.deepEqual([u.skill.rule, u.skill.kind, u.skill.spCost, u.skill.initSp, sk.bb['attack@times'], sk.bb['attack@atk_scale'], sk.bb.ability_range_forward_extend],
-      ['DEFAULT', 'toggle', elite ? 8 : 9, 0, 3, elite ? 1.6 : 1.4, -1], `T${tier}`);
+      ['SEARCH', 'toggle', elite ? 8 : 9, 0, 3, elite ? 1.6 : 1.4, -1], `T${tier}`);
     const lone = h.spawn('enemy_dummy', { pos: [10, 5] });
     assert.ok(h.runUntil(() => u.skill.active, 12), `T${tier}: on once its SP is full and an enemy is in range`);
     const short = formOf(tier, elite).rangeGrid.filter(([, c]) => c < 3);
@@ -153,7 +155,7 @@ test('S2 恶魇 (30 s, attack SP 18 from 5 / 8): 210 % / 225 % ATK + 停顿 1 s;
     const sk = skillOf(tier, elite, S2);
     const { h, u } = field({ tier, elite, skill: 1 });
     assert.deepEqual([u.skill.rule, u.skill.spType, u.skill.spCost, u.skill.initSp, sk.duration, sk.bb['attack@atk_scale'], sk.bb['attack@atk_scale_comeback'], sk.bb['attack@sluggish'], sk.bb['attack@move_ahead_time'], sk.bb['attack@projectile_range']],
-      ['DEFAULT', 'attack', 18, elite ? 8 : 5, 30, elite ? 2.25 : 2.1, elite ? 1.7 : 1.55, 1, 0.5, 1], `T${tier}`);
+      ['SEARCH', 'attack', 18, elite ? 8 : 5, 30, elite ? 2.25 : 2.1, elite ? 1.7 : 1.55, 1, 0.5, 1], `T${tier}`);
     const target = h.spawn('enemy_dummy', { pos: [10, 6] });
     const side = h.spawn('enemy_dummy', { pos: [11, 5] });    // 1.0 from the return line (row 10): hit on the way back
     const off = h.spawn('enemy_dummy', { pos: [12, 4] });     // 2 rows off: never
@@ -191,7 +193,7 @@ test('S3 吞日 (20 s): 3 boomerangs per attack (3 hits of 145 % / 160 %, flying
     const sk = skillOf(tier, elite, S3);
     const { h, u } = field({ tier, elite, skill: 2 });
     assert.deepEqual([u.skill.rule, u.skill.spCost, u.skill.initSp, sk.duration, sk.bb.cnt, sk.bb['attack@atk_scale'], sk.bb.atk_scale_aoe, sk.bb['attack@aoe.max_target'], sk.bb.sluggish],
-      ['DEFAULT', elite ? 36 : 39, elite ? 17 : 14, 20, 3, elite ? 1.6 : 1.45, elite ? 1.4 : 1.3, 3, 1], `T${tier}`);
+      ['SEARCH', elite ? 36 : 39, elite ? 17 : 14, 20, 3, elite ? 1.6 : 1.45, elite ? 1.4 : 1.3, 3, 1], `T${tier}`);
     const target = h.spawn('enemy_dummy', { pos: [10, 6] });
     const around = [[9, 3], [11, 3], [9, 4], [11, 4]].map((pos) => h.spawn('enemy_dummy', { pos }));
     h.b.addBuff(target, { key: 'test:taunt', mods: { taunt: 5 } });   // her target: the far one

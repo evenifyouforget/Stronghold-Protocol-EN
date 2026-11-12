@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLangsOf, effectiveVoiceLang, voiceLine, VOICE_TREES } from '../../public/js/audio.js';
+import { bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLangsOf, effectiveVoiceLang, voiceLine, VOICE_TREES, POP_FADE_S, HELD_ATTACK_LAYERS } from '../../public/js/audio.js';
 import { mediaUrl } from '../../public/js/media.js';
 import { songGain } from '../../public/js/audioMixer.js';
 import { PHASE } from '../../shared/constants.js';
@@ -426,6 +426,51 @@ describe('operator battle voice', () => {
     }
   });
 
+  test('(fork) the Operator Loadout lines: a line by index, the line count, and the takeover past the gate', async () => {
+    const id = 'char_a', key = 'char_a_skin#1';
+    const audioM = {
+      voice: { [id]: { select: ['/v/cn/a/cn_021.mp3', '/v/cn/a/cn_022.mp3'], place: '/v/cn/a/cn_023.mp3' },
+        [key]: { select: ['/v/cn/s/cn_021.mp3', '/v/cn/s/cn_022.mp3'] } },
+      voiceEn: { [id]: { select: ['/v/en/a/cn_021.mp3', '/v/en/a/cn_022.mp3'] }, [key]: { select: ['/v/en/s/cn_022.mp3'] } },
+    };
+    assert.equal(voiceLine(audioM, id, 'select', 'en', 1).url, '/v/en/a/cn_022.mp3', 'a whole number picks that line');
+    assert.equal(voiceLine(audioM, id, 'select', 'en', 2).url, '/v/en/a/cn_021.mp3', 'modulo the count');
+    assert.equal(voiceLine(audioM, id, 'select', 'cn', 1).url, '/v/cn/a/cn_022.mp3');
+    assert.deepEqual(voiceLine(audioM, key, 'select', 'en', 0), { url: '/v/en/s/cn_022.mp3', fallback: '/v/cn/s/cn_022.mp3' });
+
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(String(u)); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => ({ audio: { sfx: { ui: {}, battle: {}, units: {} }, ...audioM } }) });
+      a.install();
+      fw.fire('pointerdown');
+      await tick();
+      a.setVoiceLang('en', {});
+      assert.equal(a.voiceCount(id, 'select'), 2);
+      assert.equal(a.voiceCount(id, 'place'), 1, 'a slot the dub lacks: the Chinese lines');
+      assert.equal(a.voiceCount(id, 'skill1'), 0);
+      assert.equal(a.voiceCount(id, 'select', key), 1, 'the outfit set in its dub');
+      assert.equal(a.voiceCount(id, 'place', key), 0, 'a slot the outfit set lacks: none (the caller falls back)');
+      assert.equal(a.voice(id, 'place', { voiceKey: null, line: 0, takeover: true }), true);
+      await tick();
+      assert.equal(a.voiceNode?.url, '/v/cn/a/cn_023.mp3');
+      // a battle line on air would refuse a 选中 tap (priority); the Loadout's takeover cuts it off instead
+      assert.equal(a.voice(id, 'select', { voiceKey: null, line: 1, takeover: true }), true);
+      await tick();
+      assert.equal(a.voiceNode?.url, '/v/en/a/cn_022.mp3');
+      assert.equal(a.voice(id, 'select', { voiceKey: key, line: 0, takeover: true }), true);
+      await tick();
+      assert.equal(a.voiceNode?.url, '/v/en/s/cn_022.mp3', 'the outfit voice set');
+      a.volumes.muted = true;
+      assert.equal(a.voice(id, 'select', { line: 0, takeover: true }), false, 'muted stays silent');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
   test('AudioManager.voice: manifest slots (a drawn array), the gate, and the battle events that drive them', async () => {
     const fw = fakeWindow();
     const origFetch = globalThis.fetch;
@@ -672,17 +717,44 @@ describe('AudioManager', () => {
     }
   });
 
-  test('塔露拉 (committed manifest): S3 has its cast sound by index only, and its kit fx their official banks and pools', () => {
+  test('塔露拉 (committed manifest): S2 and S3 have their cast sounds by index only, and her kit fx their official banks and pools', () => {
     const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
     const u = m.units.char_4247_oxi;
-    assert.equal(u.skill, undefined, 'no cast sound on S1 / S2');
-    assert.deepEqual(Object.keys(u.skills), ['2']);
+    assert.equal(u.skill, undefined, 'no primary cast sound: by index only');
+    // S2 has no ON_SKILL_START bank: its cast is its ability's start, ON_ABILITY_START.skchr_oxi_2 (tools/assets/plan.mjs
+    // SKILL_ABILITY_SOUNDS, dc9f0dbd; now tools/assets/skillSounds.mjs); S1's ability start is her S1 swing (attacks[0]), no cast sound
+    assert.deepEqual(Object.keys(u.skills), ['1', '2']);
+    assert.match(u.skills[1], /p_skill_xtlfgbw_h\.mp3$/);
+    assert.equal(u.skillGroups[1], 'Battle_P_SAtk', 'on its official bank\'s mixer group');
     assert.match(u.skills[2], /p_skill_xtlfgbw_s\.mp3$/);
     assert.match(u.fxSounds['heatwave|oxi:heatwave'].url, /p_atk_xtlfgbwfb_s\.mp3$/);
     assert.match(u.fxSounds['blast|oxi:heatwave'].url, /p_imp_xtlfgbwfb_s\.mp3$/);
     assert.match(u.fxSounds['overload|'].url, /p_skill_xtlfgbwvl_s\.mp3$/);
     for (const e of Object.values(u.fxSounds)) assert.ok(m.pools[e.pool], `the pool of ${e.url}`);
-    assert.equal(u.fxSounds['blast|oxi:retaliate'], undefined, 'S2\'s blast is another sound');
+    // S2's strike back is another sound than S3's blast: its ability's hit, ON_ABILITY_HIT.skchr_oxi_2 (dc9f0dbd)
+    assert.match(u.fxSounds['blast|oxi:retaliate'].url, /p_imp_xtlfgbwfb_h\.mp3$/);
+    assert.equal(u.fxSounds['blast|oxi:retaliate'].pool, 'battle.ON_ABILITY_HIT.skchr_oxi_2');
+  });
+
+  test("(fork) periodic tick hits (committed manifest): each kit's fx tick plays the official buff trigger's sound on its pool", () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const want = {
+      char_450_necras: ['tick|necras:s2', 'p_imp_prlfrhlrd_h'],
+      char_4151_tinman: ['tick|tinman:s1', 'p_imp_stmpnklchbm'],
+      char_1039_thorn2: ['tick|thorn2:s2', 'p_imp_trshldacy_n'],
+      char_1042_phatm2: ['tick|phatm2:s2', 'p_imp_dmgrct_h'],   // her summon's ticks name her (src)
+      char_1044_hsgma2: ['tick|hsgma2:s2', 'p_imp_ktsldghstlp'],
+      char_4056_titi: ['tick|titi:s3', 'p_imp_sdycrtlswk'],
+      char_4202_haruka: ['tick|haruka:t1', 'p_imp_gfshblcrt'],
+      char_249_mlyss: ['tick|mlyss:s3', 'p_atk_wtrlimepull'],
+    };
+    for (const [id, [key, file]] of Object.entries(want)) {
+      const e = m.units[id]?.fxSounds?.[key];
+      assert.ok(e, `${id} ${key}`);
+      assert.equal(e.url?.split('/').pop(), `${file}.mp3`, `${id} ${key}`);
+      assert.ok(m.pools[e.pool], `${id}: the pool ${e.pool}`);
+    }
+    assert.match(m.units.char_4151_tinman.fxSounds['tick|tinman:s2'].url, /p_imp_stmpnklchbm\.mp3$/);
   });
 
   test('丰川祥子 (committed manifest): the skill stings — S1 d1/d2/d3 40/30/30, S2 h1 only (into organ), S3 s1/s2 50/50 + its loop, each on its official pool', () => {
@@ -732,6 +804,199 @@ describe('AudioManager', () => {
       a.handleBattleEvents([['skill', 4, 1]]);
       assert.deepEqual(units.map((u) => u[1]), [2, 0], 'the cast asks for its own skill index');
       assert.equal(vm.audio.sfx.units.char_4247_oxi.skill, undefined);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test('(fork) element bursts (committed manifest): the official ep_break_<el>_audio banks, operator side only except apoptosis', () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const leaf = (e) => e.url.split('/').pop();
+    assert.deepEqual(Object.keys(m.burst).sort(), ['apoptosis.char', 'apoptosis.enemy', 'burn.char', 'erosion.char', 'neural.char'],
+      'an enemy\'s burn / neural / erosion burst has no sound (its ep_break_<el>_enemy template signals none)');
+    assert.deepEqual(m.burst['burn.char'].map(leaf), ['b_char_fireharm.mp3', 'e_imp_dmfttrb_d.mp3'], 'ON_BUFF_START + ON_BUFF_SHOW_EFFECT');
+    assert.deepEqual(m.burst['neural.char'].map(leaf), ['b_char_energyharm.mp3']);
+    assert.deepEqual(m.burst['erosion.char'].map(leaf), ['b_char_waterharm.mp3']);
+    assert.deepEqual(m.burst['apoptosis.char'].map(leaf), ['b_char_darkharm.mp3']);
+    assert.deepEqual(m.burst['apoptosis.enemy'].map(leaf), ['b_char_darkharm.mp3']);
+    assert.equal(m.burst['apoptosis.char'][0].vol, 0.8, 'the dark bank plays at volume 0.8');
+    for (const list of Object.values(m.burst)) for (const e of list) assert.ok(m.pools[e.pool], `the pool of ${e.url}`);
+    assert.equal(m.pools['battle.ON_BUFF_START.ep_break_water_audio'].maxSoundAllowed, 1);
+  });
+
+  test('(fork) an element burst plays its side\'s official sounds on their pools; an enemy\'s burn burst and unknown units stay silent', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    try {
+      const burst = { 'burn.char': [{ url: '/s/fire.mp3', pool: 'f' }, { url: '/s/fire2.mp3', pool: 'f2' }], 'apoptosis.enemy': [{ url: '/s/dark.mp3', pool: 'd', vol: 0.8 }] };
+      const pools = { f: { maxSoundAllowed: 2, popOldest: true, sounds: {} }, f2: { maxSoundAllowed: 2, popOldest: true, sounds: {} }, d: { maxSoundAllowed: 1, popOldest: false, sounds: {} } };
+      const vm = { audio: { bgm: {}, sfx: { ui: {}, battle: {}, pools, units: {}, burst } } };
+      const a = new AudioManager({ win: fw.win, getManifest: () => vm, random: () => 0 });
+      a.install();
+      fw.fire('pointerdown');
+      await new Promise((r) => setTimeout(r, 10));
+      a.setFieldUnits([{ id: 1, kind: 'op', side: 'ally', defId: 'chess_char_x', spine: 'char_x' },
+        { id: 2, kind: 'enemy', side: 'enemy', defId: 'enemy_1007_slime' }]);
+      const plays = [];
+      a._playBank = (url, pool, vol) => { plays.push([url, pool, vol]); };
+      const fx = (ex) => a.handleBattleEvents([['fx', 'burst', 5, 9, ex]]);
+      fx({ id: 1, element: 'burn' });
+      assert.deepEqual(plays, [['/s/fire.mp3', 'f', 1], ['/s/fire2.mp3', 'f2', 1]], 'an operator\'s burn burst: both banks');
+      plays.length = 0;
+      fx({ id: 2, element: 'apoptosis' });
+      assert.deepEqual(plays, [['/s/dark.mp3', 'd', 0.8]], 'an enemy\'s apoptosis burst, at its bank volume');
+      plays.length = 0;
+      fx({ id: 2, element: 'burn' });
+      fx({ id: 1, element: 'apoptosis' });
+      fx({ id: 9, element: 'burn' });
+      fx({ id: 1 });
+      assert.deepEqual(plays, [], 'no entry, an untracked unit or no element: silent');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test('(fork) 塔露拉 S2 stack: while the kit counts a layer (buffLayers oxi:stack) her normal attacks are BuffedAttack\'s — its impact hits[1]; at 0 her own again', () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const u = m.units.char_4247_oxi;
+    assert.match(u.hits[1], /p_imp_xtlfgbw_h\.mp3$/, 'BuffedAttack (attack.0.1) lands p_imp_xtlfgbw_h');
+    assert.equal(u.hitPools[1], 'battle.ON_ABILITY_HIT.char_4247_oxi.attack.0.1');
+    assert.match(u.hit, /p_imp_xtlfgbw_n\.mp3$/, 'Attack (attack.0.2) lands _n');
+    assert.deepEqual(HELD_ATTACK_LAYERS.char_4247_oxi, { 'oxi:stack': 1 });
+    const a = new AudioManager({ win: fakeWindow().win, getManifest: () => ({ audio: { bgm: {}, sfx: m } }), random: () => 0 });
+    a.ctx = {};   // past the gate: unit() is spied, nothing is decoded
+    a.setFieldUnits([{ id: 3, kind: 'op', side: 'ally', defId: 'chess_char_6_diy1_a', spine: 'char_4247_oxi', skillIndex: 1 },
+      { id: 9, kind: 'enemy', side: 'enemy', defId: 'enemy_x', spine: 'enemy_x' }]);
+    const calls = [];
+    a.unit = (def, role, key, skillIndex, active) => { calls.push([role, skillIndex, active]); return true; };
+    const strike = () => { calls.length = 0; a.handleBattleEvents([['atk', 3, 9, 'none'], ['dmg', 9, 100, 'arts']]); return calls.slice(); };
+    const layers = (n) => a.handleBattleEvents([['fx', 'buffLayers', 5, 9, { id: 3, n, max: 5, skill: 'oxi:stack' }]]);
+    assert.deepEqual(strike(), [['attack', 1, false], ['hit', 1, false]], 'no layer: her own attack');
+    layers(2);
+    assert.deepEqual(strike(), [['attack', 1, true], ['hit', 1, true]], 'a layer: the skill\'s own swing and impact');
+    layers(0);
+    assert.deepEqual(strike(), [['attack', 1, false], ['hit', 1, false]], 'the last layer gone');
+    a.handleBattleEvents([['fx', 'buffLayers', 5, 9, { id: 3, n: 6, max: 6, skill: 'oxi:rage' }]]);
+    assert.deepEqual(strike(), [['attack', 1, false], ['hit', 1, false]], '怒火 changes no attack');
+  });
+
+  test('(fork) 莫斯提马 / 蕾缪安 (committed manifest): their official impact, skill-mode, skill start / end and kit fx banks', () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const leaf = (u) => (typeof u === 'string' ? u : u?.url || '').split('/').pop();
+    const mo = m.units.char_213_mostma, le = m.units.char_4193_lemuen;
+    assert.equal(leaf(mo.hit), 'p_imp_timewand_n.mp3', 'her impact is her attack\'s ON_ABILITY_ON');
+    assert.deepEqual(Object.keys(mo.attacks), ['2'], 'S2 keeps her normal attack (its mode is S3\'s: shared/fxModes.js)');
+    assert.deepEqual(mo.quietHits, [2], 'the S3 ripple has its swing only');
+    assert.equal(leaf(mo.skillOn[1]), 'p_skill_blacktimewand_layer.mp3');
+    assert.equal(mo.skillOn[1].hold, true);
+    assert.equal(leaf(mo.skillOn[2]), 'p_skill_whitetimewand.mp3');
+    assert.equal(leaf(mo.fxSounds['timeLock|']), 'p_skill_blacktimewand_shot.mp3');
+    assert.equal(leaf(mo.fxSounds['timeLockHit|']), 'p_imp_blacktimewand_s.mp3');
+    assert.equal(leaf(le.attacks[1]), 'p_atk_lmwlcrstr_h.mp3', 'S2\'s plain shots are attack.2.2');
+    assert.deepEqual([leaf(le.hits[0]), leaf(le.hits[1])], ['p_imp_lmwlcrstr_d.mp3', 'p_imp_lmwlcrstr_d.mp3']);
+    assert.deepEqual(Object.keys(le.skillOff), ['0', '1', '2']);
+    assert.equal(leaf(le.skillOff[2]), 'b_char_boostclose.mp3');
+    assert.deepEqual(Object.fromEntries(Object.entries(le.fxSounds).map(([k, e]) => [k, leaf(e)])), {
+      'lock|#1': 'p_atk_lmwlcrstrcg_h.mp3', 'crit|#1': 'p_atk_lmwlcrstrcgst_h.mp3', 'lock|#2': 'p_atk_lmwlcrstrst_s.mp3',
+      'bombardShell|': 'p_atk_lmwlcrstr_s.mp3', 'bombard|': 'p_imp_lmwlcrstr_s.mp3', 'wanted|': 'p_imp_lmwlcrstrmk.mp3',
+    });
+    for (const e of [...Object.values(mo.fxSounds), ...Object.values(le.fxSounds), ...Object.values(mo.skillOn), ...Object.values(le.skillOff)]) {
+      assert.ok(m.pools[e.pool], `the pool of ${e.url}`);
+    }
+  });
+
+  test('(fork) 烛煌 (committed manifest): S1 swing / impact, S2 / S3 bolt impacts, S3 activation and closing (audio_data banks)', () => {
+    const m = JSON.parse(readFileSync(path.join(ROOT, 'data/assets.json'), 'utf8')).audio.sfx;
+    const leaf = (u) => (typeof u === 'string' ? u : u?.url || '').split('/').pop();
+    const bz = m.units.char_1040_blaze2;
+    assert.equal(leaf(bz.hit), 'p_imp_hcnsrfr_n.mp3', 'her normal bolt');
+    assert.equal(leaf(bz.attacks[0]), 'p_atk_hcnsrfr_d.mp3', 'S1: ON_ABILITY_START.skchr_blaze2_1');
+    assert.equal(leaf(bz.hits[0]), 'p_imp_hcnsrfr_d.mp3', 'S1: ON_ABILITY_HIT.skchr_blaze2_1');
+    assert.equal(leaf(bz.hits[1]), 'p_imp_hcnsrfr_h.mp3', 'S2: ON_PROJECTILE_HIT.projectile_chr_blaze2_s2 (was her normal impact)');
+    assert.equal(leaf(bz.hits[2]), 'p_imp_hcnsrfr_s.mp3', 'S3: ON_PROJECTILE_HIT.projectile_chr_blaze2_s3 (was her normal impact)');
+    assert.equal(leaf(bz.skillOn[2]), 'p_skill_hcnsrfrsr.mp3', 'S3 activation: ON_ABILITY_START.skchr_blaze2_3');
+    assert.equal(leaf(bz.skillOff[2]), 'b_char_boostclose.mp3', 'S3 (ammo) closes: ON_SKILL_SPECIAL_POINT');
+    assert.deepEqual((bz.skillOff[2].more || []).map(leaf), ['p_skill_hcnsrfrfld.mp3'], 'and its ability ends: ON_ABILITY_END.skchr_blaze2_3');
+    assert.deepEqual(Object.fromEntries(Object.entries(bz.fxSounds || {}).map(([k, e]) => [k, leaf(e)])), {
+      'downed|': 'p_atk_hcnsrfrvv.mp3', 'revive|': 'p_imp_hcnsrfrvv.mp3', 'meltdown|': 'p_imp_hcnsrfrbm.mp3',
+    }, 'T2 knocked down / standing up (reborn_start, reborn_finish), T1 a burn burst (fire_ep_break)');
+    for (const e of [...Object.values(bz.skillOn), ...Object.values(bz.skillOff), ...(bz.skillOff[2].more || []), ...Object.values(bz.fxSounds || {})]) {
+      assert.ok(m.pools[e.pool], `the pool of ${e.url}`);
+    }
+    for (const k of ['0', '1', '2']) assert.ok(m.pools[bz.hitPools?.[k]], `S${Number(k) + 1} impact pool`);
+  });
+
+  test('(fork) a sound its bank pops (popOldest) fades out over POP_FADE_S instead of a hard cut (a click)', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    try {
+      const pools = { one: { maxSoundAllowed: 1, popOldest: true, sounds: {} } };
+      const vm = { audio: { bgm: {}, sfx: { ui: {}, battle: {}, pools, units: { char_x: { attack: '/assets/audio/sfx/a.mp3', pools: { attack: 'one' } } } } } };
+      const a = new AudioManager({ win: fw.win, getManifest: () => vm, random: () => 0 });
+      a.install();
+      fw.fire('pointerdown');
+      await new Promise((r) => setTimeout(r, 10));
+      const made = [];
+      const mkS = a.ctx.createBufferSource.bind(a.ctx), mkG = a.ctx.createGain.bind(a.ctx);
+      a.ctx.createBufferSource = () => { const s = mkS(); s.stops = []; s.stop = (t) => s.stops.push(t ?? 'now'); made.push(['src', s]); return s; };
+      a.ctx.createGain = () => { const g = mkG(); made.push(['gain', g]); return g; };
+      a.ctx.currentTime = 5;
+      let n = 0;
+      for (const run of [() => a.unit('char_x', 'attack', `u${++n}`), () => a._playBank('/assets/audio/sfx/b.mp3', 'one', 1)]) {
+        made.length = 0;
+        run(); await new Promise((r) => setTimeout(r, 60));
+        const si = made.findIndex(([k]) => k === 'src'), first = made[si][1], firstGain = made.slice(si).find(([k]) => k === 'gain')[1];   // its own gain: made right after it
+        run(); await new Promise((r) => setTimeout(r, 60));
+        assert.deepEqual(firstGain.gain.log.slice(-1), [['ramp', 0]], 'faded to silence');
+        assert.ok(first.stops.length === 1 && Math.abs(first.stops[0] - (5 + POP_FADE_S + 0.005)) < 1e-9, 'stopped once the fade is over');
+      }
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
+
+  test('(fork) kit fx sounds by the shooter and the equipped skill; a skill\'s own start / end sounds; a quiet skill impact', async () => {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
+    try {
+      const pools = { p: { maxSoundAllowed: 0, popOldest: false, sounds: {} } };
+      const lemuen = { fxSounds: { 'lock|#1': { url: '/s/aim.mp3', pool: 'p' }, 'lock|#2': { url: '/s/lock.mp3', pool: 'p' }, 'wanted|': { url: '/s/mark.mp3', pool: 'p' } },
+        skillOff: { 1: { url: '/s/close.mp3', pool: 'p', more: [{ url: '/s/end.mp3', pool: 'p' }] } } };
+      const mostima = { hit: '/s/imp_n.mp3', quietHits: [2], skillOn: { 1: { url: '/s/layer.mp3', pool: 'p', hold: true }, 2: { url: '/s/s3.mp3', pool: 'p' } } };
+      const vm = { audio: { bgm: {}, sfx: { ui: {}, battle: {}, pools, units: { char_4193_lemuen: lemuen, char_213_mostma: mostima } } } };
+      const a = new AudioManager({ win: fw.win, getManifest: () => vm, random: () => 0 });
+      a.install();
+      fw.fire('pointerdown');
+      await new Promise((r) => setTimeout(r, 10));
+      const op = (id, spine, skillIndex) => ({ id, kind: 'op', side: 'ally', defId: 'x', spine, skillIndex });
+      a.setFieldUnits([op(1, 'char_4193_lemuen', 1), op(2, 'char_4193_lemuen', 2), op(3, 'char_213_mostma', 1), op(4, 'char_213_mostma', 2),
+        { id: 9, kind: 'enemy', side: 'enemy', defId: 'enemy_1', spine: 'enemy_1' }]);
+      const plays = [], loops = [], plain = [];
+      const pb = a._playBank.bind(a), sl = a._stingLoop.bind(a), pl = a._play.bind(a);
+      a._playBank = (url, pool, vol) => { plays.push(url); return pb(url, pool, vol); };
+      a._stingLoop = (id, url, group, o) => { loops.push([id, url, o?.loop]); return sl(id, url, group, o); };
+      a._play = (url, o) => { plain.push(url); return pl(url, o); };
+      const fx = (kind, ex) => a.handleBattleEvents([['fx', kind, 5, 9, ex]]);
+      fx('lock', { id: 9, src: 1 });
+      fx('lock', { id: 9, src: 2, hold: 1 });
+      fx('wanted', { id: 9, src: 2 });
+      fx('wanted', { id: 9 });
+      assert.deepEqual(plays, ['/s/aim.mp3', '/s/lock.mp3', '/s/mark.mp3'], 'by the shooter (src), S2 / S3 by the equipped index; no shooter, no sound');
+      plays.length = 0;
+      a.handleBattleEvents([['skill', 1, 0]]);
+      assert.deepEqual(plays, [], 'an end without a start rings nothing');
+      a.handleBattleEvents([['skill', 1, 1], ['skill', 1, 0]]);
+      assert.deepEqual(plays, ['/s/close.mp3', '/s/end.mp3'], 'her last bullet: the closing sound, and every other bank of that end (`more`)');
+      plays.length = 0;
+      a.handleBattleEvents([['skill', 3, 1], ['skill', 4, 1]]);
+      assert.deepEqual(loops, [[3, '/s/layer.mp3', false]], 'S2\'s time lock: held, not looped');
+      assert.deepEqual(plays, ['/s/s3.mp3'], 'S3\'s activation');
+      a.handleBattleEvents([['atk', 4, 9], ['dmg', 9, 100, 'arts']]);
+      a.handleBattleEvents([['atk', 3, 9], ['dmg', 9, 100, 'arts']]);
+      assert.deepEqual(plain, ['/s/imp_n.mp3'], 'no impact while the ripple runs; S2 attacks land her normal impact');
     } finally {
       globalThis.fetch = origFetch;
     }
@@ -1551,21 +1816,16 @@ describe('the cast sound belongs to its own skill', () => {
   });
 
   test('data/assets.json: an operator whose lone bank is not on its primary skill keeps it, by index', () => {
+    // (fork, every skill's own sounds: tools/assets/skillSounds.mjs) 13 of the original 23 have official ability banks on
+    // their other skills too (陈 S3, 泥岩 S1, 银灰 S2 …) and left this list; the ten below still have one bank in all
     const LONE = {
-      char_010_chen: [1, 'player/p_skill/p_skill_chixiaobadao.mp3'], char_1033_swire2: [2, 'battle/b_char/b_char_atkboost.mp3'],
-      char_1045_svash2: [2, 'player/p_skill/p_skill_snwlprdg_s.mp3'], char_135_halo: [1, 'battle/b_char/b_char_atkboost.mp3'],
-      char_172_svrash: [1, 'battle/b_char/b_char_defboost.mp3'], char_179_cgbird: [2, 'player/p_skill/p_field_elefield_loop.mp3'],
-      char_183_skgoat: [1, 'player/p_skill/p_field_calcinosis.mp3'], char_196_sunbr: [1, 'battle/b_char/b_char_healboost.mp3'],
-      char_198_blackd: [1, 'battle/b_char/b_char_tactboost.mp3'], char_2025_shu: [2, 'player/p_skill/p_skill_drgndfmrhl.mp3'],
-      char_2027_wang: [2, 'player/p_skill/p_skill_stwctp_s.mp3'], char_218_cuttle: [1, 'battle/b_char/b_char_atkboost.mp3'],
-      char_311_mudrok: [2, 'battle/b_char/b_char_atkboost.mp3'], char_4054_malist: [0, 'battle/b_char/b_char_atkboost.mp3'],
-      char_4098_vvana: [1, 'battle/b_char/b_char_atkboost.mp3'], char_4121_zuole: [1, 'player/p_skill/p_skill_wrrsldisk.mp3'],
-      char_4139_papyrs: [1, 'battle/b_char/b_char_healboost.mp3'], char_4179_monstr: [2, 'battle/b_char/b_char_atkboost.mp3'],
-      char_4204_mantra: [2, 'player/p_skill/p_skill_mtelrncpnt.mp3'], char_4244_tocka: [2, 'battle/b_char/b_char_rylntbw_s.mp3'],
-      char_431_ashlok: [1, 'battle/b_char/b_char_atkboost.mp3'], char_449_glider: [1, 'battle/b_char/b_char_healboost.mp3'],
-      char_473_mberry: [1, 'battle/b_char/b_char_healboost.mp3'],
+      char_1033_swire2: [2, 'battle/b_char/b_char_atkboost.mp3'], char_135_halo: [1, 'battle/b_char/b_char_atkboost.mp3'],
+      char_196_sunbr: [1, 'battle/b_char/b_char_healboost.mp3'], char_2027_wang: [2, 'player/p_skill/p_skill_stwctp_s.mp3'],
+      char_4054_malist: [0, 'battle/b_char/b_char_atkboost.mp3'], char_4098_vvana: [1, 'battle/b_char/b_char_atkboost.mp3'],
+      char_4139_papyrs: [1, 'battle/b_char/b_char_healboost.mp3'], char_4244_tocka: [2, 'battle/b_char/b_char_rylntbw_s.mp3'],
+      char_449_glider: [1, 'battle/b_char/b_char_healboost.mp3'], char_473_mberry: [1, 'battle/b_char/b_char_healboost.mp3'],
     };
-    assert.equal(Object.keys(LONE).length, 23);
+    assert.equal(Object.keys(LONE).length, 10);
     for (const [id, [index, file]] of Object.entries(LONE)) {
       const rec = manifest.audio.sfx.units[id];
       assert.equal(rec.skill, undefined, `${id}: its primary skill has no bank`);
@@ -1576,7 +1836,9 @@ describe('the cast sound belongs to its own skill', () => {
   });
 
   test('data/assets.json: the primary skill\'s sound stays off the skills without a bank', () => {
-    const GAPS = [['char_1041_angel2', 1, [0, 2]], ['char_202_demkni', 1, [0]], ['char_2026_yu', 2, [0]], ['char_4087_ines', 1, [0, 2]]];
+    // (fork) 新约能天使 S1 / S3 and 余 S1 cast their official ability banks now (ON_ABILITY_START.skchr_angel2_1 …,
+    // tools/assets/skillSounds.mjs): the skills below still have no bank of any kind
+    const GAPS = [['char_202_demkni', 1, [0]], ['char_4087_ines', 1, [0, 2]]];
     for (const [id, own, silent] of GAPS) {
       assert.equal(castOf(manifest, id, own).played[0]?.url, manifest.audio.sfx.units[id].skills[own], `${id}: S${own + 1} keeps its sound`);
       for (const i of silent) assert.deepEqual(castOf(manifest, id, i).played, [], `${id}: S${i + 1} has no bank`);

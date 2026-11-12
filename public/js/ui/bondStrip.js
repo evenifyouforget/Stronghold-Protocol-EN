@@ -31,7 +31,7 @@
 // operator too, with the 「同构」 tag (#846: it showed the empty slot's 「甄」).
 
 import { cloneElement } from '../../vendor/preact.module.js';
-import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
+import { useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, BondDisc, Icon, MicroLabel, Tooltip } from './components.js';
 import { RichText, UnitThumb, BondGlyph, GIcon } from './gameComponents.js';
 import { sortBonds, bondMembers, nextThreshold, bondTier, harmonyMembers, HARMONY_BOND, memberHeadCount, briefingBondTip, diyGetter, diyRecordFor, memberStandIn, standInForText } from './gameLogic.js';
@@ -49,38 +49,85 @@ function OwnerTag({ owner }) {
   </span>`;
 }
 
-function BondScroller({ count, children }) {
-  const viewport = useRef(null);
-  const [edges, setEdges] = useState({ left: false, right: false });
-  useEffect(() => {
-    const el = viewport.current;
-    if (!el) return;
-    const update = () => {
-      const left = el.scrollLeft > 1, right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
-      setEdges((old) => old.left === left && old.right === right ? old : { left, right });
+/**
+ * (fork) As many bond slots as fit the strip's width, the rest behind a 「+N」 button that drops a compact grid of them
+ * under the strip (the user's pick of 2026-11-10: the scrolling strip's bar looked ugly and the full line blocked the top
+ * of the screen). No scrolling: the fit is measured from the real width (fewer on phones) and again on every resize.
+ * Tap outside, Esc or the button closes the grid; a bond opened from it closes it too, and the button then wears the
+ * open ring. `children`: the whole `.bstrip` element as BondStrip builds it (whose it is, the owner tag, every slot with its
+ * data-bond in the strip's order); this keeps its leading non-bond children and trims the slots to what fits.
+ */
+function FitStrip({ children, openId }) {
+  const strip = [children].flat(Infinity).find(Boolean);
+  const kids = [strip.props.children].flat(Infinity).filter(Boolean);
+  const lead = kids.filter((node) => node.props?.['data-bond'] == null);
+  const items = kids.filter((node) => node.props?.['data-bond'] != null).map((node) => ({ id: node.props['data-bond'], node }));
+  const wrapRef = useRef(null), stripRef = useRef(null), moreRef = useRef(null);
+  const [fit, setFit] = useState(items.length);
+  const [open, setOpen] = useState(false);
+  const [right, setRight] = useState(0);
+  const total = items.length;
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current, strip = stripRef.current;
+    if (!wrap || !strip) return;
+    const measure = () => {
+      const w = wrap.clientWidth, slot = strip.querySelector('.bslot');
+      if (!w || !slot) return; // collapsed (hidden) or not laid out yet
+      const gap = parseFloat(getComputedStyle(strip).columnGap) || 0;
+      const slotW = slot.getBoundingClientRect().width + gap;
+      const ownerEl = strip.querySelector('.bstrip__owner');
+      const room = w - (ownerEl ? ownerEl.getBoundingClientRect().width + gap : 0);
+      let n = Math.floor((room + gap) / slotW);
+      if (n < total) {
+        const moreW = (moreRef.current?.getBoundingClientRect().width || slotW - gap) + gap;
+        n = Math.max(1, Math.floor((room - moreW + gap) / slotW));
+      }
+      n = Math.min(total, n);
+      setFit((old) => (old === n ? old : n));
     };
-    // A render can resize the observed slots too. Update after observer delivery, so those changes are measured in the
-    // next frame rather than producing "ResizeObserver loop completed with undelivered notifications" during prep.
+    measure();
+    // measured a frame after the observer delivers, so a re-render cannot loop it ("ResizeObserver loop completed …")
     let frame = null;
     const observer = new ResizeObserver(() => {
       if (frame !== null) return;
-      frame = requestAnimationFrame(() => { frame = null; update(); });
+      frame = requestAnimationFrame(() => { frame = null; measure(); });
     });
-    observer.observe(el);
-    for (const child of el.children) observer.observe(child);
-    el.addEventListener('scroll', update, { passive: true });
-    update();
-    return () => {
-      observer.disconnect();
-      if (frame !== null) cancelAnimationFrame(frame);
-      el.removeEventListener('scroll', update);
+    observer.observe(wrap);
+    return () => { observer.disconnect(); if (frame !== null) cancelAnimationFrame(frame); };
+  }, [total, lead.length]);
+  const extras = items.slice(fit);
+  const isOpen = open && extras.length > 0;
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const wrap = wrapRef.current, btn = moreRef.current;
+    if (wrap && btn) setRight(Math.max(0, wrap.clientWidth - (btn.offsetLeft + btn.offsetWidth)));
+  }, [isOpen, fit]);
+  useLayoutEffect(() => { // layout, not effect: the listeners are in place before the next press (useEffect waits for a paint)
+    if (!isOpen) return;
+    const away = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation(); setOpen(false); moreRef.current?.focus();
     };
-  }, [viewport, count]);
-  const scroll = direction => viewport.current?.scrollBy({ left: direction * Math.max(80, viewport.current.clientWidth * .75), behavior: 'smooth' });
-  return html`<div class="bstrip-scroll">
-    <button type="button" class="bstrip-scroll__arrow" disabled=${!edges.left} aria-label=${t('向左滚动盟约')} onClick=${() => scroll(-1)}>‹</button>
-    ${cloneElement(children, { ref: viewport })}
-    <button type="button" class="bstrip-scroll__arrow" disabled=${!edges.right} aria-label=${t('向右滚动盟约')} onClick=${() => scroll(1)}>›</button>
+    document.addEventListener('pointerdown', away, true);
+    document.addEventListener('keydown', esc, true);
+    return () => { document.removeEventListener('pointerdown', away, true); document.removeEventListener('keydown', esc, true); };
+  }, [isOpen]);
+  const extraOpen = !!openId && extras.some((i) => i.id === openId);
+  return html`<div class="bstrip-fit" ref=${wrapRef}>
+    ${cloneElement(strip, { ref: stripRef }, ...lead, ...items.slice(0, fit).map((i) => i.node))}
+    ${extras.length ? html`<button type="button" ref=${moreRef} class=${cx('bstrip__more', isOpen && 'is-on', extraOpen && 'is-open')}
+        aria-expanded=${isOpen} aria-controls="bstrip-grid" data-count=${extras.length}
+        aria-label=${t('更多盟约（{n}）', { n: extras.length }) /* en: "{n} more bonds" */} title=${t('更多盟约（{n}）', { n: extras.length })}
+        onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); /* Space never reaches the ready / pause shortcut */ }}
+        onClick=${() => setOpen(!isOpen)}>
+      <span class="bstrip__more-n num">+${extras.length}</span><${Icon} name="chevronRight" class="bstrip__more-chev" />
+    </button>` : null}
+    ${isOpen ? html`<div id="bstrip-grid" class="bstrip-grid" role="list" aria-label=${t('其余盟约') /* en: "Other bonds" */}
+        style=${`right:${right}px; --cols:${Math.min(extras.length, 6)}`}
+        onClick=${(e) => { if (e.target.closest?.('.bond')) setOpen(false); }}>
+      ${extras.map((i) => i.node)}
+    </div>` : null}
   </div>`;
 }
 
@@ -95,11 +142,7 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
       ${owner ? html`<${OwnerTag} owner=${owner} />` : html`<${MicroLabel}>BONDS</${MicroLabel}>`}<span>${owner ? t('{owner} 尚未激活盟约', { owner }) : t('部署干员以激活盟约')}</span></div>`;
   }
   const m = data.get('assets');
-  const shown = sorted;
-  const strip = html`<div tabindex="0" class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
-      aria-label=${owner ? t('{owner} 的盟约', { owner }) : t('我的盟约')} data-owner=${owner || null}>
-    ${owner ? html`<${OwnerTag} owner=${owner} />` : null}
-    ${shown.map((b) => {
+  const items = sorted.map((b) => {
       const rec = data.lookup('bonds', b.bondId);
       const th = Array.isArray(b.thresholds) && b.thresholds.length ? b.thresholds : rec?.thresholds || [];
       if (b.off) {
@@ -122,9 +165,13 @@ export function BondStrip({ bonds, layersDisabled = false, onOpen, openId = null
           title=${`${rec?.name || b.bondId} ${b.count ?? 0}/${next ?? th[th.length - 1] ?? '-'}${b.harmony > 0 ? t('（含调和 +{harmony}）', { harmony: b.harmony }) : ''}`} />
         <span class=${cx('bslot__count', 'num', next == null && 'is-max')}>${b.count ?? 0}<small>/${next ?? th[th.length - 1] ?? '-'}</small></span>
       </div>`;
-    })}
-  </div>`;
-  const content = html`<${BondScroller} count=${sorted.length}>${strip}<//>`;
+  });
+  const content = html`<${FitStrip} openId=${openId}>
+    <div class=${cx('bstrip', layersDisabled && 'is-frozen', owner && 'is-other')} role="list"
+        aria-label=${owner ? t('{owner} 的盟约', { owner }) : t('我的盟约')} data-owner=${owner || null}>
+      ${owner ? html`<${OwnerTag} owner=${owner} />` : null}${items}
+    </div>
+  <//>`;
   return layersDisabled ? html`<${Tooltip} text=${t('层数叠加已禁用')} placement="bottom">${content}<//>` : content;
 }
 

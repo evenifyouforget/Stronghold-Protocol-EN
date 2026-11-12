@@ -206,6 +206,14 @@ export const DP_DEFAULTS = Object.freeze({ dpInit: 10, dpPerSec: 1, dpMax: 99 })
  */
 export const AUTO_OP_COOLDOWN = 3;
 /**
+ * (fork) The official attack clip scale bounds (AbstractAnimatedAbility.UpdatePlaybackSpeed, CN 2.7.91, disassembled):
+ * animScale = attackTime / clipDuration, at least MIN_ANIM_SCALE 0.1 and at most the ability's `_maxAnimScale`
+ * (attackAnim.maxScale, from the client); ALLY_ANIM_SCALE_MAX is the cap of a unit the client data lacks [ASSUMED]. An
+ * operator's attack lands hit × animScale after its cast start (ai.js allyCastWindup).
+ */
+export const ALLY_ANIM_SCALE_MIN = 0.1;
+export const ALLY_ANIM_SCALE_MAX = 2.5;
+/**
  * State of a knocked-out operator waiting to redeploy on the tile it lies on (b.snap `down` entries, Battle.snapshot):
  * its respawn timer runs (COUNTING), then it waits for the player's DP to reach its cost (WAIT_DP) or for its tile to be
  * free (WAIT_TILE — a safeguard: no ally deploys on a body's tile, Battle.downOn). render/units.js mirrors these codes.

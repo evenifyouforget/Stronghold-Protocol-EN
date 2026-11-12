@@ -9,16 +9,23 @@ import path from 'node:path';
 import { splitGenPath, genPath, rewriteIndexHtml, isGenSharedPath } from '../shared/gen.js';
 import { genOf, publicPath, goHome, RETIRED_FLAG } from '../public/js/gen.js';
 import { parseGenerations, route, createRouter } from '../scripts/router.mjs';
-import { newGenId, allocPort, withNewGen, withPreparedGen, activateGen, withRemoteMatches, regionsWithout, reapPlan, releasesToPrune, missingAssets, MAX_AGE_MS } from '../scripts/generations.mjs';
-import { parseHosts, prepareCommand, activateCommand, announceCommand, shQuote } from '../scripts/deploy-regions.mjs';
+import { newGenId, allocPort, withNewGen, withPreparedGen, activateGen, withRemoteMatches, regionsWithout, reapPlan, releasesToPrune, missingAssets, MAX_AGE_MS, PREPARED_MAX_AGE_MS, prepareCheck } from '../scripts/generations.mjs';
+import { parseHosts, formatHosts, prepareCommand, activateCommand, checkCommand, sudoCheckCommand, checkOnHost, announceCommand, shQuote, parseArgs, parseCheck, checkProblems, testUrls } from '../scripts/deploy-regions.mjs';
 import { startBuildGuard } from '../public/js/ui/buildGuard.js';
 import { startServer } from '../server/index.js';
 import { S2C } from '../shared/protocol.js';
 import { ERR, ERR_TEXT } from '../shared/constants.js';
 import { TestClient } from './helpers/wsClient.js';
 import { StubMatch } from '../server/match/StubMatch.js';
+import { botModuleFiles } from '../server/http/botModules.js';
+import { WORKER_LOAD_MS } from './helpers/simHostFixture.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// (fork) Wait until a server has picked up a table change (its genPollMs poll): a fixed 80 / 150 ms sleep was too short
+// on a loaded machine. Returns the last value, so the assertion after it reports what it saw.
+async function until(read, ok, ms = WORKER_LOAD_MS) {
+  for (const end = Date.now() + ms; ; await sleep(20)) { const v = await read(); if (ok(v) || Date.now() > end) return v; }
+}
 
 describe('shared/gen.js', () => {
   test('splitGenPath strips the prefix', () => {
@@ -173,13 +180,15 @@ describe('buildGuard retire', () => {
 describe('two generations behind the router', () => {
   let dir, file, g1, g2, router, base;
   const clients = [];
-  const ok = async (c, msg) => { const r = await c.request(msg); assert.equal(r.t, 'ok', `${msg.t}: ${JSON.stringify(r)}`); return r; };
+  // (fork) Event waits on the router and its generations get WORKER_LOAD_MS: the client's 2-3 s defaults (connect, hello,
+  // request, sys.retire after a table poll) ran out on a loaded machine. Only expectNone keeps its short window.
+  const ok = async (c, msg) => { const r = await c.request(msg, WORKER_LOAD_MS); assert.equal(r.t, 'ok', `${msg.t}: ${JSON.stringify(r)}`); return r; };
   const writeTable = (t) => { fs.writeFileSync(`${file}.tmp`, JSON.stringify(t)); fs.renameSync(`${file}.tmp`, file); };
   const get = (p, opts) => fetch(`${base}${p}`, { redirect: 'manual', ...opts });
   const wsAt = async (gen, name) => {
-    const c = await TestClient.connect(`ws://127.0.0.1:${router.server.address().port}/_build/${gen}/_/ws`);
+    const c = await TestClient.connect(`ws://127.0.0.1:${router.server.address().port}/_build/${gen}/_/ws`, { timeout: WORKER_LOAD_MS });
     clients.push(c);
-    await c.hello(name);
+    assert.equal((await c.request({ t: 'hello', name, version: 1 }, WORKER_LOAD_MS)).t, 'welcome'); // c.hello, with the longer wait
     return c;
   };
   const gen = (id) => startServer({ port: 0, host: '127.0.0.1', quiet: true, noticeFile: null, MatchClass: StubMatch,
@@ -224,6 +233,45 @@ describe('two generations behind the router', () => {
     assert.equal((await get('/index.html')).status, 302, 'the page itself always runs inside a generation');
   });
 
+  // (fork) a generation is one release at one commit: its own code is cached for good under its prefix, everything that
+  // can change (the page, sw.js, health, data/, the shared art, unprefixed dev paths) keeps asking
+  test('cache policy: the generation\'s own code is immutable under its prefix, the rest is not', async () => {
+    const IMMUTABLE = 'public, max-age=31536000, immutable';
+    const bot = [...botModuleFiles().keys()][0];
+    assert.ok(bot, 'a bot Worker module to ask for');
+    const cacheOf = async (p, at = base) => {
+      const r = await fetch(`${at}${p}`, { redirect: 'manual' });
+      await r.arrayBuffer();
+      return { status: r.status, cc: r.headers.get('cache-control') };
+    };
+    for (const p of ['/_build/g1/_/js/main.js', '/_build/g1/_/css/theme.css', '/_build/g1/_/vendor/htm.module.js',
+      '/_build/g1/shared/gen.js', '/_build/g1/_/sim/constants.js', '/_build/g1/_/data.js', '/_build/g1/_/match/bondsMeta.js',
+      `/_build/g1/_/match/${bot}`]) {
+      assert.deepEqual(await cacheOf(p), { status: 200, cc: IMMUTABLE }, p);
+    }
+    // a 304 keeps the policy
+    const first = await fetch(`${base}/_build/g1/_/js/main.js`);
+    await first.arrayBuffer();
+    const again = await fetch(`${base}/_build/g1/_/js/main.js`, { headers: { 'If-None-Match': first.headers.get('etag') } });
+    assert.equal(again.status, 304);
+    assert.equal(again.headers.get('cache-control'), IMMUTABLE);
+    // the page, health, the service worker, data/, a shared file and the plain (dev) paths keep asking
+    const notImmutable = ['/_build/g1/', '/_build/g1/_/index.html', '/_build/g1/_/healthz', '/_build/g1/_/sw.js', '/_build/g1/_/manifest.json',
+      '/_build/g1/_/data/bonds.json', '/sw.js', '/js/main.js'];
+    for (const p of notImmutable) {
+      const { status, cc } = await cacheOf(p);
+      assert.ok(status === 200 || status === 302, `${p}: ${status}`);
+      assert.ok(!/immutable|max-age=[1-9]/.test(cc || ''), `${p}: ${cc}`);
+    }
+    // another generation's prefix sent straight to g1's port, and a server outside the router (npm start), ask too
+    assert.equal((await cacheOf('/_build/g9/_/js/main.js', `http://127.0.0.1:${g1.port}`)).cc, 'no-cache');
+    const plain = await startServer({ port: 0, host: '127.0.0.1', quiet: true, noticeFile: null, MatchClass: StubMatch, gen: null, genFile: null });
+    try {
+      assert.equal((await cacheOf('/_build/g1/_/js/main.js', `http://127.0.0.1:${plain.port}`)).cc, 'no-cache');
+      assert.equal((await cacheOf('/js/main.js', `http://127.0.0.1:${plain.port}`)).cc, 'no-cache');
+    } finally { await plain.close(); }
+  });
+
   test('a new generation takes over: matches play on in the old one, everything else moves', async () => {
     // on g1: a running solo match, and a lobby player
     const player = await wsAt('g1', 'Player');
@@ -234,27 +282,26 @@ describe('two generations behind the router', () => {
 
     g2 = await gen('g2');
     writeTable({ current: 'g2', gens: { g1: { port: g1.port, retiringSince: Date.now() }, g2: { port: g2.port } } });
-    await Promise.all([player.waitFor('sys.retire'), idle.waitFor('sys.retire')]);
+    await Promise.all([player.waitFor('sys.retire', undefined, WORKER_LOAD_MS), idle.waitFor('sys.retire', undefined, WORKER_LOAD_MS)]);
 
     assert.equal((await get('/')).headers.get('location'), '/_build/g2/');
     const h1 = await (await get('/_build/g1/_/healthz')).json();
     assert.equal(h1.retiring, true);
     assert.equal(h1.humanMatches, 1, 'the match still runs on g1');
     // g1 refuses anything new
-    const r = await idle.request({ t: 'room.create', mode: 'solo', difficulty: 'NORMAL' });
+    const r = await idle.request({ t: 'room.create', mode: 'solo', difficulty: 'NORMAL' }, WORKER_LOAD_MS);
     assert.equal(r.t, 'error');
     assert.equal(r.code, 'RETIRING');
     // a reconnect into the running match still works, and hears sys.retire again
     const again = await wsAt('g1', 'Again');
-    await again.waitFor('sys.retire');
+    await again.waitFor('sys.retire', undefined, WORKER_LOAD_MS);
     // g2 takes new players
     const fresh = await wsAt('g2', 'Fresh');
     await ok(fresh, { t: 'room.create', mode: 'coop', difficulty: 'NORMAL' });
     await fresh.expectNone('sys.retire');
     // a dropped generation's pages get the "ended" page
     writeTable({ current: 'g2', gens: { g2: { port: g2.port } } });
-    await sleep(80);
-    assert.equal((await get('/_build/g1/_/healthz')).status, 410);
+    assert.equal(await until(async () => (await get('/_build/g1/_/healthz')).status, (s) => s === 410), 410);
   });
 });
 
@@ -281,13 +328,11 @@ describe('a new generation starting before the table lists it (deploy order)', (
     assert.equal((await health(old)).retiring, false);
     // the deploy makes g2 current: only g1 retires
     fs.writeFileSync(file, JSON.stringify({ current: 'g2', gens: { g1: { port: old.port, retiringSince: 1 }, g2: { port: next.port } } }));
-    await sleep(150);
-    assert.equal((await health(old)).retiring, true);
+    assert.equal((await until(() => health(old), (h) => h.retiring)).retiring, true);
     assert.equal((await health(next)).retiring, false);
     // a later deploy (g3) makes g2 retire too, even though g3 is not running here
     fs.writeFileSync(file, JSON.stringify({ current: 'g3', gens: { g2: { port: next.port, retiringSince: 2 }, g3: { port: 1 } } }));
-    await sleep(150);
-    assert.equal((await health(next)).retiring, true);
+    assert.equal((await until(() => health(next), (h) => h.retiring)).retiring, true);
   });
 });
 
@@ -325,7 +370,25 @@ describe('deploying to several regions', () => {
   test('reap leaves a prepared generation alone, until a deploy has clearly been abandoned', () => {
     const t = withPreparedGen(table(), 'b', 3102, 100, '/rel/b');
     assert.deepEqual(reapPlan(t, { b: { humanMatches: 0, sockets: 0 } }, 200).stop, []);
-    assert.deepEqual(reapPlan(t, { b: { humanMatches: 0, sockets: 0 } }, 100 + MAX_AGE_MS + 1).stop, ['b']);
+    assert.deepEqual(reapPlan(t, { b: { humanMatches: 0, sockets: 0 } }, 100 + MAX_AGE_MS + 1).stop, [], 'an hour of private testing fits');
+    assert.ok(PREPARED_MAX_AGE_MS >= 2 * MAX_AGE_MS);
+    assert.deepEqual(reapPlan(t, { b: { humanMatches: 0, sockets: 0 } }, 100 + PREPARED_MAX_AGE_MS + 1).stop, ['b']);
+  });
+
+  test('a generation can be activated only while it is prepared (or already current) and answers as itself', () => {
+    const t = withPreparedGen(table(), 'b', 3102, 100, '/rel/b');
+    const ok = { gen: 'b', build: 'x' };
+    assert.deepEqual(prepareCheck(t, 'b', ok), { ok: true, state: 'prepared' });
+    assert.equal(prepareCheck(t, 'zz', ok).state, 'missing');
+    assert.equal(prepareCheck(t, 'b', null).ok, false, 'no /healthz answer');
+    assert.equal(prepareCheck(t, 'b', { gen: 'a' }).ok, false, 'another generation on that port');
+    assert.equal(prepareCheck(t, 'b', { gen: 'b', retiring: true }).ok, false);
+    const after = activateGen(t, 'b', 300);
+    assert.deepEqual(prepareCheck(after, 'b', ok), { ok: true, state: 'current' }, 'an activate that stopped half way can be run again');
+    assert.equal(prepareCheck(after, 'a', { gen: 'a' }).state, 'retiring');
+    assert.equal(prepareCheck(after, 'a', { gen: 'a' }).ok, false);
+    const first = withPreparedGen(null, 'b', 3101, 100, '/rel/b');
+    assert.deepEqual(prepareCheck(first, 'b', ok), { ok: true, state: 'prepared' }, 'the first generation of a new server is prepared, not current');
   });
 
   test('a match on the other region keeps this region\'s copy of its generation alive', () => {
@@ -351,6 +414,86 @@ describe('scripts/deploy-regions.mjs', () => {
     assert.doesNotMatch(plain, /--no-art/);
     assert.match(prepareCommand({ gen: 'g1', commit: 'abc', noArt: true }), /--no-art/);
     assert.match(activateCommand('g1'), /generations\.mjs activate g1/);
+  });
+
+  test('commands and their argument checks', () => {
+    const env = {};
+    assert.deepEqual(parseArgs(['prepare', '--hosts', 'spa,usspa:no-art'], env), { cmd: 'prepare', hosts: parseHosts('spa,usspa:no-art'), ref: 'origin/dev-0.2' });
+    assert.equal(parseArgs(['deploy', '--hosts', 'spa', '--ref', 'abc123'], env).ref, 'abc123');
+    assert.deepEqual(parseArgs(['activate', '261109-120000', '--hosts', 'spa,usspa:no-art'], env).gen, '261109-120000');
+    assert.equal(parseArgs(['status'], { SP_DEPLOY_HOSTS: 'spa,usspa' }).hosts.length, 2, 'SP_DEPLOY_HOSTS stands in for --hosts');
+    assert.deepEqual(parseArgs([], env), { error: null }, 'a bare call prints the usage');
+    for (const [argv, why] of [
+      [['rollback', '--hosts', 'spa'], /unknown command/],
+      [['prepare'], /no servers/],
+      [['prepare', '--hosts'], /--hosts needs a list/],
+      [['prepare', '--hosts', 'spa', '--ref'], /--ref needs/],
+      [['prepare', '--hosts', 'spa', '--ref', '--hosts'], /--ref needs/],
+      [['activate', '--hosts', 'spa'], /activate needs the generation id/],
+      [['activate', '../x', '--hosts', 'spa'], /not a generation id/],
+      [['activate', '261109-120000', '--hosts', 'spa;rm -rf /'], /not an ssh host name/],
+      [['announce', '--hosts', 'spa'], /text last/],
+      [['announce', '--hosts', 'spa', '--minutes', '5'], /text last/],
+      [['announce', '--hosts', 'spa', '--minutes', 'soon', 'hi'], /--minutes needs a number/],
+    ]) assert.match(String(parseArgs(argv, env).error), why, argv.join(' '));
+    const a = parseArgs(['announce', '--hosts', 'spa', '--minutes', '3', 'Restart soon'], env);
+    assert.deepEqual([a.minutes, a.text], [3, 'Restart soon']);
+    assert.equal(formatHosts(parseHosts('spa, usspa:no-art')), 'spa,usspa:no-art');
+  });
+
+  test('activate refuses unless the generation is ready on every server, with one build', () => {
+    const ok = (build = 'b1') => ({ gen: 'g', ok: true, state: 'prepared', build });
+    assert.deepEqual(checkProblems('g', [{ host: 'spa', check: ok() }, { host: 'usspa', check: { ...ok(), state: 'current' } }]), []);
+    const p = checkProblems('g', [{ host: 'spa', check: ok() }, { host: 'usspa', check: null }]);
+    assert.equal(p.length, 1);
+    assert.match(p[0], /^usspa: no answer/);
+    assert.match(checkProblems('g', [{ host: 'spa', check: { gen: 'g', ok: false, state: 'missing', reason: 'generation g is not on this server' } }])[0], /^spa: generation g is not on this server/);
+    assert.match(checkProblems('g', [{ host: 'spa', check: ok('b1') }, { host: 'usspa', check: ok('b2') }]).join(), /different builds/);
+  });
+
+  test('the check line is read back from ssh output, and its command needs no sudo', () => {
+    assert.deepEqual(parseCheck('Welcome' + String.fromCharCode(13, 10) + '[check] {"gen":"g","ok":true}' + String.fromCharCode(10)), { gen: 'g', ok: true });
+    assert.equal(parseCheck('[check] {broken'), null);
+    assert.equal(parseCheck('usage: …'), null);
+    assert.equal(parseCheck(undefined), null);
+    assert.match(checkCommand('g1'), /^cd \/opt\/stronghold\/app && node scripts\/generations\.mjs check 'g1'$/);
+    assert.match(sudoCheckCommand('g1'), /^sudo -n bash -c 'cd \/opt\/stronghold\/app && node scripts\/generations\.mjs check '\\''g1'\\'''$/);
+  });
+
+  test('the check falls back to sudo -n when the login user cannot enter /opt/stronghold, and only then', () => {
+    const line = '[check] {"gen":"g","ok":true,"state":"prepared","build":"b1"}';
+    const calls = [];
+    const fake = (answers) => (host, cmd) => { calls.push(cmd); return answers[calls.length - 1]; };
+    // Singapore: /opt/stronghold is drwxr-x--- stronghold → the plain check gets no answer, sudo -n does
+    let r = checkOnHost('spa', 'g', fake([{ stdout: '', stderr: 'bash: line 1: cd: /opt/stronghold/app: Permission denied' }, { stdout: line }]));
+    assert.deepEqual(calls, [checkCommand('g'), sudoCheckCommand('g')]);
+    assert.equal(r.check.build, 'b1');
+    assert.equal(r.stderr, '', 'the permission error of the first try is not shown when sudo answered');
+    // the US: the plain check answers, sudo (which wants a password there) is never tried
+    calls.length = 0;
+    r = checkOnHost('usspa', 'g', fake([{ stdout: line }]));
+    assert.deepEqual(calls, [checkCommand('g')]);
+    assert.equal(r.check.ok, true);
+    // a not-ready answer is an answer: no fallback
+    calls.length = 0;
+    checkOnHost('usspa', 'g', fake([{ stdout: '[check] {"gen":"g","ok":false,"state":"missing"}' }]));
+    assert.equal(calls.length, 1);
+    // both fail → no check, and both errors for the operator
+    calls.length = 0;
+    r = checkOnHost('spa', 'g', fake([{ stdout: '', stderr: 'Permission denied' }, { stdout: '', stderr: 'sudo: a password is required' }]));
+    assert.equal(r.check, null);
+    assert.equal(r.stderr, 'Permission denied\nsudo: a password is required');
+    assert.match(checkProblems('g', [{ host: 'spa', check: r.check }])[0], /^spa: no answer/);
+  });
+
+  test('the private test URLs: the page from the first region, then each other server by ?region=', () => {
+    const regions = { self: 'sg', list: [{ id: 'sg', host: 'stronghold-en.dev' }, { id: 'us', host: 'us.stronghold-en.dev' }] };
+    assert.deepEqual(testUrls('261109-120000', regions), [
+      'https://stronghold-en.dev/_build/261109-120000/',
+      'https://stronghold-en.dev/_build/261109-120000/?region=us',
+    ]);
+    assert.deepEqual(testUrls('g', null), []);
+    assert.deepEqual(testUrls('g', { list: [] }), []);
   });
 
   test('announcement text cannot break out of its quotes', () => {

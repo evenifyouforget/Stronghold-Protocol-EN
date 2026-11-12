@@ -29,6 +29,10 @@
 //   (noAttack profiles) evaluate DEFAULT every tick instead. DEFAULT with `trigger.allies` (+ `hpAtMost`): the basic
 //   rule AND such an ally on the trigger grid — the cast replaces the attack about to be made (塞雷娅 S1 "触发时会替换当
 //   次攻击"); should that ally condition fail before the attack, the cast is withdrawn and its charge returned.
+//   Official trigger lists (the data of a version on the official triggers: officialUnitBuilder officialTrigger, the
+//   client's AutoChessBattleTrigger): `trigger.also` holds the list's further rules ({ rule, grid?, allies? }), tried
+//   after `rule` — the first that passes casts (OR): a tick rule of the list every tick, TAKE_DAMAGE at a hit, DEFAULT
+//   before an attack (every tick for a unit that cannot attack). A kit's own `trigger` replaces the data's list whole.
 //   A registered ally target (Battle.setAllyTarget: 白铁's 铁钳号·原型机, an enemy-camp summon our attacks select) counts
 //   like an enemy in each of these enemy conditions for a skill that acts on it (`_allyTargetIn`, `allyTargetsOk` — the
 //   owner's rule of 2026-10-08): one that acts through the unit's own attacks, or whose kit flags `allyTargets: true` (its
@@ -60,6 +64,13 @@ import { boundedCount } from '../../shared/plugins/limits.js';
 import { fieldCap } from '../../shared/plugins/officialBounds.js';
 
 const TICK_RULES = new Set(['SP_FULL', 'SEARCH', 'CUSTOM_RANGE', 'SKILL_RANGE', 'ACTIVE_RANGE', 'GDGLOW_SKILL_2']);
+/** A trigger rule name as the runtime uses it (ALWAYS = SP_FULL, MANUAL = NEVER, CUSTOM_RANGE_* = CUSTOM_RANGE). */
+function normRule(r) {
+  const rule = String(r ?? 'DEFAULT').toUpperCase();
+  if (rule === 'ALWAYS') return 'SP_FULL';
+  if (rule === 'MANUAL') return 'NEVER';
+  return rule.startsWith('CUSTOM_RANGE') ? 'CUSTOM_RANGE' : rule;
+}
 /** True when a SkillSpec `targeting` changes the unit's range while the skill runs (Battle._refreshRange). */
 const changesRange = (tg) => !!(tg && (tg.rangeGrid || tg.rangeExtend || tg.noRangeExtend));
 /** Enemies that satisfy a content trigger range (any targetable enemy, flyers included). */
@@ -99,21 +110,26 @@ export class SkillRuntime {
     this.maxCharges = Math.max(1, Math.floor(boundedCount(s.charges ?? d.maxCharges ?? 1, fieldCap('skill.maxCharges'), 1)));
     this.spType = s.spType ?? d.spType ?? 'time';
     const trig = typeof s.trigger === 'string' ? { rule: s.trigger } : (s.trigger || d.trigger || {});
-    this.rule = String(trig.rule ?? 'DEFAULT').toUpperCase();
-    if (this.rule === 'ALWAYS') this.rule = 'SP_FULL';
-    if (this.rule === 'MANUAL') this.rule = 'NEVER';
-    if (this.rule.startsWith('CUSTOM_RANGE')) this.rule = 'CUSTOM_RANGE';
+    this.rule = normRule(trig.rule);
     this.triggerGrid = trig.grid ?? trig.rangeGrid ?? d.trigger?.grid ?? null;
     // kit options: an injured, healable ally of the trigger grid with an HP ratio of at most `hpAtMost` (SKILL_RANGE:
     // instead of an enemy; DEFAULT: a heal target at the normal attack cadence)
     this.triggerAllies = !!trig.allies;
     this.triggerEnemies = !!trig.enemies; // mixed attack/heal skills may also open for a selectable enemy
     this.triggerHpAtMost = Number.isFinite(+trig.hpAtMost) && +trig.hpAtMost > 0 ? +trig.hpAtMost : 1;
+    // the further rules of an official trigger list (OR): { rule, grid, allies }
+    this.alsoRules = Array.isArray(trig.also) ? trig.also.filter((e) => e && e.rule).map((e) => ({
+      rule: normRule(e.rule), grid: e.grid ?? e.rangeGrid ?? e.customRangeGrid ?? null, allies: !!e.allies,
+    })) : [];
     this.healSkill = s.heal ?? (unit.profile && unit.profile.dmgType === 'heal' && !!unit.profile.heal);
     // the official skill strategies automate the manual 开启: only MANUAL skills wait for the operation cooldown
     this.manual = String(d.skillType ?? 'MANUAL').toUpperCase() === 'MANUAL';
     this.opReadyAt = -Infinity;   // no automatic cast before this battle time (AUTO_OP_COOLDOWN)
     this.nextCastAt = -Infinity;  // instant / charges with no attack of its own: no cast from the tick before (GitHub #298)
+    // (fork) the begin clip the client plays before the skill starts (data `beginAnim`, the official _playSkillBeginAnim
+    // skills: tools/build-data.mjs operatorBeginAnims) and the cast waiting for it (`starting`, activate / tick)
+    this.beginDur = this.kind !== 'passive' && d.beginAnim?.dur > 0 ? +d.beginAnim.dur : 0;
+    this.starting = null;
     if (this.kind === 'passive') this.baseSpCost = 0;
     this._spCostMul = 1;          // content may set spCostMul (e.g. 绝技 ×0.7) — see the accessor below
     this.sp = 0;
@@ -145,6 +161,26 @@ export class SkillRuntime {
     this._trigKeys = null;
     this._trigSet = null;
   }
+
+  /** The skill's rules in the order they are tried: its rule, then an official list's further ones. */
+  get rules() { return [this.rule, ...this.alsoRules.map((e) => e.rule)]; }
+
+  /** Has the trigger list a further rule `rule`? */
+  _alsoHas(rule) { return this.alsoRules.some((e) => e.rule === rule); }
+
+  /** Run `fn` with a further rule of the list in place of the skill's own (its grid and ally flag); returns its result. */
+  _withRule(e, fn) {
+    const saved = [this.rule, this.triggerGrid, this.triggerAllies];
+    this.rule = e.rule; this.triggerGrid = e.grid; this.triggerAllies = e.allies;
+    this._trigKeys = null; this._trigSet = null;
+    try { return fn(); } finally {
+      [this.rule, this.triggerGrid, this.triggerAllies] = saved;
+      this._trigKeys = null; this._trigSet = null;
+    }
+  }
+
+  /** The DEFAULT condition of the further rule `e` — with its ally flag: an injured ally instead of a target. */
+  _defaultOf(e) { return e.allies ? this._withRule(e, () => this._allyTriggerSatisfied()) : this._defaultCondition(); }
 
   /**
    * Extra DEFAULT-trigger range (海嗣 "攻击范围视为自身攻击范围的延伸", 流形): `fn(battle, unit)` returns a list whose
@@ -271,6 +307,7 @@ export class SkillRuntime {
   reset(carry = null) {
     this.active = false;
     this.pending = false;
+    this.starting = null;
     this.timeLeft = 0;
     this.ammoLeft = 0;
     this.ammoMax = 0;
@@ -397,6 +434,17 @@ export class SkillRuntime {
       const rate = u.s.spRecovery;
       if (rate > 0) this.gainSp(rate * dt, 'time');
     }
+    // (fork) a cast playing its begin clip (activate): dropped when the unit leaves the Skill state (it cannot act, or it
+    // is gone), else the skill starts on the tick its clip ends (WaitForFixedSeconds) — nothing else is cast meanwhile
+    if (this.starting) {
+      const st = this.starting;
+      if (!u.alive || !u.deployed || !u.canAct) { this.dropStart(); return; }
+      st.left -= dt;
+      if (st.left > 1e-9) return;
+      this.starting = null;
+      if (!this.activate(st.reason, { free: st.free, began: true })) this.battle._ev(['skill', u.id, 0]);
+      return;
+    }
     if (!u.canAct) return;
     // PRTS 卫戍协议/帮助, removed 2026-03-14: 斩业星熊 S3 closes after half its duration
     // when an enemy is in its running range. Use the manual close so the kit enters 临死模式.
@@ -420,15 +468,23 @@ export class SkillRuntime {
     // an instant / charge skill with no attack of its own is cast at most once per attack interval of its unit
     // (activate sets nextCastAt; GitHub #298): the casts checked here wait for it — the unit's attacks are not touched
     if (!this.isTimed && !this.spec.attack && this.battle.time < this.nextCastAt - 1e-9) return;
+    const prof = u.profile;
+    const cannotAttack = !!(prof && (prof.noAttack || (prof.noAttackUnlessSkill && !this.active)));
     if (TICK_RULES.has(this.rule)) {
-      if (this._tickRuleSatisfied()) this.activate(this.rule);
+      if (this._tickRuleSatisfied()) { this.activate(this.rule); return; }
     } else if (this.rule !== 'TAKE_DAMAGE' && this.rule !== 'NEVER') {
       // DEFAULT (and unknown rules) for units that cannot attack right now: check the initial range every tick;
       // content trigger ranges are checked every tick for everyone (nothing may be in the unit's own range)
-      const prof = u.profile;
-      if (prof && (prof.noAttack || (prof.noAttackUnlessSkill && !this.active))) {
-        if (this._defaultCondition()) this.activate('DEFAULT');
-      } else if (this.triggerRanges.length && !this.healSkill && this._extraTriggerSatisfied(false)) this.activate('DEFAULT');
+      if (cannotAttack) {
+        if (this._defaultCondition()) { this.activate('DEFAULT'); return; }
+      } else if (this.triggerRanges.length && !this.healSkill && this._extraTriggerSatisfied(false)) { this.activate('DEFAULT'); return; }
+    }
+    // an official list's further rules, in its order: a tick rule every tick; DEFAULT here only for a unit that cannot
+    // attack (else before its attack: onAboutToAttack); TAKE_DAMAGE at a hit (onDamaged)
+    for (const e of this.alsoRules) {
+      if (TICK_RULES.has(e.rule)) {
+        if (this._withRule(e, () => this._tickRuleSatisfied())) { this.activate(e.rule); return; }
+      } else if (e.rule === 'DEFAULT' && cannotAttack && this._defaultOf(e)) { this.activate('DEFAULT'); return; }
     }
   }
 
@@ -464,7 +520,8 @@ export class SkillRuntime {
     let keys;
     if (this.triggerGrid) { this._triggerKeys(); keys = this._trigSet; } else keys = u.baseRangeKeys || u.rangeKeys;
     const lim = this.triggerHpAtMost + 1e-9;
-    return b.injuredAlliesInKeys(keys, u).some((a) => a.hpRatio <= lim);
+    // an element healer's patient may be at full HP with only an element gauge to clear (as `_defaultCondition`)
+    return b.injuredAlliesInKeys(keys, u, !!u.profile?.heal?.elementHealRatio).some((a) => a.hpRatio <= lim);
   }
 
   _tickRuleSatisfied() {
@@ -522,14 +579,27 @@ export class SkillRuntime {
     return !this.healSkill && this.triggerRanges.length > 0 && this._extraTriggerSatisfied();
   }
 
+  /** (fork) Drop a cast still playing its begin clip (tick, activate): nothing was spent; the client's skill clip ends. */
+  dropStart() {
+    if (!this.starting) return;
+    this.starting = null;
+    const u = this.unit;
+    u.skillAnimUntil = -1;
+    this.battle._ev(['skill', u.id, 0]);
+  }
+
   /** Called by the attack loop right before a normal attack/heal. Returns true when the skill fired. */
   onAboutToAttack() {
+    if (this.starting) return false;
     if (!this.ready || this.unit.s.flags.silence) return false;
     if (this.active && this.isTimed) return false;
-    if (this.rule === 'TAKE_DAMAGE' || this.rule === 'NEVER' || TICK_RULES.has(this.rule)) return false;
+    const own = !(this.rule === 'TAKE_DAMAGE' || this.rule === 'NEVER' || TICK_RULES.has(this.rule));
+    // an official list's further DEFAULT (COMBAT_OR_ATTACK) also casts before an attack
+    const alt = own ? null : this.alsoRules.find((e) => e.rule === 'DEFAULT');
+    if (!own && !alt) return false;
     if (this.pending || this._opCooling()) return false;
     // Guardian charged heals supply their own attack target; no enemy is required (#406).
-    if (this.triggerAllies ? !this._allyTriggerSatisfied() : !this._defaultCondition()) return false;
+    if (own ? (this.triggerAllies ? !this._allyTriggerSatisfied() : !this._defaultCondition()) : !this._defaultOf(alt)) return false;
     this._beforeAttack = true;   // the attack follows this cast in the same check (ai.js updateAlly): attacks pace it
     try { return this.activate('DEFAULT'); } finally { this._beforeAttack = false; }
   }
@@ -538,18 +608,34 @@ export class SkillRuntime {
   onDamaged() {
     if (this.noSkill) return;
     if (this.spType === 'hurt' && !(this.active && this.isTimed)) this.gainSp(1, 'hurt');
-    if (this.rule === 'TAKE_DAMAGE' && this.ready && !this.pending && !(this.active && this.isTimed) && this.unit.canAct && !this.unit.s.flags.silence && !this._opCooling()) {
+    if ((this.rule === 'TAKE_DAMAGE' || this._alsoHas('TAKE_DAMAGE')) && this.ready && !this.pending && !(this.active && this.isTimed) && this.unit.canAct && !this.unit.s.flags.silence && !this._opCooling()) {
       this.activate('TAKE_DAMAGE');
     }
   }
 
-  /** Activate now (consumes one charge). Returns true on success. */
-  activate(reason = 'manual', { free = false } = {}) {
+  /**
+   * Activate now (consumes one charge). Returns true on success. (fork) A skill with a begin clip (`beginDur`, the official
+   * _playSkillBeginAnim skills) is cast first: the client enters the Skill state, plays the clip — its 'skill' event, its
+   * sound — and starts the skill only when the clip ends (BasicSkill.PlayBeginAnimation → DoStartSkill → Cast, where the
+   * SP is spent); no attack runs meanwhile (the Attack state is left). `starting` holds the cast until tick() starts it
+   * (`began`: the call that does); leaving the Skill state first (stunned, frozen, asleep, knocked out, retreated —
+   * SkillState.OnExit → InterruptStartIfNot) drops it with nothing spent.
+   */
+  activate(reason = 'manual', { free = false, began = false } = {}) {
     if (this.noSkill || this.kind === 'passive') return false;
     if (!free && !this.ready) return false;
     if (this.active && this.isTimed) return false;
+    if (this.starting && !began) return false;
     const u = this.unit;
     if (!u.alive || !u.deployed) return false;
+    if (this.beginDur > 0 && !began) {
+      const b = this.battle;
+      this.starting = { left: this.beginDur, reason, free };
+      const cue = this.spec.cue ? this._call('cue', { reason }) : null;
+      b._ev(cue && typeof cue === 'object' ? ['skill', u.id, 1, cue] : ['skill', u.id, 1]);
+      u.skillAnimUntil = b.time + Math.max(SKILL_ANIM_WINDOW, this.beginDur);
+      return true;
+    }
     if (!free) {
       const wasFull = this.charges >= this.maxCharges;
       this.charges--;
@@ -572,9 +658,12 @@ export class SkillRuntime {
       // (a targeting-only instant skill must still switch to its skill range for the pending attack)
       if (this.spec.mods || this.spec.flags || this.spec.targeting) this._applyMods();
     }
-    const cue = this.spec.cue ? this._call('cue', { reason }) : null;
-    b._ev(cue && typeof cue === 'object' ? ['skill', u.id, 1, cue] : ['skill', u.id, 1]);
-    u.skillAnimUntil = b.time + SKILL_ANIM_WINDOW;
+    // (a begun cast sent its event, and its cue, with its begin clip)
+    if (!began) {
+      const cue = this.spec.cue ? this._call('cue', { reason }) : null;
+      b._ev(cue && typeof cue === 'object' ? ['skill', u.id, 1, cue] : ['skill', u.id, 1]);
+      u.skillAnimUntil = b.time + SKILL_ANIM_WINDOW;
+    }
     this._call('onStart', { reason });
     if (b._hooks.skillStart) b.emit('skillStart', { unit: u, skill: this, reason });
     // bullets added in skillStart (拉特兰's ×(1.05 + 0.015 × layers), 逃犯引渡手续, talents): the bar's full mark

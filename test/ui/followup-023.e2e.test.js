@@ -15,8 +15,8 @@ describe('0.2.3 follow-up client features', { skip: !ENABLED }, () => {
     browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--mute-audio', '--no-sandbox'] });
   });
   after(async () => { await browser?.close(); await server?.close(); });
-  async function pageIn(ctx, phone = false, random = null) {
-    const page = await ctx.newPage(); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
+  async function pageIn(ctx, phone = false, random = null, init = null) {
+    const page = await ctx.newPage(); if (init) await page.evaluateOnNewDocument(init); await page.evaluateOnNewDocument(() => { try { if (localStorage.getItem('sp.pref.lang') == null) localStorage.setItem('sp.pref.lang', JSON.stringify('zh')); } catch { /* opaque origin */ } }); // (fork) the checks read Chinese msgids
     await page.setViewport({ width: phone ? 844 : 1440, height: phone ? 390 : 900 });
     if (random != null) await page.evaluateOnNewDocument((value) => { Math.random = () => value; }, random);
     await page.evaluateOnNewDocument(() => { localStorage.setItem('sp.name', 'Recovery Test'); sessionStorage.setItem('sp.entered', '1'); });
@@ -161,7 +161,7 @@ describe('0.2.3 follow-up client features', { skip: !ENABLED }, () => {
     try {
       const page = await pageIn(ctx, true);
       // this fork: the square picker (ui/voiceLang.js) on upstream's settings.voiceOverrides
-      const open = async () => { await page.evaluate(async () => (await import('/js/ui/loadoutSync.js')).openLoadout()); await page.waitForSelector('.lo-card__pick'); await page.click('.lo-card__pick'); await page.waitForSelector('[data-voice-char] [data-lang]', { visible: true }); };
+      const open = async () => { await page.evaluate(async () => (await import('/js/ui/loadoutSync.js')).openLoadout()); await page.waitForSelector('.lo-op[data-chess] .lo-op__pick'); await page.click('.lo-op[data-chess] .lo-op__pick'); await page.waitForSelector('[data-voice-char] [data-lang]', { visible: true }); };
       await open();
       const id = await page.$eval('[data-voice-char]', (e) => e.dataset.voiceChar);
       const def = await page.$eval('[data-voice-char] [aria-checked="true"]', (e) => e.dataset.lang);
@@ -180,7 +180,13 @@ describe('0.2.3 follow-up client features', { skip: !ENABLED }, () => {
     const ctx = browser.defaultBrowserContext();
     let page;
     try {
-      page = await pageIn(ctx);
+      // Chrome now issues its own trusted offer once the page is installable, a few ms after the dispatched one
+      // below; the app keeps the newest offer (pwa.js), so the button would call the real prompt and promptCalls stay
+      // 0. A capture listener added before the app's script holds the browser's offer back: the test's fake event is
+      // the only offer, as on the Chrome versions that issued none in headless mode.
+      page = await pageIn(ctx, false, null, () => {
+        window.addEventListener('beforeinstallprompt', (e) => { if (e.isTrusted) e.stopImmediatePropagation(); }, true);
+      });
       const client = await page.createCDPSession();
       const manifest = await client.send('Page.getAppManifest');
       assert.deepEqual(manifest.errors, []);

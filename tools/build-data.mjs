@@ -36,7 +36,7 @@
 // waves · stages · bosses · config · validation · main.
 
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -50,6 +50,7 @@ import { createOfficialUnitBuilders } from '../server/plugins/officialUnitBuilde
 import { DEFAULT_VERSION, VERSIONS } from '../shared/versions.js';
 import { loadProfile, pinnedShaOf } from './versions/profiles.mjs';
 import { applyAdapters } from './versions/adapters.mjs';
+import { SKILL_BEGIN_ANIMS } from './assets/skill-begin-anims.mjs';
 
 // ===== CLI & IO ==================================================================================
 
@@ -126,7 +127,7 @@ function warn(msg) {
   warnings.push(msg);
 }
 
-const { stripRich, richRaw, cleanNum, flattenBB, textPair, naturalCmp, phaseIdx, unlocked, bestCandidate, withPotential, rangeGrid, interpolateAttrs, statsFrom, immunitiesOf, TRIGGER_DEVIATIONS, STANDIN_TRIGGER_DEVIATIONS, strictlyContains, ACTIVE_RANGE_OVER, resolveTrigger, buildSkill, splitModuleParts, applyModuleTraitParts, traitRecord, moduleAttr, buildTalents, baseTalentList, moduleTalentChanges, mergeTalentChanges, classifyAttack, hasE2Art, rarityOf, statusCmp, buildUnitHead, buildUnitForm, placeOnRangedOf } = createOfficialUnitBuilders(warn);
+const { stripRich, richRaw, cleanNum, flattenBB, textPair, naturalCmp, phaseIdx, unlocked, bestCandidate, withPotential, rangeGrid, interpolateAttrs, statsFrom, immunitiesOf, TRIGGER_DEVIATIONS, STANDIN_TRIGGER_DEVIATIONS, OFFICIAL_TRIGGER_DEVIATIONS, strictlyContains, ACTIVE_RANGE_OVER, resolveTrigger, buildSkill, splitModuleParts, applyModuleTraitParts, traitRecord, moduleAttr, buildTalents, baseTalentList, moduleTalentChanges, mergeTalentChanges, classifyAttack, hasE2Art, rarityOf, statusCmp, buildUnitHead, buildUnitForm, placeOnRangedOf } = createOfficialUnitBuilders(warn);
 
 /**
  * Make sure an official gamedata file exists in the cache; download it when missing.
@@ -277,8 +278,13 @@ async function loadContext() {
     assets: await loadResearch('07-assets.json'),
   };
 
+  // the official skill triggers that replace the table's (the profile's skillTriggers file; officialTrigger)
+  const officialTriggers = PROFILE.skillTriggers
+    ? JSON.parse(await readFile(new URL(`./versions/${PROFILE.skillTriggers}`, import.meta.url), 'utf8'))
+    : null;
+
   return {
-    act, ac, charTable, skillTable, rangeTable, uniequip, battleEquip, handbook, enemyDb,
+    act, ac, officialTriggers, charTable, skillTable, rangeTable, uniequip, battleEquip, handbook, enemyDb,
     levels, templateIds: [...templateIds].sort(naturalCmp), stageIds, enemyDataLevelId, research,
     manifest: await loadManifest(),
   };
@@ -720,7 +726,12 @@ function checkUnitFormParity(ctx, chess) {
       continue;
     }
     const form = buildUnitForm(ctx, c.charId, c.status, { chessId: c.baseId, skillIndex: c.skill.index });
-    const rec = composeUnitRecord(c, buildUnitHead(ctx, c.charId), form, { skillIndex: c.backup.skillIndex, moduleId: c.backup.uniEquipId });
+    // (fork) and its skills' begin clips (operatorBeginAnims, the default version only)
+    if (IS_DEFAULT && ctx.manifest && c.skills?.some((k) => k.beginAnim)) markBeginAnims(ctx.manifest, c.charId, [form.skill, ...(form.skills || [])]);
+    // (fork) the unit's attack clip is set after the build (operatorAttackAnims, from the same manifest entry as the
+    // chess record's): composeUnitRecord must carry it through
+    const head = { ...buildUnitHead(ctx, c.charId), ...(c.attackAnim ? { attackAnim: c.attackAnim } : {}) };
+    const rec = composeUnitRecord(c, head, form, { skillIndex: c.backup.skillIndex, moduleId: c.backup.uniEquipId });
     if (!isDeepStrictEqual(rec, c)) {
       const keys = [...new Set([...Object.keys(rec || {}), ...Object.keys(c)])].filter((k) => !isDeepStrictEqual(rec?.[k], c[k]));
       errors.push(`unit parity ${c.chessId}: buildUnitForm + composeUnitRecord differ from buildChess in ${keys.join(', ')}`);
@@ -1711,7 +1722,11 @@ const MIRRORED_PREFABS = new Set(['enemy_1196_msfyin']);
  * never reads client files; an enemy whose model the manifest lacks gets none (the sim falls back to ATTACK_PAUSE).
  */
 function enemyAttackAnim(manifest, spineId) {
-  const sp = manifest?.enemies?.[spineId]?.spine;
+  return attackAnimOf(manifest?.enemies?.[spineId]?.spine);
+}
+
+/** A model's attack clip { clip, dur, hit } (the manifest's `anims.attack.loop`, its length and first strike frame). */
+function attackAnimOf(sp) {
   const a = sp?.anims?.attack;
   if (!a || typeof a.loop !== 'string' || a.via === 'idle') return null;
   const dur = sp.animations?.[a.loop];
@@ -1719,6 +1734,90 @@ function enemyAttackAnim(manifest, spineId) {
   const h = sp.hits?.[a.loop];
   const hit = Array.isArray(h) && Number.isFinite(h[0]) ? Math.min(dur, Math.max(0, h[0])) : null;
   return hit != null ? { clip: a.loop, dur, hit } : { clip: a.loop, dur };
+}
+
+/**
+ * (fork) An operator's or summon's attack clip → `attackAnim` { clip, dur, hit } on its chess records (data/chess.json),
+ * its backups.json unit (stand-ins and 自选 picks compose it in, shared/standIn.js) and its tokens.json record: the clip
+ * the client plays for its normal attacks (the manifest's front model `anims.attack.loop`), its length and its strike
+ * frame (`hits`: the clip's OnAttack event). The sim starts each attack as a cast and lands it at that frame
+ * (server/sim/ai.js allyCastWindup), as the official client does (AbilityStandard → EasyToStartAbility's pre-delay waits
+ * for the clip's attack event; AbstractAnimatedAbility.UpdatePlaybackSpeed scales the clip to the attack time). Read from
+ * the committed data/assets.json like the enemies' (enemyAttackAnim); a model the manifest lacks gets none (the sim keeps
+ * the strike at the end of the cooldown). Outfits never change it: the sim times by the default model.
+ */
+function operatorAttackAnims(manifest, chess, backups, tokens) {
+  if (!manifest) return;
+  const scales = attackScaleTable();
+  const withScale = (id, a) => {
+    if (!a) return a;
+    const m = attackMaxScale(scales[id], a.clip);
+    return m == null ? a : { ...a, maxScale: m };
+  };
+  const ofChar = (charId) => withScale(charId, attackAnimOf(manifest.chars?.[charId]?.spine?.front ?? manifest.chars?.[charId]?.spine?.back));
+  for (const c of Object.values(chess)) {
+    const a = c.charId ? ofChar(c.charId) : null;
+    if (a) c.attackAnim = a;
+  }
+  for (const u of Object.values(backups?.units || {})) {
+    const a = ofChar(u.charId);
+    if (a) u.attackAnim = a;
+  }
+  for (const [id, t] of Object.entries(tokens || {})) {
+    const a = withScale(id, attackAnimOf(manifest.tokens?.[id]?.spine));
+    if (a) t.attackAnim = a;
+  }
+}
+
+/**
+ * (fork) A skill's begin clip → `beginAnim` { clip, dur } on each skill record of its operator (data/chess.json `skill` /
+ * `skills`, backups.json forms' `skills`): the client plays it at the cast and starts the skill — and attacks again — when
+ * it ends (BasicSkill.PlayBeginAnimation: PlayAnimation at time scale 1, WaitForFixedSeconds(its length), DoStartSkill;
+ * server/sim/skills.js activate). Only the skills the client marks `_playSkillBeginAnim` (tools/assets/
+ * skill-begin-anims.mjs, generated from [uc]skills.ab); the length is the clip's in the default model's front skeleton
+ * (outfits never change it, as `attackAnim`). A clip the model lacks gets none [ASSUMED: PlayAnimation then waits 0].
+ */
+function operatorBeginAnims(manifest, chess, backups) {
+  if (!manifest) return;
+  for (const c of Object.values(chess)) if (c.charId) markBeginAnims(manifest, c.charId, [c.skill, ...(c.skills || [])]);
+  for (const u of Object.values(backups?.units || {})) {
+    for (const f of Object.values(u.forms || {})) markBeginAnims(manifest, u.charId, [f.skill, ...(f.skills || [])]);
+  }
+}
+
+/** (fork) Set (or clear) `beginAnim` on each of an operator's skill records (operatorBeginAnims). */
+function markBeginAnims(manifest, charId, skills) {
+  const sp = manifest?.chars?.[charId]?.spine?.front ?? manifest?.chars?.[charId]?.spine?.back;
+  for (const s of skills) {
+    if (!s || typeof s !== 'object') continue;
+    const row = SKILL_BEGIN_ANIMS[String(s.prefabId || s.skillId || '').toLowerCase().replace(/\[\d+\]$/, '')];
+    const dur = row ? sp?.animations?.[row.begin] : null;
+    if (typeof dur === 'number' && dur > 0) s.beginAnim = { clip: row.begin, dur }; else delete s.beginAnim;
+  }
+}
+
+/**
+ * (fork) docs/research/15-attack-anim-scale.json (tools/anim_scale.py, from the official client): unit id → { node path
+ * → [`_maxAnimScale`, `_animKey`, class] } of every ability of its prefab. {} when the file is missing.
+ */
+function attackScaleTable() {
+  const f = join(RESEARCH_DIR, '15-attack-anim-scale.json');
+  return existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+}
+
+/**
+ * (fork) The clip-scale cap of a unit's normal attack (`attackAnim.maxScale`): the `_maxAnimScale` of its Default mode's
+ * ability that plays the attack clip, else of `Modes/Default/Body/Attack`, else of the first Default-mode ability with
+ * one; −1 when the client sets none (the clip stretches without a limit); null when the client data has no entry (the sim
+ * keeps ALLY_ANIM_SCALE_MAX). AbstractAnimatedAbility.UpdatePlaybackSpeed: animScale ≤ `_maxAnimScale` when it is ≥ 0.
+ */
+export function attackMaxScale(abilities, clip) {
+  if (!abilities) return null;
+  const rows = Object.entries(abilities).filter(([p]) => p.startsWith('Modes/Default/'));
+  const pick = rows.find(([, r]) => clip && r[1] === clip) || rows.find(([p]) => p === 'Modes/Default/Body/Attack') || rows[0];
+  if (!pick) return null;
+  const v = Number(pick[1][0]);
+  return Number.isFinite(v) ? (v < 0 ? -1 : v) : null;
 }
 
 /** The handbook's 「不停止移动」 attack (“十字路口”量产型's 四向攻击) → enemies.json `attackMoves`: it never stops to attack. */
@@ -3254,7 +3353,33 @@ function validateAll(f) {
   const deviationHolds = (rule, trig) => trig.rawRule === 'TAKE_DAMAGE' && (trig.rule === rule || (ACTIVE_RANGE_OVER.has(rule) && trig.rule === 'ACTIVE_RANGE'));
   const checkDeviations = want.triggerDeviations === 'default' || want.triggerDeviations === 'present';
   const onlyPresent = want.triggerDeviations === 'present';
-  if (!checkDeviations) {
+  // 'official' (the profile's skillTriggers): every MANUAL skill carries its official list; the only deviations are
+  // officialUnitBuilder OFFICIAL_TRIGGER_DEVIATIONS (余 S2 on its x-1) and the larger running range, an ACTIVE_RANGE added
+  // to the list (never its first rule) of a skill with no range of its own
+  const officialOnly = want.triggerDeviations === 'official';
+  if (officialOnly) {
+    const check = (label, s) => {
+      if (s.skillType !== 'MANUAL') return;
+      const t = s.trigger || {};
+      if (!Array.isArray(t.official) || !t.official.length) err(`${label} ${s.skillId}: no official trigger list`);
+      if (t.rule === 'ACTIVE_RANGE') err(`${label} ${s.skillId}: ACTIVE_RANGE as the first rule of an official list`);
+      const larger = (t.also || []).some((e) => e.rule === 'ACTIVE_RANGE');
+      if (larger && (t.deviation !== 'ACTIVE_RANGE' || s.rangeGrid?.length)) err(`${label} ${s.skillId}: ACTIVE_RANGE without the larger-range deviation`);
+    };
+    for (const c of Object.values(chess)) for (const s of c.skills || []) check(`chess ${c.chessId}`, s);
+    for (const [id, u] of Object.entries(backups?.units || {})) for (const [key, form] of Object.entries(u.forms)) for (const s of form.skills) check(`unit ${id}@${key}`, s);
+    for (const [charId, skillsOf] of Object.entries(OFFICIAL_TRIGGER_DEVIATIONS)) {
+      const recs = Object.values(chess).filter((c) => c.charId === charId);
+      if (recs.length !== 2) err(`official trigger deviation ${charId}: expected the normal and the elite record, got ${recs.length}`);
+      for (const [skillId, rule] of Object.entries(skillsOf)) {
+        for (const c of recs) {
+          const s = (c.skills || []).find((x) => x.skillId === skillId);
+          if (!s) err(`official trigger deviation ${c.chessId}: no skill ${skillId}`);
+          else if (s.trigger?.rule !== rule || s.trigger?.deviation !== rule || s.trigger?.also || JSON.stringify(s.trigger.customRangeGrid) !== JSON.stringify(s.rangeGrid)) err(`official trigger deviation ${c.chessId} ${skillId}: expected ${rule} alone on the skill's range`);
+        }
+      }
+    }
+  } else if (!checkDeviations) {
     for (const c of Object.values(chess)) for (const s of c.skills || []) if (s.trigger?.rawRule === 'TAKE_DAMAGE') err(`chess ${c.chessId} ${s.skillId}: a TAKE_DAMAGE row in a version whose profile expects none`);
     for (const [id, u] of Object.entries(backups?.units || {})) {
       for (const [key, form] of Object.entries(u.forms)) for (const s of form.skills) if (s.trigger?.rawRule === 'TAKE_DAMAGE') err(`unit ${id}@${key} ${s.skillId}: a TAKE_DAMAGE row in a version whose profile expects none`);
@@ -3374,6 +3499,12 @@ async function main() {
   const enemies = buildEnemies(ctx);
   for (const p of passes) p.tokens = buildTokens(p.ctx, p.chess, p.tokenOwners, enemies);
   const tokens = passes[FULL_RANK].tokens;
+  // (fork) the operators' attack clips (the official cast → hit order, server/sim/ai.js allyCastWindup): the default
+  // version only, so the older versions' data stays as it was (their operators strike at the end of the cooldown)
+  // (every potential pass: shared/potential.js atRank rebuilds each rank from the full one)
+  if (IS_DEFAULT) for (const p of passes) operatorAttackAnims(ctx.manifest, p.chess, p.backups, p.tokens);
+  // (fork) the skills' begin clips (the official cast → start order, server/sim/skills.js activate): the default version only
+  if (IS_DEFAULT) for (const p of passes) operatorBeginAnims(ctx.manifest, p.chess, p.backups);
   const waves = buildWaves(ctx, enemies);
   const stages = buildStages(ctx, ctx.act.modeDataDict);
   const factions = buildFactions(ctx, enemies);

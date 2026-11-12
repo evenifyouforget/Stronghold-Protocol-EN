@@ -6,12 +6,20 @@
 //
 // Everything is optional by design. A link that is down, or a peer on another build, only makes each server local again:
 // key joins never use it (the key names the server, shared/regions.js) and the counts shrink to this server's own.
+// The same goes for the Grand Alliance room browser: each server's open rooms ride along with its state (`rooms`) and
+// Lobby.roomList adds the other servers' (peerRooms); a link that is down lists this server's rooms only.
 //
 //   signature   HMAC-SHA256 of `<ms>.<body>` with SP_PEER_SECRET, in x-sp-peer-time / x-sp-peer-sig; 30 s of clock skew
 //   tickets     `<base64url json>.<hmac>`: a moved group's seats, checked by the room's own server (Lobby.join)
+//   fallback    (fork) an arbiter with a socket host (SP_REGION_SOCKETS) is posted to there, directly. After
+//               FALLBACK_AFTER_FAILS failed posts in a row the link posts to the arbiter's own host (through Cloudflare)
+//               instead, tries the direct host again every DIRECT_RETRY_MS and goes back to it once it answers. Only this
+//               link switches: the players' sockets keep the direct host (server/regions.js, public/js/regions.js).
+//   backoff     while the posts keep failing, the wait between them doubles from POLL_MS up to BACKOFF_MAX_MS
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { isLocalHost } from '../shared/regions.js';
+import { peerHostOf } from './regions.js';
 import { PROTOCOL_VERSION } from '../shared/constants.js';
 import { sendJson, sendError } from './http/common.js';
 
@@ -22,6 +30,33 @@ export const PEER_TIMEOUT_MS = 5000;
 export const SIGNATURE_WINDOW_MS = 30_000;
 export const MAX_BODY_BYTES = 256 * 1024;
 export const SYNC_PATH = '/_peer/sync';
+/** The rooms one region shows the others (Lobby.ownRoomList caps them too). */
+export const MAX_PEER_ROOMS = 50;
+/** (fork) Failed posts in a row before the link leaves the direct host for the arbiter's own host. */
+export const FALLBACK_AFTER_FAILS = 3;
+/** (fork) On the fallback, how often the direct host is tried again. */
+export const DIRECT_RETRY_MS = 5 * 60_000;
+/**
+ * (fork) A direct try from the fallback gives up sooner than a post: a failed try plus the fallback post right after it
+ * stay within PEER_FRESH_MS of the last post, so the arbiter never counts this server as gone for it.
+ */
+export const DIRECT_RETRY_TIMEOUT_MS = 2500;
+/** (fork) The longest wait between posts while they keep failing. */
+export const BACKOFF_MAX_MS = 30_000;
+
+/**
+ * A room browser row from another server, only its known fields (it is shown to players), or null.
+ * @param {any} r @param {string} region
+ */
+export function peerRoomRow(r, region) {
+  if (!r || typeof r.code !== 'string' || !/^[A-Za-z0-9]{1,12}$/.test(r.code) || !Number.isInteger(r.seats) || !Number.isInteger(r.capacity)) return null;
+  return {
+    code: r.code, host: typeof r.host === 'string' ? r.host.slice(0, 64) : '', seats: r.seats, capacity: r.capacity,
+    difficulty: typeof r.difficulty === 'string' ? r.difficulty : undefined,
+    squads: Array.isArray(r.squads) && r.squads.length === 2 ? r.squads.map((n) => (Number.isInteger(n) ? n : 0)) : [r.seats, 0],
+    ...(r.locked === true ? { locked: true } : {}), at: Number(r.at) || 0, region,
+  };
+}
 
 const hmac = (secret, text) => createHmac('sha256', secret).update(text).digest('hex');
 const same = (a, b) => {
@@ -96,6 +131,17 @@ export class PeerLink {
     this.polling = false;
     this.repoll = false;
     this.failing = false;
+    /** (fork) failed posts in a row; above FALLBACK_AFTER_FAILS the posts wait longer (backoff) */
+    this.failStreak = 0;
+    /** (fork) no post before this time (backoff); 0 = at the next tick */
+    this.nextPollAt = 0;
+    /** (fork) failed posts in a row to the direct host */
+    this.directFails = 0;
+    /** (fork) posting to the arbiter's own host instead of its socket host; the next direct try at `directRetryAt` */
+    this.viaFallback = false;
+    this.directRetryAt = 0;
+    /** the other regions' rooms as the room browser last got them (noticeRooms) */
+    this.roomsKey = '[]';
   }
 
   start() {
@@ -112,8 +158,42 @@ export class PeerLink {
 
   tick() {
     if (this.isActive && !this.isActive()) return;
-    if (!this.isArbiter) { void this.poll(); return; }
+    this.noticeRooms(); // a region that went quiet leaves the room browser
+    if (!this.isArbiter) { if (this.now() >= this.nextPollAt) void this.poll(); return; }
     try { this.onTick?.(); } catch (e) { this.log.error?.('[peer] planning failed', e); }
+  }
+
+  /**
+   * The other regions' open Grand Alliance rooms for the room browser (Lobby.roomList), each with its `region`: only
+   * regions still heard from and on this server's build (`compatible`: the same rules), so a link that is down or a
+   * peer mid-deploy lists nothing here. The arbiter's answer also carries the regions other than this one.
+   */
+  peerRooms() {
+    const me = { gen: this.gen, proto: PROTOCOL_VERSION, cs: this.cs };
+    const out = [];
+    const seen = new Set([this.config.self]);
+    const add = (id, rows) => {
+      if (seen.has(id) || !Array.isArray(rows) || !this.config.list.some((r) => r.id === id)) return;
+      seen.add(id);
+      for (const r of rows.slice(0, MAX_PEER_ROOMS)) { const row = peerRoomRow(r, id); if (row) out.push(row); }
+    };
+    for (const { id, state } of this.freshPeers()) {
+      if (!compatible(me, state)) continue;
+      add(id, state.rooms);
+      for (const [r, rows] of Object.entries(state.others?.rooms || {})) add(r, rows);
+    }
+    return out;
+  }
+
+  /** The other regions' rooms changed (or went away): the pages watching the room browser get the list again. */
+  noticeRooms() {
+    if (typeof this.lobby.roomListChanged !== 'function') return;
+    try {
+      const key = JSON.stringify(this.peerRooms());
+      if (key === this.roomsKey) return;
+      this.roomsKey = key;
+      this.lobby.roomListChanged();
+    } catch (e) { this.log.error?.('[peer] room list failed', e); }
   }
 
   /** This server, as the other regions read it. */
@@ -124,6 +204,8 @@ export class PeerLink {
       online: this.network.connectionCount, searching: counts.searching,
       // only a server with cross-region matchmaking on offers its waiters (SP_CROSS_MATCH)
       digest: this.lobby.crossTicket ? this.lobby.crossDigest() : null,
+      // the open Grand Alliance rooms, for the other regions' room browsers (only while large rooms are on here)
+      rooms: this.lobby.largeRooms === true && typeof this.lobby.ownRoomList === 'function' ? this.lobby.ownRoomList() : null,
     };
   }
 
@@ -162,11 +244,27 @@ export class PeerLink {
     this.outbox.get(region).push({ cmd, gen: this.peers.get(region)?.state?.gen ?? null });
   }
 
+  /**
+   * (fork) Where the next post goes: the arbiter's socket host (direct) when it has one, its own host on the fallback,
+   * and the socket host again once DIRECT_RETRY_MS have passed there. `fallback`: the host to switch to, or null.
+   */
+  target() {
+    const direct = peerHostOf(this.config, this.config.arbiter);
+    const own = this.config.list.find((r) => r.id === this.config.arbiter)?.host ?? direct;
+    const fallback = own && own !== direct ? own : null;
+    if (!fallback) return { host: direct, direct: true, fallback: null, retry: false };
+    if (!this.viaFallback) return { host: direct, direct: true, fallback, retry: false };
+    if (this.now() >= this.directRetryAt) return { host: direct, direct: true, fallback, retry: true };
+    return { host: fallback, direct: false, fallback, retry: false };
+  }
+
   /** Not the arbiter: post this server's state; run what comes back. */
   async poll() {
     if (this.polling) { this.repoll = true; return; }
     this.polling = true;
-    const host = this.config.list.find((r) => r.id === this.config.arbiter).host;
+    // (fork) the arbiter's socket host when it has one (SP_REGION_SOCKETS); its own host on the fallback
+    const to = this.target();
+    const host = to.host;
     const results = this.results;
     this.results = [];
     try {
@@ -176,19 +274,46 @@ export class PeerLink {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'stronghold-peer', 'x-sp-peer-time': String(at), 'x-sp-peer-sig': signBody(this.config.secret, at, body) },
         body,
-        signal: AbortSignal.timeout(PEER_TIMEOUT_MS),
+        signal: AbortSignal.timeout(to.retry ? DIRECT_RETRY_TIMEOUT_MS : PEER_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const reply = await res.json();
+      this.failStreak = 0;
+      this.nextPollAt = 0;
+      if (to.direct) this.directFails = 0;
+      if (to.retry) { this.viaFallback = false; this.log.info?.(`[peer] the direct link to the arbiter (${host}) works again; posting there`); }
       if (this.failing) { this.failing = false; this.log.info?.('[peer] link to the arbiter is back'); }
       this.peers.set(this.config.arbiter, { state: reply, at: this.now() });
+      this.noticeRooms();
       for (const cmd of Array.isArray(reply.cmds) ? reply.cmds : []) {
         this.results.push(this.runCommand(cmd));
         this.repoll = true;
       }
     } catch (e) {
       this.results = results.concat(this.results); // nothing was delivered
-      if (!this.failing) { this.failing = true; this.log.warn?.(`[peer] link to the arbiter failed: ${e?.message || e}; matchmaking stays local`); }
+      if (to.retry) {
+        // (fork) the direct host still fails: stay on the fallback, post there at once, try direct again later
+        this.directRetryAt = this.now() + DIRECT_RETRY_MS;
+        this.repoll = true;
+      } else {
+        if (!this.failing) { this.failing = true; this.log.warn?.(`[peer] link to the arbiter failed: ${e?.message || e}; matchmaking stays local`); }
+        this.failStreak++;
+        if (to.direct && to.fallback && ++this.directFails >= FALLBACK_AFTER_FAILS) {
+          // (fork) the direct route is down: post through the arbiter's own host at once
+          this.viaFallback = true;
+          this.directFails = 0;
+          this.directRetryAt = this.now() + DIRECT_RETRY_MS;
+          this.failStreak = 0;
+          this.nextPollAt = 0;
+          this.repoll = true;
+          this.log.warn?.(`[peer] the direct link to the arbiter (${host}) failed ${FALLBACK_AFTER_FAILS} times; posting through ${to.fallback} instead, retrying direct every ${DIRECT_RETRY_MS / 60_000} min`);
+        } else {
+          // backoff: the ticks during this post asked for another one; it waits instead
+          this.repoll = false;
+          const over = this.failStreak - FALLBACK_AFTER_FAILS;
+          this.nextPollAt = over > 0 ? this.now() + Math.min(BACKOFF_MAX_MS, this.pollMs * 2 ** over) : 0;
+        }
+      }
     } finally {
       this.polling = false;
       if (this.repoll && this.timer) { this.repoll = false; void this.poll(); }
@@ -218,13 +343,16 @@ export class PeerLink {
       if (gen === (msg.gen ?? null)) { cmds.push(cmd); continue; }
       try { this.onResult?.(msg.region, { id: cmd.id, kind: cmd.kind, ok: false, member: cmd.member }); } catch (e) { this.log.error?.('[peer] result failed', e); }
     }
-    const rest = { online: 0, searching: {}, byRegion: {} };
+    const rest = { online: 0, searching: {}, byRegion: {}, rooms: {} };
     for (const { id, state } of this.freshPeers()) {
       if (id === msg.region) continue;
       rest.online += Number(state.online) || 0;
       rest.byRegion[id] = Number(state.online) || 0;
       for (const [d, n] of Object.entries(state.searching || {})) rest.searching[d] = (rest.searching[d] || 0) + (Number(n) || 0);
+      // a third region's rooms, for the asker's room browser: only when they share a build
+      if (Array.isArray(state.rooms) && compatible(msg, state)) rest.rooms[id] = state.rooms;
     }
+    this.noticeRooms();
     return { ...this.state(), digest: null, others: rest, cmds };
   }
 
@@ -256,6 +384,8 @@ export class PeerLink {
       arbiter: this.config.arbiter,
       up: this.isArbiter ? this.freshPeers().length === this.config.list.length - 1 : this.freshPeers().length > 0,
       peers: this.freshPeers().map((p) => ({ id: p.id, gen: p.state.gen ?? null })),
+      // (fork) the link posts through the arbiter's own host because its direct host failed (no addresses here)
+      ...(this.viaFallback ? { fallback: true } : {}),
     };
   }
 }

@@ -44,7 +44,7 @@
 import { PHASE } from '../../shared/constants.js';
 import { collectViolations } from './invariants.js';
 import { mergeTile, pieceDir, canPlace, placeClass } from './board.js';
-import { bossPoolHp, hiddenEligible } from './finalAssault.js';
+import { bossPoolHp, bossPoolSeats, hiddenEligible } from './finalAssault.js';
 import { helperOrder } from './unite.js';
 import { BAND_TURN_SECONDS } from './Match.js';
 
@@ -298,7 +298,8 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
     check('band draft', () => {
       if (m.phase !== PHASE.BAND_DRAFT) return;
       const d = m.draft;
-      const ids = m.order.map((p) => p.playerId).sort();
+      // (fork) One for All: the vote's voters are the seats that are not AI seats (match/oneForAll.js)
+      const ids = m.order.filter((p) => !d.vote || !p.isBot).map((p) => p.playerId).sort();
       if (JSON.stringify(d.order.slice().sort()) !== JSON.stringify(ids)) fail(`draft order ${d.order} != seats ${ids}`);
       // one countdown (user playtest #4 item 4): the step's deadline IS the current turn's, BAND_TURN_SECONDS long
       if (m.soloUntimed) { if (m.deadline || d.turnDeadline) fail('untimed band draft is timed'); } else {
@@ -319,7 +320,7 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
         const lp0 = typeof m.startLp === 'function' ? m.startLp(ps.bandId) : gd.startLp(ps.bandId); // the doubleLp cheat
         if (ps.lp !== lp0) fail(`${ps.playerId}: LP ${ps.lp} != start LP ${lp0} of ${ps.bandId}`);
       }
-      expectDeadline(gd.timer('battleCheck'), 'BATTLE_CHECK', { silentSolo: true });
+      expectDeadline(m.battleCheckSeconds(), 'BATTLE_CHECK', { silentSolo: true });
     });
     return r;
   });
@@ -470,7 +471,7 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
       m.fields.forEach((f, i) => { if (f.fieldId !== `b${i + 1}`) fail(`boss field id ${f.fieldId}`); });
       if (!hidden && m.teamLp !== lpSum) fail(`team LP ${m.teamLp} != Σ alive LP ${lpSum}`);
       if (hidden && m.teamLp !== teamLp0) fail(`hidden core changed team LP ${teamLp0} → ${m.teamLp}`);
-      const want = bossPoolHp(gd, hidden ? m.hiddenBossId : m.bossId, alive.length, m.lobbyRules);
+      const want = bossPoolHp(gd, hidden ? m.hiddenBossId : m.bossId, alive.length, m.lobbyRules, { seats: bossPoolSeats(m) });
       if (!m.bossPool || m.bossPool.maxHp !== want) fail(`boss pool ${m.bossPool && m.bossPool.maxHp} != ${want}`);
       if (hidden && !hiddenEligible(gd, { layerSum: m.hiddenLayerSum, teamLp: m.teamLp })) fail('hidden core entered while not eligible');
       if (hidden && gd.difficulty === 'FUNNY') fail('hidden core on FUNNY');

@@ -16,6 +16,10 @@
 // capped per tier (MAX_EFFECTS) and so is the sum of live particles (MAX_PARTICLES): past it, new one-shot effects are
 // skipped (loops and projectiles still start). A prefab not loaded yet starts when it arrives if that is within
 // LATE_START s (else a one-shot is dropped); the battle's units preload their effects at the prep → battle switch.
+// (fork) Crowd budget: the field view reports its animated units (setCrowd, render/app.js). Past CROWD_UNITS — a
+// Grand Alliance relay field, a big boss fight — a one-shot that repeats on the same unit within CROWD_MERGE_S plays
+// once (the first one stands for both: an Agile stack's fast hits on one target), and new one-shots stop at
+// CROWD_PARTICLES live particles instead of MAX_PARTICLES. Loops, projectiles and other important effects never wait.
 // Effects never touch the sim: they only read the views (render/vfx/wiring.js).
 
 import { FxLibrary } from './library.js';
@@ -27,6 +31,12 @@ import { mat4, mat4Mul } from './math.js';
 export const TIERS = Object.freeze(['off', 'lite', 'full']);
 export const MAX_EFFECTS = Object.freeze({ lite: 90, full: 220 });
 export const MAX_PARTICLES = Object.freeze({ lite: 2500, full: 6000 });
+/** (fork) Animated units on the field from which the crowd budget applies. */
+export const CROWD_UNITS = 60;
+/** (fork) Live particles past which a crowded field starts no new one-shot. */
+export const CROWD_PARTICLES = Object.freeze({ lite: 800, full: 1200 });
+/** (fork) Battle seconds in which a crowded field plays a one-shot only once per unit it lands on. */
+export const CROWD_MERGE_S = 0.1;
 /** Battle seconds a pending one-shot may start late (its prefab still loading) before it is dropped. */
 export const LATE_START = 0.6;
 /** Finished instances kept per prefab for reuse (at most; `_preloadCnt` sets the share of each). */
@@ -112,7 +122,9 @@ function byUnityOrder(a, b) {
 export class OfficialFx {
   /**
    * @param {{ P: any, renderer: any, assets?: any, cam: () => any, heightAt?: (r: number, c: number) => number,
-   *           fieldRect?: () => any, lib?: FxLibrary, tier?: string }} ctx
+   *           fieldRect?: () => any, lib?: FxLibrary, tier?: string, rate?: () => number }} ctx
+   * `rate`: the battle speed (the client's Time.timeScale, 2 at 2×): an effect's playback-speed cap counts in real time
+   * (Effect.setPlayback)
    */
   constructor(ctx) {
     this.ctx = ctx;
@@ -124,6 +136,7 @@ export class OfficialFx {
     this.tier = TIERS.includes(ctx.tier) ? ctx.tier : 'off';
     this.effects = [];
     this.pending = [];
+    this.remap = null;         // (fork) (key, owner) → the key an owner's chained effects play (FxWiring: its outfit twin)
     this.time = 0;
     this.frameNo = 0;
     this.prepared = -1;
@@ -133,6 +146,9 @@ export class OfficialFx {
     this.needDepth = false;
     this.particles = 0;
     this.dropped = 0;
+    this.crowded = false;
+    this.merged = 0;
+    this.recent = new Map();   // (fork) key → [{ owner, t, handle }] of a crowded field's latest one-shots (CROWD_MERGE_S)
     this.hfSig = null;
     this.paused = false;
     this.vpB = mat4(); this.vpU = mat4();
@@ -160,6 +176,27 @@ export class OfficialFx {
 
   get lite() { return this.tier === 'lite'; }
 
+  /** (fork) The field's animated units (render/app.js, every 30 frames): the crowd budget applies past CROWD_UNITS. */
+  setCrowd(n) {
+    const on = n > CROWD_UNITS;
+    if (on === this.crowded) return;
+    this.crowded = on;
+    this.recent.clear();
+  }
+
+  /** (fork) A crowded field's one-shot `k` on `owner` already started within CROWD_MERGE_S: its handle, else null. */
+  _merge(k, owner, handle) {
+    const now = this.time;
+    let list = this.recent.get(k);
+    if (list) {
+      for (let i = list.length - 1; i >= 0; i--) if (now - list[i].t > CROWD_MERGE_S || now < list[i].t) list.splice(i, 1);
+      const hit = list.find((e) => e.owner === owner && !e.handle.cancelled);
+      if (hit) return hit.handle;
+    } else this.recent.set(k, list = []);
+    if (handle) list.push({ owner, t: now, handle });
+    return null;
+  }
+
   setTier(t) {
     const tier = TIERS.includes(t) ? t : 'off';
     if (tier === this.tier) return;
@@ -184,8 +221,15 @@ export class OfficialFx {
     const important = !!opts.loop || !!opts.important;
     // [ASSUMED] Author loops never bypass tier budgets; pending plugin loads also count toward 128 instances.
     if (k.startsWith('plugin:') && (this.effects.length + this.pending.length >= Math.min(128, lim) || this.particles >= (MAX_PARTICLES[this.tier] || 5000))) { this.dropped++; return null; }
-    if (!important && (this.effects.length >= lim || this.particles >= (MAX_PARTICLES[this.tier] || 5000))) { this.dropped++; return null; }
+    const crowd = this.crowded && !important && opts.owner != null;
+    if (crowd) {
+      const same = this._merge(k, opts.owner, null);
+      if (same) { this.merged++; return same; }
+    }
+    const maxParts = this.crowded ? CROWD_PARTICLES[this.tier] || 1200 : MAX_PARTICLES[this.tier] || 5000;
+    if (!important && (this.effects.length >= lim || this.particles >= maxParts)) { this.dropped++; return null; }
     const handle = new FxHandle(this, k, place, opts);
+    if (crowd) this._merge(k, opts.owner, handle);
     const def = this.lib.def(k);
     if (def) handle._start(def);
     else if (def === null && this.lib.defs.has(k)) return null; // known absent
@@ -255,7 +299,8 @@ export class OfficialFx {
 
   /**
    * Programs and textures of these prefabs go to the GPU ahead of their first draw, a few per frame (WARM_MS of each
-   * frame's pass): a battle's effects compile at its start instead of hitching when each first plays.
+   * frame's pass): a battle's effects compile at its start instead of hitching when each first plays. (fork) Where the
+   * GL compiles in parallel (FxGL.parallel) every queued program starts at once and stays queued until it is built.
    */
   warm(keys) {
     const seenP = new Set(this.warmQueue.map((w) => w.id));
@@ -279,14 +324,27 @@ export class OfficialFx {
     }
   }
 
+  /**
+   * (fork) One pass over the queue per frame: a program whose build runs in parallel starts (or is asked whether it is
+   * done) whatever the budget, as that costs well under a millisecond; a blocking build and a texture upload only while
+   * the frame's WARM_MS lasts. What isn't done stays queued in order (in place: app.js empties it with length = 0).
+   */
   _warmStep() {
-    if (!this.warmQueue.length || !this.glr) return;
+    const q = this.warmQueue, glr = this.glr;
+    if (!q.length || !glr) return;
     const t0 = performance.now();
-    while (this.warmQueue.length && performance.now() - t0 < WARM_MS) {
-      const w = this.warmQueue.shift();
-      if (w.kind) this.glr.program(w.kind, w.mat);
-      else if (!this.glr.texture(w.tex, this.lite) && ++w.tries < 120) this.warmQueue.push(w); // its image still loads
+    let budget = true, w2 = 0;
+    for (let i = 0; i < q.length; i++) {
+      const w = q[i];
+      let keep;
+      if (w.kind && glr.parallel) { glr.program(w.kind, w.mat); keep = glr.building(w.kind, w.mat); }
+      else if (!budget) keep = true;
+      else if (w.kind) { glr.program(w.kind, w.mat); keep = false; }
+      else keep = !glr.texture(w.tex, this.lite) && ++w.tries < 120; // its image still loads
+      if (keep) q[w2++] = w;
+      if (budget && performance.now() - t0 >= WARM_MS) budget = false;
     }
+    q.length = w2;
   }
 
   /** Keep a finished instance for the next play of its prefab (up to its `_preloadCnt`, POOL_MAX). */
@@ -321,6 +379,7 @@ export class OfficialFx {
     this.effects.length = 0;
     for (const h of this.pending) h.cancelled = true;
     this.pending.length = 0;
+    this.recent.clear();
   }
 
   /** The board's heights for the ZTest materials' depth pre-pass (rebuilt when they change). */
@@ -403,7 +462,7 @@ export class OfficialFx {
     for (const fx of this.effects) for (const s of fx.sys) if (s && s.count) systems++;
     return {
       tier: this.tier, available: this.available, effects: this.effects.length, pending: this.pending.length, particles: this.particles, reused: this.pooled,
-      systems, dropped: this.dropped, draws: this.glr ? this.glr.stats.draws : 0, programs: this.glr ? this.glr.stats.programs : 0,
+      systems, dropped: this.dropped, crowded: this.crowded, merged: this.merged, draws: this.glr ? this.glr.stats.draws : 0, programs: this.glr ? this.glr.stats.programs : 0,
       textures: this.glr ? this.glr.stats.textures : 0, texMB: this.glr ? Math.round(this.glr.stats.texBytes / 1048576) : 0,
     };
   }
@@ -459,15 +518,26 @@ export class FxHandle {
     // stops with it (OnFinishEmitter's start where it finished)
     this.children = [];
     const own = { track: this.opts.track, data: this.opts.data, loop: this.opts.loop, important: this.opts.important, owner: this.opts.owner };
-    for (const e of def.onPlay) for (const k of e.keys) if (k !== def.key) { const c = s.spawn(k, this.placeArgs, own); if (c) this.children.push(c); }
+    // (fork) an outfit prefab's emitter names its children by their plain keys; the client plays the owner's outfit
+    // replacements of them (蕾缪安's Requiem Vesperis S1 loop: lemuen_skill_01_buff_02 → its _ambiencesynesthesia#7 twin)
+    const twin = (k) => (s.remap && this.opts.owner != null ? s.remap(k, this.opts.owner) || k : k);
+    for (const e of def.onPlay) for (const k of e.keys) if (k !== def.key) { const c = s.spawn(twin(k), this.placeArgs, own); if (c) this.children.push(c); }
     const prev = fx.onFinish;
     fx.onFinish = (f) => {
       prev?.(f);
       this._stopChildren();
-      for (const k of def.onFinish) if (k !== def.key) s.spawn(k, { pos: f.anchor.slice(), yaw: f.yaw, mirror: f.mirror, groundZ: f.groundZ }, { track: this.opts.track, owner: this.opts.owner });
+      for (const k of def.onFinish) if (k !== def.key) s.spawn(twin(k), { pos: f.anchor.slice(), yaw: f.yaw, mirror: f.mirror, groundZ: f.groundZ }, { track: this.opts.track, owner: this.opts.owner });
     };
     this.effect = fx;
     // started late (a cast whose wind-up began past the clip's start): advanced to where it would be
+    // (fork) an ability's effect plays at its playback speed (an attack: its clip's speed, SpineActor.abilitySpeed)
+    if (this.opts.speed > 0 && this.opts.speed !== 1) {
+      const r = Number(s.ctx?.rate?.());
+      fx.setPlayback(this.opts.speed, Number.isFinite(r) && r > 0 ? r : 1);
+    }
+    // (fork) a cast that began `lead` s before it was shown (an attack not wound up): its FxDelay counts from there (in
+    // the effect's own time, which runs at its speed)
+    if (this.opts.lead > 0) fx.delayLead = Math.min(2, this.opts.lead) * fx.speed;
     if (this.opts.skip > 0) fx.update(Math.min(1, this.opts.skip));
     if (this.stopped) fx.stop(this.stopped);
     s._add(fx);

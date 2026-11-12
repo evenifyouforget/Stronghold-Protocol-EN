@@ -10,6 +10,8 @@
 // A bot's band or card pick is a small task on the same frames: one `final` batch with one move (design B10).
 //
 // Live frames: b.botTask → b.botReceived (at once) → b.botMoves { batch: 'plan' } → b.botAck → b.botMoves { batch: 'final' }.
+// A receipt with `starting: true` says the page's Worker is still starting: b.botLoaded then opens the plan window, and
+// BOT_START_MS bounds the wait for it, so a Worker that never comes up still fails over.
 // b.botHurry stops the rehearsal at the best layout so far, b.botCancel drops the task. No receipt, a silent executor, a
 // failed task, a hidden tab or a lost connection moves the seat to the next human with a fresh snapshot; moves already
 // applied stay. With nobody left, the seat keeps its board and readies up: the server makes no bot decision.
@@ -30,8 +32,14 @@ export const MAX_BATCH_MOVES = 200;
 export const MAX_BOT_ATTEMPTS = 3;
 /** Wall-clock ms for b.botReceived. 2 s lost tasks in a real game: a page's main thread can be that busy at the start of a prep. */
 export const BOT_RECEIPT_MS = 5000;
-/** Wall-clock ms for the plan batch after the receipt: a first Worker start in the match, then the plan on a slow device. */
+/** Wall-clock ms for the plan batch after the receipt (or after b.botLoaded, when the Worker was starting): the plan on a slow device. */
 export const BOT_PLAN_MS = 10000;
+/**
+ * Wall-clock ms for b.botLoaded after a `starting` receipt: the page waits for its screen to settle (botHost.js
+ * BOT_SCREEN_WAIT_MS, 10 s) and then loads the Worker, about 16 s on 5 Mbps / 100 ms. [ASSUMED] With BOT_PLAN_MS after it, a
+ * first task ends within 40 s of its receipt even when the Worker never comes up.
+ */
+export const BOT_START_MS = 30000;
 /** Wall-clock ms on top of a seat's rehearsal budget for the final batch to arrive. */
 export const BOT_GRACE_MS = 3000;
 
@@ -121,7 +129,7 @@ export class MatchBotTasks {
 
   /** Start the next seat that still wants its prep. */
   _pumpBotQueue() {
-    while (!this._botActive && this._botQueue.length) { // loop-cap: each pass shifts one entry off the queue
+    while (!this._botActive && this._botQueue.length) { // loop-cap: the queue (one shift a pass)
       const entry = this._botQueue.shift();
       if (this._botEntryLive(entry)) this._startBotTask(entry);
     }
@@ -192,6 +200,7 @@ export class MatchBotTasks {
   /** `ms` is real time: a browser's work does not speed up with the match's timer scale. */
   _armBotTimer(active, ms) {
     this._clearBotTimer(active);
+    active.timerAt = this.sched.now() + ms;
     active.timer = this.later(ms, () => {
       active.timer = null;
       if (this._botActive !== active) return;
@@ -225,14 +234,39 @@ export class MatchBotTasks {
     return active && active.executor === ps.playerId && active.task.id === taskId ? active : null;
   }
 
-  /** b.botReceived: the page has the task. Its Worker may still be starting, so the plan batch gets a longer window. */
+  /**
+   * b.botReceived: the page has the task. With `starting` its Worker is still coming up: the plan window waits for b.botLoaded,
+   * BOT_START_MS at most. (fork review) `starting` counts only until that executor's Worker has been up once on this
+   * connection (b.botLoaded, a plain receipt, a plan): after that a page that claims it on every task would hold each bot
+   * seat for BOT_START_MS + BOT_PLAN_MS with no strike. A reconnect, a hidden tab or a departure clears it
+   * (_botTaskHostLost): a reloaded page's Worker really is cold. Once every human is Ready the start window is BOT_PLAN_MS.
+   */
   _onBotReceived(ps, msg) {
     const active = this._botTaskOf(ps, msg.taskId);
     // once per task, and never after its plan: a repeated receipt must not re-open the window (an executor looping frames
     // would stall an untimed prep)
     if (!active || active.receivedId === msg.taskId || active.plannedId === msg.taskId) return OK;
     active.receivedId = msg.taskId;
+    if (msg.starting === true && !this._botWorkerUp.has(ps.playerId)) {
+      active.startingId = msg.taskId;
+      this._armBotTimer(active, active.hurried ? BOT_PLAN_MS : BOT_START_MS);
+      return OK;
+    }
+    this._botWorkerUp.add(ps.playerId);
     this._armBotTimer(active, BOT_PLAN_MS);
+    return OK;
+  }
+
+  /**
+   * b.botLoaded: the Worker of a `starting` receipt can take the task now, so the plan window starts. Once per task. A
+   * hurried seat's window already counts from the hurry (or its receipt): it is not opened again.
+   */
+  _onBotLoaded(ps, msg) {
+    const active = this._botTaskOf(ps, msg.taskId);
+    if (!active || active.startingId !== msg.taskId || active.loadedId === msg.taskId || active.plannedId === msg.taskId) return OK;
+    active.loadedId = msg.taskId;
+    this._botWorkerUp.add(ps.playerId);
+    if (!active.hurried) this._armBotTimer(active, BOT_PLAN_MS);
     return OK;
   }
 
@@ -244,6 +278,7 @@ export class MatchBotTasks {
     if (msg.batch === 'plan' && !msg.error) {
       if (active.plannedId === msg.taskId) return OK;
       active.plannedId = msg.taskId;
+      this._botWorkerUp.add(ps.playerId); // a plan came from a running Worker
     }
     if (msg.error) {
       this.botTaskStats.errors++;
@@ -281,12 +316,17 @@ export class MatchBotTasks {
 
   /** An executor disconnected, left or went hidden. */
   _botTaskHostLost(ps) {
+    this._botWorkerUp.delete(ps.playerId); // (fork review) its next page starts a Worker of its own
     const active = this._botActive;
     if (active && active.executor === ps.playerId) this._botFailover(active);
   }
 
   _botSendHurry(active) {
     active.hurried = true;
+    // (fork review) a seat still in its start window: the humans wait for it now, so it gets the plan window from here,
+    // as before b.botLoaded existed (the page stops waiting for the screen too)
+    const starting = active.startingId === active.task.id && active.loadedId !== active.task.id && active.plannedId !== active.task.id;
+    if (starting && active.timer && active.timerAt - this.sched.now() > BOT_PLAN_MS) this._armBotTimer(active, BOT_PLAN_MS);
     this.sendTo(active.executor, { t: 'b.botHurry', taskId: active.task.id });
   }
 

@@ -99,7 +99,7 @@
 //                           while that seat has not pressed 准备 (DESIGN §34.15).
 // onLeave(playerId)         The human quit permanently (g.leave, room.leave, or the 10-minute reconnect
 //                           window expired). They will never return under this playerId in this match;
-//                           treat as quit (AI takes over / eliminated per DESIGN). No onDisconnect follows.
+//                           treat as quit: eliminated, in every room type (中途退出). No onDisconnect follows.
 // dispose()                 Stop every timer/interval and release resources. Idempotent. After dispose the
 //                           platform ignores send/broadcast/onEnd from this instance.
 // addSpectator(id)          (optional for the platform) A spectator seat joined during the match, came back or asked
@@ -168,6 +168,9 @@
 //   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 6, 0 = heuristic only; (fork) env SP_BOT_REHEARSAL when unset;
 //                      a whole battle per candidate: ~20–300 ms of CPU each, see server/match/bot.js createRehearsal)
 //   opts.botStrategy  a registered ID or trusted server-side strategy object; defaults to SP_BOT_STRATEGY / 'legacy'
+//   opts.hostBotStrategy  (fork) host mode only (opts.botExecution 'host'): the strategy a bot seat plays in the host's browser,
+//                      in place of opts.botStrategy; defaults to SP_HOST_BOT_STRATEGY (unset or empty = opts.botStrategy). Bots the
+//                      server plays itself never see it. Seat overrides (opts.botStrategySeats) still win.
 //   opts.botStrategySeats  per-seat overrides { [seat 0..3]: ID | object } or 'seat:id,…'; defaults to
 //                      SP_BOT_STRATEGY_SEATS (none); a seat not listed plays opts.botStrategy (getBotStrategySeats)
 //   opts.botSliceMs    wall-clock ms of rehearsal per scheduler callback (default 8 with a real scheduler, unbounded
@@ -269,6 +272,7 @@ import { installRecorder } from './records.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
 import { MatchLargeRoom } from './match/largeRoom.js';
+import { MatchOneForAll } from './match/oneForAll.js';
 import { createExternalAI } from './llmGate.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS } from './match/common.js';
@@ -434,6 +438,9 @@ export class Match {
     this.seatStreams = opts.seatStreams === true || this.botExecution === 'host';
     // The hard rule (docs/host-browser-bots.md): in host mode no bot decision may run here, so a strategy's hooks throw.
     if (this.botExecution === 'host') {
+      // (fork) SP_HOST_BOT_STRATEGY: the strategy of host-run bots only (deploy: ioleta-adaptive); server-run bots keep this.bot
+      const hostBot = String(opts.hostBotStrategy ?? env('SP_HOST_BOT_STRATEGY') ?? '').trim();
+      if (hostBot) this.bot = getBotStrategy(hostBot);
       this.bot = guardBotStrategy(this.bot);
       this.seatBots = Object.freeze(Object.fromEntries(Object.entries(this.seatBots).map(([seat, s]) => [seat, guardBotStrategy(s)])));
     }
@@ -451,6 +458,8 @@ export class Match {
     this._botHostDemoted = new Set();
     /** @type {Set<string>} humans whose tab is hidden (b.botHidden): not asked while it stays so */
     this._botHostHidden = new Set();
+    /** @type {Set<string>} (fork) humans whose bot Worker is up this connection: their `starting` receipts no longer count */
+    this._botWorkerUp = new Set();
     this.botTaskStats = { sent: 0, stale: 0, failovers: 0, timeouts: 0, errors: 0, hidden: 0, noHost: 0 };
     /** The round every human turned Ready in (b.botHurry), and that round's bot budget (_botSeatBudgetMs). */
     this._botHurryRound = -1;
@@ -486,6 +495,8 @@ export class Match {
     this._battleSeq = 0;
     /** solo pause (g.pause, DESIGN §14): the field clocks / deadlines are frozen while true (m.public.paused) */
     this.paused = false;
+    /** (fork) the test harness's battle hold (test/e2e/harnessControl.mjs): frozen like a pause, published as m.public.hold */
+    this.pauseQuiet = false;
     this._pausedAt = 0;
     /** real ms spent paused this match (diagnostics) */
     this.pausedMs = 0;
@@ -538,6 +549,7 @@ export class Match {
     this.loneHuman = this.order.filter((p) => !p.isBot).length === 1;
     // (fork) an 8-seat room (shared/largeRoom.js, match/largeRoom.js): squads and the room scale, before the pools
     this._initLargeRoom(opts);
+    this._initOneForAll(opts);
 
     // per-match setup (DESIGN §6.5)
     const setup = setupMatchWaves(this.gd, this.rngSetup, { stageId: this.lobbyRules.stage });
@@ -629,7 +641,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchBotTasks, MatchBotBattles, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchLargeRoom]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchRehearsal, MatchBotTasks, MatchBotBattles, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchLargeRoom, MatchOneForAll]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

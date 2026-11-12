@@ -39,6 +39,9 @@
 // card this browser's choice at once, another doctor's the map that seat published (room.state seats[].skins) unless
 // 「显示其他玩家的皮肤」 is off; an outfit this page's appearance plugins do not have draws the default art (ui/seatArt.js
 // seatCardSkin). The picker is one's own picker, so its tiles wear one's own outfits too (like 干员调配's).
+// (fork, docs/OUTFITS.md) The fork's outfits ride on room.state seats[].outfits: another doctor's card wears that seat's
+// outfit for the operator (ui/outfits.js outfitOptsOf), one's own card this browser's choice; the default portrait stays
+// the fallback when the outfit has no portrait or it fails to load.
 // Without the art pack the card keeps its avatar frame; a bot keeps its robot frame.
 // Official versions (DESIGN §35.23, M1; versions.js): a room plays one version (room.state.version; absent = 第二期下半).
 // Another version's name shows beside the mode in the top bar (ui/pluginTag.js VersionTag) and every page loads and checks
@@ -52,11 +55,11 @@
 // Texts go through t() (docs/I18N.md).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
-import { SQUAD_SEATS, ROOM_PASSWORD_RE } from '../../../shared/largeRoom.js';
+import { DIFFICULTY_NAMES, DIFFICULTY_COLORS, EMOTE_BUBBLE_MS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { SQUAD_SEATS, ROOM_PASSWORD_RE, squadOfSeat, squadMoveWait, squadMoveLog } from '../../../shared/largeRoom.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, Spinner, confirmDialog, doctorNo, Modal,
-  TextField,
+  TextField, useTicker,
 } from '../ui/components.js';
 import { RulesBar } from '../ui/lobbyRules.js';
 import { toast, toastError } from '../ui/toasts.js';
@@ -70,6 +73,7 @@ import { LoadoutButton } from './loadout.js';
 import { PluginTag, VersionTag, isModdedRoom } from '../ui/pluginTag.js';
 import { VersionVote, versionVoteOf } from '../ui/versionVote.js';
 import { VersionPicker } from '../ui/versionPicker.js';
+import { StrategySwitch, OneForAllTag } from '../ui/largeRooms.js';
 import { DEFAULT_VERSION, lobbyVersion, needsContent, offeredDifficulties, roomVersion, serverDefaultVersion, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
 import { hasScriptConsent, rememberScriptConsent, pageVersion } from '../content.js';
 import { net } from '../net.js';
@@ -77,6 +81,7 @@ import { store, useStore, shallowEqual, emptyMatch, isSpectating, savePref } fro
 import { data, useData, getConfig } from '../data.js';
 import { chessAvatarUrl, chessPortraitUrl } from '../ui/assetUrls.js';
 import { CARD_KEY, cardStore, setCard, cardOperators, cardContext, seatOperator, seatCardSkin, seatArtSrc, botCharId } from '../ui/seatArt.js';
+import { outfitOptsOf } from '../ui/outfits.js';
 import { useAvatarArt } from '../ui/avatars.js';
 import { AvatarPicker, useAvatarPickerReady } from '../ui/avatarPicker.js';
 import { skinsStore, SKINS_KEY, ownerSkin } from '../ui/skins.js';
@@ -89,6 +94,11 @@ import { OnlinePill } from '../ui/presence.js';
 import { publicPath } from '../gen.js';
 import { t, tc, getLang, tName, botNameParts as splitBotName } from '../../../shared/i18n.js';
 import { ROOM_BOTS, FILL_PRESETS, roomBot } from '../../../shared/botProfiles.js';
+import { RoomChat } from '../ui/chatLog.js';
+import { ChatMuteButton } from '../ui/chat.js';
+import { ChatBubble, EmoteBubble } from '../ui/emotes.js';
+import { chatMuted } from '../chatState.js';
+import { activeBubbles } from '../ui/gameLogic/watch.js';
 
 /**
  * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
@@ -296,7 +306,7 @@ function CardPicker({ current, list, m, localSkins = {}, onPick, onClose }) {
  * (given when an outfit is worn): a picture that fails to load gives way to the next, the last to the avatar frame.
  */
 function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot, onSetBot = null, onKick, onInvite, portrait = null, portraitDefault = null, botAvatar = null, operator = null, onPickCard = null, onPickAvatar = null, fresh = false,
-  onMoveSeat = null, swapFrom = null, onSwap = null }) {
+  onMoveSquad = null, mySquad = null, moveWait = 0, swapFrom = null, onSwap = null, bubble = null, chatOn = false, muted = false }) {
   const [badArt, setBadArt] = useState([]);
   // (fork) the profile icon (ui/avatars.js): the name plate's frame, and the card's frame without portrait art
   const iconSrc = useAvatarArt(seat, !!seat && seat.playerId === myId);
@@ -304,15 +314,20 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
   // the 转场 flash: a seat that turns ready (or becomes the host's), and an AI teammate added while the room is open
   // (`fresh`: this card mounted after the room was already on screen)
   const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId), 700, fresh);
-  // (fork) a large room's seat moves (shared/largeRoom.js): sit in an empty seat, or the host swaps two seats.
-  // msgids — 坐到这里 en: "Sit here"; 与此交换 en: "Swap here"; 与另一个座位交换 en: "Swap with another seat"; 取消交换 en: "Cancel swap"
+  // (fork) a large room's seat moves (shared/largeRoom.js): join the other squad (from its empty seats; the server picks
+  // its lowest free seat, with a cooldown shown here), or the host swaps two seats of different squads. Never inside a
+  // squad: the seat in a squad means nothing in play (user 2026-11-11, seat-hopping spam).
+  // msgids — 加入小队 {name} en: "Join Squad {name}"; 加入小队 {name}（{s} 秒） en: "Join Squad {name} ({s}s)";
+  // 与此交换 en: "Swap here"; 与另一个座位交换 en: "Swap with another seat"; 取消交换 en: "Cancel swap"
   const large = isLargeRoom(room);
   const swapping = large && facts.isHost && swapFrom != null;
-  const swapHere = swapping && swapFrom !== index ? html`<button type="button" class="rseat__swapto" data-testid="seat-swap-here" disabled=${!!busy}
+  const squad = squadOfSeat(index), squadName = squad ? 'B' : 'A';
+  const swapHere = swapping && swapFrom !== index && squadOfSeat(swapFrom) !== squad ? html`<button type="button" class="rseat__swapto" data-testid="seat-swap-here" disabled=${!!busy}
     onClick=${() => onSwap?.(swapFrom, index)}><${Icon} name="swap" />${t('与此交换')}</button>` : null; // en: "Swap here"
   if (!seat) {
     const canAdd = coop && facts.isHost && !large;
-    const canSit = large && !facts.spectating && !!facts.mine && !swapping;
+    const canSit = large && !facts.spectating && !!facts.mine && !swapping && mySquad != null && mySquad !== squad;
+    const waitS = Math.ceil(moveWait / 1000);
     const invitable = coop && !facts.spectating;
     return html`<article class="seat seat--empty rseat rseat--empty" style=${`--i:${index}`}>
       <span class="rseat__clip" aria-hidden="true"></span>
@@ -324,7 +339,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
               <span class="rseat__plus" aria-hidden="true"></span><b>${t('邀请')}</b><small>${t('复制同盟密钥以邀请队友')}</small></button>`
           : html`<span class="rseat__wait"><small>${t('等待博士加入')}</small></span>`}
         ${canAdd ? html`<${Button} variant="secondary" size="sm" icon="robot" class="rseat__add" loading=${busy === 'add'} onClick=${onAddBot}>${t('添加 AI 队友')}<//>` : null}
-        ${canSit ? html`<${Button} variant="secondary" size="sm" icon="user" class="rseat__add" data-testid="seat-sit" loading=${busy === `sit${index}`} onClick=${() => onMoveSeat?.(index)}>${t('坐到这里')}<//>` : null}
+        ${canSit ? html`<${Button} variant="secondary" size="sm" icon="user" class="rseat__add" data-testid="seat-sit" disabled=${waitS > 0}
+          loading=${busy === `sq${squad}`} onClick=${() => onMoveSquad?.(squad)}>${waitS > 0 ? t('加入小队 {name}（{s} 秒）', { name: squadName, s: waitS }) : t('加入小队 {name}', { name: squadName })}<//>` : null}
         ${swapHere}
         <span class="rseat__noinfo" aria-hidden="true">NOINFO</span>
       </div>
@@ -365,6 +381,9 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
         </span>` : null}
       </div>
       ${offline ? html`<span class="rseat__lost"><${Icon} name="wifiOff" />${t('连接中断')}</span>` : null}
+      ${bubble ? html`<div class="rseat__bubble" data-testid="seat-bubble">${bubble.text != null
+        ? html`<${ChatBubble} key=${bubble.seq} text=${bubble.text} at=${bubble.at} ttl=${bubble.ttl} />`
+        : html`<${EmoteBubble} key=${bubble.seq} id=${bubble.id} />`}</div>` : null}
       <div class="rseat__low">
         ${art ? html`<span class="seat__op">${operator?.name || ''}</span>` : null}
         <span class=${`rseat__state seat__state--${state}`}>
@@ -396,6 +415,7 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
             aria-label=${t('AI 方案')} onChange=${(e) => onSetBot(index, e.currentTarget.value)}>
             ${ROOM_BOTS.map((b) => html`<option key=${b.id} value=${b.id}>${t(b.label)}</option>`)}</select>`
         : html`<small class="rseat__doc" title=${prof ? t(prof.desc) : undefined}>${prof ? (seat.bot ? t(prof.label) : 'AUTONOMOUS UNIT') : `DOCTOR #${doctorNo(seat.playerId)}`}</small>`}
+      ${chatOn && !isMe && !seat.isBot ? html`<${ChatMuteButton} player=${seat} muted=${muted} class="team__mute rseat__mute" />` : null}
     </div>
   </article>`;
 }
@@ -459,48 +479,51 @@ function AiLastToggle({ option, busy, onToggle }) {
 }
 
 /**
- * (fork) A Grand Alliance room's lock (room.setLock, shared/largeRoom.js), beside the alliance key — the HOST's only: nobody
- * else gets the control or the password (the server sends the password in the host's room.state alone). The button shows
- * 上锁 or the password; it opens a small panel with the 4-letter field, 锁定 / 更新密码 and 解锁. A locked room still shows in
- * the room browser; joining it — from the browser, by key or by invite link — asks for the password.
- * msgids — 上锁 en: "Lock"; 锁定房间 en: "Lock Room"; 解锁 en: "Unlock"; 更新密码 en: "Update Password"; 密码 en: "Password";
- * 4 个字母。锁定后，加入房间（包括邀请链接）需要输入密码。 en: "4 letters. Once locked, joining the room (invite links too) needs
- * the password."
+ * (fork) A Grand Alliance room's access (room.setLock, shared/largeRoom.js), its own box beside the alliance key. The host
+ * gets a 公开 | 私密 switch that applies at once: 私密 brings back the room's last password, or gives it 4 random letters
+ * the first time (the server keeps it while public and sends it in the host's room.state alone, only while private), shown beside the switch in a field the host types into directly: 4 letters
+ * save on Enter or when the field loses focus, Esc or fewer letters put the old ones back. Everyone else sees which one it
+ * is. A private room still shows in the room browser; joining it — from the browser, by key or by invite link — asks for
+ * the password. msgids — 公开 en: "Public"; 私密 en: "Private"; 房间权限 en: "Room access"; 密码 en: "Password";
+ * 修改密码 en: "Change password".
  */
-function RoomLock({ room, busy, onLock }) {
+function RoomAccess({ room, isHost, busy, onLock }) {
   const on = room.locked === true;
-  const [open, setOpen] = useState(false);
   const [pw, setPw] = useState(room.password || '');
   useEffect(() => { setPw(room.password || ''); }, [room.password]);
-  useEffect(() => {
-    if (!open) return undefined;
-    const away = (e) => { if (!e.target.closest?.('.rs-lockbox, .rs-lockbtn')) setOpen(false); };
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
-    addEventListener('pointerdown', away);
-    addEventListener('keydown', onKey);
-    return () => { removeEventListener('pointerdown', away); removeEventListener('keydown', onKey); };
-  }, [open]);
-  const valid = ROOM_PASSWORD_RE.test(pw);
+  if (!isHost) {
+    return html`<div class=${`rs-access rs-access--ro${on ? ' is-private' : ''}`} data-testid="room-access" title=${t('房间权限')}>
+      <${Icon} name=${on ? 'lock' : 'users'} /><span>${on ? t('私密') : t('公开')}</span>
+    </div>`;
+  }
   const clean = (v) => v.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
-  const lock = () => { if (valid) { onLock?.(true, pw); setOpen(false); } };
-  return html`<span class="rs-lockwrap">
-    <button type="button" class=${`rs-lockbtn${on ? ' is-on' : ''}`} data-testid="room-lock" aria-expanded=${open ? 'true' : 'false'}
-        onClick=${() => setOpen((v) => !v)} title=${on ? t('密码') : t('锁定房间')}>
-      <${Icon} name="lock" /><span class="num">${on ? room.password : t('上锁')}</span>
-    </button>
-    ${open ? html`<div class="rs-lockbox" role="dialog" aria-label=${t('锁定房间')}>
-      <label class="rs-lockbox__pw"><span>${t('密码')}</span>
-        <input class="num" data-testid="room-lock-password" value=${pw} maxLength=${4} placeholder="ABCD" autoComplete="off" spellCheck=${false}
-          ref=${(el) => { if (el && !el.dataset.f) { el.dataset.f = '1'; setTimeout(() => el.focus(), 40); } }}
-          onInput=${(e) => setPw(clean(e.currentTarget.value))} onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); lock(); } }} /></label>
-      <small class="rs-lockbox__hint">${t('4 个字母。锁定后，加入房间（包括邀请链接）需要输入密码。')}</small>
-      <div class="rs-lockbox__actions">
-        ${on ? html`<button type="button" class="rs-lockbox__off" data-testid="room-unlock" disabled=${!!busy} onClick=${() => { onLock?.(false); setOpen(false); }}>${t('解锁')}</button>` : null}
-        <button type="button" class="rs-lockbox__on" data-testid="room-lock-apply" disabled=${!!busy || !valid || (on && pw === room.password)} onClick=${lock}>
-          <${Icon} name="lock" />${on ? t('更新密码') : t('锁定房间')}</button>
-      </div>
-    </div>` : null}
-  </span>`;
+  // private again: the server brings back the room's last password (room.setLock { on: true } without one)
+  const pick = (priv) => { if (busy || priv === on) return; onLock?.(priv); };
+  // 4 letters that differ: saved; anything else: the room's own back in the field
+  const commit = () => {
+    if (ROOM_PASSWORD_RE.test(pw) && pw !== room.password) onLock?.(true, pw);
+    else setPw(room.password || '');
+  };
+  const opt = (priv, icon, label, id) => html`<button type="button" role="radio" aria-checked=${on === priv ? 'true' : 'false'} data-testid=${id}
+      class=${`rs-access__opt${on === priv ? ' is-on' : ''}`} disabled=${!!busy} onClick=${() => pick(priv)}><${Icon} name=${icon} />${label}</button>`;
+  const short = pw.length < 4;
+  return html`<div class=${`rs-access${on ? ' is-private' : ''}`} data-testid="room-access">
+    <div class="rs-access__seg" role="radiogroup" aria-label=${t('房间权限')}>
+      ${opt(false, 'users', t('公开'), 'room-public')}${opt(true, 'lock', t('私密'), 'room-private')}
+    </div>
+    ${on ? html`<label class=${`rs-access__pw${short ? ' is-short' : ''}`} title=${t('修改密码')}>
+      <span class="rs-access__pwk">${t('密码')}</span>
+      <input class="num" data-testid="room-password" value=${pw} maxLength=${4} autoComplete="off" spellCheck=${false} aria-label=${t('修改密码')}
+        onFocus=${(e) => e.currentTarget.select()}
+        onInput=${(e) => setPw(clean(e.currentTarget.value))}
+        onBlur=${commit}
+        onKeyDown=${(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+          else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setPw(room.password || ''); setTimeout(() => e.target.blur(), 0); }
+        }} />
+      <${Icon} name="edit" />
+    </label>` : null}
+  </div>`;
 }
 
 function AiTakeoverToggle({ option, busy, onToggle }) {
@@ -620,7 +643,8 @@ export function RoomScreen() {
   const [protoPick, setProtoPick] = useState(null);
   const [opts, setOpts] = useState(false);
   useSearchNotice(room, me.playerId);
-  const [findMates, setFindMates] = useFindMates();
+  // (fork) a Grand Alliance's switch is remembered apart from a normal room's, on by default (DESIGN §90.4)
+  const [findMates, setFindMates] = useFindMates(isLargeRoom(room));
   // the host's change of difficulty, told to the others (see the header); never on entering a room or switching rooms
   const seenDiff = useRef(room ? `${room.code}|${room.difficulty}` : '');
   useEffect(() => {
@@ -652,7 +676,14 @@ export function RoomScreen() {
   // every pick, welcome and content change and retries a RATE / TIMEOUT / OFFLINE refusal (review of PR #813)
   const pickCard = (charId) => { setCard(charId); setPicking(false); };
 
+  // (fork) room chat (ui/chatLog.js): the seat bubbles — match chat's store.emotes and its rule (each player's newest, for
+  // its time) — and the page's mutes; the operator's SP_CHAT=0 shows none of it
+  const emotes = useStore((s) => s.emotes);
+  const chatMute = useStore((s) => s.chatMute);
+  const bubbles = activeBubbles(emotes, Date.now(), EMOTE_BUBBLE_MS);
+  useTicker(bubbles.size ? 500 : 0);
   if (!room) return null;
+  const chatOn = !room.chatOff;
   const online = conn.status === 'online';
   const coop = room.mode !== 'solo';
   const facts = roomFacts(room, me.playerId);
@@ -692,9 +723,30 @@ export function RoomScreen() {
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
   const setRules = (partial) => run('rules', () => net.request('room.setRules', { rules: partial }));
   // (fork) a large room (shared/largeRoom.js): the list switch, sitting elsewhere, the host's seat swap (two taps)
-  const setLock = (on, password) => run('lock', () => net.request('room.setLock', on ? { on, password } : { on }));
+  const setLock = (on, password) => run('lock', () => net.request('room.setLock', on && password ? { on, password } : { on }));
+  // (fork) One for All (ui/largeRooms.js StrategySwitch): the host's strategy mode; nobody is un-readied, a search restarts
+  const setOneForAll = (on) => run('ofa', () => net.request('room.setOneForAll', { on }));
   const [swapFrom, setSwapFrom] = useState(null);
-  const moveSeat = (seat) => run(`sit${seat}`, () => net.request('room.moveSeat', { seat }));
+  // this page's own squad moves (shared/largeRoom.js squadMoveWait, the server's rule): the join button shows the wait
+  const moveLog = useRef([]);
+  const [moveWait, setMoveWait] = useState(0);
+  useEffect(() => {
+    if (!(moveWait > 0)) return undefined;
+    const id = setTimeout(() => setMoveWait(squadMoveWait(moveLog.current, Date.now())), Math.min(moveWait, 250));
+    return () => clearTimeout(id);
+  }, [moveWait]);
+  const moveSquad = (squad) => run(`sq${squad}`, async () => {
+    if (squadMoveWait(moveLog.current, Date.now()) > 0) return;
+    try {
+      await net.request('room.moveSeat', { squad });
+    } finally {
+      // a refused move (RATE: the server counted moves this page did not, e.g. before a reload) waits too
+      moveLog.current = squadMoveLog(moveLog.current, Date.now());
+      if (alive.current) setMoveWait(squadMoveWait(moveLog.current, Date.now()));
+    }
+  });
+  const myIndex = facts.seats.findIndex((x) => x && x.playerId === me.playerId);
+  const mySquad = myIndex >= 0 ? squadOfSeat(myIndex) : null;
   const swap = (a, b) => {
     if (a == null || b == null) { setSwapFrom(a); return; }
     setSwapFrom(null);
@@ -828,7 +880,7 @@ export function RoomScreen() {
           <button type="button" class="rs-exit" disabled=${busy === 'leave'} onClick=${leave} aria-label=${t('离开同盟')}><${Icon} name="exit" /></button>
         <//>
         <div class="rs-clock">
-          <b>${modeName}${room.test ? html` <${TestMark} />` : null}<${VersionTag} room=${room} class="rs-clock__ver" />
+          <b>${modeName}${isLargeRoom(room) && room.oneForAll ? html`<${OneForAllTag} class="rs-clock__ofa" />` : null}${room.test ? html` <${TestMark} />` : null}<${VersionTag} room=${room} class="rs-clock__ver" />
             ${pluginMode ? html`<span class="rs-clock__sep"></span><span class="room-mode" data-testid="room-mode">${pluginMode}</span>` : null}</b>
           <span class="rs-clock__ping">${t('当前延迟')}<${PingPill} ms=${conn.ping} online=${online} /><${OnlinePill} /></span>
         </div>
@@ -842,10 +894,10 @@ export function RoomScreen() {
       </div>
       <div class="rs-top__right">
         <${LoadoutButton} from="room" size="md" class="hub-plate hub-plate--loadout rs-loadout room-loadout" label=${t('干员调配')} />
+        ${isLargeRoom(room) ? html`<${RoomAccess} room=${room} isHost=${facts.isHost && !facts.spectating} busy=${busy} onLock=${setLock} />` : null}
         ${coop ? html`<div class="rs-key">
           <span class="rs-key__k">${t('同盟密钥')}</span>
           <b class="rs-key__code num selectable" aria-label=${t('同盟密钥 {code}', { code: room.code })}>${room.code}</b>
-          ${isLargeRoom(room) && facts.isHost ? html`<${RoomLock} room=${room} busy=${busy} onLock=${setLock} />` : null}
           <button type="button" class="rs-key__copy" onClick=${() => copy('code')} title=${t('复制密钥')}>${t('复制')}</button>
           <button type="button" class="rs-key__link" onClick=${() => copy('link')} title=${t('复制链接')} aria-label=${t('复制链接')}><${Icon} name="link" /></button>
         </div>` : html`<div class="rs-key rs-key--solo"><${MicroLabel}>SINGLE OPERATOR<//><span>${t('仅限 1 名博士')}</span></div>`}
@@ -857,11 +909,17 @@ export function RoomScreen() {
         const op = seatOperator(s, cards, { myId: me.playerId, myCard });
         // the player's outfit for that operator (header "Outfits"); null = the default art
         const skin = op ? seatCardSkin(s, op.chess.charId, { myId: me.playerId, localSkins, players: facts.occupied, otherSkins }) : null;
+        // (fork) that seat's outfit for the operator (undefined for one's own seat: the own choice applies by itself);
+        // `plain` is the default portrait, the fallback when the outfit's picture fails to load
+        const outfit = op ? outfitOptsOf(op.chess.charId, s.playerId) : undefined;
+        const art = op ? chessPortraitUrl(data.get('assets'), op.chess, { skin, ...outfit }) : null;
+        const plain = op ? chessPortraitUrl(data.get('assets'), op.chess, { outfit: null }) : null;
         return html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
           myId=${me.playerId} busy=${busy} onAddBot=${addBot} onRemoveBot=${removeBot} onSetBot=${setBot} onKick=${kick} onInvite=${() => copy('code')}
-          portrait=${op ? chessPortraitUrl(data.get('assets'), op.chess, { skin }) : null} botAvatar=${chessAvatarUrl(data.get('assets'), { charId: botCharId(s) }, { outfit: null })}
-          portraitDefault=${op && skin ? chessPortraitUrl(data.get('assets'), op.chess) : null} operator=${op?.chess} onPickCard=${() => setPicking(true)} onPickAvatar=${avatarReady ? () => setPickingAvatar(true) : null}
-          fresh=${shownRoom.current === room.code} onMoveSeat=${moveSeat} swapFrom=${swapFrom} onSwap=${swap} />`;
+          portrait=${art} botAvatar=${chessAvatarUrl(data.get('assets'), { charId: botCharId(s) }, { outfit: null })}
+          portraitDefault=${art && plain !== art ? plain : null} operator=${op?.chess} onPickCard=${() => setPicking(true)} onPickAvatar=${avatarReady ? () => setPickingAvatar(true) : null}
+          fresh=${shownRoom.current === room.code} onMoveSquad=${moveSquad} mySquad=${mySquad} moveWait=${moveWait} swapFrom=${swapFrom} onSwap=${swap}
+          bubble=${s ? bubbles.get(s.playerId) || null : null} chatOn=${chatOn} muted=${!!s && chatMuted(chatMute, s.playerId)} />`;
       }))}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
@@ -880,9 +938,7 @@ export function RoomScreen() {
     <${RulesBar} room=${room} isHost=${facts.isHost} busy=${busy} onSet=${setRules} />
 
     <footer class=${`room-bar rs-foot${fillAiShown(room, facts) ? ' rs-foot--fill' : ''}`}>
-      ${fillAiShown(room, facts)
-        ? html`<div class="rs-foot__left"><${FillAi} busy=${busy} onFill=${fillBots} /></div>`
-        : html`<div class="rs-foot__left" aria-hidden="true"></div>`}
+      <div class="rs-foot__left">${fillAiShown(room, facts) ? html`<${FillAi} busy=${busy} onFill=${fillBots} />` : null}${coop && chatOn ? html`<${RoomChat} room=${room} myId=${me.playerId} seated=${!!facts.mine} online=${online} />` : null}</div>
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}<span class="room-bar__status">${statusLine}</span></p>
         <div class="rs-pill">
@@ -890,6 +946,8 @@ export function RoomScreen() {
             title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num rs-pill__code">${info.code}</span></button>
           ${versionCtl ? html`<${Tooltip} text=${versionCtl.why} class="rs-pill__version"><button type="button" class=${`rs-pill__ver${versionCtl.editable ? '' : ' is-ro'}`} data-testid="room-version"
             disabled=${versionCtl.disabled} onClick=${versionCtl.onOpen} aria-label=${t('游戏版本：{name}', { name: versionLabel(curVersion) })}><${Icon} name="book" /><span class="rs-pill__vername">${versionLabel(curVersion)}</span></button><//>` : null}
+          ${isLargeRoom(room) ? html`<${StrategySwitch} on=${room.oneForAll === true} onPick=${setOneForAll} editable=${facts.isHost && !facts.spectating && !room.inMatch}
+            busy=${!!busy || !online} class="rs-pill__ofa" />` : null}
           ${aiLast || soloOpt ? html`<button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${aiLast ? t('同盟设置') : t('模拟设置')} aria-label=${aiLast ? t('同盟设置') : t('模拟设置')}
             aria-expanded=${opts ? 'true' : 'false'}><${GearGlyph} /></button>` : null}
           ${opts && (aiLast || soloOpt) ? html`<${RoomOptions} takeoverOption=${aiTakeoverOption(room, me.playerId)} onAiTakeover=${setAiTakeover} option=${aiLast} soloOption=${soloOpt} room=${room} isHost=${facts.isHost} busy=${busy} onAiLast=${setAiLast}

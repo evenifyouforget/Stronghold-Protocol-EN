@@ -168,6 +168,12 @@ const VOICE_GAP_MS = 1200;
 const VOICE_XFADE_S = 0.1;
 /** 'atk' projectile kinds whose first id is the previous bounce target (sim ai.js), not the attacker. */
 const CHAIN_KINDS = new Set(['chain', 'chainHeal']);
+/**
+ * (fork) Kit layer counts (fx 'buffLayers' { id, n, skill: tag }) whose layers make a unit's normal attacks a skill's
+ * own — its `attacks` / `hits[index]` —, by unit → tag → that skill index. 塔露拉 S2 'oxi:stack': while oxi_s_2_stack
+ * holds she attacks with BuffedAttack (attack.0.1, impact p_imp_xtlfgbw_h), not Attack (attack.0.2, p_imp_xtlfgbw_n).
+ */
+export const HELD_ATTACK_LAYERS = Object.freeze({ char_4247_oxi: Object.freeze({ 'oxi:stack': 1 }) });
 /** 'dmg' types that are an attack's impact (element gauge fills / 元素伤害 carry the element's name instead). */
 const IMPACT_TYPES = new Set(['phys', 'arts', 'true']);
 /** A 'dmg' later than this (real ms) after the attack aimed at the target is not that attack's impact. */
@@ -304,7 +310,7 @@ export function deathSfxUrl(manifest, info, { consumed = false, reason = null } 
   if (!info || consumed) return null;
   const cls = unitSoundClass(info);
   if (cls === 'char' && reason && reason !== 'killed') return null;
-  const own = manifest?.audio?.sfx?.units?.[info.def]?.die;
+  const own = unitSfx(manifest?.audio?.sfx, info.def, info.outfit)?.die;
   if (typeof own === 'string') return own;
   const b = manifest?.audio?.sfx?.battle ?? {};
   if (cls === 'enemy') return (info.boss ? b.enemyDieHeavy : null) ?? b.enemyDie ?? null;
@@ -319,7 +325,7 @@ export function deathSfxUrl(manifest, info, { consumed = false, reason = null } 
  */
 export function deploySfxUrl(manifest, info) {
   if (!info || info.side === 'enemy') return null;
-  const own = manifest?.audio?.sfx?.units?.[info.def]?.born;
+  const own = unitSfx(manifest?.audio?.sfx, info.def, info.outfit)?.born;
   if (typeof own === 'string') return own;
   const b = manifest?.audio?.sfx?.battle ?? {};
   const cls = unitSoundClass(info);
@@ -407,26 +413,34 @@ export const VOICE_TAP_SLOTS = Object.freeze(['select']);
  * VOICE_TREES (`voiceJp` / `voiceEn` / `voiceKr` / `voiceNative`), the same slots and file names, and falls back
  * to the Chinese line twice over: per slot when that tree lacks it (a file the fetch could not get is left out of
  * the manifest), and per line at play time — `fallback` is the Chinese file of the same name, played when the host
- * does not have the chosen one. A slot with several lines draws one (`random` ∈ [0, 1)).
+ * does not have the chosen one. A slot with several lines draws one (`random` ∈ [0, 1)); (fork) a whole number as
+ * `random` takes that line instead (modulo the slot's count: the Operator Loadout's rotation, ui/loadoutVoice.js).
  * @param {any} audio the manifest's `audio`
  * @param {string} charId
  * @param {string} slot
  * @param {'cn'|'jp'|'en'|'kr'|'native'|string} [lang]
- * @param {() => number} [random]
+ * @param {(() => number)|number} [random]
  * @returns {{ url: string, fallback: string|null } | null}
  */
 export function voiceLine(audio, charId, slot, lang = 'cn', random = Math.random) {
-  const lines = (line) => (Array.isArray(line) ? line : [line]).filter((u) => typeof u === 'string' && u);
-  const draw = (list) => (list.length ? list[Math.min(list.length - 1, Math.floor(random() * list.length))] : null);
-  const cn = lines(audio?.voice?.[charId]?.[slot]);
-  const tree = VOICE_TREES[lang];
-  const dub = tree ? draw(lines(audio?.[tree]?.[charId]?.[slot])) : null;
+  const at = Number.isInteger(random) && random >= 0 ? random : null;
+  const draw = (list) => (!list.length ? null : at != null ? list[at % list.length]
+    : list[Math.min(list.length - 1, Math.floor(random() * list.length))]);
+  const { cn, dub: dubs } = slotLines(audio, charId, slot, lang);
+  const dub = draw(dubs);
   if (dub) {
     const file = (u) => u.slice(u.lastIndexOf('/') + 1);
     return { url: dub, fallback: cn.find((u) => file(u) === file(dub)) ?? draw(cn) };
   }
   const url = draw(cn);
   return url ? { url, fallback: null } : null;
+}
+
+/** A slot's lines: the Chinese ones and the chosen dub's ([] for 'cn' or a dub that lacks the slot). */
+function slotLines(audio, charId, slot, lang) {
+  const lines = (line) => (Array.isArray(line) ? line : [line]).filter((u) => typeof u === 'string' && u);
+  const tree = VOICE_TREES[lang];
+  return { cn: lines(audio?.voice?.[charId]?.[slot]), dub: tree ? lines(audio?.[tree]?.[charId]?.[slot]) : [] };
 }
 
 // ---- outfit voices (fork, docs/OUTFITS.md) -------------------------------------------------------------------
@@ -442,13 +456,33 @@ export function outfitVoiceKey(u) {
   try { return (voiceKeyResolver && voiceKeyResolver(u)) || null; } catch { return null; }
 }
 
-/** The line of `slot` in outfit voice set `key` (the operator's language pick, else the global dub), or null. */
-function outfitVoiceLine(am, charId, slot, key) {
+// (fork, docs/OUTFITS.md) An outfit with official battle banks of its own (Goldenglow's, Executor's and Eyjafjalla's
+// Sanrio outfits) has its own whole sound entry, `sfx.outfits[skinId]` (tools/assets/plan.mjs outfitSfx); every other
+// outfit is the operator's.
+let outfitResolver = null;
+/** Set the function that names the outfit a unit wears ((unitInfo) => skinId | null; ui/outfits.js outfitSkinOf). */
+export function setOutfitSfxResolver(fn) { outfitResolver = typeof fn === 'function' ? fn : null; }
+/** The outfit (skinId) a tracked unit / an operator piece wears, or null. */
+export function outfitSfxKey(u) {
+  try { return (outfitResolver && outfitResolver(u)) || null; } catch { return null; }
+}
+/** The sound entry of unit `def` wearing `outfit`: the outfit's own when it has one, else the unit's. */
+export function unitSfx(sfx, def, outfit = null) {
+  return (outfit && sfx?.outfits?.[outfit]) || sfx?.units?.[def];
+}
+
+/** The language outfit voice set `key` of `charId` speaks: the operator's language pick, else the global dub. */
+function outfitLangOf(am, charId, key, a) {
+  const own = am.voiceOverrides?.[charId];
+  return voiceLangFor(key, VOICE_LANGS.includes(own) ? own : am.voiceLang, null, { native: false, audio: a });
+}
+
+/** The line of `slot` in outfit voice set `key` (outfitLangOf), or null. `random`: as voiceLine's. */
+function outfitVoiceLine(am, charId, slot, key, random = Math.random) {
   if (typeof key !== 'string' || !key) return null;
   const a = am.getManifest()?.audio;
   if (!a?.voice?.[key]?.[slot]) return null;
-  const own = am.voiceOverrides?.[charId];
-  return voiceLine(a, key, slot, voiceLangFor(key, VOICE_LANGS.includes(own) ? own : am.voiceLang, null, { native: false, audio: a }));
+  return voiceLine(a, key, slot, outfitLangOf(am, charId, key, a), random);
 }
 
 /**
@@ -527,6 +561,21 @@ export function effectiveVoiceLang(a, charId, pref) {
 /** Concurrency + cooldown gate for battle SFX. Pure (time is passed in). */
 /** Gestures that may unlock audio: iOS Safari only accepts touchend / click / keydown; pointerdown covers the rest. */
 const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'click', 'keydown'];
+
+/** (fork) Seconds a sound cut by a newer one of its bank (popOldest) takes to fall silent: a hard stop clicks. */
+export const POP_FADE_S = 0.015;
+/** (fork) Fade a playing source out over POP_FADE_S and stop it then (its onended does the rest). False when it cannot. */
+function fadeOut(ctx, src, gain) {
+  if (!ctx || !src || !gain) return false;
+  try {
+    const t = ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(gain.gain.value, t);
+    gain.gain.linearRampToValueAtTime(0, t + POP_FADE_S);
+    src.stop(t + POP_FADE_S + 0.005);
+    return true;
+  } catch { return false; }
+}
 
 export class SfxLimiter {
   /** @param {{ maxVoices?: number, unitCooldownMs?: number, urlGapMs?: number, maxPerUrl?: number }} [o] */
@@ -1316,9 +1365,61 @@ export class AudioManager {
    * the client's per-shot births cut each other], with the volley rather than each shot's birth delay.
    */
   _fxSound(kind, ex) {
+    if (kind === 'burst') { this._burstSound(ex); return; }
+    // (fork) the unit the fx names (`id`), else its shooter (`src`: 蕾缪安's locks and shots name the enemy); a key with
+    // '#<skill index>' is that equipped skill's own (her S2 aim and S3 lock are both 'lock')
+    for (const id of [ex.id, ex.src]) {
+      const u = id != null ? this.units.get(id) : null;
+      const table = u ? unitSfx(this.getManifest()?.audio?.sfx, u.def, u.outfit)?.fxSounds : null;
+      if (!table) continue;
+      const tag = `${kind}|${ex.skill ?? ''}`;
+      const e = (Number.isInteger(u.skillIndex) ? table[`${tag}#${u.skillIndex}`] : null) ?? table[tag];
+      if (typeof e?.url === 'string') { this._playParts(e, NOTE_GAIN); return; }
+    }
+  }
+
+  /**
+   * (fork) A sound and the ones listed with it (`also`: one official moment's several banks, tools/assets/plan.mjs
+   * FX_SOUND_BANKS / attackAlso), each on its bank's pool; one with `after` waits that many seconds [ASSUMED: real time,
+   * not the battle speed] and is dropped when the field changed meanwhile.
+   */
+  _playParts(e, gain) {
+    for (const p of [e, ...(Array.isArray(e?.also) ? e.also : [])]) {
+      if (typeof p?.url !== 'string') continue;
+      if (!(p.after > 0)) { this._playBank(p.url, p.pool, gain); continue; }
+      const token = this.poolFieldToken;
+      setTimeout(() => { if (token === this.poolFieldToken) this._playBank(p.url, p.pool, gain); }, p.after * 1000);
+    }
+  }
+
+  /**
+   * (fork) An element burst's official sound (b.ev ['fx', 'burst', x, y, { id, element }], server/sim/attack/element.js):
+   * manifest sfx.burst['<element>.<side>'], every listed bank at once on its own pool (burn: its START and SHOW_EFFECT
+   * banks). The side is the bursting unit's, as render/vfx/wiring.js burstSide decides; a side with no entry (an enemy's
+   * burn / neural / erosion burst, as in the official client) stays silent.
+   */
+  _burstSound(ex) {
     const u = this.units.get(ex.id);
-    const e = u ? this.getManifest()?.audio?.sfx?.units?.[u.def]?.fxSounds?.[`${kind}|${ex.skill ?? ''}`] : null;
-    if (typeof e?.url === 'string') this._playBank(e.url, e.pool, NOTE_GAIN);
+    if (!u || typeof ex.element !== 'string') return;
+    const side = u.kind === 'enemy' || String(u.defId || '').startsWith('enemy_') ? 'enemy' : 'char';
+    const list = this.getManifest()?.audio?.sfx?.burst?.[`${ex.element}.${side}`];
+    for (const e of Array.isArray(list) ? list : []) {
+      if (typeof e?.url === 'string') this._playBank(e.url, e.pool, NOTE_GAIN * (Number(e.vol) > 0 ? Number(e.vol) : 1));
+    }
+  }
+
+  /**
+   * (fork) A skill's own sound at its start beside its ON_SKILL_START sting (`skillOn[index]`; `hold`: cut when the
+   * skill ends — 莫斯提马 S2's time lock; `loop`: its bank loops until then — 伊芙利特 S3's flamethrower) or at its end (`skillOff[index]`: 蕾缪安's last bullet), on its bank's pool;
+   * (fork) an entry's `more`: the other banks of that edge, each on its own pool (烛煌 S3's end: b_char_boostclose and its
+   * ability's end p_skill_hcnsrfrfld).
+   */
+  _skillEdge(id, u, on) {
+    const e = Number.isInteger(u?.skillIndex) ? unitSfx(this.getManifest()?.audio?.sfx, u.def, u.outfit)?.[on ? 'skillOn' : 'skillOff']?.[u.skillIndex] : null;
+    if (typeof e?.url !== 'string') return;
+    if (on && e.hold) this._stingLoop(id, e.url, this.getManifest()?.audio?.sfx?.pools?.[e.pool]?.group ?? null, { loop: !!e.loop });
+    else this._playBank(e.url, e.pool, NOTE_GAIN);
+    for (const m of Array.isArray(e.more) ? e.more : []) if (typeof m?.url === 'string') this._playBank(m.url, m.pool, NOTE_GAIN);
   }
 
   /** One note's born / hit sound (handleBattleEvents 'fx' 'note'): on its official bank's pool (_playBank). */
@@ -1326,7 +1427,7 @@ export class AudioManager {
     const u = this.units.get(ex.owner);
     if (!u) return;
     const look = typeof ex.look === 'string' ? (ex.look.startsWith('s1_') ? 's1' : ex.look) : '';
-    const e = this.getManifest()?.audio?.sfx?.units?.[u.def]?.notes?.[look];
+    const e = unitSfx(this.getManifest()?.audio?.sfx, u.def, u.outfit)?.notes?.[look];
     const role = ex.on === 'hit' ? 'hit' : 'born';
     if (typeof e?.[role] !== 'string') return;
     this._playBank(e[role], e[role + 'Pool'], NOTE_GAIN);
@@ -1339,7 +1440,7 @@ export class AudioManager {
    * _stopStingLoop when the skill ends, the unit dies or the field changes).
    */
   _sting(id, u, cue) {
-    const st = Number.isInteger(u.skillIndex) ? this.getManifest()?.audio?.sfx?.units?.[u.def]?.stings?.[u.skillIndex] : null;
+    const st = Number.isInteger(u.skillIndex) ? unitSfx(this.getManifest()?.audio?.sfx, u.def, u.outfit)?.stings?.[u.skillIndex] : null;
     if (!st) return;
     const clips = Array.isArray(st.clips) ? st.clips.filter((c) => typeof c?.url === 'string') : [];
     if (cue.sting && clips.length) {
@@ -1353,15 +1454,19 @@ export class AudioManager {
   }
 
   /** Decode a unit's stings, loops and note sounds ahead (a tracked unit with them): they then play at once, never late. */
-  _warmStings(def) {
-    const sfx = this.getManifest()?.audio?.sfx?.units?.[def];
+  _warmStings(def, outfit = null) {
+    const sfx = unitSfx(this.getManifest()?.audio?.sfx, def, outfit);
     if (!this.ctx) return;
     for (const e of Object.values(sfx?.stings || {})) {
       for (const c of Array.isArray(e?.clips) ? e.clips : []) if (typeof c?.url === 'string') this._buffer(c.url);
       if (typeof e?.loop === 'string') this._buffer(e.loop);
     }
     for (const e of Object.values(sfx?.notes || {})) for (const r of ['born', 'hit']) if (typeof e?.[r] === 'string') this._buffer(e[r]);
-    for (const e of Object.values(sfx?.fxSounds || {})) if (typeof e?.url === 'string') this._buffer(e.url);
+    for (const e of Object.values(sfx?.fxSounds || {})) for (const x of [e, ...(Array.isArray(e?.also) ? e.also : [])]) if (typeof x?.url === 'string') this._buffer(x.url);
+    for (const list of Object.values(sfx?.attackAlso || {})) for (const x of Array.isArray(list) ? list : []) if (typeof x?.url === 'string') this._buffer(x.url);
+    for (const t of [sfx?.skillOn, sfx?.skillOff]) {
+      for (const e of Object.values(t || {})) for (const x of [e, ...(Array.isArray(e?.more) ? e.more : [])]) if (typeof x?.url === 'string') this._buffer(x.url);
+    }
   }
 
   /**
@@ -1382,11 +1487,17 @@ export class AudioManager {
       const limit = params?.maxSoundAllowed > 0 ? params.maxSoundAllowed : Infinity;
       if (voices.length >= limit) {
         if (!params?.popOldest) return;
-        voices[0].stop();
+        voices[0].pop();
       }
       let src, gain, done = false;
       const voice = {
         stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); },
+        pop: () => {   // (fork) as a pool voice's pop: out of the bank now, silent over POP_FADE_S
+          const i = voices.indexOf(voice);
+          if (i >= 0) voices.splice(i, 1);
+          if (!voices.length) this.stingVoices.delete(key);
+          if (!fadeOut(ctx, src, gain)) voice.stop();
+        },
       };
       const end = () => {
         if (done) return;
@@ -1414,7 +1525,7 @@ export class AudioManager {
   }
 
   /** The skill's held loop of unit `id` (one per unit: a new one replaces it), on its bank's mixer `group`. */
-  _stingLoop(id, url, group = null) {
+  _stingLoop(id, url, group = null, { loop = true } = {}) {
     this._stopStingLoop(id);
     const ctx = this.ctx;
     if (!ctx || this.volumes.muted || this.volumes.sfx <= 0) return;
@@ -1425,8 +1536,9 @@ export class AudioManager {
       if (!buf || ctx !== this.ctx || this.stingLoops.get(id) !== cur) return;
       try {
         const src = ctx.createBufferSource(), gain = ctx.createGain();
-        src.buffer = buf; src.loop = true;
+        src.buffer = buf; src.loop = loop;
         gain.gain.value = STING_GAIN;
+        if (!loop) src.onended = () => { if (this.stingLoops.get(id) === cur) this.stingLoops.delete(id); };
         src.connect(gain); gain.connect(this._out(group));
         src.start();
         cur.node = { src, gain };
@@ -1521,9 +1633,10 @@ export class AudioManager {
    * @param {{ volume?: number, rate?: number, limited?: boolean, unitKey?: string | null, again?: (() => unknown) | null, pool?: any, group?: string | null }} [o]
    *   again: the sound's URL picked from the manifest again — played instead once when this one was a cosmetic plugin's
    *   file that would not load (its entry fell back: see the header); pool: the official bank pool (_playPool); group:
-   *   (fork) its official mixer group (_out)
+   *   (fork) its official mixer group (_out); (fork) shape, all off by default: pan (-1..1, StereoPanner), lowpass (Hz),
+   *   offset / len (s: a slice of the file, faded out over its last 45 %; the One for All reveal, ui/protocolBoot.js)
    */
-  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, pool = null, again = null, group = null, song = false } = {}) {
+  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, pool = null, again = null, group = null, song = false, pan = 0, lowpass = 0, offset = 0, len = 0 } = {}) {
     if (!this.ctx || !url || this.volumes.muted || this.volumes.sfx <= 0) return;
     if (limited && pool) { this._playPool(url, { volume, unitKey, again, pool }); return; }
     // (fork) its mixer group: the call's, else the UI / battle default (_out); a song past its own group's duck
@@ -1543,7 +1656,7 @@ export class AudioManager {
       if (!buf && again && this.fellBack.has(url)) {
         release();
         const next = again();
-        if (typeof next === 'string' && next !== url) this._play(next, { volume, rate, limited, unitKey, pool, group, song });
+        if (typeof next === 'string' && next !== url) this._play(next, { volume, rate, limited, unitKey, pool, group, song, pan, lowpass, offset, len });
         return;
       }
       if (!buf || !this.ctx) { release(); return; }
@@ -1554,7 +1667,24 @@ export class AudioManager {
         const g = this.ctx.createGain();
         // (fork) a singing skill's song plays its boost over the battle (audioMixer.js SONG_DUCK)
         g.gain.value = Math.max(0, Math.min(1.5, volume)) * (song && this.mixer ? songGain() : 1);
-        s.connect(g); g.connect(out);
+        // (fork) the optional shape: high cut before the gain, the slice's fade on it, the pan after it
+        const shaped = [];
+        let head = s;
+        if (lowpass > 0 && typeof this.ctx.createBiquadFilter === 'function') {
+          const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lowpass; head.connect(f); head = f; shaped.push(f);
+        }
+        const cut = len > 0 ? Math.min(len, Math.max(0, buf.duration - offset)) : 0;
+        if (cut > 0 && g.gain.setValueAtTime) {
+          const t0 = this.ctx.currentTime;
+          g.gain.setValueAtTime(g.gain.value, t0 + cut * 0.55);
+          g.gain.linearRampToValueAtTime(0, t0 + cut);
+        }
+        head.connect(g);
+        let tail = g;
+        if (pan && typeof this.ctx.createStereoPanner === 'function') {
+          const p = this.ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); g.connect(p); tail = p; shaped.push(p);
+        }
+        tail.connect(out);
         let done = false;
         const mixer = song ? this.mixer : null;
         if (mixer) { mixer.songStart(); this.songNodes.add(s); }
@@ -1563,10 +1693,12 @@ export class AudioManager {
           done = true; release();
           if (mixer && this.songNodes.delete(s)) mixer.songEnd();
           try { g.disconnect(); } catch { /* ignore */ }
+          for (const n of shaped) { try { n.disconnect(); } catch { /* ignore */ } }
         };
         s.onended = end;
-        setTimeout(end, (buf.duration / rate) * 1000 + 250); // safety if onended never fires
-        s.start();
+        const plays = cut > 0 ? cut : Math.max(0, buf.duration - offset);
+        setTimeout(end, (plays / rate) * 1000 + 250); // safety if onended never fires
+        if (offset > 0 || cut > 0) s.start(0, Math.max(0, offset), cut > 0 ? cut : undefined); else s.start();
       } catch { release(); }
     }, release);
   }
@@ -1661,13 +1793,22 @@ export class AudioManager {
       }
       try { src?.disconnect(); gain?.disconnect(); } catch { /* ignore */ }
     };
-    const voice = { stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); } };
+    const voice = {
+      stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); },
+      // (fork) popped by a newer sound of its bank (popOldest): out of the pool now, silent over POP_FADE_S — a hard cut
+      // clicked (莫斯提马's 5.6 s S3 ripple was cut on every attack: "static")
+      pop: () => {
+        const index = voices.indexOf(voice);
+        if (index >= 0) voices.splice(index, 1);
+        if (!fadeOut(ctx, src, gain)) voice.stop();
+      },
+    };
     try {
       src = ctx.createBufferSource(); gain = ctx.createGain();
       src.buffer = buf; src.playbackRate.value = rate;
       gain.gain.value = Math.max(0, Math.min(1.5, volume)) * spatialGain(pool.spatial, buf.numberOfChannels);
       src.connect(gain); gain.connect(this._out(pool.group));
-      if (oldest) oldest.stop();
+      if (oldest) oldest.pop();
       acquired = this.limiter.tryAcquire(now, unitKey, url, Infinity);
       if (!acquired) { end(); return; }
       voices.push(voice); this.poolVoices.set(pool.id, voices);
@@ -1700,7 +1841,8 @@ export class AudioManager {
   /**
    * UI sound by name (sfx.ui keys). Unknown names are ignored.
    * @param {string} name
-   * @param {{ volume?: number, scope?: string }} [o]
+   * @param {{ volume?: number, scope?: string, pan?: number, lowpass?: number, offset?: number, len?: number }} [o] (fork) pan /
+   *   lowpass / offset / len: _play's optional shape (the One for All reveal)
    */
   sfx(name, o = {}) {
     try {
@@ -1708,7 +1850,7 @@ export class AudioManager {
       const url = pick();
       if (typeof url === 'string') {
         if (name === 'bondUp') this._playBondCue(url, o.volume ?? 0.9, o.scope, pick);
-        else this._play(url, { volume: o.volume ?? 0.9, again: pick, group: this._groupOf('ui', name) });
+        else this._play(url, { volume: o.volume ?? 0.9, again: pick, group: this._groupOf('ui', name), pan: o.pan || 0, lowpass: o.lowpass || 0, offset: o.offset || 0, len: o.len || 0 });
       }
     } catch { /* ignore */ }
   }
@@ -1821,10 +1963,10 @@ export class AudioManager {
    * @param {boolean} [skillActive] whether that skill runs right now (`attacks` / `hits` need it, see header)
    * @returns {boolean} whether a unit-specific sound exists
    */
-  unit(defId, kind, unitId, skillIndex, skillActive = false) {
+  unit(defId, kind, unitId, skillIndex, skillActive = false, outfit = null) {
     try {
       const pick = () => {
-        const u = this.getManifest()?.audio?.sfx?.units?.[defId];
+        const u = unitSfx(this.getManifest()?.audio?.sfx, defId, outfit);
         // DESIGN §16: the equipped skill's own ON_SKILL_START sound (`skills[index]`). (fork) A unit with `skills` plays by
         // index only: an index without a sound is a skill the official bank table leaves silent, never `skill` (the
         // primary skill's sound, which rang on 54 operators' other skills)
@@ -1838,6 +1980,8 @@ export class AudioManager {
         return { u, mode, own, url: byIndex ? own : typeof mode === 'string' ? mode : u?.[kind] };
       };
       const { u, mode, url, own } = pick();
+      // (fork) a skill whose attacks land no impact of their own (`quietHits`: 莫斯提马 S3's ripple has its swing only)
+      if (kind === 'hit' && skillActive && Number.isInteger(skillIndex) && Array.isArray(u?.quietHits) && u.quietHits.includes(skillIndex)) return true;
       if (typeof url !== 'string') return false;
       // a skill-mode file is fine here when it IS the running skill's (mode); the gate is for normal attacks
       // (丰川祥子's normal swing IS an `_h` file, ON_ABILITY_ON.attack.0.1: an operator with per-note banks is exempt)
@@ -1855,6 +1999,14 @@ export class AudioManager {
       // (fork) a singing skill (SONG_SKILLS): the battle sounds step back while its song plays
       const song = kind === 'skill' && typeof own === 'string' && SONG_SKILLS[defId]?.includes(skillIndex);
       this._play(url, { volume: unitGain(UNIT_BASE_GAIN, mix), limited: true, unitKey: `${unitId}:${kind}`, again: () => pick().url, pool, group, song });
+      // (fork) the running skill's attack may sound again after its swing (attackAlso: 圣约送葬人's Sanrio S2 shot)
+      // — once per swing: an attack on several targets is one 'atk' per target, so it keeps the unit cooldown the swing has
+      const also = kind === 'attack' && typeof mode === 'string' ? u?.attackAlso?.[skillIndex] : null;
+      const alsoKey = `${unitId}:attackAlso`, at = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      if (Array.isArray(also) && !this.limiter.cooling(at, alsoKey)) {
+        this.limiter.lastByUnit.set(alsoKey, at);
+        this._playParts({ also }, unitGain(UNIT_BASE_GAIN, mix));
+      }
       return true;
     } catch { return false; }
   }
@@ -1870,7 +2022,9 @@ export class AudioManager {
    * @param {string} charId e.g. 'char_263_skadi'
    * @param {'start'|'faceEnemy'|'select'|'place'|'skill1'|'skill2'|'skill3'|'skill4'|'squad'|'squadFirst'
    *   |'resultFour'|'resultThree'|'resultTwo'|'resultLose'|'gacha'} slot
-   * @param {{ unitKey?: string|number|null, volume?: number }} [o] `unitKey` = the cooldown key (a battle unit id)
+   * @param {{ unitKey?: string|number|null, volume?: number, voiceKey?: string|null, line?: number, takeover?: boolean }} [o]
+   *   `unitKey` = the cooldown key (a battle unit id); (fork) `line` = which of the slot's lines (voiceLine), `takeover`
+   *   = outside a battle (the Operator Loadout, ui/loadoutVoice.js): no VoiceGate, the newest line cuts the one on air off
    * @returns {boolean} whether such a line exists and started
    */
   voice(charId, slot, o = {}) {
@@ -1880,18 +2034,38 @@ export class AudioManager {
       // the chosen dub's line (settings 语音语言), with the Chinese file of the same name as its fallback (voiceLine);
       // (fork) the outfit's own voice set first: a battle unit's (o.voiceKey, null = none), else the player's own choice
       const voiceKey = o.voiceKey !== undefined ? o.voiceKey : outfitVoiceKey({ charId });
-      const pick = () => outfitVoiceLine(this, charId, slot, voiceKey) || voiceLine(this.getManifest()?.audio, charId, slot, this._voiceLangOf(charId));
+      const at = Number.isInteger(o.line) ? o.line : undefined;
+      const pick = () => outfitVoiceLine(this, charId, slot, voiceKey, at) || voiceLine(this.getManifest()?.audio, charId, slot, this._voiceLangOf(charId), at);
       const line = pick();
       if (!line) return false;
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const verdict = this.voiceGate.request(slot, o.unitKey ?? null, now);
+      const verdict = o.takeover ? 'preempt' : this.voiceGate.request(slot, o.unitKey ?? null, now);
       if (verdict === 'drop') return false;
       if (verdict === 'preempt') this._stopVoice();
-      this.voiceGate.start(slot, o.unitKey ?? null, now);
+      this.voiceGate.start(slot, o.takeover ? null : o.unitKey ?? null, now);
       const token = ++this.voiceToken;
       this._playVoice(line.url, token, o.volume, line.fallback, pick);
       return true;
     } catch (err) { this._warn('voice', err); return false; }
+  }
+
+  /**
+   * (fork) How many lines `slot` has in the set `voice` would draw it from: outfit voice set `voiceKey` (a string; the
+   * slot must be in it), else the operator's own (null) — in the dub that set speaks (0 = none). ui/loadoutVoice.js
+   * rotates over these.
+   * @param {string} charId
+   * @param {string} slot
+   * @param {string|null} [voiceKey]
+   */
+  voiceCount(charId, slot, voiceKey = null) {
+    try {
+      const a = this.getManifest()?.audio;
+      if (typeof charId !== 'string' || typeof slot !== 'string' || !a) return 0;
+      const key = typeof voiceKey === 'string' && voiceKey ? voiceKey : null;
+      if (key && !a.voice?.[key]?.[slot]) return 0;
+      const { cn, dub } = slotLines(a, key || charId, slot, key ? outfitLangOf(this, charId, key, a) : this._voiceLangOf(charId));
+      return dub.length || cn.length;
+    } catch { return 0; }
   }
 
   /**
@@ -2021,10 +2195,10 @@ export class AudioManager {
     // official class sounds (operator vs summon vs device). `skillActive` follows the ['skill', id, 1] / 0 events.
     // (fork, docs/OUTFITS.md) `voiceKey`: the voice set of the outfit its owner chose (null = the operator's own)
     this.units.set(u.id, { def: u.spine || u.defId, voice: u.voice || u.spine || u.defId, defId: u.defId ?? null, kind: u.kind ?? null, side: u.side, boss: !!u.boss,
-      voiceKey: u.side === 'enemy' ? null : outfitVoiceKey(u),
+      voiceKey: u.side === 'enemy' ? null : outfitVoiceKey(u), outfit: u.side === 'enemy' ? null : outfitSfxKey(u),
       skillIndex: Number.isInteger(u.skillIndex) ? u.skillIndex : null, skillActive: !!u.skillActive });
     // (fork) its skill stings and note sounds decode now, so its first cast / note is not late (or dropped)
-    if (u.side !== 'enemy') this._warmStings(u.spine || u.defId);
+    if (u.side !== 'enemy') this._warmStings(u.spine || u.defId, this.units.get(u.id)?.outfit);
     // a cast that arrived before this unit was known (handleBattleEvents): it sounds now, once
     const held = this.pendingSkill.get(u.id);
     if (held) {
@@ -2042,9 +2216,10 @@ export class AudioManager {
    * (fork) The mixer group of a unit's die / born sound `url`: its own bank's (sfx.units[def].groups), else the generic
    * file's (sfx.groups.battle by its sfx.battle name).
    */
-  _unitUrlGroup(def, role, url) {
+  _unitUrlGroup(def, role, url, outfit = null) {
     const s = this.getManifest()?.audio?.sfx;
-    if (url === s?.units?.[def]?.[role]) return s.units[def].groups?.[role] ?? null;
+    const own = unitSfx(s, def, outfit);
+    if (url === own?.[role]) return own.groups?.[role] ?? null;
     for (const [name, u] of Object.entries(s?.battle || {})) if (u === url) return this._groupOf('battle', name);
     return null;
   }
@@ -2064,11 +2239,13 @@ export class AudioManager {
     try {
       const m = this.getManifest();
       const u = { def: info?.def ?? null, defId: info?.defId ?? null, kind: info?.kind ?? null, side: 'ally' };
+      u.outfit = outfitSfxKey({ ...u, spine: u.def, ownerId: info?.ownerId ?? null });
       const url = deploySfxUrl(m, u);
       if (!url) return false;
-      const own = url === m?.audio?.sfx?.units?.[u.def]?.born;
-      const mix = own ? m.audio.sfx.units[u.def].mix?.born : null;
-      if (unitSoundPlays(mix, this.random())) this._playLanding(url, `land:${key}`, own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'born', url));
+      const e = unitSfx(m?.audio?.sfx, u.def, u.outfit);
+      const own = url === e?.born;
+      const mix = own ? e.mix?.born : null;
+      if (unitSoundPlays(mix, this.random())) this._playLanding(url, `land:${key}`, own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'born', url, u.outfit));
       return true;
     } catch { return false; }
   }
@@ -2136,6 +2313,18 @@ export class AudioManager {
   }
 
   /**
+   * (fork) Fetch these sfx.ui sounds ahead (One for All's reveal, ui/protocolBoot.js warmOfaSounds): a sound's first
+   * play waits for its download and decode, which bunched the reveal's beats together. Nothing before the first gesture
+   * or while the SFX are silent (the play would be silent too).
+   * @param {string[]} names sfx.ui keys
+   */
+  warmUi(names) {
+    if (!this.ctx || this.volumes.muted || this.volumes.sfx <= 0) return;
+    const ui = this.getManifest()?.audio?.sfx?.ui;
+    for (const n of Array.isArray(names) ? names : []) if (typeof ui?.[n] === 'string') this._buffer(ui[n]);
+  }
+
+  /**
    * Fetch the generic landing sounds ahead (b_char_set / b_char_tokenset, ~30 KB together), so the round start's first
    * landings never wait for a download (a wait would bunch the chain's first sounds together). The field view asks when a
    * match screen comes up (render/app.js createFieldView); before the first gesture, or while the SFX are silent, the wish
@@ -2172,13 +2361,17 @@ export class AudioManager {
           if (!src) continue;
           // only a hostile attack authors the target's next impact (a heal — an ally aiming at an ally — never does)
           const tgt = this.units.get(e[2]);
-          if (tgt && tgt.side !== src.side) this.lastAttacker.set(e[2], { def: src.def, at: now, skillIndex: src.skillIndex ?? null, skillActive: !!src.skillActive });
-          if (!this.unit(src.def, 'attack', e[1], src.skillIndex ?? undefined, src.skillActive) && src.side === 'enemy') this.battle('enemyHit', { unitKey: `${e[1]}:atk` });
+          // (fork) a held layer count (HELD_ATTACK_LAYERS) makes this normal attack that skill's own, as while it runs
+          const held = Number.isInteger(src.heldAttack) && !src.skillActive;
+          const sIdx = held ? src.heldAttack : src.skillIndex ?? null;
+          const sOn = held || !!src.skillActive;
+          if (tgt && tgt.side !== src.side) this.lastAttacker.set(e[2], { def: src.def, outfit: src.outfit ?? null, at: now, skillIndex: sIdx, skillActive: sOn });
+          if (!this.unit(src.def, 'attack', e[1], sIdx ?? undefined, sOn, src.outfit) && src.side === 'enemy') this.battle('enemyHit', { unitKey: `${e[1]}:atk` });
         } else if (kind === 'dmg') {
           const by = this.lastAttacker.get(e[1]);
           if (!by || !IMPACT_TYPES.has(e[3])) continue;
           this.lastAttacker.delete(e[1]); // one impact per attack
-          if (now - by.at <= IMPACT_WINDOW_MS) this.unit(by.def, 'hit', `h${e[1]}`, by.skillIndex ?? undefined, by.skillActive);
+          if (now - by.at <= IMPACT_WINDOW_MS) this.unit(by.def, 'hit', `h${e[1]}`, by.skillIndex ?? undefined, by.skillActive, by.outfit);
         } else if (kind === 'heal') {
           this.battle('heal', { unitKey: `heal:${e[1]}`, volume: 0.8 }); // (fork) the bank's own volume 0.8, on the mixer
         } else if (kind === 'skill' && e[2]) {
@@ -2186,9 +2379,10 @@ export class AudioManager {
           if (u) {
             // the running skill's own swing / impact (`attacks` / `hits`, header) follow this flag
             u.skillActive = true;
-            this.unit(u.def, 'skill', e[1], u.skillIndex ?? undefined);
+            this.unit(u.def, 'skill', e[1], u.skillIndex ?? undefined, false, u.outfit);
             // (fork) a cast cue (the sim's skill `cue`, 丰川祥子): the skill's sting, and its held loop
             if (e[3] && typeof e[3] === 'object') this._sting(e[1], u, e[3]);
+            this._skillEdge(e[1], u, true);
             // 作战中N: the equipped skill's own slot (0-based; 作战中4 is the fallback of a 4th slot)
             if (unitSoundClass(u) === 'char') {
               const n = Number.isInteger(u.skillIndex) ? Math.min(4, u.skillIndex + 1) : 1;
@@ -2206,9 +2400,11 @@ export class AudioManager {
           // ['skill', id, 0] = the skill ENDED (the sim's skills.js: `b._ev(['skill', u.id, 0])`): back to the unit's own
           // attack / impact. The end carries no sound of its own (the activation sound belongs to the start).
           const u = this.units.get(e[1]);
+          const was = !!u?.skillActive;
           if (u) u.skillActive = false;
           this.pendingSkill.delete(e[1]);
           this._stopStingLoop(e[1]);
+          if (was) this._skillEdge(e[1], u, false);
         } else if (kind === 'engage') {
           // 行动开始: the first attack a unit makes on an enemy (the sim's ENGAGE, official ENCOUNTER_ENEMY, 3 s apart)
           const u = this.units.get(e[1]);
@@ -2221,10 +2417,11 @@ export class AudioManager {
           const m = this.getManifest();
           const url = deathSfxUrl(m, u, { consumed, reason: typeof e[2] === 'string' ? e[2] : null });
           if (!url) continue;
-          const own = url === m?.audio?.sfx?.units?.[u.def]?.die;
-          const mix = own ? m.audio.sfx.units[u.def].mix?.die : null;
+          const ue = unitSfx(m?.audio?.sfx, u.def, u.outfit);
+          const own = url === ue?.die;
+          const mix = own ? ue.mix?.die : null;
           if (!unitSoundPlays(mix, this.random())) continue;
-          this._playUnitUrl(url, own ? `${e[1]}:die` : `die:${e[1]}`, own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'die', url));
+          this._playUnitUrl(url, own ? `${e[1]}:die` : `die:${e[1]}`, own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'die', url, u.outfit));
         } else if (kind === 'leak') {
           // 漏怪: an enemy reached its goal (Battle.leak emits the sim's own EV.LEAK — it is NOT a `die`, so until now a
           // leak was completely silent, for the player's own field and for a 联防 the helpers could not hold alike).
@@ -2250,14 +2447,21 @@ export class AudioManager {
             } else this.voice(u.voice, 'place', { unitKey: e[1], voiceKey: u.voiceKey });
           }
           if (!url) continue;
-          const own = url === m?.audio?.sfx?.units?.[u.def]?.born;
-          const mix = own ? m.audio.sfx.units[u.def].mix?.born : null;
+          const ue = unitSfx(m?.audio?.sfx, u.def, u.outfit);
+          const own = url === ue?.born;
+          const mix = own ? ue.mix?.born : null;
           if (!unitSoundPlays(mix, this.random())) continue;
-          this._playUnitUrl(url, own ? `${e[1]}:born` : 'deploy', own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'born', url));
+          this._playUnitUrl(url, own ? `${e[1]}:born` : 'deploy', own ? unitGain(UNIT_BASE_GAIN, mix) : 1, this._unitUrlGroup(u.def, 'born', url, u.outfit));
         } else if (kind === 'fx' && e[1] === 'note') {
           if (e[4] && typeof e[4] === 'object') this._noteSound(e[4]);
         } else if (kind === 'fx' && e[1] === 'fever') {
           if (e[4] && e[4].on) this.feverStart();
+        } else if (kind === 'fx' && e[1] === 'buffLayers') {
+          // (fork) a layer count that makes her attacks a skill's own (HELD_ATTACK_LAYERS); no sound of its own
+          const ex = e[4];
+          const u = ex && typeof ex === 'object' ? this.units.get(ex.id) : null;
+          const idx = u ? HELD_ATTACK_LAYERS[u.def]?.[ex.skill] : undefined;
+          if (u && Number.isInteger(idx)) u.heldAttack = Number(ex.n) > 0 ? idx : null;
         } else if (kind === 'fx') {
           // an enemy's animation-event sound (manifest sfx.units[def].events, planned for the fork's enemies): 爱国者
           // kneels into his revive, rises from it, and his spear lands (FX_EVENT_SFX)
@@ -2277,7 +2481,7 @@ export class AudioManager {
           if (!u || u.side === 'enemy') continue;
           this.consumed.add(ex.id);
           if (this.consumed.size > 200) this.consumed.delete(this.consumed.values().next().value);
-          this.unit(u.def, 'hit', `${ex.id}:boom`);
+          this.unit(u.def, 'hit', `${ex.id}:boom`, undefined, false, u.outfit);
         } else if (kind === 'bounty') {
           this.battle('killCoin', { unitKey: 'coin' });
         }
