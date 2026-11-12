@@ -965,5 +965,58 @@ export const CARRY_ISO = defineTactic({
   },
 });
 
+/**
+ * Always buy Minimalist (至简; Fish's TODO: "He costs 1 and sells for 1, so there's basically no downside … that already
+ * adds 1 buy counter for buy triggers and 1 sell counter for sell triggers"). Before legacy's buy loop, from `fromRound`,
+ * every Minimalist the shop shows is bought (above `reserve`, with hand room):
+ *   - mode cycle: sold again at once (a free gain + sale for the on-gain / on-spend stackers; cycle-econ does the same
+ *     only for a first copy, and only when its own valuation says so);
+ *   - mode merge: kept (legacy's plan keeps them) until a merge, for the merge reward; past a pair the extra one is sold.
+ */
+const MINIMALIST = 'chess_char_3_13_a';
+export const BUY_MINIMALIST = defineTactic({
+  id: 'buy-minimalist',
+  describe: 'buys every Minimalist the shop shows (he costs what he sells for); sells him at once or keeps him for merges',
+  params: {
+    fromRound: int(1, 14, 2),
+    mode: { type: 'choice', choices: ['cycle', 'merge'], default: 'cycle' },
+    reserve: int(0, 30, 0),
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (p.mode === 'merge' && m.round >= p.fromRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const mine = ps.allChess().filter((q) => gd.baseIdOf(q.id) === MINIMALIST && !gd.isGolden(q.id)).map((q) => q.id);
+        if (mine.length) {
+          const plan = own?.plan || {};
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, keep: Object.freeze([...new Set([...(plan.keep || []), ...mine])].slice(0, 32)) }) };
+        }
+      }
+      return ctx.next();
+    },
+    *buyLoopSteps(ctx) {
+      const { match: m, player: ps, params: p, args: [opts] } = ctx;
+      if (!opts?.fillOnly && ps.isBot && !ps.autoplay && m.round >= p.fromRound) {
+        const gd = gdOf(m, ps);
+        for (let guard = 0; guard < 6; guard++) {
+          const i = ps.shop.slots.findIndex((sl) => sl && !sl.sold && sl.kind === 'chess' && gd.baseIdOf(sl.id) === MINIMALIST
+            && ps.funds - ps.priceOf(sl) >= p.reserve);
+          if (i < 0 || freeSlot(ps.hand) < 0) break;
+          const before = new Set(ps.allChess().map((q) => q.uid));
+          if (!ok(() => ps.buy(i))) break;
+          const fresh = ps.allChess().find((q) => !before.has(q.uid) && gd.baseIdOf(q.id) === MINIMALIST && !gd.isGolden(q.id));
+          const normals = ps.allChess().filter((q) => gd.baseIdOf(q.id) === MINIMALIST && !gd.isGolden(q.id)).length;
+          // cycle: straight back; merge: only a copy past what a merge needs (a merge already happened on the buy)
+          if (fresh && (p.mode === 'cycle' || normals > 2)) ok(() => ps.sell(fresh.uid));
+          yield;
+        }
+      }
+      return yield* ctx.next();
+    },
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST]);

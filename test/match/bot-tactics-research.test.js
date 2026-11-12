@@ -308,3 +308,31 @@ test('carry-iso puts a loose Isomorph and an Alliance item on the main attacker,
     assert.ok(gd.item(iso.id).canGiveBond);
   } finally { h.m.dispose(); }
 });
+
+test('buy-minimalist buys every Minimalist shown; cycle sells him back at once, merge keeps a pair', async () => {
+  const { BUY_MINIMALIST } = await import('../../server/match/botTacticsResearch.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(3);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    const gd = h.m.gd, id = 'chess_char_3_13_a';
+    const slot = () => ({ kind: 'chess', id, basePrice: gd.chessPrice(id), frozen: false, sold: false });
+    const count = () => ps.allChess().filter((q) => gd.baseIdOf(q.id) === id).length;
+    const run = (mode) => {
+      const gen = BUY_MINIMALIST.at.buyLoopSteps({ match: h.m, player: ps, params: { ...resolveParams(BUY_MINIMALIST), mode }, args: [{}], next: function* () {} });
+      for (let g = gen.next(); !g.done; g = gen.next());
+    };
+    ps.hand.fill(null);
+    ps.funds = 10;
+    ps.shop.slots[0] = slot(); ps.shop.slots[1] = slot();
+    assert.equal(ps.priceOf(ps.shop.slots[0]), 1, 'Minimalist costs 1');
+    run('cycle');
+    assert.equal(count(), 0, 'cycle: both sold back');
+    assert.equal(ps.funds, 10, 'cycle: no funds lost');
+    ps.shop.slots[0] = slot(); ps.shop.slots[1] = slot();
+    run('merge');
+    assert.equal(count(), 2, 'merge: a pair kept');
+  } finally { h.m.dispose(); }
+});
