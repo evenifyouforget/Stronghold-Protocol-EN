@@ -366,13 +366,11 @@ evolution pool one by one, default off; the race decides whether any pair works.
 Fish: "I thought I was already asking for bots to use custom operators. yes, 100% I approve". Until now bots never
 had custom operator picks: only a human's seat got them (`PlayerState`: `if (!this.isBot && seat.diy)`).
 
-**What the humans pick.** The records don't store the picks, but the battle specs carry each fielded custom piece.
-Of 269 human seats, 67 fielded one:
-
-| Tier | Pick (seats) |
-|---|---|
-| 6 | Togawa Sakiko S3 (17), Haruka S3 (11), Wang S3 (4), Angelina the Mellow Wish S3 (4) |
-| 5 | Ch'en the Dawnstreak S3 (10), Kal'tsit·Esperanta S2 (5), Wang S3 (5), Angelina the Mellow Wish S2/S3 (7), Leizi the Thunderbringer S1 (3) |
+**What the humans pick.** The records don't store the picks, but the battle specs carry each fielded custom piece
+(`untracked/dyy-2026-11/`, clean Hard/Ultimate games, seats that passed ≥ 10 rounds): 17 of 62 human seats fielded
+one. Tier 5: Ch'en the Dawnstreak S3 (6), Kal'tsit·Esperanta S2 (4), Clementia (2); tier 6: Togawa Sakiko S3 (2),
+Angelina the Mellow Wish, Wang (1 each). (A first count that also took cheat games, with booster packs, had 67 of 269
+and Sakiko first: cheat games are left out everywhere below.)
 
 **Built** (`feature/bot-plan-tactics` c72a5eea): a tactic may now declare `diyPicks(params)`. The match calls it for
 each bot seat at setup, before the custom stock is drawn, so it also works once bots run in the browser. `diy-picks`
@@ -391,14 +389,63 @@ plan), botbench co-op Ultimate 1–40, paired against legacy.
 start of the snake").** Morph Isomorph worn with an Alliance item makes its wearer a member of that Alliance. In the
 battle specs:
 
-| | Humans | Bots |
+| Clean games | Humans | Bots |
 |---|---|---|
-| Seats that wear an Isomorph | 125 of 269 (46 %) | 16 of 120 (13 %) |
-| Paired with an Alliance item (seat-pairs) | Victoria 82, Indomitable 67, Precision 66, Siracusa 66, Arcane 60, Yan 58, Kjerag 56, … Ægir 42 | Yan 3, Kjerag 1, Sargon 1, Swift 1 |
+| Seats that wear an Isomorph (`isomorph.mjs`) | 37 of 62 (60 %) | 16 of 111 (14 %) |
+| Paired with an Alliance item (seat × item) | Victoria 32, Kjerag 13, Precision 6, Arcane 5, Ægir 3, … | Yan 3, Kjerag 1, Sargon 1, Swift 1 |
 
-The humans' Ægir carriers are damage dealers: Pramanix the Prerita, Dusk, Archetto, Exusiai the alter, SilverAsh the
-alter, Togawa Sakiko (custom). Bots mostly wear the Isomorph alone, where it grants no Alliance. Next tactic: put the
+Most bots that wear one wear it alone, where it grants no Alliance. The few human Ægir carriers are damage dealers
+(Pramanix the Prerita, Exusiai the alter, Archetto). Humans also get more Isomorphs: 0.8 a seat from merge rewards
+against 0.2, because they merge twice as often (below). Next tactic: put the
 Isomorph and an Alliance item on the main damage dealer, and for Ægir place it where the chain feeds it.
+
+## The economy gap: humans cycle, merge and buy items (2026-11-12)
+
+Fish: "keep it up with investigating human games and learning from them". A broad per-seat comparison
+(`untracked/dyy-2026-11/gaps.mjs`, `econ.mjs`, `cycle.mjs`): clean Hard/Ultimate games, seats that passed ≥ 10
+rounds. Humans: 62 seats (38 co-op Ultimate, 20 solo Ultimate, 4 co-op Hard); bots: 111 legacy seats, co-op Ultimate.
+
+| Per seat | Humans | Bots |
+|---|---|---|
+| Gold spent | 228 | 142 |
+| Operators bought (R1–4 / R5–8 / R9+) | 6.5 / 9.5 / 38.5 | 9.4 / 6.7 / 13.1 |
+| Operators sold | 48 | 14 |
+| … sold in the round they were bought | **25.6** | 3.1 |
+| Merges | 9.1 | 4.8 |
+| Items bought (gold) | 13.4 (29) | 0.6 (2) |
+| Items equipped | 31 | 3.7 |
+| Refreshes | 50 | 40 |
+| Shop freezes | 3.6 | 1.2 |
+| Round 5: LP / elites / active Alliances | 22.9 / 0.4 / 1.5 | 32.0 / 1.2 / 2.9 |
+| Round 12: LP / elites / items held / layers | 13.3 / 2.9 / 3.9 / 421 | 10.7 / 1.8 / 0.7 / 134 |
+
+Humans play a weaker early game (lower LP at round 5, fewer elites and Alliances) and a much richer late one. The
+stacks gap of the earlier sections is mostly an **economy** gap.
+
+**Cycling.** Most of the extra buying is buy-and-sell in the same prep, from round 9 on, of operators whose trait
+fires when gained or sold. Net cost is the price minus the sale (mostly 3 − 1 = 2; Minimalist costs 1, so 0):
+
+| Cycled (per seat) | Trait |
+|---|---|
+| Minimalist 2.5 | buys for 1: free to cycle (an on-gain trigger for whatever counts gains) |
+| Pinecone 1.8 | on sale: a free tier-1 special recruit (tier 5 once she is elite) |
+| Ashlock 1.5 | on gain: +3 layers to the most-stacked active Alliance |
+| Swire 1.4 | on gain: an Alliance Coin |
+| Wild Mane 1.3, Gnosis 0.9 | on gain: +2 / +5 layers to their own Alliances (no activation needed) |
+| Texas 1.3, Provence 1.1 | a free refresh on sale / on gain |
+| Flametail 1.2 | on gain: a Wild Mane or Greyy (a second trigger) |
+| Exusiai 1.0 | on gain: +1 gold next prep |
+| Kjera 0.9 | on gain: a Nevermeltice |
+| Mudrock 0.9 | on sale: +2 gold next prep (net 0) |
+
+The Alliances most often active while cycling: Elite, Agile, Foresight, Laterano, Solo. queue3's `trade1.5` (legacy's
+own trade at half the bar) was worse; it trades by lineup value, not by trait. A trait-driven cycle is a different
+tactic.
+
+**Shop items.** Legacy buys an item only to complete an item merge (§37.39). The humans' items are mostly economy:
+Simple Communicator 1.5, Money-Grubbing Doll 1.3, Knightly Savings 1.2, Alliance Coin 1.2, Dispatch Module 0.9,
+Mimic Matter 0.6, Originium Solvent 0.6, Budget-Savvy Doll 0.5, then Alliance items (Victorian Hammer 0.5, Arcane Arts
+Circle 0.4, …).
 
 ## Next tactics (not built)
 

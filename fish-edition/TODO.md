@@ -97,6 +97,10 @@ Fish's bot research list (2026-11-11):
 Bot issues still open: research #29, #115; the rest are in "Scoping under the freeze".
 
 - [ ] Break up legacy tactics to be less monolithic, so there are more opportunities to build on it.
+      Started (2026-11-12, `feature/bot-plan-tactics`): `legacy-rules` switches 12 of legacy's named rules off one by
+      one (trade, layer refresh, pager seat, custom-operator level step, focus steps, full-board gate, shop items only
+      for merges, the Isomorph rules, Final Assault item hunt); all on is legacy. A new decision point `finishLayout`
+      runs after the rehearsed layout. Next: more rules, and race legacy with each one off.
 
 To make sure we are making use of the shared data:
 
@@ -106,8 +110,13 @@ To make sure we are making use of the shared data:
 We should also look at any other resources that human players have access to but bots currently are not using.
 
 - [ ] Add tactics that equip alternate operator skills
-- [ ] Add tactics that equip custom operators
+- [x] Add tactics that equip custom operators
+      `diy-picks` (c72a5eea): picks at match setup, defaults Ch'en the Dawnstreak S3 + Shu S3 on tier 5; the pieces go
+      into legacy's buy / keep plan (without it bots never bought them). Measuring: queue13.
 - [ ] See if there are other actions/information that humans could use, and try writing tactics that use them
+      Found (`ai-players/08` "The economy gap", clean games): humans buy and sell 25.6 operators a game in the same prep
+      (bots 3.1), as fuel for per-gain / per-spend stackers (Dusk, Grain Buds, Astgenne); 2× the merges; 13 shop items
+      (bots 0.6); the Isomorph worn with an Alliance item in 60 % of seats (bots 14 %). `cycle-econ` built (queue14).
 
 Long-term goals:
 
@@ -124,15 +133,25 @@ Long-term goals:
 
 Small tweaks may be possible:
 
-- [ ] Commit to Aegir if got Gladiia
-- [ ] Commit to Laterano if got Mostima or Executor the Ex Foedore
-- [ ] Executor Alter > Ines on field if Foresight is active
-- [ ] Commit to Yan or Arcane if got Dusk
-- [ ] Take Yu and field Yu (for most boards) (just to generate operators)
-- [ ] Commit to Kjerag if got Silverash Alter and have 3 Kjerag operators
+- [ ] Kjerag: take Ascalon as custom operator with skill 2, give her Kjerag Nevermeltice to trigger a lot of Frozen
+      (`diy-picks` can field custom operators now; an Ascalon choice and the Nevermeltice pairing are next)
+- [x] Commit to Aegir if got Gladiia
+- [x] Commit to Laterano if got Mostima or Executor the Ex Foedore
+- [x] Executor Alter > Ines on field if Foresight is active
+- [x] Commit to Yan or Arcane if got Dusk
+- [x] Take Yu and field Yu (for most boards) (just to generate operators)
+- [x] Commit to Kjerag if got Silverash Alter and have 3 Kjerag operators
+      The six above: `plan-commit` / `plan-keepers` (76694da7). Alone each is neutral (27 → 27 wins of 40); all three
+      tweak tactics together lose (20, p 0.04). In the evolution pool one by one (`ai-players/08`).
+- [ ] Activate 2 Marvel if we have space, to make refreshes much more efficient (especially for Siracusa)
+      (`plan-bond` with `bond: miraShip` covers it without a new tactic; not measured yet)
 - [ ] Put Archetto behind an operator with desirable alliances (this is a lowroll method compared to more efficient stack generators)
-- [ ] Yan/Investor: Have Swire in inventory and don't sell unless it's the boss round. Her passive income is great
+- [x] Yan/Investor: Have Swire in inventory and don't sell unless it's the boss round. Her passive income is great
+      (`plan-keepers` `swire`)
 - [ ] Other tactics that make better use of specific Operators
+- [ ] From the economy gap (`ai-players/08`): `cycle-econ` buys and sells in the same prep to feed stackers
+      (queue14); still to draft: shop items beyond `plan-items` (Alliance Coin, Mimic Matter, Originium Solvent),
+      and an Isomorph + Alliance item on the main carry
 
 Also, I don't know how the current board layout works, but I suspect there may be better placement strategies:
 How it works, and each idea against legacy and the records: `ai-players/09`.
@@ -141,9 +160,13 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
 - [ ] Kjerag specific: maximize overlap between freeze area and "on freeze, + stack" range
 - [ ] Kjerag specific: do not have a tile in front (earlier in path) that can be frozen but doesn't generate stacks
 - [ ] Put Civilight behind a stack generating Operator
+      Copiers in general (Ptilopsis, Saria, Civilight…): `place-copiers` (6fe043c0) puts a copier on the tile behind
+      a partner, facing it. Humans do this about half the time, legacy 5–15 %. Measuring: queue15.
 - [ ] Kazimierz specific: Fartooth + Blemishine combo (or Fartooth + Degenbrecher is even better)
 - [ ] Aegir specific: build a snake with the dps operator at the back
 - [ ] Aegir specific: can use a non-Aegir dps operator if they are given damazti isomorph + aegir equipment
+      (Fish 2026-11-12: the point is a huge buff for the carry at the start of the snake. Humans' Ægir carriers:
+      Pramanix the Prerita, Exusiai the alter, Archetto, Sakiko. Next tactic.)
 - [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
 ## Mod Z
