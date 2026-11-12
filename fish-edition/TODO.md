@@ -141,6 +141,8 @@ Small tweaks may be possible:
 - [ ] Kjerag: take Ascalon as custom operator with skill 2, give her Kjerag Nevermeltice to trigger a lot of Frozen
       `diy-picks` `t6a: ascalon` (1db55e37): Ascalon S2 on tier 6; while she is owned, Kjeragi Nevermeltice goes into
       legacy's item buy / keep list (its freeze chance is a global buff, so the carrier doesn't matter). queue17: 29 vs 27, n.s.
+- - [ ] You know you can also get Nevermeltice from Kjera, right? on obtained?
+- - [ ] Also Ascalon is typically equipped on tier 5 to avoid diluting the tier 6 pool and so she can be obtained earlier
 - [x] Commit to Aegir if got Gladiia
 - [x] Commit to Laterano if got Mostima or Executor the Ex Foedore
 - [x] Executor Alter > Ines on field if Foresight is active
@@ -150,9 +152,9 @@ Small tweaks may be possible:
       The six above: `plan-commit` / `plan-keepers` (76694da7). Alone each is neutral (27 → 27 wins of 40); all three
       tweak tactics together lose (20, p 0.04). In the evolution pool one by one (`ai-players/08`).
 - [ ] Activate 2 Marvel if we have space, to make refreshes much more efficient (especially for Siracusa)
-      (`plan-bond` with `bond: miraShip` covers it without a new tactic; queue17: 23 vs 27, n.s.)
+      (`plan-bond` with `bond: miraShip` covers it without a new tactic; queue17: 23 vs 27, n.s.) (nice)
 - [ ] Put Archetto behind an operator with desirable alliances (this is a lowroll method compared to more efficient stack generators)
-      (legacy's layout already scores this trait, `positionTraitsOf` `pos`; to check in the records how often it lands)
+      (legacy's layout already scores this trait, `positionTraitsOf` `pos`; to check in the records how often it lands) (nice)
 - [x] Yan/Investor: Have Swire in inventory and don't sell unless it's the boss round. Her passive income is great
       (`plan-keepers` `swire`)
 - [ ] Other tactics that make better use of specific Operators
@@ -180,7 +182,9 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
       (Fish 2026-11-12: the point is a huge buff for the carry at the start of the snake. Humans' Ægir carriers:
       Pramanix the Prerita, Exusiai the alter, Archetto, Sakiko. `carry-iso` (fc1bc1d2) puts a held Isomorph + the focus
       Alliance item on the main damage dealer. queue16: never fired, because legacy equips a new Isomorph
-      at once, before the item arrives. Now it holds the Isomorph until the item comes (491b87c1); queue18 reruns it. Placing that carry at the snake's start is still to do.)
+      at once, before the item arrives. Now the carry is planned and kept across rounds, and either
+      item may go on first (Fish: "humans may equip either item first to reduce inventory pressure"; 176fb58c,
+      `order: either`, default), or both together (`order: hold`). queue18 measures hold, queue19 either. Placing that carry at the snake's start is still to do.)
 - [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
 ## Mod Z

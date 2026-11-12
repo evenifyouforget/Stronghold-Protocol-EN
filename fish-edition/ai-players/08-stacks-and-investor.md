@@ -508,7 +508,8 @@ botbench co-op Ultimate 1–40, paired against legacy's 27 wins (`untracked/carr
 - **`carry-iso` never fired:** identical to legacy on every seed. Legacy's own Isomorph rule (morphPlan) equips a new
   Isomorph in the same prep it arrives, before the Alliance item `carry-iso` asks for can be bought. To work, it has to
   hold the Isomorph until the item comes: built (491b87c1, the plan's `items.hold`, which legacy's equip loops skip),
-  rerun in queue18. `carry-iso-buy`'s loss is
+  rerun in queue18. Then, after Fish's note that humans equip either item first on a carry they've planned, the
+  default became `order: either` with the carry kept across rounds (176fb58c, queue19); `hold` stays as an option. `carry-iso-buy`'s loss is
   `plan-iso`'s merge-reward picks (05).
 - **Three small positives:** `minimalist-merge`, `ammo` and `ascalon` each win 2 more than legacy. None is
   significant, and `ammo` changed only 2 seeds (Mostima with an ammo user is rare). Into the race pool.
