@@ -556,5 +556,112 @@ export const PLAN_ISO = defineTactic({
   },
 });
 
+/** The owned operators' distinct base ids per bond (board, bench and hand; golden copies count as their base). */
+function ownedMembers(gd, ps, bond) {
+  return new Set(ps.allChess().filter((q) => gd.chess(q.id)?.bonds?.includes(bond)).map((q) => gd.baseIdOf(q.id))).size;
+}
+/** Adds `adds` ({ id, priority }) to the seat's plan bonds (replacing the same ids) and `keep` ids to its keep list. */
+function writePlan(m, ps, adds, keep = []) {
+  const own = ps._botSelf;
+  const plan = own?.plan || {};
+  const ids = new Set(adds.map((b) => b.id));
+  const bonds = Object.freeze([...(plan.bonds || []).filter((b) => !ids.has(b.id)), ...adds.map((b) => Object.freeze(b))]);
+  const merge = (a, b) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, 32));
+  ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, bonds, ...(keep.length ? { keep: merge(plan.keep, keep) } : {}) }) };
+}
+const OP = Object.freeze({ GLADIIA: 'chess_char_4_12_a', MOSTIMA: 'chess_char_4_02_a', EXECUTOR: 'chess_char_5_01_a', DUSK: 'chess_char_5_12_a',
+  SILVERASH_ALTER: 'chess_char_5_14_a', YU: 'chess_char_6_03_a', SWIRE_ALTER: 'chess_char_3_04_a', INES: 'chess_char_4_04_a' });
+
+/**
+ * Fish's "small tweaks" (fish-edition/TODO.md, 2026-11-12): commit to an Alliance once its key operator is owned, by
+ * writing the Alliance into legacy's plan bonds at `priority` (as plan-bond does) and keeping the key operator:
+ *   - gladiia: 歌蕾蒂娅 → Ægir;
+ *   - laterano: 莫斯提马 or 圣约送葬人 → Laterano;
+ *   - dusk: 夕 → Yan or Arcane, whichever has more members owned (Yan on a tie);
+ *   - silverash: 凛御银灰 with 3 Kjerag operators owned → Kjerag.
+ * From `fromRound`; data only, never an action.
+ */
+export const PLAN_COMMIT = defineTactic({
+  id: 'plan-commit',
+  describe: "writes legacy's plan: commits to an Alliance once its key operator is owned (歌蕾蒂娅 → Ægir, 莫斯提马 / 圣约送葬人 → Laterano, 夕 → Yan / Arcane, 凛御银灰 + 3 → Kjerag)",
+  params: {
+    priority: int(1, 5, 4),
+    fromRound: int(1, 14, 3),
+    gladiia: { type: 'bool', default: true },
+    laterano: { type: 'bool', default: true },
+    dusk: { type: 'bool', default: true },
+    silverash: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (m.round >= p.fromRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const bases = new Set(ps.allChess().map((q) => gd.baseIdOf(q.id)));
+        const adds = [], keep = [];
+        const commit = (bond, key) => { adds.push({ id: bond, priority: p.priority }); keep.push(...ps.allChess().filter((q) => key.includes(gd.baseIdOf(q.id))).map((q) => q.id)); };
+        if (p.gladiia && bases.has(OP.GLADIIA)) commit('egirShip', [OP.GLADIIA]);
+        if (p.laterano && (bases.has(OP.MOSTIMA) || bases.has(OP.EXECUTOR))) commit('lateranoShip', [OP.MOSTIMA, OP.EXECUTOR]);
+        if (p.dusk && bases.has(OP.DUSK)) commit(ownedMembers(gd, ps, 'arcaneShip') > ownedMembers(gd, ps, 'yanShip') ? 'arcaneShip' : 'yanShip', [OP.DUSK]);
+        if (p.silverash && bases.has(OP.SILVERASH_ALTER) && ownedMembers(gd, ps, 'kjeragShip') >= 3) commit('kjeragShip', [OP.SILVERASH_ALTER]);
+        if (adds.length) writePlan(m, ps, adds, keep);
+      }
+      return ctx.next();
+    },
+  },
+});
+
+/**
+ * Fish's "small tweaks" (fish-edition/TODO.md, 2026-11-12) about single operators, written into legacy's plan:
+ *   - yu: take 余 from a merge reward (tier 6: legacy's shop stops at level 5) and keep him (his row trait makes
+ *     operators);
+ *   - swire: keep 琳琅诗怀雅 (+1 fund every prep; from the Bench too with Yan / Investor active) until the boss round;
+ *   - executor: with Foresight active (2 members owned) and both owned, keep 圣约送葬人, not 伊内丝, so the lineup
+ *     prefers him.
+ * Data only, apart from yu's reward pick.
+ */
+export const PLAN_KEEPERS = defineTactic({
+  id: 'plan-keepers',
+  describe: "writes legacy's plan: takes and keeps 余, keeps 琳琅诗怀雅 until the boss round, prefers 圣约送葬人 to 伊内丝 under Foresight",
+  params: {
+    yu: { type: 'bool', default: true },
+    swire: { type: 'bool', default: true },
+    executor: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = gdOf(m, ps);
+        const keepBases = new Set();
+        if (p.yu) keepBases.add(OP.YU);
+        if (p.swire && !(m.round >= (gd.bossRound || 99))) keepBases.add(OP.SWIRE_ALTER);
+        const bases = new Set(ps.allChess().map((q) => gd.baseIdOf(q.id)));
+        if (p.executor && bases.has(OP.EXECUTOR) && bases.has(OP.INES) && ownedMembers(gd, ps, 'visiShip') >= 2) keepBases.add(OP.EXECUTOR);
+        const keep = ps.allChess().filter((q) => keepBases.has(gd.baseIdOf(q.id))).map((q) => q.id);
+        if (keep.length) {
+          const plan = own?.plan || {};
+          // 伊内丝 off the keep list while 圣约送葬人 is preferred
+          const drop = keepBases.has(OP.EXECUTOR) ? new Set(ps.allChess().filter((q) => gd.baseIdOf(q.id) === OP.INES).map((q) => q.id)) : new Set();
+          const merged = [...new Set([...(plan.keep || []).filter((id) => !drop.has(id)), ...keep])].slice(0, 32);
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, keep: Object.freeze(merged) }) };
+        }
+      }
+      return ctx.next();
+    },
+    takeOffers(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (p.yu && ps.isBot && !ps.autoplay && ps.offers?.length) {
+        const gd = gdOf(m, ps);
+        const i = ps.offers[0].slots.findIndex((sl) => sl && !sl.sold && gd.baseIdOf(sl.id) === OP.YU);
+        if (i >= 0 && freeSlot(ps.hand) >= 0) ok(() => ps.pickReward(i));
+      }
+      return ctx.next();
+    },
+  },
+});
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS]);

@@ -175,3 +175,32 @@ test('plan-combos buys and keeps both halves of a trait combo, then 圣约送葬
   assert.equal(run(3, 6).buy, undefined, 'before fromRound: untouched');
   assert.ok(TACTICS['plan-combos'], 'registered');
 });
+
+test("plan-commit writes the key operator's Alliance into legacy's plan bonds and keeps the operator", async () => {
+  const { PLAN_COMMIT, PLAN_KEEPERS } = await import('../../server/match/botTacticsResearch.js');
+  const h = soloBot({ seed: 3 });
+  h.start();
+  const m = h.m;
+  const run = (tactic, params, round, owned, extra = {}) => {
+    const fake = { isBot: true, autoplay: false, _botSelf: { round, plan: Object.freeze({ bonds: [{ id: 'swiftShip', priority: 3 }] }) }, gd: m.gd,
+      shop: { level: 5 }, allChess: () => owned.map((id, i) => ({ uid: 900 + i, id })), ...extra };
+    tactic.at.sellJunk({ match: { round, gd: m.gd }, player: fake, params, next: () => 'legacy' });
+    return fake._botSelf.plan;
+  };
+  const P = { priority: 4, fromRound: 3, gladiia: true, laterano: true, dusk: true, silverash: true };
+  const g = run(PLAN_COMMIT, P, 6, ['chess_char_4_12_b']);
+  assert.deepEqual(g.bonds.map((b) => b.id), ['swiftShip', 'egirShip'], "歌蕾蒂娅 → Ægir, legacy's own bond kept");
+  assert.deepEqual(g.keep, ['chess_char_4_12_b']);
+  assert.ok(run(PLAN_COMMIT, P, 6, ['chess_char_5_01_a']).bonds.some((b) => b.id === 'lateranoShip'), '圣约送葬人 → Laterano');
+  assert.ok(run(PLAN_COMMIT, P, 6, ['chess_char_5_12_a']).bonds.some((b) => b.id === 'yanShip'), '夕 → Yan on a tie');
+  assert.ok(!run(PLAN_COMMIT, P, 6, ['chess_char_5_14_a']).bonds.some((b) => b.id === 'kjeragShip'), '凛御银灰 alone: no Kjerag');
+  assert.equal(run(PLAN_COMMIT, P, 2, ['chess_char_4_12_a']).bonds.length, 1, 'before fromRound: untouched');
+  assert.equal(run(PLAN_COMMIT, { ...P, gladiia: false }, 6, ['chess_char_4_12_a']).bonds.length, 1, 'rule off');
+  // plan-keepers: Swire kept until the boss round; 圣约送葬人 kept over 伊内丝 with Foresight
+  const K = { yu: true, swire: true, executor: true };
+  assert.deepEqual(run(PLAN_KEEPERS, K, 5, ['chess_char_3_04_a']).keep, ['chess_char_3_04_a']);
+  assert.equal(run(PLAN_KEEPERS, K, m.gd.bossRound, ['chess_char_3_04_a']).keep, undefined, 'the boss round: Swire may go');
+  const ex = run(PLAN_KEEPERS, K, 8, ['chess_char_5_01_a', 'chess_char_4_04_a']);
+  assert.deepEqual(ex.keep, ['chess_char_5_01_a'], 'Foresight (2 members) active: 圣约送葬人 kept, not 伊内丝');
+  assert.ok(TACTICS['plan-commit'] && TACTICS['plan-keepers'], 'registered');
+});
