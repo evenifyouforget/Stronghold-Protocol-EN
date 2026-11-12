@@ -507,7 +507,8 @@ botbench co-op Ultimate 1–40, paired against legacy's 27 wins (`untracked/carr
 
 - **`carry-iso` never fired:** identical to legacy on every seed. Legacy's own Isomorph rule (morphPlan) equips a new
   Isomorph in the same prep it arrives, before the Alliance item `carry-iso` asks for can be bought. To work, it has to
-  hold the Isomorph until the item comes; that needs a switch in legacy's morph loop (next). `carry-iso-buy`'s loss is
+  hold the Isomorph until the item comes: built (491b87c1, the plan's `items.hold`, which legacy's equip loops skip),
+  rerun in queue18. `carry-iso-buy`'s loss is
   `plan-iso`'s merge-reward picks (05).
 - **Three small positives:** `minimalist-merge`, `ammo` and `ascalon` each win 2 more than legacy. None is
   significant, and `ammo` changed only 2 seeds (Mostima with an ammo user is rare). Into the race pool.

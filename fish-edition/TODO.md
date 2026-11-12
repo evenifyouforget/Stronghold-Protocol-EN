@@ -180,7 +180,7 @@ How it works, and each idea against legacy and the records: `ai-players/09`.
       (Fish 2026-11-12: the point is a huge buff for the carry at the start of the snake. Humans' Ægir carriers:
       Pramanix the Prerita, Exusiai the alter, Archetto, Sakiko. `carry-iso` (fc1bc1d2) puts a held Isomorph + the focus
       Alliance item on the main damage dealer. queue16: never fired, because legacy equips a new Isomorph
-      at once, before the item arrives; it needs to hold the Isomorph (next). Placing that carry at the snake's start is still to do.)
+      at once, before the item arrives. Now it holds the Isomorph until the item comes (491b87c1); queue18 reruns it. Placing that carry at the snake's start is still to do.)
 - [ ] General boss board strategy focusing on a carry dps and making sure they get the maximum buffs/healing and are not on a pathable tile if possible (so put them on a ranged/fence tile) (you may actually be able to identify a favourite tile for each carry dps. if you place the dps first, the favourite tile is always available)
 
 ## Mod Z
