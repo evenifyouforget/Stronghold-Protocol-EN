@@ -110,6 +110,7 @@ test('S1 炮管敲击 (AUTO, data DEFAULT): her next attack — 120 % / 135 % AT
       assert.ok(h.runUntil(() => u.skill.activations === 1, 3), `T${tier}: cast on her attack`);
       // the skill arms at the cast start, its hit lands one wind-up later (official cast → hit, ai.js allyCastWindup)
       assert.ok(h.runUntil(() => from(h, u).some((c) => c.dmg.isSkill), 1), `T${tier}: the skill hit lands`);
+      h.settle(); // (Fish Edition, GitHub #60) the push is a slide: measured where it ends
       const hit = from(h, u).find((c) => c.dmg.isSkill);
       approx(hit.amount, u.s.atk * sk.bb.atk_scale, `T${tier}: ${sk.bb.atk_scale * 100} %`);
       assert.equal(hit.type, 'phys');
@@ -335,7 +336,7 @@ test('PUS-X trait: redeployed on a 高台 she gets half her cost back (not at th
     assert.ok(h.runUntil(() => u.skill.activations === 1, 3));
     // the push lands with the hit, one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
     assert.ok(h.runUntil(() => from(h, u).some((c) => c.dmg.isSkill), 1), 'the skill hit lands');
-    h.step();
+    h.settle(); // (Fish Edition, GitHub #60) the pushes are slides: measured where they end
     const moved = [w1.x - xs[0], w2.x - xs[1]];
     for (const m of moved) approx(m, PUSH_TILES[mod === Y ? 2 : 1], `${mod ?? 'none'}: every blocked enemy pushed`, 0.08);
     done(h);
