@@ -679,6 +679,9 @@ export const DIY_CHOICES = Object.freeze({
   sakiko: Object.freeze({ charId: 'char_4182_oblvns', skillIndex: 2, uniEquipId: 'uniequip_002_oblvns' }),
   haruka: Object.freeze({ charId: 'char_4202_haruka', skillIndex: 2, uniEquipId: 'uniequip_002_haruka' }),
   goldenglow: Object.freeze({ charId: 'char_377_gdglow', skillIndex: 2, uniEquipId: 'uniequip_002_gdglow' }),
+  // Fish's TODO: "Kjerag: take Ascalon as custom operator with skill 2, give her Kjerag Nevermeltice to trigger a lot of
+  // Frozen" (tier 6; while she is owned, the Nevermeltice goes into legacy's items.buy / keep)
+  ascalon: Object.freeze({ charId: 'char_4132_ascln', skillIndex: 1, uniEquipId: null, items: Object.freeze(['chess_item_5_02_e_a']) }),
 });
 const DIY_OPTIONS = ['none', ...Object.keys(DIY_CHOICES)];
 export const DIY_PICKS = defineTactic({
@@ -704,10 +707,18 @@ export const DIY_PICKS = defineTactic({
         const owned = ps.allChess().filter((q) => slots.has(gd.baseIdOf(q.id)));
         const buy = p.buy ? [...ps.diyStock.entries].filter(([id, e]) => e.left > 0 && !owned.some((q) => gd.isGolden(q.id) && gd.baseIdOf(q.id) === id)).map(([id]) => id) : [];
         const keep = p.keep ? owned.map((q) => q.id) : [];
-        if (buy.length || keep.length) {
+        // a choice's paired items (Ascalon: the Nevermeltice) while that operator is owned
+        const ownedChars = new Set(owned.map((q) => ps.diy?.[gd.baseIdOf(q.id)]?.charId));
+        const pair = Object.values(DIY_CHOICES).filter((c) => c.items && ownedChars.has(c.charId)).flatMap((c) => c.items);
+        const held = new Set([...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item').map((q) => q.id));
+        const worn = new Set(ps.allChess().flatMap((q) => (q.items || []).map((it) => it.id)));
+        const itemBuy = pair.filter((id) => !held.has(id) && !worn.has(id)), itemKeep = pair.filter((id) => held.has(id));
+        if (buy.length || keep.length || itemBuy.length || itemKeep.length) {
           const plan = own?.plan || {};
-          const merge = (a, b) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, 32));
-          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, ...(buy.length ? { buy: merge(plan.buy, buy) } : {}), ...(keep.length ? { keep: merge(plan.keep, keep) } : {}) }) };
+          const merge = (a, b, n = 32) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
+          const items = plan.items || {};
+          ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, ...(buy.length ? { buy: merge(plan.buy, buy) } : {}), ...(keep.length ? { keep: merge(plan.keep, keep) } : {}),
+            ...(itemBuy.length || itemKeep.length ? { items: Object.freeze({ ...items, buy: merge(items.buy, itemBuy, 8), keep: merge(items.keep, itemKeep) }) } : {}) }) };
         }
       }
       return ctx.next();
@@ -719,7 +730,8 @@ export const DIY_PICKS = defineTactic({
     for (const [slot, key] of [['chess_char_5_diy1_a', p.t5a], ['chess_char_5_diy2_a', p.t5b], ['chess_char_6_diy1_a', p.t6a], ['chess_char_6_diy2_a', p.t6b]]) {
       if (key === 'none' || used.has(key)) continue;
       used.add(key);
-      out[slot] = { ...DIY_CHOICES[key] };
+      const { items: _paired, ...pick } = DIY_CHOICES[key];
+      out[slot] = pick;
     }
     return Object.keys(out).length ? out : null;
   },

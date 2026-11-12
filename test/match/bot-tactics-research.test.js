@@ -367,3 +367,22 @@ test('place-ammo moves Mostima next to a deployed ammo user, keeping her facing'
     assert.equal(placeAmmo(h.m, ps), 0, 'already beside one: no move');
   } finally { h.m.dispose(); }
 });
+
+test('diy-picks: Ascalon takes a tier-6 slot, and while she is owned the Nevermeltice goes into the item plan', async () => {
+  const { DIY_PICKS } = await import('../../server/match/botTacticsResearch.js');
+  const bot = profileFromData({ id: 't-diy-ascalon', tactics: [{ tactic: 'diy-picks', params: { t6a: 'ascalon' } }] });
+  const h = soloBot({ botStrategy: bot, seed: 7 });
+  try {
+    h.start();
+    const ps = h.m.order[0];
+    assert.equal(ps.diy?.chess_char_6_diy1_a?.charId, 'char_4132_ascln', JSON.stringify(ps.diy));
+    h.toPrep(3);
+    const run = () => DIY_PICKS.at.sellJunk({ match: h.m, player: ps, params: resolveParams(DIY_PICKS, { t6a: 'ascalon' }), next: () => null });
+    ps._botSelf = null; run();
+    assert.ok(!(ps._botSelf?.plan?.items?.buy || []).includes('chess_item_5_02_e_a'), 'not before she is owned');
+    const her = ps.newPiece('chess', 'chess_char_6_diy1_a');
+    ps.hand[ps.hand.findIndex((x) => !x)] = her;
+    ps._botSelf = null; run();
+    assert.ok(ps._botSelf.plan.items.buy.includes('chess_item_5_02_e_a'));
+  } finally { h.m.dispose(); }
+});
