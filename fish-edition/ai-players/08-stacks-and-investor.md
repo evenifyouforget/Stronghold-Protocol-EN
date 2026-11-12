@@ -47,6 +47,41 @@ battle specs record each Alliance's stacks at every battle (`untracked/dyy-2026-
 - The humans' 200+ Alliances: Yan 10, Victoria 9, Laterano 8, then Siracusa, Sargon, Ægir. The bots': Kjerag 4,
   Siracusa 3.
 
+**What the 200+ humans do differently** (`untracked/dyy-2026-11/stackers-vs.mjs` → `stackers-vs.md`; the 43 human
+seats whose top Alliance reached 200, against all bot seats, battles of rounds 7–13):
+
+| Per battle | Humans (200+) | Bots |
+|---|---|---|
+| The top Alliance's tier (mean) | 1.32 | 1.33 |
+| Its members on the board | 4.4 | 3.9 |
+| Active Alliances | 4.2 | 4.9 |
+| Operators / elites deployed | 8.0 / 2.5 | 8.0 / 2.1 |
+
+**Not Alliance activation:** the same tier, and the bots even have more active Alliances. **The operators:**
+
+| Operator | Humans (share of battles) | Bots | What it does |
+|---|---|---|---|
+| 空弦 | 40 % | 7 % | prep start: itself and the piece in front, each active Alliance +3 |
+| 断崖 | 27 % | 2 % | prep end: itself and the piece behind, the same |
+| 圣约送葬人 | 23 % | 3 % | in battle: per 7 bullets, Laterano +7, Foresight +3 (up to 7×) |
+| 白面鸮 | 23 % | 7 % | copies the front piece's prep-start trait |
+| 塞雷娅 | 20 % | 1 % | copies the front piece's prep-end trait |
+| 铃兰 | 13 % | 3 % | prep start: re-triggers the front piece's on-obtain effect |
+| 伊内丝, 薄绿, 夕, 烛煌 | 13–16 % | 3–9 % | prep-end / on-obtain stackers |
+| 刺玫 | 13 % | 31 % | prep end: Victoria +1 (the bots' favourite) |
+
+**Combos:** humans build trait chains with the copy operators, bots don't:
+
+| A trait piece in front of … | Humans | Bots |
+|---|---|---|
+| 白面鸮 (copies prep start) | 59 % of 103 battles (空弦 48) | 6 % of 49 |
+| 塞雷娅 (copies prep end) | 60 % of 83 (山 14, 溯光星源 9, 夕 8) | 0 % of 6 |
+| 铃兰 (re-triggers on-obtain) | 55 % of 60 | 26 % of 19 |
+
+So 白面鸮 behind 空弦 doubles 空弦's +3 per Alliance per round; 塞雷娅 does the same behind 断崖 or 山. Legacy's
+placement knows the `copy` kind (§37.37), but it rarely owns both halves, and its buy score doesn't value a copy
+operator for the partner it could copy. 圣约送葬人 explains much of the Laterano battle gap above.
+
 ## Why: the operators deployed and the items, more than cycling
 
 **Where the stacks come from, rounds 7–13** (`untracked/dyy-2026-11/stack-sources.mjs` → `stack-sources.md`). Each
