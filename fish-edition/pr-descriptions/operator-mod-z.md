@@ -32,7 +32,7 @@ those first, then retarget this PR to `main`.
 | Typhon | SIE-W | HP +300, ATK +150, ASPD +10 | Attacks inflict Cold; on a Frozen target, Shatter within 1 tile: Freeze ends, Stun 4 s, +40 % physical damage taken for 4 s |
 | Rosa | SIE-Z | ATK +700 | Marks enemies she damages; at skill end, 17 SP per marked enemy that fell during the skill |
 | Eunectes | HES-Z | ATK +150, DEF +150 | 3×3 range; SP +1/s with an enemy in range; skill start lures enemies in range to her until it ends; DEF + her ATK gain (max +5000) |
-| Fiammetta | ART-Z | ATK +100, RES +30 | Every skill an ammo skill (18 / 3 / 100); during it ASPD +50, Max HP +100 % |
+| Fiammetta | ART-Z | ATK +100, RES +30 | Every skill an ammo skill (18 / 3 / 100: S1 her attacks, S2 / S3 one shell per ammo); during it ASPD +50, Max HP +100 % |
 | Hellagur | SBL-Z | ATK +150; joins Raid | Per attack: HP +50 and 1 % Sanctuary (80 stacks, kept); per deployment 1 Waxing (max 10): healing received +20 %, ASPD +20, 1 % ATK Corrosion per hit |
 | Phantom | EXE-Z | ATK +100; joins Raid and Indomitable | Raid always treats his skill as ready |
 | Saileach | BEA-Z | HP +200, RES +30 | Block 0, always Invisible; her DP ×2; her player's redeploy timers +50 % faster (+300 % during her skill) |
@@ -71,7 +71,6 @@ those first, then retarget this PR to `main`.
 
 ## Ideas that don't fit the code (yet)
 
-- **Eunectes S1 is a passive skill**, so "lure while the skill is active" never starts with S1.
 - **Choices where the text names no number** (marked `[DRAFT]` in the code):
   - Typhon W's Cold lasts 3 s;
   - Siege drains all DP above 90 every 0.5 s;
@@ -96,7 +95,8 @@ those first, then retarget this PR to `main`.
   - Saileach Z: block 0, Invisible, allied redeploy +50 %;
   - Typhon Z: the balance numbers (+50 % ATK → +25 / +25, the +500 ASPD cap), and in battle +60 % ATK with the
     +100 ASPD ends at +80 / +80; Zuo Le Z doubles a buff, not a debuff;
-  - Zuo Le Z's extra charge; Viviana Z's RES shred stays after she falls.
+  - Zuo Le Z's extra charge; Viviana Z's RES shred stays after she falls;
+  - Fiammetta Z: S2 fires 3 shells and ends, S3's shells spend ammo (both through the `ammoUsed` hook Laterano reads).
 - `test/ui/rules-modz.e2e.test.js` (browser, `SP_E2E=1`): the five tabs, one tab at a time, the 14 buttons, turning
   on two modules updates the room's rules, the tab count and the chip, Typhon W replaces his Z, turning one off. Passed
   here with Chromium.
