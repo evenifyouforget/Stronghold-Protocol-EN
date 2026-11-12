@@ -136,8 +136,31 @@ Seats with Ægir active in 2+ battles of rounds 4–13 (6 human seats, 10 bot se
   bots 22 (08, replayed battles). The visible differences are 歌蕾蒂娅 (a free 斯卡蒂, 幽灵鲨 or 深巡 each prep
   with 3 operators in her row: more members, merges and elites), one more member on the board, and more elites.
   The bots fill with 深巡 instead.
-- Next: why a round of the bots' Ægir gives fewer stacks. Replaying their battles with the stack events logged
-  (devour, 幽灵鲨 knock-outs, 斯卡蒂 kills, the 5-member revives) would split the 31 against 22.
+
+**Where the in-battle Ægir stacks come from** (`untracked/dyy-2026-11/aegir-sources.mjs` → `aegir-sources.md`).
+Every Ægir battle of rounds 7–13 is replayed with each stack gain credited to its source. "Devour" is the bond
+crediting the devourer (it gains the eaten piece's tier); "trait" is the operator's own trait.
+
+| Per Ægir battle | Humans (42 battles) | Bots (59) |
+|---|---|---|
+| All Ægir stacks in battle | 30.6 | 22.4 |
+| 归溟幽灵鲨's trait (+5 when knocked out) | 7.6 | 4.7 |
+| 幽灵鲨's trait (+3 when knocked out) | 3.4 | 3.5 |
+| 斯卡蒂's and 海霓's traits | 4.1 | 4.2 |
+| Devours, all devourers | 13.4 | 10.2 |
+| … of them by a custom operator (甄选干员, 盟约·辅助干员) | 3.5 | 0 |
+| … by 浊心斯卡蒂 | 2.9 | 0.3 |
+| Strategy (band) effects (海霓, 水月 bands) | 1.6 | 0 |
+
+- **About 5 of the 8-stack gap per battle are things bots never have:** custom operators that are Ægir members
+  (3.5) and the bands' Ægir effects (1.6). Bots field no custom operators (bot.js: "bots field none").
+- **归溟幽灵鲨 dies more often on human boards** (+2.9 a battle): +5 per knock-out, and the 5-member revive lets it
+  die twice. Placing it where it's knocked out early is worth stacks.
+- **Devours:** more devours of higher tier on human boards (浊心斯卡蒂 eats a big piece); bots devour more with
+  深巡 and 斯卡蒂. The total from devours is 13.4 against 10.2.
+- **Tactic ideas:** an Ægir custom-operator pick for bots (bigger: bots would need custom operators, the same
+  prerequisite as Fish's Ascalon idea); 归溟幽灵鲨 in front (the knock-outs); 歌蕾蒂娅 kept with her row filled
+  (`plan-commit` `gladiia` does the commit part).
 
 ## Proposed experiments, in order
 
