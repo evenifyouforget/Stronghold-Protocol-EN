@@ -8,7 +8,7 @@
 // Each acts through PlayerState's validated intents only, and stays cheap and deterministic: no RNG draw, no rehearsal,
 // so a profile of them plays the same in the browser.
 import { defineTactic, PASS } from './botTactics.js';
-import { bountyKillChance } from './bot.js';
+import { bountyKillChance, gainCountLayers, acquireLayers } from './bot.js';
 import { freeSlot } from './board.js';
 
 const ok = (fn) => { try { const r = fn(); return !!(r && r.ok); } catch { return false; } };
@@ -725,5 +725,122 @@ export const DIY_PICKS = defineTactic({
   },
 });
 
+/**
+ * Cycling for the economy (fish-edition/ai-players/08 "The economy gap": human seats buy and sell 25.6 operators a game
+ * in the same prep, bots 3.1). Buy an operator whose 获得时 / 售出时 trait pays back more than its net cost (price − sale)
+ * and sell it at once. Legacy's own trade (bot.js tradeOnce) counts layers only, at TRADE_MIN layers per fund; this
+ * counts the economy traits in funds:
+ *   - refresh: a free refresh (普罗旺斯 on gain, 德克萨斯 on sale) is worth the refresh price;
+ *   - gold: SERVER_ONCE_GOLD (能天使 +1 on gain, 泥岩 +2 on sale);
+ *   - recruit: 松果's sale recruits a tier-1 operator (worth its sale, and one more gain);
+ *   - coin: SERVER_GAIN_EQUIP of 盟约之币 (诗怀雅: equipped, it is destroyed for 1 fund);
+ * plus `layerGold` funds per layer the cycle feeds: the deployed round-gain stackers for every operator gained (小满 / 山 / 夕,
+ * bot.js gainCountLayers), the deployed spend stackers for every fund spent (溯光星源, Astgenne the Lightchaser — SERVER_ADD_BOND_ROUND_COIN_COST,
+ * +2 灵巧 / 奥术 per 3 funds; bot.js has no counterpart), and the operator's own 获得时 layer traits on active Alliances
+ * (bot.js acquireLayers). Humans cycle where these engines are deployed (08: 13.4 cycles a round with a spend stacker,
+ * 8.8 with a gain stacker, 0.7 with none); 极简 / 葡萄 (price 1, sale 1) cycle for free. On the economy traits alone a
+ * cycle breaks even at best (a refresh costs 1). 获得时 effects count ×2 under an active
+ * 投资人 (×3 from 100 layers), as the dispatcher runs them (effectsMeta.js investRepeat).
+ * Runs before legacy's buy loop and again with the leftover (spendDown), from `fromRound`, keeping `reserve` funds,
+ * at most `maxPerRound` cycles. An operator the seat already owns a copy of is never cycled (a merge copy).
+ */
+const RECRUIT_GOLD = 1;
+export const CYCLE_ECON = defineTactic({
+  id: 'cycle-econ',
+  describe: 'buy and sell at once the operators whose gain or sale trait pays back more than price − sale (refreshes, funds, recruits, coins, per-gain layers)',
+  params: {
+    fromRound: int(1, 14, 5),
+    minProfit: num(-2, 3, 0),
+    layerGold: num(0, 1, 0.5),
+    reserve: int(0, 20, 2),
+    maxPerRound: int(1, 20, 8),
+    refresh: { type: 'bool', default: true },
+    gold: { type: 'bool', default: true },
+    recruit: { type: 'bool', default: true },
+    coin: { type: 'bool', default: true },
+  },
+  at: {
+    *buyLoopSteps(ctx) {
+      yield* cycleSteps(ctx);
+      return yield* ctx.next();
+    },
+    spendDown(ctx) {
+      const it = cycleSteps(ctx);
+      while (!it.next().done);
+      return ctx.next();
+    },
+  },
+});
+/** The funds one gain-and-sale of chess `id` brings, net of its cost (price − sale); null: not a cycle. */
+export function cycleProfit(m, ps, slot, p) {
+  const gd = gdOf(m, ps);
+  const c = gd.chess(slot.id);
+  if (!c || gd.isGolden(slot.id)) return null;
+  const inv = ps.bonds?.investShip?.active ? ((ps.layers?.investShip || ps.bonds.investShip.layers || 0) >= 100 ? 3 : 2) : 1;
+  const active = (b) => !!ps.bonds?.[b]?.active;
+  let gold = 0;
+  let gains = 1;
+  for (const gid of c.garrisonIds || []) {
+    const g = gd.garrison(gid);
+    if (!g) continue;
+    const onGain = g.eventType === 'SERVER_GAIN', onSale = g.eventType === 'SERVER_CHESS_SOLD';
+    if (!onGain && !onSale) continue;
+    const k = onGain ? inv : 1;
+    const n = Number(g.bb?.count) || 1;
+    if (p.refresh && g.effectKey === 'SERVER_GAIN_FREE_REFRESH_COUNT') gold += k * n * gd.refreshPrice;
+    else if (p.gold && g.effectKey === 'SERVER_ONCE_GOLD') gold += k * n;
+    else if (p.recruit && g.effectKey === 'SERVER_SELL_CHESS_GAIN_SPECIAL_GOODS') { gold += RECRUIT_GOLD; gains += 1; }
+    else if (p.coin && g.effectKey === 'SERVER_GAIN_EQUIP' && gd.item(g.bbStr?.chess)?.giveBondId == null
+      && /1_03_e/.test(String(g.bbStr?.chess))) gold += k * n;
+  }
+  let layers = 0;
+  for (const [b, n] of acquireLayers(m, ps, c)) if (active(b)) layers += inv * n;
+  layers += gains * gainCountLayers(m, ps) + ps.priceOf(slot) * spendLayersPerGold(m, ps);
+  gold += layers * p.layerGold;
+  const net = ps.priceOf(slot) - gd.sellPrice(slot.id);
+  return gold - net;
+}
+/** Layers per fund spent this prep from the deployed spend stackers (SERVER_ADD_BOND_ROUND_COIN_COST), active Alliances only. */
+export function spendLayersPerGold(m, ps) {
+  const gd = gdOf(m, ps);
+  let n = 0;
+  for (const q of ps.board.values()) {
+    if (q.kind !== 'chess') continue;
+    for (const gid of gd.chess(q.id)?.garrisonIds || []) {
+      const g = gd.garrison(gid);
+      if (g?.effectKey !== 'SERVER_ADD_BOND_ROUND_COIN_COST') continue;
+      const per = (Number(g.bb?.layer) || 0) / (Number(g.bb?.count) || 1);
+      for (const b of String(g.bbStr?.bond || '').split(',')) if (ps.bonds?.[b.trim()]?.active) n += per;
+    }
+  }
+  return n;
+}
+function* cycleSteps(ctx) {
+  const { match: m, player: ps, params: p, args: [opts] } = ctx;
+  if (opts?.fillOnly || !ps.isBot || ps.autoplay || m.round < p.fromRound) return;
+  const gd = gdOf(m, ps);
+  if (gd.leftoverKeptBands?.includes(ps.bandId)) return;
+  const done = ps._botCycles?.round === m.round ? ps._botCycles : (ps._botCycles = { round: m.round, n: 0 });
+  for (let guard = 0; guard < 12 && done.n < p.maxPerRound; guard++) {
+    if (freeSlot(ps.hand) < 0) return;
+    const owned = copiesOf(m, ps);
+    let best = -1, bestV = -Infinity;
+    ps.shop.slots.forEach((sl, i) => {
+      if (!sl || sl.sold || sl.kind !== 'chess' || owned.has(gd.baseIdOf(sl.id))) return;
+      if (ps.funds - ps.priceOf(sl) < p.reserve) return;
+      const v = cycleProfit(m, ps, sl, p);
+      if (v != null && v >= p.minProfit && v > bestV) { bestV = v; best = i; }
+    });
+    if (best < 0) return;
+    const before = new Set(ps.allChess().map((q) => q.uid));
+    const id = ps.shop.slots[best].id;
+    if (!ok(() => ps.buy(best))) return;
+    const fresh = ps.allChess().find((q) => !before.has(q.uid) && q.id === id);
+    if (fresh) ok(() => ps.sell(fresh.uid));
+    done.n++;
+    yield;
+  }
+}
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON]);

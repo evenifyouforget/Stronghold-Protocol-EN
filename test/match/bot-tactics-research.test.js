@@ -226,3 +226,23 @@ test('diy-picks fills a bot seat\'s custom operator slots at setup; legacy and a
     } finally { h.m.dispose(); }
   }
 });
+
+test('cycle-econ values a cycle in funds: economy traits break even, engines on the board make it pay', async () => {
+  const { cycleProfit, spendLayersPerGold, CYCLE_ECON } = await import('../../server/match/botTacticsResearch.js');
+  const p = resolveParams(CYCLE_ECON);
+  const h = soloBot({ seed: 3 });
+  try {
+    h.start();
+    const ps = h.m.order[0];
+    const slot = (id) => ({ kind: 'chess', id, basePrice: h.m.gd.chessPrice(id), frozen: false, sold: false });
+    // Provence: a free refresh (1) for price 2 − sale 1; Mudrock: +2 next prep for 3 − 1; Exusiai: +1 for 3 − 1
+    assert.equal(cycleProfit(h.m, ps, slot('chess_char_1_07_a'), p), 0);
+    assert.equal(cycleProfit(h.m, ps, slot('chess_char_4_18_a'), p), 0);
+    assert.equal(cycleProfit(h.m, ps, slot('chess_char_3_01_a'), p), -1);
+    assert.equal(cycleProfit(h.m, ps, slot('chess_char_1_07_a'), { ...p, refresh: false }), -1);
+    assert.equal(spendLayersPerGold(h.m, ps), 0, 'no spend stacker deployed');
+    // under an active Investor a gain trait pays twice
+    ps.bonds = { ...ps.bonds, investShip: { active: true, layers: 0 } };
+    assert.equal(cycleProfit(h.m, ps, slot('chess_char_1_07_a'), p), 1);
+  } finally { h.m.dispose(); }
+});
