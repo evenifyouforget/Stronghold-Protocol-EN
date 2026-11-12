@@ -4,6 +4,20 @@
 
 ## 0.3.4 — Unreleased
 
+### Fish Edition
+
+This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
+
+- SPA-CC balance update (November 2026): every tag level it changes shows "α" after its name in the room's rules, so you can see what changed. The tag texts in all four languages follow the new numbers (#138).
+- Environment: Suffocation 2 / 3 α: operators' SP recovery is −0.4 / −0.6 per second (was −0.5 / −0.8). Level 1 is unchanged (#138).
+- Famiglia: Cleaner 1 α: 3 Famiglia Shadow Silencers in co-op and 2 in solo (was 5), in rounds 10–13, for the player with the fewest Stacks as before. Unending 2 / 3 α include this change. Seasonal 2 / 3 α: the Blood Ledger fills to 300 before an Asset Liquidation (was 200), plus the Cleaner change (#138).
+- Patriot: Undying 2 α: 2 Guerrilla Shieldguards come with Patriot, and in Marching Stance he takes 90 % less Physical and Arts damage from units not blocking him. Skipping him still gives the final Leader +100 % ATK. Undying 3 α: Patriot +200 % HP; in Marching Stance he is immune to Slow, Stun, Bind, Cold, Frozen, Frighten, Sleep, Fear, Levitate and Lure, and never slower than his base speed; he and his escort come again in the final rounds whether he was taken or not (was: only if taken). The 5 Shieldguards and every enemy's +40 % movement speed and +40 ASPD while he lives are gone. Undying 1 is unchanged (#138).
+- Delegation: United 1 α: Degenbrecher, 2 Delegation Shieldbearers and 2 Delegation Centurion Champions (was 5 and 5). Degenbrecher spawns at the start of the round with 100 % HP per living player, and the others keep the round's HP (was: the whole sub-wave 200 %). United 2 / 3 α: her HP is 200 % / 300 % per living player (was: the whole sub-wave 300 % / 500 %), and ATK ×1.5 is hers only. At United 3 α, Momentum Murder's HP gate comes every 15 % of her HP (was 9 %). The Degenbrechers of every field now share one HP bar, so a wiped board no longer leaves one that can never die, and one field's finished Momentum Murder opens the gate on every field (#138).
+- Vengeance: Invincible Blade 2 α: Reid, "Hateful Avenger", gets +50 % ATK, Status Resistance, 40 % less Physical and Arts damage below 50 % HP (was 30 %) and 15 s of invulnerability after reviving; the +150 % HP is gone. Invincible Blade 3 α: one more Reid per 200 Stacks above 200, as before; below 50 % HP he takes 80 % less Physical and Arts damage (was 60 %) and gains +100 ASPD; the status immunities are gone. Invincible Blade 1 is unchanged (#138).
+- Fixed the SPA-CC Delegation, Patriot and Vengeance sub-waves standing still in the Hidden Core: they took the Leader's route, which stands still for 500 s, so United 2's Degenbrecher held the HP pool until the overtime. A sub-wave never takes a Leader's standing route now (#136).
+- Promoted operators and their summons now ignore the 300,000 limit on one hit to the Leader. Damage with no hitting unit (element bursts) is still limited (#136, issue #131).
+- Bots: the `fish-patriot` profile (legacy bots that always take the Patriot card) for testing the Patriot tags; not in any room's list by default (#138).
+
 ### New Operators and Modules (CN 2.7.91)
 
 - Added the Custom Squad Operators Toska, Territoriya and Talulah (the new 6★ of CN 2.7.91): all three skills are selectable, Potential and Development follow the player's settings, and Territoriya comes with the Module "Empty Jars"; all three are Ursus, and since the second half has no Ursus Alliance they count as support Operators under the rules. Toska is the first "trigger-type effect" support (§37.91).
