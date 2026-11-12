@@ -8,7 +8,8 @@
 // and Swire the Elegant Wit are Yan members of those Alliances.
 import { defineTactic, defineProfile, PASS } from './botTactics.js';
 import { freeSlot, parseKey, tileKey, FIELD } from './board.js';
-import { PLAN_ISO, CARRY_ISO, PLAN_ITEMS, listedItemsFirst } from './botTacticsResearch.js';
+import { PLAN_ISO, CARRY_ISO, PLAN_ITEMS, listedItemsFirst, plannedCarry } from './botTacticsResearch.js';
+import { itemSlotFree } from './bot.js';
 
 const DYY = 'band_duyaoy';
 const YAN = 'yanShip';
@@ -173,13 +174,13 @@ export const DYY_FREEZE = defineTactic({
  * Investor repeats it), so every copy of her is an Isomorph. Legacy sells a normal one as she arrives (§37.42
  * sellMorphBringers: the Isomorph stays, she goes back to the pool), so it never clones her.
  * The clones (Fish 2026-11-13: "simple communicator always gives muelsyse since she's the only harmony alliance operator.
- * same with all the other same alliance printers. commercial packaging plan as well. mimic matter should work as well.
- * doctor hologram technically isn't cloning but it gets a similar effect"):
+ * same with all the other same alliance printers. commercial packaging plan as well. mimic matter should work as well"):
  *   - 画卷 (Art): copies the operator on its tile — her, with her elite status;
  *   - 拟态物质: her third copy with 2 normal ones held, else a random operator of her Alliances (her), any tier;
  *   - 简易通讯机 / 寻呼模块 (an offer: she is picked) / 商业包装方案 (one of her Alliances every 8 (elite 7) sales, while it
  *     stays on her): operators of her Alliances up to the shop level, so only from level 6 (she is tier 6);
- *   - 博士投影: promotes her; the next copies of an elite are elite (2 Isomorphs each). Used first.
+ * Not 博士投影: promoting her is no gain, so it brings no Isomorph (Fish: "better to put it on the carry dps",
+ * carry-hologram below).
  * The printers need her own Alliances only: one wearing an Isomorph is not used for them.
  * While fewer than `maxIso` Isomorphs are owned (hand, temp hand, worn) and she is held, this tactic:
  *   - keeps her (`keep: clone`: while a clone item is held or shown, or the packaging plan is on her; `always`);
@@ -196,7 +197,7 @@ const MIMIC = ['chess_item_5_05_e_a', 'chess_item_5_05_e_b'];
 const PRINTERS = ['chess_item_2_06_e_a', 'chess_item_2_06_e_b', 'chess_item_4_01_e_a', 'chess_item_4_01_e_b'];
 const PACKAGING = ['chess_item_5_07_e_a', 'chess_item_5_07_e_b'];
 const HOLOGRAM = ['chess_item_5_06_e_a', 'chess_item_5_06_e_b'];
-const CLONE_ITEMS = Object.freeze([SCROLL, ...MIMIC, ...PRINTERS, ...PACKAGING, ...HOLOGRAM]);
+const CLONE_ITEMS = Object.freeze([SCROLL, ...MIMIC, ...PRINTERS, ...PACKAGING]);
 const isoCount = (gd, ps) => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
   + ps.allChess().flatMap((q) => q.items || []).filter((it) => gd.item(it.id)?.canGiveBond).length;
 const heldMuelsyse = (gd, ps) => ps.allChess().filter((q) => gd.baseIdOf(q.id) === MUELSYSE);
@@ -224,16 +225,10 @@ function herPiece(gd, ps, { morphFree = false } = {}) {
   return all.sort((a, b) => (onBoard.has(b) - onBoard.has(a)) || (gd.isGolden(b.id) - gd.isGolden(a.id)) || a.uid - b.uid)[0] || null;
 }
 
-/** Puts the clone items on her: 博士投影, then the copies (画卷, 拟态物质), then the printers from shop level 6. */
+/** Puts the clone items on her: the copies (画卷, 拟态物质), then the printers from shop level 6. */
 function cloneMuelsyse(m, ps, p) {
   const gd = gdOf(m, ps);
   const stillActive = () => isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
-  // 博士投影 on a normal her (not while an elite is held already)
-  for (const it of loose(ps, HOLOGRAM)) {
-    const her = herPiece(gd, ps);
-    if (!her || gd.isGolden(her.id) || heldMuelsyse(gd, ps).some((q) => gd.isGolden(q.id))) break;
-    ok(() => ps.equip(it.uid, her.uid));
-  }
   for (let guard = 0; guard < 2 && stillActive(); guard++) {
     const scroll = loose(ps, [SCROLL])[0];
     if (!scroll || freeSlot(ps.hand) < 0) break;
@@ -275,7 +270,7 @@ function cloneMuelsyse(m, ps, p) {
 
 export const DYY_MUELSYSE = defineTactic({
   id: 'dyy-muelsyse',
-  describe: 'Du Yaoye: keep 缪尔赛思 and clone her (画卷, 拟态物质, the same-Alliance printers, 博士投影) for more Isomorphs; level 6 for her; then legacy',
+  describe: 'Du Yaoye: keep 缪尔赛思 and clone her (画卷, 拟态物质, the same-Alliance printers) for more Isomorphs; level 6 for her; then legacy',
   params: {
     maxIso: { type: 'int', min: 1, max: 8, default: 6 },
     keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
@@ -310,7 +305,59 @@ export const DYY_MUELSYSE = defineTactic({
   },
 });
 
-export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE]);
+/**
+ * 博士投影 on the carry (Fish 2026-11-13: "better to put it on the carry dps so they don't hit the 300k ceiling": a
+ * promoted operator ignores the 300,000 damage cap, #131). From `fromRound`, a held 博士投影 goes on carry-iso's planned
+ * carry (the operator wearing the Isomorph, else the main damage dealer) while it is a normal operator with a free item
+ * slot; it is kept from legacy's own rule (which takes any deployed normal tier-5+ operator) until then. Any band.
+ * `target` (Fish: "or certain stack generators like executor alter are also a good candidate"): `carry`; `stacker` = the
+ * deployed normal stack generator of highest tier (a trait that adds Alliance layers, "层数+", e.g. 圣约送葬人: Laterano
+ * +7 → +14 per 7 bullets as an elite); `stacker-first` = a stacker if one is deployed, else the carry.
+ * (In this file, not the research list, so the weekend race's pool stays as it was; it moves there after the race.)
+ */
+const STACKS = /层数\+\d/;
+const isStacker = (gd, id) => (gd.chess(id)?.garrisonIds || []).some((gid) => STACKS.test(gd.garrison(gid)?.desc || ''));
+/** The deployed normal stack generator of highest tier that `fits`, or null. */
+function stackerOnBoard(gd, ps, fits) {
+  return [...ps.board.values()].filter((q) => q.kind === 'chess' && isStacker(gd, q.id) && fits(q))
+    .sort((a, b) => (gd.tierOf(b.id) - gd.tierOf(a.id)) || a.uid - b.uid)[0] || null;
+}
+export const CARRY_HOLOGRAM = defineTactic({
+  id: 'carry-hologram',
+  describe: '博士投影 on the planned carry (a promoted operator ignores the damage cap); then legacy',
+  params: {
+    fromRound: { type: 'int', min: 1, max: 14, default: 4 },
+    target: { type: 'choice', choices: ['carry', 'stacker', 'stacker-first'], default: 'carry' },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && loose(ps, HOLOGRAM).length && (!own || own.round === m.round)) {
+        const plan = own?.plan || {};
+        const items = plan.items || {};
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan,
+          items: Object.freeze({ ...items, keep: Object.freeze([...new Set([...(items.keep || []), ...HOLOGRAM])].slice(0, 32)) }) }) };
+      }
+      return ctx.next();
+    },
+    equipItems(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound) {
+        const gd = gdOf(m, ps);
+        const it = loose(ps, HOLOGRAM)[0];
+        const fits = (q) => !!q && !gd.isGolden(q.id) && itemSlotFree(m, ps, q, gd.item(it.id));
+        const stacker = it && p.target !== 'carry' ? stackerOnBoard(gd, ps, fits) : null;
+        const carry = it && p.target !== 'stacker' && !stacker ? plannedCarry(m, ps).carry : null;
+        const to = stacker || (fits(carry) ? carry : null);
+        if (to && ok(() => ps.equip(it.uid, to.uid)) && to === carry) ps._botCarry = carry.uid;
+      }
+      return ctx.next();
+    },
+  },
+});
+
+export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM]);
 
 /** Opt-in: Fish's Du Yaoye list, legacy below. Plays as legacy for every other Strategy. */
 export const DYY_PROFILES = Object.freeze([
@@ -318,5 +365,5 @@ export const DYY_PROFILES = Object.freeze([
   // DYYBot, the draft of step 3 (ai-players/05): the economy list (human schedule), the Isomorph engine (plan-iso from
   // level 5, the Muelsyse clone, the carry), and the stack items (简易通讯机 and co.)
   defineProfile({ id: 'dyybot', tactics: [DYY_MUELSYSE, DYY_SHOP, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } },
-    { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
+    { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, CARRY_HOLOGRAM, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
 ]);

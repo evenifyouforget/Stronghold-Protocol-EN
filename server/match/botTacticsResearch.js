@@ -934,7 +934,7 @@ export function placeCopiers(m, ps) {
 const isIsoItem = (gd, it) => !!gd.item(it?.id)?.canGiveBond;
 const isBondGift = (gd, it) => { const r = gd.item(it?.id); return !!r && !r.canGiveBond && !!r.giveBondId; };
 /** The planned carry: the one already given a carry item (still deployed), else the main damage dealer. */
-function plannedCarry(m, ps) {
+export function plannedCarry(m, ps) {
   const gd = gdOf(m, ps);
   const { carry, focus } = carryAndFocus(m, ps);
   const kept = ps._botCarry != null ? [...ps.board.values()].find((q) => q.uid === ps._botCarry && q.kind === 'chess') : null;

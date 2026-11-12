@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOT_STRATEGIES } from '../../server/match/botStrategies.js';
 import { PASS, profileOf, resolveParams } from '../../server/match/botTactics.js';
-import { DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE } from '../../server/match/botTacticsDyy.js';
+import { DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_MUELSYSE, CARRY_HOLOGRAM } from '../../server/match/botTacticsDyy.js';
 import { makeMatch, checkInvariants } from './harness.js';
 
 const YAN_T1 = 'chess_char_1_03_a'; // 惊蛰 / Leizi: 炎, tier 1
@@ -125,7 +125,7 @@ test('dyy-muelsyse: keeps 缪尔赛思 while a 画卷 is held, copies her with i
   assert.equal(ps._botSelf, null, 'at maxIso: no plan written');
 });
 
-test('dyy-muelsyse: 拟态物质 and, from shop level 6, 简易通讯机 print her again (her only Alliance); 博士投影 promotes her first', () => {
+test('dyy-muelsyse: 拟态物质 and, from shop level 6, 简易通讯机 print her again (her only Alliance); 博士投影 is not for her', () => {
   const { m, ps } = prep({ round: 10, funds: 80 });
   const gd = m.gd;
   const isos = () => [...ps.hand, ...ps.temp].filter((q) => q && q.kind === 'item' && gd.item(q.id)?.canGiveBond).length
@@ -137,9 +137,36 @@ test('dyy-muelsyse: 拟态物质 and, from shop level 6, 简易通讯机 print h
   for (const id of ['chess_item_5_06_e_b', 'chess_item_5_05_e_a', 'chess_item_2_06_e_a']) assert.ok(ps.acquireItem(id, { source: 'test', requirePool: false }), id);
   const iso0 = isos();
   DYY_MUELSYSE.at.equipItems(ctxOf(DYY_MUELSYSE, m, ps));
-  assert.ok(mus().some((q) => gd.isGolden(q.id)), 'promoted');
-  assert.ok(mus().length >= 3, `printed twice: ${mus().map((q) => q.id)}`);
+  assert.ok(mus().length >= 3 || mus().some((q) => gd.isGolden(q.id)), `printed twice (3 copies merge): ${mus().map((q) => q.id)}`);
   assert.ok(isos() >= iso0 + 2, `${iso0} → ${isos()} Isomorphs`);
-  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item' && ['chess_item_5_05_e_a', 'chess_item_2_06_e_a', 'chess_item_5_06_e_b'].includes(q.id)).length, 0, 'all used');
+  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.kind === 'item' && ['chess_item_5_05_e_a', 'chess_item_2_06_e_a'].includes(q.id)).length, 0, 'both used');
+  assert.equal([...ps.hand, ...ps.temp].filter((q) => q?.id === 'chess_item_5_06_e_b').length, 1, 'the 博士投影 stays');
   checkInvariants(m);
+});
+
+test('carry-hologram: 博士投影 on the planned carry, or (target stacker) on a deployed stack generator like 圣约送葬人', async () => {
+  const { tileKey, inField } = await import('../../server/match/board.js');
+  for (const target of ['carry', 'stacker']) {
+    const { m, ps } = prep({ round: 8, funds: 30 });
+    try {
+      const gd = m.gd;
+      for (const [k] of [...ps.board]) ps.board.delete(k);
+      const exe = ps.newPiece('chess', 'chess_char_5_01_a'), dusk = ps.newPiece('chess', 'chess_char_5_12_a');
+      const tiles = [];
+      for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(exe, r, c) && ps._legal(dusk, r, c)) tiles.push([r, c]);
+      ps.board.set(tileKey(...tiles[0]), exe);
+      ps.board.set(tileKey(...tiles[tiles.length - 1]), dusk);
+      ps.recompute();
+      ps._botCarry = dusk.uid;
+      assert.ok(ps.acquireItem('chess_item_5_06_e_b', { source: 'test', requirePool: false }));
+      const params = { ...resolveParams(CARRY_HOLOGRAM), target };
+      CARRY_HOLOGRAM.at.sellJunk({ ...ctxOf(CARRY_HOLOGRAM, m, ps), params });
+      assert.ok(ps._botSelf.plan.items.keep.includes('chess_item_5_06_e_b'), 'kept from legacy');
+      CARRY_HOLOGRAM.at.equipItems({ ...ctxOf(CARRY_HOLOGRAM, m, ps), params });
+      const promoted = target === 'carry' ? dusk : exe, other = target === 'carry' ? exe : dusk;
+      assert.ok(gd.isGolden(promoted.id), `${target}: ${promoted.id} promoted`);
+      assert.ok(!gd.isGolden(other.id), `${target}: ${other.id} not`);
+      checkInvariants(m);
+    } finally { m.dispose(); }
+  }
 });
