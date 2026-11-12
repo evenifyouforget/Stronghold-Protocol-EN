@@ -36,6 +36,8 @@ export const DECISION_POINTS = Object.freeze({
   maybeFreeze: Object.freeze({ slot: 'economy' }),
   equipItems: Object.freeze({ slot: 'economy' }),
   arrangeSteps: Object.freeze({ slot: 'placement', gen: true }),
+  // (fork) after the rehearsed layout is on the board, before the temporary hand is resolved (botPrep.js prepEnd)
+  finishLayout: Object.freeze({ slot: 'placement' }),
 });
 
 const ID = /^[a-z][a-z0-9-]*$/;

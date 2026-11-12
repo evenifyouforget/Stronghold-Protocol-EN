@@ -9,7 +9,7 @@
 // so a profile of them plays the same in the browser.
 import { defineTactic, PASS } from './botTactics.js';
 import { bountyKillChance, gainCountLayers, acquireLayers } from './bot.js';
-import { freeSlot } from './board.js';
+import { freeSlot, parseKey, tileKey, inField, pieceDir } from './board.js';
 
 const ok = (fn) => { try { const r = fn(); return !!(r && r.ok); } catch { return false; } };
 const gdOf = (m, ps) => ps.gd || m.gd;
@@ -842,5 +842,63 @@ function* cycleSteps(ctx) {
   }
 }
 
+/**
+ * The copy combos, placed (fish-edition/ai-players/08): a copier takes the trait of the piece in front of it — 白面鸮
+ * Ptilopsis (SERVER_FRONT_SAME_EFFECT_PREP_START) a 进入休整期时 one, 塞雷娅 Saria (…_PREP_FIN) a 休整期结束时 one. Bots
+ * that own both rarely put the copier behind the partner (records: Ptilopsis 2–5 % of her battles, Saria 15–25 %;
+ * humans about half), and legacy-arrange's prep tie-break does not change that: the rehearsal can't see a copied
+ * prep-time trait. So after the rehearsed layout is on the board (finishLayout), each deployed copier with no partner in
+ * front moves onto the tile behind a deployed partner (facing it), swapping with that tile's piece if needed — never
+ * breaking another copier's pair. From `fromRound`; in the final boss rounds only with `boss`.
+ */
+const COPY_EVENTS = Object.freeze({ SERVER_FRONT_SAME_EFFECT_PREP_START: 'SERVER_PREP_START', SERVER_FRONT_SAME_EFFECT_PREP_FIN: 'SERVER_PREP_FIN' });
+const DIRS = Object.freeze({ UP: [-1, 0], RIGHT: [0, 1], DOWN: [1, 0], LEFT: [0, -1] });
+export const PLACE_COPIERS = defineTactic({
+  id: 'place-copiers',
+  describe: 'after the rehearsed layout, moves Ptilopsis / Saria behind a deployed piece whose prep trait they copy',
+  params: { fromRound: int(1, 14, 4), boss: { type: 'bool', default: false } },
+  at: {
+    finishLayout(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && (p.boss || m.wave)) placeCopiers(m, ps);
+      return ctx.next();
+    },
+  },
+});
+/** The prep event a piece's trait copies (a copier), or null. */
+function copiedEvent(gd, id) {
+  for (const gid of gd.chess(id)?.garrisonIds || []) { const e = COPY_EVENTS[gd.garrison(gid)?.effectKey]; if (e) return e; }
+  return null;
+}
+const hasEvent = (gd, id, ev) => (gd.chess(id)?.garrisonIds || []).some((gid) => {
+  const g = gd.garrison(gid);
+  return g && g.eventType === ev && !COPY_EVENTS[g.effectKey];
+});
+export function placeCopiers(m, ps) {
+  const gd = gdOf(m, ps);
+  const front = (key, dir) => { const [r, c] = parseKey(key); const [dr, dc] = DIRS[dir] || [0, 0]; return tileKey(r + dr, c + dc); };
+  const pieces = () => [...ps.board.entries()].filter(([, q]) => q.kind === 'chess');
+  const paired = (key, q, ev) => { const f = ps.board.get(front(key, pieceDir(q))); return !!f && f.kind === 'chess' && hasEvent(gd, f.id, ev); };
+  let moved = 0;
+  for (const [key, q] of pieces()) {
+    const ev = copiedEvent(gd, q.id);
+    if (!ev || paired(key, q, ev)) continue;
+    // tiles whose occupant must stay: every partner, and every copier already paired
+    const keep = new Set(pieces().filter(([k, x]) => hasEvent(gd, x.id, ev) || (copiedEvent(gd, x.id) && paired(k, x, copiedEvent(gd, x.id)))).map(([k]) => k));
+    let done = false;
+    for (const [pk, partner] of pieces()) {
+      if (done || partner === q || !hasEvent(gd, partner.id, ev)) continue;
+      const [pr, pc] = parseKey(pk);
+      for (const dir of [pieceDir(q), ...Object.keys(DIRS).filter((d) => d !== pieceDir(q))]) {
+        const [dr, dc] = DIRS[dir];
+        const tr = pr - dr, tc = pc - dc, tk = tileKey(tr, tc);
+        if (!inField(tr, tc) || (keep.has(tk) && tk !== key)) continue;
+        if (ok(() => ps.move(q.uid, { area: 'board', row: tr, col: tc }, dir))) { moved++; done = true; break; }
+      }
+    }
+  }
+  return moved;
+}
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS]);

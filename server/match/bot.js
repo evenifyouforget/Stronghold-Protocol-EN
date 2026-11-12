@@ -4790,6 +4790,8 @@ export function withLegacyTunables(t, fn) {
 export const LEGACY_PREP_ACTIONS = Object.freeze({
   takeOffers, sellJunk, buyLoopSteps, levelUp, planSpendSteps, spendDown, maybeFreeze, arrangeSteps, equipItems,
   applyPlanSteps, resolveTemp, freeHandSlot, rememberOwned,
+  // (fork) a tactics decision point after the rehearsed layout is on the board (botPrep.js prepEnd); legacy: nothing
+  finishLayout: () => {},
   hasHandRoom: (ps) => freeSlot(ps.hand) >= 0,
   ready: (ps) => tryDo(() => ps.setReady(true)),
 });

@@ -246,3 +246,33 @@ test('cycle-econ values a cycle in funds: economy traits break even, engines on 
     assert.equal(cycleProfit(h.m, ps, slot('chess_char_1_07_a'), p), 1);
   } finally { h.m.dispose(); }
 });
+
+test('place-copiers moves Ptilopsis onto the tile behind a deployed prep-start partner, facing it', async () => {
+  const { placeCopiers } = await import('../../server/match/botTacticsResearch.js');
+  const { tileKey, parseKey, pieceDir, inField } = await import('../../server/match/board.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(2);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const copier = ps.newPiece('chess', 'chess_char_4_21_a'), partner = ps.newPiece('chess', 'chess_char_2_02_a');
+    // two tiles where both may stand: the partner's with a free legal tile beside it, and a far one for the copier
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(copier, r, c) && ps._legal(partner, r, c)) tiles.push([r, c]);
+    const near = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
+    const P = tiles.find((t) => tiles.some((u) => near(t, u)));
+    const far = tiles.find((t) => Math.abs(t[0] - P[0]) + Math.abs(t[1] - P[1]) > 2);
+    assert.ok(P && far, 'the deploy map has the tiles');
+    ps.board.set(tileKey(...P), partner);
+    copier.dir = 'RIGHT';
+    ps.board.set(tileKey(...far), copier);
+    ps.recompute();
+    assert.equal(placeCopiers(h.m, ps), 1);
+    const at = [...ps.board].find(([, q]) => q === copier)[0];
+    const [r, c] = parseKey(at), d = { UP: [-1, 0], RIGHT: [0, 1], DOWN: [1, 0], LEFT: [0, -1] }[pieceDir(copier)];
+    assert.equal(tileKey(r + d[0], c + d[1]), tileKey(...P), 'the partner is in front');
+    assert.equal(placeCopiers(h.m, ps), 0, 'already paired: no move');
+  } finally { h.m.dispose(); }
+});
