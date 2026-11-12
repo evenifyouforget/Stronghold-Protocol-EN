@@ -319,6 +319,105 @@ export const PLAN_ENGINES = defineTactic({
   },
 });
 
+/**
+ * Writes legacy's own plan, like plan-engines, for the trait combos the high-stacking humans build
+ * (fish-edition/ai-players/08, "What the 200+ humans do differently"): a copier behind a stacker, both bought and kept.
+ * Legacy places a copier behind its partner already (§37.37 positionTraitsOf `copy` / `trigger`); what it misses is
+ * owning both halves (its buy score values each operator alone). Kinds, from the trait data:
+ *   - start: SERVER_FRONT_SAME_EFFECT_PREP_START (白面鸮) behind a prep-start stacker (空弦 …): humans 59 % of 白面鸮's
+ *     battles, bots 6 %;
+ *   - fin: SERVER_FRONT_SAME_EFFECT_PREP_FIN (塞雷娅) behind a prep-end stacker (断崖, 山, 夕 …): humans 60 %, bots 0 %;
+ *   - gain: SERVER_TRIGGER_ANOTHER of the front piece's SERVER_GAIN (铃兰) behind an on-obtain stacker (烛煌 …).
+ * A stacker: a trait of that event whose effect adds stacks (an effectKey with ADD_BOND) and is strong (a position one, a
+ * per-event engine, or +3 or more at once: not 刺玫's +1); the position stackers first.
+ * Each prep from `fromRound` to `toRound`: a kind with one half owned puts the other half into the plan's `buy`; while
+ * fewer than `max` kinds are complete and none is started, both halves of every kind go in (whatever the shop shows
+ * first starts a pair). The owned halves of a started kind go into `keep` (+18 in the lineup, bench and sale scores).
+ * `laterano`: 圣约送葬人 (Laterano +7 / Foresight +3 per 7 bullets in battle; humans 23 % of battles, bots 3 %) is
+ * bought and kept once 2 Laterano operators are owned. Data only, never an action.
+ */
+function comboRoles(m) {
+  if (m._tacticCombos) return m._tacticCombos;
+  const gd = m.gd;
+  const roles = { start: { copier: [], partner: [], pos: [] }, fin: { copier: [], partner: [], pos: [] }, gain: { copier: [], partner: [], pos: [] } };
+  const EV = { start: 'SERVER_PREP_START', fin: 'SERVER_PREP_FIN', gain: 'SERVER_GAIN' };
+  for (const id of m.pool?.entries?.keys?.() || []) {
+    const c = gd.chess(id);
+    if (!c || gd.isGolden(id) || c.isHidden) continue;
+    for (const gid of c.garrisonIds || []) {
+      const g = gd.garrison(gid);
+      if (!g) continue;
+      if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_START') roles.start.copier.push(id);
+      else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_FIN') roles.fin.copier.push(id);
+      else if (g.effectKey === 'SERVER_TRIGGER_ANOTHER' && g.bbStr?.event === 'SERVER_GAIN') roles.gain.copier.push(id);
+      for (const k of Object.keys(EV)) {
+        if (g.eventType !== EV[k] || !/ADD_BOND/.test(g.effectKey || '')) continue;
+        // a strong stacker only: a position one, a per-event engine (add_method), or +3 or more at once (not 刺玫's +1)
+        const strong = g.effectKey === 'SERVER_ADD_BOND_POSITION' || !!g.bbStr?.add_method
+          || Math.max(Number(g.bb?.count) || 0, ...String(g.bbStr?.count || '').split(',').map(Number).filter(Number.isFinite)) >= 3;
+        if (!strong) continue;
+        (g.effectKey === 'SERVER_ADD_BOND_POSITION' ? roles[k].pos : roles[k].partner).push(id);
+      }
+    }
+  }
+  const fz = (xs) => Object.freeze([...new Set(xs)].sort());
+  for (const r of Object.values(roles)) { r.copier = fz(r.copier); r.pos = fz(r.pos); r.partner = fz([...r.pos, ...r.partner]); }
+  const executor = [...(m.pool?.entries?.keys?.() || [])].find((id) => gd.baseIdOf(id) === 'chess_char_5_01_a' && !gd.isGolden(id)) || null;
+  return (m._tacticCombos = Object.freeze({ roles, executor }));
+}
+const COMBO_KINDS = Object.freeze(['start', 'fin', 'gain']);
+export const PLAN_COMBOS = defineTactic({
+  id: 'plan-combos',
+  describe: "writes legacy's plan: buys and keeps both halves of a trait combo (白面鸮 behind 空弦, 塞雷娅 behind 断崖 …) and 圣约送葬人 on Laterano boards",
+  params: {
+    fromRound: int(1, 14, 4),
+    toRound: int(1, 14, 12),
+    max: int(1, 3, 1),
+    start: { type: 'bool', default: true },
+    fin: { type: 'bool', default: true },
+    gain: { type: 'bool', default: false },
+    laterano: { type: 'bool', default: true },
+  },
+  at: {
+    sellJunk(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      const own = ps._botSelf;
+      if (m.round >= p.fromRound && m.round <= p.toRound && ps.isBot && !ps.autoplay && (!own || own.round === m.round)) {
+        const gd = ps.gd || m.gd;
+        const { roles, executor } = comboRoles(m);
+        const ownedBases = new Set(ps.allChess().map((q) => gd.baseIdOf(q.id)));
+        const has = (ids) => ids.filter((id) => ownedBases.has(gd.baseIdOf(id)));
+        const shows = (id) => (gd.chess(id)?.tier || 9) <= ps.shop.level;
+        const buy = [], keepBases = new Set();
+        const kinds = COMBO_KINDS.filter((k) => p[k] && roles[k].copier.length && roles[k].partner.length);
+        let complete = 0, started = 0;
+        for (const k of kinds) {
+          const c = has(roles[k].copier), q = has(roles[k].partner);
+          if (c.length && q.length) complete++;
+          else if (c.length || q.length) started++;
+        }
+        for (const k of kinds) {
+          const r = roles[k], c = has(r.copier), q = has(r.partner);
+          if (c.length || q.length) for (const id of [...c, ...q]) keepBases.add(gd.baseIdOf(id));
+          if (c.length && q.length) { buy.push(...c, ...q); continue; } // copies to merge
+          if (c.length) buy.push(...c, ...(r.pos.length ? r.pos : r.partner));
+          else if (q.length && complete < p.max) buy.push(...q, ...r.copier);
+          else if (!started && complete < p.max) buy.push(...r.copier, ...(r.pos.length ? r.pos : r.partner));
+        }
+        if (p.laterano && executor) {
+          const lat = ps.allChess().filter((x) => gd.chess(x.id)?.bonds?.includes('lateranoShip')).length;
+          if (lat >= 2 || ownedBases.has(gd.baseIdOf(executor))) { buy.push(executor); keepBases.add(gd.baseIdOf(executor)); }
+        }
+        const keep = ps.allChess().filter((x) => keepBases.has(gd.baseIdOf(x.id))).map((x) => x.id);
+        const plan = own?.plan || {};
+        const merge = (a, b) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, 32));
+        ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, buy: merge(plan.buy, buy.filter(shows)), keep: merge(plan.keep, keep) }) };
+      }
+      return ctx.next();
+    },
+  },
+});
+
 /** The plan's listed shop items (items.buy) the shop shows, bought before legacy's buy loop (above params.reserve). */
 function* listedItemsFirst(ctx) {
   const { match: m, player: ps, params: p, args: [opts] } = ctx;
@@ -458,4 +557,4 @@ export const PLAN_ISO = defineTactic({
 });
 
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS]);

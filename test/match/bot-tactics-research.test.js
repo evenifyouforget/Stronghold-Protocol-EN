@@ -143,3 +143,35 @@ test("plan-iso lists 缪尔赛思 and the Isomorph from its shop level, then the
   const full = run(6, { hand: Array.from({ length: 6 }, (_, i) => ({ ...iso, uid: 60 + i })) });
   assert.deepEqual([full.buy, full.items.buy], [[], []], 'maxIso reached: 缪尔赛思 and the Isomorph no longer listed');
 });
+
+test('plan-combos buys and keeps both halves of a trait combo, then 圣约送葬人 on a Laterano board', async () => {
+  const { PLAN_COMBOS } = await import('../../server/match/botTacticsResearch.js');
+  const h = soloBot({ seed: 3 });
+  h.start();
+  const m = h.m;
+  const params = { fromRound: 4, toRound: 12, max: 1, start: true, fin: true, gain: false, laterano: true };
+  const pool = { entries: new Map(m.gd.visibleChess.map((id) => [id, {}])) };
+  const fm = { pool, gd: m.gd };
+  const run = (round, level, owned = []) => {
+    const fake = { isBot: true, autoplay: false, _botSelf: { round, plan: Object.freeze({ bonds: [] }) }, gd: m.gd,
+      shop: { level }, allChess: () => owned.map((id, i) => ({ uid: 900 + i, id })) };
+    PLAN_COMBOS.at.sellJunk({ match: { ...fm, round }, player: fake, params, next: () => 'legacy' });
+    return fake._botSelf.plan;
+  };
+  const OWL = 'chess_char_4_21_a', KONGXIAN = 'chess_char_3_21_a', SARIA = 'chess_char_5_11_a', DUANYA = 'chess_char_3_02_a';
+  const empty = run(6, 6);
+  for (const id of [OWL, KONGXIAN, SARIA, DUANYA]) assert.ok(empty.buy.includes(id), `${id}: both halves while nothing is started`);
+  assert.ok(!empty.buy.includes('chess_char_1_06_a'), '刺玫 (+1) is no partner');
+  const half = run(6, 6, ['chess_char_3_21_b']);
+  assert.ok(half.buy.includes(OWL), '空弦 owned: its copier 白面鸮 is bought');
+  assert.ok(!half.buy.includes(SARIA), 'one kind started: no second kind');
+  assert.deepEqual(half.keep, ['chess_char_3_21_b']);
+  const done = run(6, 6, [OWL, KONGXIAN]);
+  assert.ok(!done.buy.includes(SARIA) && !done.buy.includes(DUANYA), 'max 1 complete: no new kind');
+  assert.deepEqual([...done.keep].sort(), [KONGXIAN, OWL].sort());
+  assert.ok(!run(6, 4).buy.includes(SARIA), 'above the shop level: not listed');
+  const lat = run(8, 6, [KONGXIAN, 'chess_char_3_01_a']);
+  assert.ok(lat.buy.includes('chess_char_5_01_a'), '2 Laterano owned: 圣约送葬人 is bought');
+  assert.equal(run(3, 6).buy, undefined, 'before fromRound: untouched');
+  assert.ok(TACTICS['plan-combos'], 'registered');
+});
