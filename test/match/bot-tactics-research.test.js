@@ -336,3 +336,34 @@ test('buy-minimalist buys every Minimalist shown; cycle sells him back at once, 
     assert.equal(count(), 2, 'merge: a pair kept');
   } finally { h.m.dispose(); }
 });
+
+test('place-ammo moves Mostima next to a deployed ammo user, keeping her facing', async () => {
+  const { placeAmmo } = await import('../../server/match/botTacticsResearch.js');
+  const { tileKey, parseKey, inField } = await import('../../server/match/board.js');
+  const h = soloBot({ seed: 5 });
+  try {
+    h.start();
+    h.toPrep(2);
+    const ps = h.m.order[0];
+    ps.ready = false;
+    for (const [k] of [...ps.board]) ps.board.delete(k);
+    const most = ps.newPiece('chess', 'chess_char_4_02_a'), gun = ps.newPiece('chess', 'chess_char_4_01_a');
+    assert.equal(h.m.gd.chess(gun.id).skill.durationType, 'AMMO');
+    const tiles = [];
+    for (let r = -5; r <= 20; r++) for (let c = -5; c <= 20; c++) if (inField(r, c) && ps._legal(most, r, c) && ps._legal(gun, r, c)) tiles.push([r, c]);
+    const near = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) === 1;
+    const G = tiles.find((t) => tiles.some((u) => near(t, u)));
+    const far = tiles.find((t) => Math.abs(t[0] - G[0]) + Math.abs(t[1] - G[1]) > 2);
+    assert.ok(G && far, 'the deploy map has the tiles');
+    ps.board.set(tileKey(...G), gun);
+    most.dir = 'LEFT';
+    ps.board.set(tileKey(...far), most);
+    ps.recompute();
+    assert.equal(placeAmmo(h.m, ps), 1);
+    const at = parseKey([...ps.board].find(([, q]) => q === most)[0]);
+    assert.ok(near(at, G), 'next to the ammo user');
+    assert.equal(ps.board.get(tileKey(...G)), gun, 'the ammo user stays');
+    assert.equal((await import('../../server/match/board.js')).pieceDir(most), 'LEFT', 'facing kept');
+    assert.equal(placeAmmo(h.m, ps), 0, 'already beside one: no move');
+  } finally { h.m.dispose(); }
+});

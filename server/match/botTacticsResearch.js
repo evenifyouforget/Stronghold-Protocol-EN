@@ -1018,5 +1018,56 @@ export const BUY_MINIMALIST = defineTactic({
   },
 });
 
+/**
+ * Mostima next to an ammo user (Fish's TODO "Laterano specific: put Mostima next to an ammo user"). Her trait (ADD_BOND
+ * act1autochess_gar_event_consume_ammo, range x-5) adds Laterano stacks for the bullets spent by the operators on the four
+ * tiles next to her; legacy's layout scores position traits but not this battle-time one. After the rehearsed layout
+ * (finishLayout), each deployed piece with such a trait and no ammo user (selected skill durationType AMMO) beside it
+ * moves to the free or swappable tile beside the most ammo users, keeping its facing. A tile whose piece has an ammo
+ * skill or such a trait itself is never taken. From `fromRound`; in the final boss rounds only with `boss`.
+ */
+const AMMO_EVENT = 'act1autochess_gar_event_consume_ammo';
+export const PLACE_AMMO = defineTactic({
+  id: 'place-ammo',
+  describe: 'after the rehearsed layout, moves Mostima next to the operators with ammo skills',
+  params: { fromRound: int(1, 14, 4), boss: { type: 'bool', default: false } },
+  at: {
+    finishLayout(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && (p.boss || m.wave)) placeAmmo(m, ps);
+      return ctx.next();
+    },
+  },
+});
+const usesAmmo = (gd, id) => gd.chess(id)?.skill?.durationType === 'AMMO';
+const countsAmmo = (gd, id) => (gd.chess(id)?.garrisonIds || []).some((gid) => {
+  const g = gd.garrison(gid);
+  return g?.bbStr?.key === AMMO_EVENT && g.bbStr.range_id === 'x-5';
+});
+export function placeAmmo(m, ps) {
+  const gd = gdOf(m, ps);
+  const near = (k) => { const [r, c] = parseKey(k); return Object.values(DIRS).map(([dr, dc]) => tileKey(r + dr, c + dc)); };
+  const users = (k, self) => near(k).filter((t) => { const q = ps.board.get(t); return q && q !== self && q.kind === 'chess' && usesAmmo(gd, q.id); }).length;
+  let moved = 0;
+  for (const [key, q] of [...ps.board.entries()]) {
+    if (q.kind !== 'chess' || !countsAmmo(gd, q.id) || users(key, q) > 0) continue;
+    const cands = new Map();
+    for (const [uk, u] of ps.board.entries()) {
+      if (u.kind !== 'chess' || !usesAmmo(gd, u.id)) continue;
+      for (const t of near(uk)) {
+        const [r, c] = parseKey(t), o = ps.board.get(t);
+        if (!inField(r, c) || (o && (o.kind !== 'chess' || usesAmmo(gd, o.id) || countsAmmo(gd, o.id)))) continue;
+        cands.set(t, users(t, q));
+      }
+    }
+    const order = [...cands].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1));
+    for (const [t] of order) {
+      const [r, c] = parseKey(t);
+      if (ok(() => ps.move(q.uid, { area: 'board', row: r, col: c }, pieceDir(q)))) { moved++; break; }
+    }
+  }
+  return moved;
+}
+
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST, PLACE_AMMO]);
