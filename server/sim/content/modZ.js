@@ -205,7 +205,8 @@ const INSTALL = {
   },
 
   // while she lives, every enemy's weight −2; her damage to an enemy not in an element burst becomes Corrosion; per
-  // +10 % ATK (99 at most): SP +0.02/s [DRAFT: the cannon's redeploy −1 % per step is not wired — no cannon timer hook]
+  // +10 % ATK (99 at most): SP +0.02/s and the Water Cannon's redeploy time −1 % (kits/ops/op-weedy.js reads
+  // `fishCannonRedeployMul` when the cannon leaves) [DRAFT: the ATK at that moment counts]
   uniequip_fishz_weedy(battle, u) {
     battle.every(0.5, () => {
       if (!u.alive || !u.deployed) return;
@@ -216,7 +217,10 @@ const INSTALL = {
       c.dmg.cancel = true;
       battle.dealElementDamage({ source: u, target: c.target, element: 'erosion', amount: c.dmg.amount, tags: ['module'] });
     }, { owner: u, priority: -10 });
-    spTime(battle, u, () => (up(u) && !skillBusy(u) ? 0.02 * Math.min(99, Math.floor(atkGain(u) * 10)) : 0));
+    const steps = () => Math.min(99, Math.floor(atkGain(u) * 10 + 1e-9));
+    spTime(battle, u, () => (up(u) && !skillBusy(u) ? 0.02 * steps() : 0));
+    u.fishCannonRedeployMul = 1;
+    battle.on('tick', () => { if (up(u)) u.fishCannonRedeployMul = 1 - 0.01 * steps(); }, { owner: u });
   },
 };
 
