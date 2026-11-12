@@ -310,19 +310,26 @@ Isomorph she brought stays, she goes back to the pool). So no Muelsyse is held w
 - 拟态物质: her third copy with 2 normal ones held, else a random operator of her Alliances (only her); any level.
 - 简易通讯机, 寻呼模块 (an offer; she is picked), 商业包装方案 (a copy every 8 sales while it stays on her): operators of
   her Alliances, but only up to the shop level, so only from level 6 (she is tier 6).
-- 博士投影: promotes her in place. That is not a gain (no Isomorph), but every later copy of an elite is elite: 2
-  Isomorphs each. Used first.
+- Not 博士投影: it promotes her in place, which is no gain, so no Isomorph. Fish: "better to put it on the carry dps so
+  they don't hit the 300k ceiling" (a promoted operator ignores the cap since #131), "or certain stack generators like
+  executor alter" (an elite 圣约送葬人 gives Laterano +14 per 7 bullets instead of +7).
 
-`dyy-muelsyse` (`server/match/botTacticsDyy.js`, 473851a7; c2b1b386 had 画卷 only): while fewer than `maxIso` (6)
+`dyy-muelsyse` (`server/match/botTacticsDyy.js`, a0bd1b85; c2b1b386 had 画卷 only): while fewer than `maxIso` (6)
 Isomorphs are owned and a Muelsyse is held:
 - keeps her (`keep: clone`: while a clone item is held or shown, or the packaging plan is on her; `always`);
 - lists the clone items for buying and keeps them from legacy's own item rules;
-- uses them on her: 博士投影, 画卷 (moving her onto the board first if needed), 拟态物质, then from level 6 the printers;
+- uses them on her: 画卷 (moving her onto the board first if needed), 拟态物质, then from level 6 the printers;
   the printers only on a Muelsyse without an Isomorph (it would add another Alliance to roll from);
 - levels to 6 by Fish's rule (`level6: clone`: she is held and a clone item is held or shown; `held`; `off`).
 From 6 Isomorphs on it stops, and legacy sells her and uses the items its own way.
 
+`carry-hologram` (same file, any band): from round 4, a held 博士投影 goes on carry-iso's planned carry (`target:
+carry`), on the deployed normal stack generator of highest tier (`stacker`: a trait with "层数+"), or a stacker first
+(`stacker-first`); until then it's kept from legacy's own rule (any deployed normal tier-5+ operator). It sits in the
+DYY file, not the research list, so the weekend race's pool is unchanged; it moves after the race. Note: the plan
+branch doesn't have #131 yet (it's on main), so in its benches a promoted carry is still capped.
+
 **`dyybot`** (the step-3 draft): dyy-muelsyse, dyy-shop, dyy-freeze, dyy-level (`human`), plan-iso from shop level 5,
-carry-iso, plan-items (stack items: 简易通讯机 and co.). Queue21: solo Ultimate, Du Yaoye forced, seeds 1–160, against
+carry-iso, carry-hologram, plan-items (stack items: 简易通讯机 and co.). Queue21: solo Ultimate, Du Yaoye forced, seeds 1–160, against
 the baseline above; `dyybot` without dyy-muelsyse; and the scenario `mu-scroll` (Muelsyse and a 画卷 at round 9, a
 second 画卷 at round 11), legacy against dyybot, seeds 1–80.
