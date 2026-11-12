@@ -189,7 +189,8 @@ export const DYY_FREEZE = defineTactic({
  *   - levels to 6 (`level6`): `clone` = Fish's rule (she is held and a clone item is held or shown), `held` = she is held,
  *     `off` = never. Tier 6 only shows from shop level 6; legacy stops at 5.
  * From maxIso on, it does nothing: legacy sells her and uses the items its own way.
- * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics.
+ * `dyyOnly` (default): only for a 杜遥夜 seat, like the other dyy tactics. `scroll: false` leaves 画卷 to legacy (which copies
+ * its most valuable operator: queue21's scenario, Muelsyse + 画卷 at round 9, took legacy from 7 to 19 wins of 80).
  */
 const MUELSYSE = 'chess_char_6_11_a';
 const SCROLL = 'chess_item_6_02_m';
@@ -210,11 +211,12 @@ function muelsyseActive(m, ps, p) {
   const gd = gdOf(m, ps);
   return isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
 }
-const cloneSource = (ps) => loose(ps, CLONE_ITEMS).length > 0 || shopShows(ps, CLONE_ITEMS);
+const clonesOf = (p) => (p.scroll ? CLONE_ITEMS : CLONE_ITEMS.filter((id) => id !== SCROLL));
+const cloneSource = (ps, p) => loose(ps, clonesOf(p)).length > 0 || shopShows(ps, clonesOf(p));
 
 function muelsyseLevel(m, ps, p) {
   if (p.level6 === 'off' || ps.shop.level !== 5 || !muelsyseActive(m, ps, p)) return;
-  if (p.level6 === 'clone' && !cloneSource(ps)) return;
+  if (p.level6 === 'clone' && !cloneSource(ps, p)) return;
   ok(() => ps.levelUp());
 }
 
@@ -229,7 +231,7 @@ function herPiece(gd, ps, { morphFree = false } = {}) {
 function cloneMuelsyse(m, ps, p) {
   const gd = gdOf(m, ps);
   const stillActive = () => isoCount(gd, ps) < p.maxIso && heldMuelsyse(gd, ps).length > 0;
-  for (let guard = 0; guard < 2 && stillActive(); guard++) {
+  for (let guard = 0; guard < 2 && p.scroll && stillActive(); guard++) {
     const scroll = loose(ps, [SCROLL])[0];
     if (!scroll || freeSlot(ps.hand) < 0) break;
     let at = [...ps.board.entries()].filter(([, q]) => q.kind === 'chess' && gd.baseIdOf(q.id) === MUELSYSE)
@@ -276,6 +278,7 @@ export const DYY_MUELSYSE = defineTactic({
     keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
     level6: { type: 'choice', choices: ['clone', 'held', 'off'], default: 'clone' },
     dyyOnly: { type: 'bool', default: true },
+    scroll: { type: 'bool', default: true },
   },
   at: {
     sellJunk(ctx) {
@@ -287,9 +290,9 @@ export const DYY_MUELSYSE = defineTactic({
         const plan = own?.plan || {};
         const items = plan.items || {};
         const merge = (a, b, n) => Object.freeze([...new Set([...(a || []), ...b])].slice(0, n));
-        const keep = p.keep === 'always' || cloneSource(ps) || packed(gd, ps) ? heldMuelsyse(gd, ps).map((q) => q.id) : [];
+        const keep = p.keep === 'always' || cloneSource(ps, p) || packed(gd, ps) ? heldMuelsyse(gd, ps).map((q) => q.id) : [];
         ps._botSelf = { round: m.round, plan: Object.freeze({ ...plan, keep: merge(plan.keep, keep, 32),
-          items: Object.freeze({ ...items, buy: merge(items.buy, CLONE_ITEMS.filter((id) => !id.endsWith('_b')), 8), keep: merge(items.keep, CLONE_ITEMS, 32) }) }) };
+          items: Object.freeze({ ...items, buy: merge(items.buy, clonesOf(p).filter((id) => !id.endsWith('_b')), 8), keep: merge(items.keep, clonesOf(p), 32) }) }) };
       }
       return ctx.next();
     },
