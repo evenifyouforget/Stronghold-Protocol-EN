@@ -445,3 +445,54 @@ copies, no 画卷); `dyybot3` = the dyybot profile at 783d0ae7.
 
 **Next (queue25):** dyybot3 minus one tactic at a time in mu-scroll; the packaging cycle's trigger counts; the
 iso-memberships draft.
+
+## Queue25 prep: why the packaging cycle never fired, and the humans' sale engine (2026-11-13)
+
+**The cycle isn't broken; it has nothing to buy.** Instrumented (mu-pack, seeds 1–2): 商业包装方案 only gets onto her at
+round 12 (at round 11 the seat holds it with 2 funds), and from then on the shop is mostly price 3–4 (level 6). The
+cycle looks at the shop once a prep (no refresh) for operators of price ≤ 2, so it seldom finds one.
+
+**The humans' engine is Foresight's.** The three 11–12 Isomorph seats (`scratchpad` engine.mjs over the records), from
+round 11–12: 14–75 refreshes and 18–100 buys a round, reselling tier 1, 3 and 4 operators alike (two-thirds sold the same
+round), 166 funds spent in one round with 8 left. What pays for it is 远见 (Foresight): every 10 layers +2 funds, from 80
+layers its operators cost 1 less, from 150 every operator does (a tier 1 then costs 1 and sells for 1). All three were
+Paganini (潘格尼尼: an elite Laterano operator per 55 funds spent) with Foresight active from round 7, and Civilight
+Eterna (+2 Skillful / Arcane layers per 3 funds spent) wearing the packaging plan as often as Muelsyse.
+
+Across the 62 human seats past round 10 (clean HARD / ABYSS):
+
+| | Seats | Wins | Median layers | Median max buys + refreshes a round (r11+) |
+|---|---|---|---|---|
+| Foresight active 4+ rounds | 17 | 6 (35 %) | 772 | 31 |
+| Foresight 1–3 rounds | 7 | 2 (29 %) | 478 | 14 |
+| never | 38 | 22 (58 %) | 461 | 14 |
+
+All 6 seats that bought or refreshed 60+ times in a round ran it, and the top 5 by layers (2,900–4,600). **It makes
+stacks, not wins**, and it isn't a Du Yaoye engine. The packaging cycle without Foresight's discount has no free cycle
+to run; it stays in `dyy-muelsyse` (default 24) but can't matter on a Du Yaoye board.
+
+## The Isomorphs the bots waste, and `iso-pair` (2026-11-13)
+
+A 变形同构体 grants the Alliance of another item worn beside it (one with `giveBondId`: 36 items over 14 Alliances,
+维式重锤 → Victoria and so on), and nothing alone. Records (scratchpad isopair.mjs; bot games recorded with
+`botrecords.mjs --scenario`):
+
+| | Isomorphs worn | with an Alliance item beside | Alliance items gained a seat |
+|---|---|---|---|
+| humans, clean HARD / ABYSS seats with any Isomorph (39) | 144 | 114 (79 %) | 6.8 (5.4 bought) |
+| legmu3, mu-scroll, 10 games | 22 | 5 (23 %) | 1.1 |
+
+So most of the clone's Isomorphs did nothing, which fits the clone losing. Legacy's `morphPlan` already chooses the
+carrier (the lineup score of the granted Alliance); what it lacks is the item: §37.39 keeps it from buying shop
+equipment, and with no partner the Isomorph goes on alone.
+
+**`iso-pair`** (27002c44, `botTacticsDyy.js`, outside the race pools): while an Isomorph grants nothing, every shop the
+buy loop sees (after each refresh) is searched for an Alliance item one more deployed member would make worth it (1 if
+the Alliance is active, +2 per tier it adds, ×2 for a core one; 0 if no deployed operator could join it); held ones are
+kept, then paired: with a lone worn Isomorph, or a loose one goes on with it onto a deployed non-member (the planned
+carry first; never Muelsyse). Unit test in `bot-tactics-dyy.test.js`.
+
+In the same 10 games it pairs 6 of 20 (from 5 of 22) and buys 1.2 Alliance items a seat. The limit is the board:
+a Du Yaoye board is mostly Yan, so the Yan item is worth nothing, and two copies of an item merge into its + version,
+so an Alliance gains one member this way (Victoria: one per item kind). The Isomorph pays only where another Alliance
+is one member short or active. Queue26 measures it anyway (mu-scroll 1–80, normal 1–160).
