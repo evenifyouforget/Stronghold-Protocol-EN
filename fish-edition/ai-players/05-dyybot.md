@@ -383,3 +383,19 @@ at round 10, 商业包装方案 at round 11).
 
 **Queue22** (d044f278): dyybot with iso-not-muelsyse 17 of 160, exactly as queue21's (0 seeds change), with carry-iso's
 buying on or off. In the mu-scroll scenario: 4 of 80 (legacy 19), the 画卷 spent on Muelsyse.
+
+**Queue23** (65af52fa): the clone alone, on legacy, in the mu-scroll scenario (Du Yaoye solo Ultimate, seeds 1–80),
+paired with legacy in the same scenario (19 wins):
+
+| | Wins | Seeds won / lost | p |
+|---|---|---|---|
+| legacy + iso-not-muelsyse | 15 | 1 / 5 | 0.22 |
+| + dyy-muelsyse, 画卷 on her | 4 | 1 / 16 | < 0.001 |
+| + dyy-muelsyse, no 画卷 | 12 | 2 / 9 (1 / 4 against the line above it… against iso-not-muelsyse: p 0.38) | 0.07 |
+
+- **画卷 on Muelsyse is a clear loss** (19 → 4): the copy of the best operator is worth far more than one Isomorph. The
+  default is now off (783d0ae7), as the humans play it.
+- **No Isomorph on her costs legacy a little here** (19 → 15, n.s.): in a Du Yaoye game legacy's §37.43 Yan conversion
+  (her Yan item + Isomorph, "9 Yan with 8 deployed") may be worth something. Fish's rule stands; worth watching.
+- **Keeping her and level 6 without the 画卷:** 15 → 12 (n.s.). Level 6 by round 13 (5.6 against 5.0), and stacks at
+  round 13 drop (178 against 210): the funds go into the level, not the board.
