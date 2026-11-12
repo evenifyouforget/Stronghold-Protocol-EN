@@ -201,6 +201,18 @@ let BOT_MAX_LEVEL = 5;
  * levelled one round earlier for the step that opens a slotted tier (levelUp).
  */
 export let DIY_PIECE_BONUS = 12;
+/**
+ * (fork) Legacy's named rules, each one switchable (botTacticsLegacy.js legacy-rules; fish-edition/ai-players/02): all
+ * on is legacy. Off, the rule's step is skipped and the rest of legacy plays as before, so the evolution race can test
+ * legacy without it, or with a research tactic in its place. RNG draws are unchanged while all are on.
+ *   trade (§37.35 tradeOnce), layerRefresh (§37.35), pager (§37.69 杰西卡's members first), diyEarlyLevel (自选 slot one
+ *   round earlier), bandStep / coreStep (§35.63 a missing focus member bought without a lineup gain), fullBoardGate (a new
+ *   operator for a full board must raise the lineup), shopItemsMergeOnly (§37.39), sellMorphBringers (§37.42),
+ *   morphPlan (§37.41 the 变形同构体's carrier), holdBondItemForMorph (§37.41), faItemHunt (§37.67).
+ */
+let RULES = Object.freeze({ trade: true, layerRefresh: true, pager: true, diyEarlyLevel: true, bandStep: true, coreStep: true,
+  fullBoardGate: true, shopItemsMergeOnly: true, sellMorphBringers: true, morphPlan: true, holdBondItemForMorph: true, faItemHunt: true });
+export const LEGACY_RULE_NAMES = Object.freeze(Object.keys(RULES));
 const TIER_POWER = [0, 10, 12.5, 15, 18, 21.5, 25];
 /** Prep-side 特质 that keep adding bond layers every round / every refresh (a player's main layer engine). */
 const RECURRING_TRAIT_EVENTS = new Set(['SERVER_PREP_START', 'SERVER_PREP_FIN', 'SERVER_REFRESH_SHOP']);
@@ -2025,7 +2037,11 @@ export function createRehearsalJob(m, ps, chosen, plans, inputs, prebuilt = null
     chosen, plans, inputs, cap: ticks, limits, stats: null, best: plans[0], done: false, pending: false,
     run(budgetMs = Infinity, control = null) {
       if (job.done) return true;
-      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, limits || {});
+      // (fork research) PREP_TIEBREAK's per-candidate prep-time stacks (arrangeSteps sets plan.prepGain)
+      const bonus = plans.some((p) => p?.prepGain > 0) ? plans.map((p) => p?.prepGain || 0) : null;
+      // (fork research) LEAK_ALLOW's per-candidate leak allowance (arrangeSteps sets plan.leakAllow)
+      const allow = plans.some((p) => p?.leakAllow > 0) ? plans.map((p) => p?.leakAllow || 0) : null;
+      if (!run) run = new RehearsalRun(factories, ps.playerId, ticks, { ...(limits || {}), bonus, allow });
       // A test replay (`control.replaying`) stops on the journalled step count, not the wall clock.
       const replaying = !!(control && control.replaying);
       const timed = !replaying && Number.isFinite(budgetMs);
@@ -2546,7 +2562,7 @@ export function levelUp(m, ps, { spare = false, policy = null } = {}) {
     let want = price === 0;
     if (!want && ps.shop.level < target && (boardReady || r >= 6)) want = true;
     // a human's 自选 slots of the next level (AI 托管): that step one round earlier (DIY_PIECE_BONUS)
-    if (!want && boardReady && ps.shop.level < nextTarget && diyOpensAt(ps, ps.shop.level + 1)) want = true;
+    if (!want && RULES.diyEarlyLevel && boardReady && ps.shop.level < nextTarget && diyOpensAt(ps, ps.shop.level + 1)) want = true;
     if (!want && ps.shop.level < nextTarget && price <= 2 && boardReady) want = true;
     if (!want && spare && ps.funds >= price + 1 + fundsReserve(m, ps) && ps.shop.level < nextTarget + 1 && boardReady) want = true;
     if (!want && ps.funds >= price + 14) want = true;
@@ -2634,6 +2650,7 @@ function plannedLevelFunds(m, ps) {
  * or a member).
  */
 function pagerBuy(m, ps) {
+  if (!RULES.pager) return false;
   const h = pagerPlan(m, ps);
   if (!h) return false;
   const gd = ps.gd || m.gd;
@@ -2714,8 +2731,8 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
     if (guard > 0) yield;
     // §37.69: the 杰西卡 seat's missing 谢拉格 members come first
     if (!policy && pagerBuy(m, ps)) { memo = null; continue; }
-    if (!policy && !fillOnly && tradeOnce(m, ps, () => context(m, ps))) continue;
-    if (!policy && !fillOnly && layerRefresh(m, ps)) { refreshes++; continue; }
+    if (!policy && !fillOnly && RULES.trade && tradeOnce(m, ps, () => context(m, ps))) continue;
+    if (!policy && !fillOnly && RULES.layerRefresh && layerRefresh(m, ps)) { refreshes++; continue; }
     if (policy) takeOffers(m, ps, policy); // a merge reward can enable another merge before upgrading
     if (customPolicy && !fillOnly && policy.canLevel(m, ps)) {
       const oldLevel = ps.shop.level;
@@ -2763,7 +2780,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         const merges = ps.completesChessMerge(s.id);
         const base = gd.baseIdOf(s.id);
         // §37.35: before the level-up, a new member of the opening strategy's core bond is bought like a merge
-        const bandStep = fillOnly && !merges && !customPolicy && ctx.focus && ctx.focus === bandMain(m, ps)
+        const bandStep = RULES.bandStep && fillOnly && !merges && !customPolicy && ctx.focus && ctx.focus === bandMain(m, ps)
           && !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
           && !!coreGap(m, ctx.focus, ctx.owned, ps)
           // §37.69: the 杰西卡 seat's member before the level-up only with the level-up's funds kept
@@ -2785,9 +2802,9 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         sc = buyScore(m, ps, s.id, ctx) - price;
         // §35.63: a missing member of the focus core bond is bought even when one swap does not raise the lineup yet,
         // while the bench keeps room for it and the members a later swap withdraws (3 free hand slots)
-        const coreStep = !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
+        const coreStep = RULES.coreStep && !ctx.owned.bases.has(base) && countFree(ps.hand) >= 3 && (chessRec(m, s.id, ps)?.bonds || []).includes(ctx.focus)
           && !!coreGap(m, ctx.focus, ctx.owned, ps);
-        if (boardFull && !merges && !planBuyTarget(m, ps, s.id) && !coreStep) {
+        if (RULES.fullBoardGate && boardFull && !merges && !planBuyTarget(m, ps, s.id) && !coreStep) {
           if (!ctx.copies.get(base)) {
             // with a full board a new operator must improve the lineup
             if (!cur) {
@@ -2814,7 +2831,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         // strategy bots) keeps its own equipment rule. §37.41: the elite items, the dolls and the bond item of a focus whose
         // top tier needs 缪尔赛思 are bought too (shopItemWanted).
         const wanted = !customPolicy && shopItemWanted(m, ps, s.id, ctx);
-        if (!customPolicy && !requested && !wanted && !ps.completesItemMerge(s.id)) return;
+        if (RULES.shopItemsMergeOnly && !customPolicy && !requested && !wanted && !ps.completesItemMerge(s.id)) return;
         if (requested && !wanted && !ps.completesItemMerge(s.id) && !planItemRoom(m, ps, s)) return;
         if (customPolicy && (policy.canLevel(m, ps) || (canRefresh && freeSlot(ps.hand) >= 0
           && policy.searchTargets(m, ps).some(t => ps.funds >= refreshCost
@@ -3111,7 +3128,7 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
   // §37.37 the positional traits' arrangement goes first (the rehearsal still prefers one that leaks less or kills more)
   if (final && plans.length) {
     const pos = yield* positionPlanSteps(m, ps, chosen, plans[0], ctx);
-    if (pos) { if (plans[0].lineup) pos.lineup = plans[0].lineup; plans.unshift(pos); }
+    if (pos) { if (plans[0].lineup) pos.lineup = plans[0].lineup; pos.positional = true; plans.unshift(pos); }
   }
   // §37.62 the damage lineups: their default plan and, for a self-bound leader, the body plan, for a walking one the
   // leader chain; §37.63 the co-op alternatives of a normal round: their default plan — after the candidates the
@@ -3190,6 +3207,10 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
       more += fresh.length;
     }
   }
+  if (PREP_TIEBREAK > 0 && plans.length > 1) for (const pl of plans) pl.prepGain = PREP_TIEBREAK * prepPositionGain(m, ps, rehChosen, pl, ctx);
+  if (LEAK_ALLOW > 0 && !boss && m.round >= LEAK_ALLOW_FROM && m.round <= LEAK_ALLOW_TO && ps.lp >= LEAK_ALLOW_LP) {
+    for (const pl of plans) if (pl.positional) pl.leakAllow = LEAK_ALLOW;
+  }
   if ((defer || adaptive) && plans.length > 1) {
     const limits = adaptive ? { stage: 3, tickBudget: 6 * (!m.wave && bossWaveOf(m, ps) ? faRehearsalTicks(m) : rehearsalCap(m.wave?.timeLimit)) } : null;
     const job = yield* createRehearsalSteps(m, ps, rehChosen, plans,
@@ -3208,7 +3229,30 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
 /** [ASSUMED] §37.37: a free operator each prep (歌蕾蒂娅 / 余 with 3 in their row), in layers of the focus bond. */
 const GIFT_VALUE = 12;
 /** [ASSUMED] §37.37: the share of the default plan's layout value a positional placement may give up. */
-const POSITION_TOLERANCE = 0.03;
+let POSITION_TOLERANCE = 0.03;
+/**
+ * (fork research, fish-edition/ai-players/09) The rehearsal breaks a leak and leader-damage tie by the stacks the battle
+ * gained, but prep-time positional stacks (空弦 at prep start, 断崖 at prep end …) happen outside the battle, so a candidate
+ * that kills one more enemy beats the positional one. With PREP_TIEBREAK > 0 each candidate's prep-time positional value
+ * (prepPositionGain, in focus-bond stacks) × PREP_TIEBREAK joins that tie-break. 0 (legacy): off. Only a rehearsal run on
+ * this thread reads it (not a delegated or pooled one).
+ */
+let PREP_TIEBREAK = 0;
+/**
+ * (fork research, ai-players/09) 莫斯提马's 「自身周围4格的干员每消耗6发弹药，使已激活的【拉特兰】层数+1」 (positional kind
+ * `around`): the stacks per battle one ammo user among her 4 neighbours is worth, per bond_add_count (ammo users: 拉特兰
+ * members, whose skills are ammo skills, and the 猎手 branch). 0 (legacy): not valued, and her neighbours are not searched.
+ */
+let AROUND_VALUE = 0;
+/**
+ * (fork research, ai-players/09) The positional candidate's leak allowance: the rehearsal counts its leaks minus this,
+ * so 0.5 makes it win a leak tie outright and 1.5 also with one leak more. Only in normal rounds LEAK_ALLOW_FROM to
+ * LEAK_ALLOW_TO while the LP is at least LEAK_ALLOW_LP. 0 (legacy): off. Like PREP_TIEBREAK, only a rehearsal run on this
+ * thread reads it.
+ */
+let LEAK_ALLOW = 0;
+let LEAK_ALLOW_LP = 20;
+const LEAK_ALLOW_FROM = 6, LEAK_ALLOW_TO = 11;
 
 const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null ? Number(v) : d);
 
@@ -3249,6 +3293,7 @@ export function positionTraitsOf(m, ps, c) {
         out.push(desc.includes('同一行最右边') ? { kind: 'mostRight', g2 } : { kind: 'grant', g2, need: bs.check_bond_id || null });
       }
     } else if (g.effectKey === 'act1autochess_gar_event_addition_cnt') out.push({ kind: 'extra', n: numOr(bb.extra_cnt, 1) });
+    else if (g.effectKey === 'act1autochess_gar_event_consume_ammo' && bs.range_id === 'x-5') out.push({ kind: 'around', bond: bs.bond_id, n: numOr(bb.bond_add_count, 1) });
     else if (g.effectKey === 'SERVER_TRIGGER_ANOTHER' && bs.scope === 'front' && bs.event === 'SERVER_GAIN') out.push({ kind: 'trigger' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_START') out.push({ kind: 'copy', event: 'SERVER_PREP_START' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_FIN') out.push({ kind: 'copy', event: 'SERVER_PREP_FIN' });
@@ -3324,6 +3369,17 @@ function positionTraitValue(m, ps, view, W, p, key, dir, t, final) {
   const sum = (bonds, n) => bonds.reduce((s, b) => s + n * W(b), 0);
   switch (t.kind) {
     case 'pos': { const q = chessAhead(view, key, dir, t.off); return q ? sum(bondsOf(q), t.n) : 0; }
+    case 'around': {
+      if (!(AROUND_VALUE > 0)) return 0;
+      const [r, c] = parseKey(key);
+      let users = 0;
+      for (const [dr, dc] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const q = view.at.get(tileKey(r + dr, c + dc));
+        const rec = q && q.kind === 'chess' ? chessRec(m, q.id, ps) : null;
+        if (rec && ((rec.bonds || []).includes('lateranoShip') || rec.subProfessionId === 'hunter')) users++;
+      }
+      return users * AROUND_VALUE * t.n * W(t.bond);
+    }
     case 'row': return sum(t.bonds, t.n * rowChess(view, key));
     case 'row3': {
       if (rowChess(view, key) < t.need) return 0;
@@ -3577,6 +3633,27 @@ export function* devourFeedSteps(m, ps, pieces, plans, ctx) {
   return out;
 }
 
+/**
+ * (fork research, PREP_TIEBREAK) The prep-time part of a plan's positional value: the traits that run at prep start or end
+ * (not in the battle, which the rehearsal measures itself), weighted as positionPlanSteps weighs them.
+ */
+function prepPositionGain(m, ps, pieces, plan, ctx) {
+  const pgd = ps.gd || m.gd;
+  const chess = pieces.filter((p) => p.kind === 'chess' && plan.has(p.uid));
+  const board = new Map(chess.map((p, i) => [`x${i}`, p]));
+  const inSet = new Set(chess.map((p) => p.uid));
+  const bonds = computeBonds(pgd, { board, hand: ps.hand.filter((p) => p && !inSet.has(p.uid)), layers: ps.layers, bondCountBonus: ps.bondCountBonus });
+  const W = (b) => (!bonds[b]?.active ? 0 : b === ctx.focus ? 1 : pgd.bond(b)?.isCore ? 0.5 : 0.3);
+  const view = planView(plan, chess);
+  const final = !m.wave && m.round === m.gd.bossRound;
+  let v = 0;
+  for (const [uid, key] of view.keyOf) {
+    const p = view.byUid.get(uid);
+    for (const t of positionTraitsOf(m, ps, chessRec(m, p.id, ps))) if (t.on !== 'IN_BATTLE') v += positionTraitValue(m, ps, view, W, p, key, view.dirOf.get(uid), t, final);
+  }
+  return v;
+}
+
 /** §37.37 Σ positional trait value of a plan (`dm`: devourModel). */
 function positionValue(m, ps, view, W, final, dm = null) {
   let v = devourValue(view, dm, W('egirShip'));
@@ -3673,6 +3750,12 @@ export function* positionPlanSteps(m, ps, chosen, base, ctx, { devourOnly = fals
       const spots = new Set();
       for (const k of [1, -1]) { const [pr, pc] = parseKey(key); const [dr, dc] = rotateOffset(0, k, dir); spots.add(tileKey(pr + dr, pc + dc)); }
       for (const [rr, cc] of legalTiles(deployMap, 'all')) if (rr === r) spots.add(tileKey(rr, cc));
+      // (fork research) AROUND_VALUE: an `around` piece's 4 neighbours too
+      const self = AROUND_VALUE > 0 ? chess.find((q) => q.uid === uid) : null;
+      if (self && positionTraitsOf(m, ps, chessRec(m, self.id, ps)).some((t) => t.kind === 'around')) {
+        const [pr, pc] = parseKey(key);
+        for (const [dr, dc] of [[1, 0], [-1, 0]]) spots.add(tileKey(pr + dr, pc + dc));
+      }
       for (const q of chess) {
         if (q.uid === uid) continue;
         for (const spot of spots) {
@@ -4181,6 +4264,24 @@ function morphPlan(m, ps, morph, ctx) {
 }
 
 /**
+ * (fork, carry-iso, fish-edition/ai-players/08) The main damage dealer: the deployed non-healer attacker of highest
+ * pieceValue (ties: lower uid), and the bot's focus Alliance. Humans put the Isomorph with an Alliance item on such a
+ * carry (Fish: "buff Pramanix the Prerita or Sakiko to deal tons of damage").
+ */
+export function carryAndFocus(m, ps) {
+  const ctx = context(m, ps);
+  let best = null, bestV = -Infinity;
+  for (const p of ps.board.values()) {
+    const c = p.kind === 'chess' ? chessRec(m, p.id, ps) : null;
+    if (!c || isHealer(c) || c.attackKind === 'none') continue;
+    const v = pieceValue(m, ps, p, ctx);
+    if (v > bestV || (v === bestV && p.uid < best.uid)) { bestV = v; best = p; }
+  }
+  return { carry: best, focus: ctx.focus || null };
+}
+export { slotFree as itemSlotFree };
+
+/**
  * Whom the bot injects with 突变细胞 (after the battle its carrier — deployed or on the bench: every owned carrier's item
  * hooks run — is destroyed and a random operator one tier higher joins the bench, PlayerState.transformChess; the next
  * prep's lineup step deploys it like any owned unit, so a deployed carrier only costs a re-placement): a normal operator
@@ -4360,11 +4461,14 @@ function useArt(m, ps, item, ctx) {
 export function equipItems(m, ps) {
   const gd = ps?.gd || m.gd;
   // §37.42: one that arrived another way (a transformation, a copy, a purchase) is sold here
-  sellMorphBringers(m, ps);
+  if (RULES.sellMorphBringers) sellMorphBringers(m, ps);
   const tried = new Set();
+  // (fork) the plan's items.hold: items that wait in the hand this prep (carry-iso holds an Isomorph for its carry)
+  const hold = advisorPlan(m, ps)?.items?.hold;
   // §37.41: a 变形同构体 goes where its granted bond gains most (morphPlan, with the bond item the plan names); without such a
   // carrier it waits for a focus whose top tier needs it (topAboveCap), else the usual target below takes it
-  for (const morph of [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p))) {
+  for (const morph of RULES.morphPlan ? [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p)) : []) {
+    if (planContains(m, hold, morph.id)) continue;
     const mctx = context(m, ps);
     // §37.43 [ASSUMED]: with such a focus 缪尔赛思 takes its bond item and the 变形同构体 wherever she stands (one slot, two
     // members of the focus) — morphPlan only looks at the current lineup, which she is rarely in before her conversion
@@ -4389,7 +4493,7 @@ export function equipItems(m, ps) {
     const item = [...ps.hand, ...ps.temp].find((p) => p && p.kind === 'item' && canUseItem(m, ps, p) && !tried.has(p.uid));
     if (!item) break;
     tried.add(item.uid);
-    if (planContains(m, advisorPlan(m, ps)?.items?.keep, item.id)) continue;
+    if (planContains(m, advisorPlan(m, ps)?.items?.keep, item.id) || planContains(m, hold, item.id)) continue;
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
@@ -4399,7 +4503,7 @@ export function equipItems(m, ps) {
     if (itemEffect(rec) === 'use_equip_upgrade_char' && m.round < gd.bossRound && !planEquips(m, ps, item.id)
       && ![...ps.board.values()].some((p) => p.kind === 'chess' && !gd.isGolden(p.id) && gd.tierOf(p.id) >= ELITE_ITEM_TIER)) continue;
     // §37.41: one bond item of a focus whose top tier needs 缪尔赛思 waits for her 变形同构体 until the Final Assault prep
-    if (!heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
+    if (RULES.holdBondItemForMorph && !heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
       heldNine = true;
       continue;
     }
@@ -4564,6 +4668,7 @@ function faModDps(rec, model, mod, T) {
  * advisor plan's seat too — the hunt keeps the pieces the plan protects and the items it keeps.
  */
 function faHunts(m, ps) {
+  if (!RULES.faItemHunt) return false;
   return m.round === (ps?.gd || m.gd).bossRound && !!ps.isBot && !ps.autoplay;
 }
 /** A damage item obtained before the hunt waits for it. */
@@ -4682,12 +4787,12 @@ function faItemHunt(m, ps) {
 // runs synchronously between yields, so the values are swapped in and back around each step and never leak to another
 // seat. Read at call time only: nothing above uses them while the module loads.
 const currentTunables = () => ({
-  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS,
+  BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES,
 });
 /** Upstream's values of legacy's tunables. */
 export const LEGACY_TUNABLES = Object.freeze(currentTunables());
 function setTunables(t) {
-  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS } = t);
+  ({ BAND_STRENGTH_SHRINK, BAND_STRENGTH_POWER, SOFT_BAND_RESERVE, MATE_BURDEN, BOUNTY_KILL, TRADE_MIN, SOLO_TRADE_MIN, TRADE_FROM, BUY_FULL_MIN, MERGE_HIT, PAIR_HIT, MAX_PAIRS, MAX_REFRESHES, BENCH_BUDGET, COOP_BENCH_BUDGET, DIY_PIECE_BONUS, ENGINE_BONUS, ARMOR_WEIGHT, PLAN_UNIT_SHARE, FOCUS_MEMBER, CORE_TOP_TIER, TOP_ABOVE_CAP, CORE_KEEP_OWNED, CORE_LOCK, CORE_MEMBER, CORE_HIT, HEAL_FROM, HEAL_FIRST, HEAL_SECOND, LEVEL_TARGET, BOT_MAX_LEVEL, WANTED_ITEM, ELITE_ITEM_TIER, LAYOUT_PARAMS, FA_LINEUPS, POSITION_TOLERANCE, PREP_TIEBREAK, AROUND_VALUE, LEAK_ALLOW, LEAK_ALLOW_LP, RULES } = t);
 }
 /**
  * Run `fn` with some of legacy's tunables replaced (`t`: a partial LEGACY_TUNABLES; null runs it as is), then put the
@@ -4706,6 +4811,8 @@ export function withLegacyTunables(t, fn) {
 export const LEGACY_PREP_ACTIONS = Object.freeze({
   takeOffers, sellJunk, buyLoopSteps, levelUp, planSpendSteps, spendDown, maybeFreeze, arrangeSteps, equipItems,
   applyPlanSteps, resolveTemp, freeHandSlot, rememberOwned,
+  // (fork) a tactics decision point after the rehearsed layout is on the board (botPrep.js prepEnd); legacy: nothing
+  finishLayout: () => {},
   hasHandRoom: (ps) => freeSlot(ps.hand) >= 0,
   ready: (ps) => tryDo(() => ps.setReady(true)),
 });

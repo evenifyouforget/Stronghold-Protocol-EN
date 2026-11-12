@@ -3,7 +3,7 @@
 // layers are the lever (all active bonds ×2 at the boss prep: leader pool share 40.8 → 58.1 %).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { positionTraitsOf, positionPlanSteps, LayoutPlan, itemTarget, buyScoreOf } from '../../server/match/bot.js';
+import { positionTraitsOf, positionPlanSteps, LayoutPlan, itemTarget, buyScoreOf, withLegacyTunables } from '../../server/match/bot.js';
 import { RehearsalScore } from '../../server/sim/rehearsal.js';
 import { rotateOffset } from '../../server/sim/dir.js';
 import { tileKey, parseKey } from '../../server/match/board.js';
@@ -47,6 +47,7 @@ test('positional traits are read from the garrison data: front / behind, rows, g
     assert.deepEqual(kinds('白面鸮'), ['copy:SERVER_PREP_START']);
     assert.deepEqual(kinds('塞雷娅'), ['copy:SERVER_PREP_FIN']);
     assert.deepEqual(kinds('惊蛰'), [], '获得时 only');
+    assert.deepEqual(kinds('莫斯提马'), ['around'], '(fork research) 自身周围4格的干员每消耗6发弹药');
     assert.equal(positionTraitsOf(m, ps, m.gd.chess(idOf(m, '凛御银灰')))[0].need, 'kjeragShip', 'a 谢拉格 in front only');
   } finally { h.dispose?.(); }
 });
@@ -144,5 +145,32 @@ test('engine merges: the pair of a focus engine scores ENGINE_BONUS / 2 more, it
     assert.ok(Math.abs(single - 10) < 1e-9, `no copy: engine-first only (${single})`);
     assert.ok(Math.abs(pair - 15) < 1e-9, `the second copy (${pair})`);
     assert.ok(Math.abs(third - 20) < 1e-9, `the merge (${third})`);
+  } finally { h.dispose?.(); }
+});
+
+test('(fork research) AROUND_VALUE: 莫斯提马 gets 拉特兰 ammo users beside her; at 0 (legacy) nothing moves', () => {
+  const { h, m, ps } = solo();
+  try {
+    const ids = [idOf(m, '莫斯提马'), idOf(m, '能天使'), idOf(m, '送葬人'), idOf(m, '隐现')];
+    const pieces = ids.map((id) => give(m, ps, id, 'hand'));
+    ps.recompute();
+    const map = ps.deployMap();
+    const tiles = [...map.keys()].map(parseKey).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const near = ([r, c]) => [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dr, dc]) => tileKey(r + dr, c + dc));
+    const spot = tiles.find((t) => near(t).some((k) => map.has(k)));
+    const base = new LayoutPlan();
+    base.set(pieces[0].uid, tileKey(spot[0], spot[1])); base.dirs.set(pieces[0].uid, 'RIGHT');
+    const used = new Set([tileKey(spot[0], spot[1]), ...near(spot)]);
+    for (const p of pieces.slice(1)) {
+      const t = tiles.find(([r, c]) => !used.has(tileKey(r, c)));
+      used.add(tileKey(t[0], t[1]));
+      base.set(p.uid, tileKey(t[0], t[1])); base.dirs.set(p.uid, 'RIGHT');
+    }
+    const chosen = pieces.map((p) => ({ ...p }));
+    assert.equal(run(positionPlanSteps(m, ps, chosen, base, { focus: 'lateranoShip' })), null, 'legacy: no positional plan');
+    const plan = withLegacyTunables({ AROUND_VALUE: 3, POSITION_TOLERANCE: 1 }, () => run(positionPlanSteps(m, ps, chosen, base, { focus: 'lateranoShip' })));
+    assert.ok(plan, 'a positional plan');
+    const around = near(parseKey(plan.get(pieces[0].uid)));
+    assert.ok(pieces.slice(1).some((p) => around.includes(plan.get(p.uid))), 'a 拉特兰 operator beside 莫斯提马');
   } finally { h.dispose?.(); }
 });

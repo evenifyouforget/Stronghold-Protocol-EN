@@ -6,8 +6,9 @@ import { IOLETA_BOT } from './botIoleta.js';
 // (fork) the tactics profiles (botTactics.js): browser-safe like the rest, so a seat played in a browser keeps its profile
 import { FISH_PROFILES } from './botTacticsBasic.js';
 import { LEGACY_LAYERED } from './botTacticsLegacy.js';
+import { DYY_PROFILES } from './botTacticsDyy.js'; // Fish's Du Yaoye tactics
 
-export const BUILTIN_BOTS = Object.freeze([IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, LEGACY_LAYERED]);
+export const BUILTIN_BOTS = Object.freeze([IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, ...DYY_PROFILES, LEGACY_LAYERED]);
 
 const BUILTIN_REGISTRY = createBotRegistry([...BUILTIN_BOTS]);
 

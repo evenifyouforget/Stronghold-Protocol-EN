@@ -144,12 +144,14 @@ export class PlayerDiy {
    * Fix the 自选 picks for the match (see the header): the seat's picks re-checked against this match's data and kits;
    * a slot whose record cannot be composed is left empty. With picks, `this.gd` becomes the player's data view.
    * @param {any} picks `{ [slotBaseId]: { charId, skillIndex?, uniEquipId? } | null }`
-   * @param {{ kitted?: Iterable<string> }} [opts] the operators with a kit (default: the registry's KITTED_CHARS; tests may
+   * @param {{ kitted?: Iterable<string>, bot?: boolean }} [opts] the operators with a kit (default: the registry's KITTED_CHARS; tests may
    *   widen it to slot an operator whose kit is still being written)
+   * @param {boolean} [opts.bot] (fork) a bot seat's picks (its profile's diy-picks tactic, Match.js at setup); without
+   *   it a bot's call changes nothing
    * @returns {boolean} false when the picks are malformed (nothing changes) or the player is a bot
    */
-  setDiy(picks, { kitted = KITTED_CHARS } = {}) {
-    if (this.isBot) return false;
+  setDiy(picks, { kitted = KITTED_CHARS, bot = false } = {}) {
+    if (this.isBot && !bot) return false;
     const gd = this.m.gd;
     const data = gd.raw;
     const res = checkDiyPicks(picks, { data, kitted });
