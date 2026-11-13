@@ -30,6 +30,17 @@ import { STATUS_META, sortedPlayers, teamFrameIds } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
 import { localAsset } from '../data.js';
 import { t, shownName } from '../../../shared/i18n.js';
+import { ROOM_BOTS } from '../../../shared/botProfiles.js';
+
+/**
+ * (fork, GitHub #87) The AI badge's tooltip: the bot's name and what it does (shared/botProfiles.js), or its id when it
+ * isn't a room choice (a server's own default, e.g. a bench profile); nothing from an older server.
+ */
+export function botTitle(id) {
+  if (typeof id !== 'string' || !id) return undefined;
+  const b = ROOM_BOTS.find((x) => x.id === id);
+  return b ? `${t('AI 方案')}：${t(b.label)} · ${t(b.desc)}` : `${t('AI 方案')}：${id}`;
+}
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -179,7 +190,7 @@ export function TeamPanel({ pub, myId, watching, bubbles, onWatch, compact = fal
           ${inTeam ? html`<span class=${cx('team__frame', !frameArt && 'team__frame--plain')} style=${frameArt ? `--frame:url("${frameArt}")` : undefined} aria-hidden="true"></span>` : null}
           <span class="team__seat num">P${(p.seat ?? 0) + 1}</span>
           ${Number.isInteger(p.squad) ? html`<span class=${cx('team__squad', p.squad === 1 && 'is-b')} title=${t('小队 {name}', { name: p.squad ? 'B' : 'A' })}>${p.squad ? 'B' : 'A'}</span>` : null}
-          ${p.isBot ? html`<span class="team__ai">AI</span>` : null}
+          ${p.isBot ? html`<span class="team__ai" title=${botTitle(p.bot)}>AI</span>` : null}
           ${self ? html`<span class="team__you"><${Icon} name="user" /></span>` : null}
           ${spMarks?.get(p.playerId) === 'done' ? html`<span class="team__spmark is-done" title=${t('已完成选择')}><${Icon} name="check" /></span>`
             : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}

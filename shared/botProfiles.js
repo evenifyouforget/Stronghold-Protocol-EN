@@ -18,6 +18,49 @@ export const ROOM_BOTS = Object.freeze([
 
 export const DEFAULT_ROOM_BOT = ROOM_BOTS[0].id;
 
+/**
+ * (fork, GitHub #87 / #124) The 「AI 方案」 popup (public/js/ui/botInfo.js): how each room bot plays, in players' words.
+ * `about`: the bot's own way of playing; `tactics`: a tactic profile's tactics, top first (server/match/botTacticsBasic.js;
+ * a test checks they match the registered profile); every bot but the base AI also plays like it where its own rules stop.
+ * @type {Readonly<Record<string, { about: string[], tactics?: Array<{ id: string, text: string }> }>>}
+ */
+export const BOT_INFO = Object.freeze({
+  legacy: {
+    about: [
+      N_('选择一个主盟约，围绕它购买、合成并升级干员，按回合推进调度中心等级'),
+      N_('避免购买队友正在收集的盟约干员（高星干员更是如此），不与队友争抢'),
+      N_('也会买入能与已有干员合成的干员'),
+      N_('每回合部署前在后台试演几种布阵，选漏怪最少的一种；漏怪相同时，选对首领伤害更高、获得层数更多、击杀更多的一种'),
+    ],
+  },
+  'fish-level': {
+    about: [N_('按升级曲线提升调度中心等级，曲线按模式长度换算（较短的模式升级更早）'), N_('其余同基础 AI')],
+    tactics: [{ id: 'level-curve', text: N_('升级曲线：每回合把调度中心升到曲线的等级，然后由基础 AI 继续升级') }],
+  },
+  'fish-tier6': {
+    about: [N_('优先买入商店里的六星干员，调度中心升到 6 级'), N_('其余同基础 AI')],
+    tactics: [
+      { id: 'buy-tier', text: N_('高星优先：在基础 AI 购买之前，先买商店里的六星干员，同时保留一些资金') },
+      { id: 'level-curve', text: N_('升级曲线（最高 6 级）：每回合把调度中心升到曲线的等级') },
+    ],
+  },
+  ioleta: {
+    about: [
+      N_('开局有伊奥莱塔策略时优先选择它，并按它的合成计划分阶段采购核心干员'),
+      N_('核心盟约被关闭时改为收集奥术或迅捷；其他策略的回合同基础 AI'),
+    ],
+  },
+  adaptive: {
+    about: [
+      N_('采购同基础 AI'),
+      N_('布阵时按当前地图的路线、可部署格和攻击范围搜索，最多比较 8 种布阵（包括正面接敌的方案），试演后选最好的一种'),
+    ],
+  },
+  'ioleta-adaptive': {
+    about: [N_('伊奥莱塔开局（同「伊奥莱塔开局」），布阵同「自适应布阵」')],
+  },
+});
+
 /** @param {unknown} id @returns {boolean} */
 export const isRoomBot = (id) => typeof id === 'string' && ROOM_BOTS.some((b) => b.id === id);
 

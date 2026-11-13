@@ -391,6 +391,22 @@
 }
 .rseat__botpick:hover, .rseat__botpick:focus-visible { border-color: #5df0c6; outline: none; }
 .rseat__botpick option { color: #eef0ef; background: #1b1e1d; }
+/* (fork, GitHub #87) the ⓘ of an AI seat's plate: the 「AI 方案」 popup (ui/botInfo.js) */
+.rseat__botinfo {
+  position: absolute; right: .04rem; bottom: .04rem; display: grid; place-items: center; width: max(.24rem, 18px); height: max(.24rem, 18px);
+  padding: 0; color: #9fa6a3; background: rgba(0, 0, 0, .35); border: 1px solid rgba(255, 255, 255, .16); border-radius: 50%; cursor: pointer;
+}
+.rseat__botinfo:hover, .rseat__botinfo:focus-visible { color: #5df0c6; border-color: #5df0c6; outline: none; }
+.rseat__botinfo .icon { width: 70%; height: 70%; }
+.botinfo__intro { margin: 0 0 .12rem; font-size: calc(.14 * var(--t)); color: #b9bfbc; }
+.botinfo__bot { padding: .1rem .12rem; margin-top: .08rem; border-left: 2px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .03); }
+.botinfo__bot.is-current { border-left-color: #5df0c6; background: rgba(93, 240, 198, .06); }
+.botinfo__name { margin: 0 0 .04rem; font-size: calc(.17 * var(--t)); }
+.botinfo__name small { margin-left: .06rem; font-size: calc(.12 * var(--t)); font-weight: 400; color: #9fa6a3; }
+.botinfo__name .botinfo__here { color: #5df0c6; }
+.botinfo__about, .botinfo__tactics { margin: 0; padding-left: 1.2em; line-height: 1.45; font-size: calc(.14 * var(--t)); }
+.botinfo__sub { margin: .06rem 0 .02rem; font-size: calc(.13 * var(--t)); color: #9fa6a3; }
+.botinfo__tactics code { font-size: calc(.12 * var(--t)); color: #9fa6a3; }
 .rseat__me { position: absolute; left: -.1rem; top: -.1rem; display: grid; place-items: center; width: max(.26rem, 16px); height: max(.26rem, 16px); color: #08221b; background: #4fe8c0; border-radius: 3px; }
 .rseat__me .icon { width: 80%; height: 80%; }
 .rseat__plate--empty { display: flex; justify-content: center; border-style: dashed; border-color: rgba(255, 255, 255, .12); background: none; font-size: calc(.15 * var(--t)); }
