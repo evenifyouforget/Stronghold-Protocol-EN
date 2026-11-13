@@ -538,3 +538,19 @@ Code 27002c44. Paired by seed.
   tactic stays a draft (not in any profile).
 - **dyybot without dyy-shop is the first Du Yaoye profile that beats legacy** (legacy reran on this code: 20 of 160,
   as in the baseline). The full dyybot is legacy's equal (17 vs 20, n.s.).
+
+## Queue28: which part of dyy-shop (2026-11-13)
+
+dyybot with one of dyy-shop's switches off, seeds 1–160, paired with the full dyybot (17 wins; legacy 20):
+
+| dyy-shop with | Wins | Seeds better / worse | p |
+|---|---|---|---|
+| `side` off (no Foresight / Marvel / Investor operator buys) | 24 | 16 / 9 | 0.23 |
+| `sellToBuy` off (no Bench sales for room) | 23 | 8 / 2 | 0.11 |
+| `hunt` off (no Yan refreshes) | 21 | 8 / 4 | 0.39 |
+| the whole tactic off | 33 | 27 / 11 | 0.01 |
+
+Each part costs a few wins, none all of them: what's left with all three off is the buying of every Yan operator not
+yet owned, ahead of legacy's own choices. **So dyybot drops dyy-shop** (feature/bot-plan-tactics, the commit after
+27002c44; `--bot dyybot` now plays queue25's `loo-no-dyy-shop` seed for seed: checked on seeds 1–20). `fish-dyy`
+keeps it, as Fish's original list.
