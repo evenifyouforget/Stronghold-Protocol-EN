@@ -8,6 +8,7 @@
 
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
+- Custom Lobby Modifications: a room you create starts with the rules you last used (remembered in this browser), and the rules dialog has a "Clear all" button (#PR, issue #143).
 - SPA-CC balance update (November 2026): every tag level it changes shows "α" after its name in the room's rules, so you can see what changed. The tag texts in all four languages follow the new numbers (#138).
 - Environment: Suffocation 2 / 3 α: operators' SP recovery is −0.4 / −0.6 per second (was −0.5 / −0.8). Level 1 is unchanged (#138).
 - Famiglia: Cleaner 1 α: 3 Famiglia Shadow Silencers in co-op and 2 in solo (was 5), in rounds 10–13, for the player with the fewest Stacks as before. Unending 2 / 3 α include this change. Seasonal 2 / 3 α: the Blood Ledger fills to 300 before an Asset Liquidation (was 200), plus the Cleaner change (#138).
