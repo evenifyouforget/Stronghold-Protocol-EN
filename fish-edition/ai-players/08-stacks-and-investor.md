@@ -533,3 +533,26 @@ run in sp-plan-run2 at 58d6c04a; their tactics' code is the same as at 78b911a6 
 
 **To measure:** stacks (botbench `--layers`) and boss damage, paired by seed against legacy. Wins alone need hundreds
 of seeds (07).
+
+## Fish's gift scenarios (queue27, 2026-11-13)
+
+Every gift at round 5's prep (`untracked/scenario-2026-11/gifts/`), solo Ultimate, the bot's own Strategy pick, seeds
+1–80, paired by seed. Code 27002c44. Ascalon is a custom operator only (no shop piece), so the Kjerag gift is SilverAsh
+the Reignfrost, Pramanix and Gnosis, and its tactic profile adds her through `diy-picks`. "Swire" is the Foresight one.
+
+| Gift | Legacy with it (no gift: 27) | p | Tactic profile | With it | p |
+|---|---|---|---|---|---|
+| Foresight (Ines, Swire) | 43 (+25 / −9) | 0.01 | plan-bond Foresight | 40 (+8 / −11) | 0.65 |
+| Investor (Mountain, Tin Man) | 28 (+13 / −12) | 1.00 | plan-bond Investor | 31 (+11 / −8) | 0.65 |
+| Kjerag (3) | 62 (+40 / −5) | < 0.001 | plan-commit + diy-picks Ascalon | 63 (+12 / −11) | 1.00 |
+| Gladiia | 40 (+22 / −9) | 0.03 | **plan-commit (Ægir)** | **27 (+7 / −20)** | **0.02** |
+| Kazimierz (3) | 46 (+25 / −6) | < 0.001 | plan-bond Kazimierz + place-fartooth | 46 (+14 / −14) | 1.00 |
+| Laterano (3) | 45 (+26 / −8) | < 0.001 | plan-commit + place-ammo | 38 (+9 / −16) | 0.23 |
+
+- **Legacy scales from five of the six gifts by itself**, Kjerag most (27 → 62 of 80). It already builds around a
+  strong start; "does the bot know how to scale" is yes for these.
+- **Except Investor**: two Investor operators change nothing (28 vs 27). The same gap as the records (Investor active
+  in 30 of 62 human seats, 1 of 111 bot seats); `plan-bond` doesn't close it (31, n.s.).
+- **Committing to Ægir on Gladiia loses** (40 → 27): `plan-commit` steers legacy into Ægir, and with only Gladiia that
+  costs more than legacy's own choice. Fish's tweak "Commit to Aegir if got Gladiia" doesn't work as drafted for bots.
+- The others: no gain over legacy with the same gift.
