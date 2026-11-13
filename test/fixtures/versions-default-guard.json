@@ -20,6 +20,7 @@
       "tierStart": false,
       "boosterPack": false,
       "itemBoosterPack": false,
+      "modZ": [],
       "lateranoMod": "A",
       "victoriaMod": "A",
       "virtuosaBonds": false,

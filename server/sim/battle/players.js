@@ -13,6 +13,7 @@ import { isPotential, isCultivate } from '../../../shared/potential.js';
 import { setupUnitKit } from '../content/index.js';
 import { installTraitAttackSpeed } from '../content/traitMods.js';
 import { installFxStates } from '../content/fxStates.js';
+import { installModZ } from '../content/modZ.js';
 import { clone } from './util.js';
 
 export class BattlePlayers {
@@ -244,6 +245,8 @@ export class BattlePlayers {
       if (t && typeof t.install === 'function') this._safe(() => t.install(this, u), 'talent.install', u);
     }
     if (typeof u.kit.install === 'function') this._safe(() => u.kit.install(this, u), 'kit.install', u);
+    // (Fish Edition) Mod Z / W (content/modZ.js): after the kit, so a module effect sees the kit's skill and range
+    this._safe(() => installModZ(this, u), 'modZ', u);
     // trait lines the ENGINE owns for every operator (content/traitMods.js: the module attack-speed riders whose
     // condition is a pure function of the field — 「攻击范围内存在N名及以上敌人时攻击速度+X」). Runs after kit.install:
     // a kit that implements its own line for this trait is never double-counted — traitMods.js refuses every condition

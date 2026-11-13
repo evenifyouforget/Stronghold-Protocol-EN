@@ -14,6 +14,7 @@
 - 晋升后的干员及其召唤物对领袖的单次伤害不再受 300,000 上限限制；没有攻击单位的伤害（元素爆发）仍受限制（#136，issue #131）。
 - 人机：新增 `fish-patriot` 配置（总是收下爱国者卡的 legacy 人机），用于测试爱国者词条；默认不在任何房间的列表里（#138）。
 - 合入英文翻译版 2026-11-09 至 2026-11-12 的改动（[YuriRestia/Stronghold-Protocol-EN-translation](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation)；主要内容见大厅的“0.3.4-2 更新”公告，全部见 [FORK-CHANGELOG.md](https://github.com/evenifyouforget/Stronghold-Protocol-EN/blob/main/FORK-CHANGELOG.md)）：房间聊天；离开的博士永久退出，下一回合不再等待他们；大同盟小队与“一策同心”策略投票；干员先挥动再命中，与官方一致；更多官方技能特效与音效；外部 AI 封存。自定义大厅规则、人机配置与一键补满人机与这些改动并存（同步 PR）。
+- 自定义大厅改动新增作弊项 **Z型/W型模组（草案）**：房主按干员开启 Fish Edition 的自制模组——提丰的Z型或W型，以及早露、森蚺、菲亚梅塔、赫拉格、傀影、琴柳、闪灵、推进之王、棘刺、温蒂、薇薇安娜、左乐的Z型——所有博士选择的该自选干员都会装备它。均为草案，未经平衡。自选干员列表中这些干员标有“Z型模组可用”。规则窗口改为分页（作弊、Z型/W型模组、盟约、减少随机、风险），每页显示已开启的规则数（Mod Z PR）。
 
 ### 新干员与模组（CN 2.7.91）
 
