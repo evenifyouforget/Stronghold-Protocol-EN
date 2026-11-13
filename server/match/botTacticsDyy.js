@@ -565,7 +565,8 @@ export const DYY_TACTICS = Object.freeze([DYY_LEVEL, DYY_SHOP, DYY_FREEZE, DYY_M
 export const DYY_PROFILES = Object.freeze([
   defineProfile({ id: 'fish-dyy', tactics: [DYY_SHOP, DYY_FREEZE, DYY_LEVEL] }),
   // DYYBot, the draft of step 3 (ai-players/05): the economy list (human schedule), the Isomorph engine (plan-iso from
-  // level 5, the Muelsyse clone, the carry), and the stack items (简易通讯机 and co.)
-  defineProfile({ id: 'dyybot', tactics: [DYY_MUELSYSE, DYY_SHOP, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } },
+  // level 5, the Muelsyse clone, the carry), and the stack items (简易通讯机 and co.). No dyy-shop (queues 25–28: without
+  // it 33 wins of 160 against 17 with it and legacy's 20; its buying of every unowned Yan operator costs merges)
+  defineProfile({ id: 'dyybot', tactics: [DYY_MUELSYSE, DYY_FREEZE, { tactic: DYY_LEVEL, params: { schedule: 'human' } },
     { tactic: PLAN_ISO, params: { fromLevel: 5 } }, CARRY_ISO, CARRY_HOLOGRAM, ISO_NOT_MUELSYSE, { tactic: PLAN_ITEMS, params: { set: 'stack' } }] }),
 ]);
