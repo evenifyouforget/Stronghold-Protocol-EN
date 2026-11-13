@@ -2578,6 +2578,8 @@
   "装备补充包": "Equipment Booster Pack",
   "装备到任意干员上：免费选择一件装备（按固定顺序轮换全部装备，每次6件），装备补充包留在手牌": "Equip it on any Operator: pick one piece of equipment for free (6 at a time, going through every piece of equipment in a fixed order). The Equipment Booster Pack stays in your hand",
   "开局获得装备补充包": "Start with an Equipment Booster Pack",
+  "{name}还能与更多听起来属于某个盟约的装备搭配": "{name} also pairs with more items that sound like they belong to an Alliance",
+  "与{name}一同装备时，以下装备也使携带者视为对应盟约成员：{list}": "Equipped together with {name}, these items also make the holder count as a member of the Alliance: {list}",
   "开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）": "Every Doctor starts with an Equipment Booster Pack: equip it on any Operator to pick a piece of equipment for free, 6 at a time, going through every piece of equipment in a fixed order. The pack stays in your hand (AI players don't use it)",
   "盟约效果剩余时间": "Bond effect timers",
   "在选中单位的详情中显示叙拉古、萨尔贡效果的剩余时间；萨尔贡显示层数与下一层到期时间。官方界面没有这些数字。": "Show remaining Siracusa and Sargon effect times in the selected unit’s details. Sargon shows the stack count and next expiry. These numbers are not in the official interface.",
