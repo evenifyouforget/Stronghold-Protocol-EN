@@ -554,3 +554,7 @@ Each part costs a few wins, none all of them: what's left with all three off is 
 yet owned, ahead of legacy's own choices. **So dyybot drops dyy-shop** (feature/bot-plan-tactics, the commit after
 27002c44; `--bot dyybot` now plays queue25's `loo-no-dyy-shop` seed for seed: checked on seeds 1–20). `fish-dyy`
 keeps it, as Fish's original list.
+
+**Queue29, fresh seeds 161–320** (c8b01929, the new dyybot against legacy): 30 wins against 21, 19 seeds better / 10
+worse (p 0.14, score +0.063, t 1.67). The same direction, a little smaller, as expected after choosing on seeds 1–160.
+Both sets together: 63 against 41 of 320, 40 / 18 seeds (p 0.005).
