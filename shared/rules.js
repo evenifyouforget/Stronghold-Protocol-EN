@@ -43,6 +43,7 @@ export const RULES = Object.freeze([
   { key: 'tierStart', type: 'bool', category: 'cheat' },        // every player starts with one random operator of each tier
   { key: 'boosterPack', type: 'bool', category: 'cheat' },      // every player starts with a Booster Pack (shared/ruleData.js BOOSTER)
   { key: 'itemBoosterPack', type: 'bool', category: 'cheat' },  // … and an Equipment Booster Pack (shared/ruleData.js ITEM_BOOSTER)
+  { key: 'isoPlus', type: 'choice', options: ['off', 'plus', 'plusplus'], category: 'cheat' }, // Damazti Isomorph+ / ++: more item → Alliance pairs (GitHub #134; shared/ruleData.js ISO_PLUS)
   // Alliance Modules: A = the original effect
   { key: 'lateranoMod', type: 'choice', options: ['A', 'B'], category: 'neutral' },
   { key: 'victoriaMod', type: 'choice', options: ['A', 'C'], category: 'neutral' },

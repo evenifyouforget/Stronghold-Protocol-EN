@@ -8,6 +8,8 @@
 
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
+- New cheat, Damazti Isomorph+ (#PR): worn with the Isomorph, more items that sound like an Alliance's make the holder its member: Tianshi's Cauldron (Yan), Steam Heart (Victoria), Kjeragandr's Tears (Kjerag), Desert Compass (Sargon), Trench Test Subject (Aegir), Chivalric Commandments, Pegasian Helm and Pegasian Lance (Kazimierz), Famiglia Insignia (Siracusa), Gun-Knight's Might (Laterano) and Laser Sighter (Arcane). Isomorph++ also pairs the Miniature Accelerator with Agile. The items are still no Alliance items of their own.
+- Fixed SPA-CC Strategy's tag texts in the game: the Strategy texts now show the rounds that come later (#PR).
 - SPA-CC balance update (November 2026): every tag level it changes shows "α" after its name in the room's rules, so you can see what changed. The tag texts in all four languages follow the new numbers (#138).
 - Environment: Suffocation 2 / 3 α: operators' SP recovery is −0.4 / −0.6 per second (was −0.5 / −0.8). Level 1 is unchanged (#138).
 - Famiglia: Cleaner 1 α: 3 Famiglia Shadow Silencers in co-op and 2 in solo (was 5), in rounds 10–13, for the player with the fewest Stacks as before. Unending 2 / 3 α include this change. Seasonal 2 / 3 α: the Blood Ledger fills to 300 before an Asset Liquidation (was 200), plus the Cleaner change (#138).

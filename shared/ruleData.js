@@ -230,10 +230,46 @@ export const LATERANO_B_AMMO = Object.freeze({ base: 0.05, perStack: 0.01, capBa
 export const LATERANO_B_100 = N_('<达到<@autochess.dgreen>100</>层>【{bond}】干员造成的伤害提升至<@ba.vup>200%</>；消耗弹药时触发的特质（{list}）触发两次，两次均计入该特质每场战斗的触发次数上限');
 export const VICTORIA_C_TEXT = N_('【{bond}】干员技能结束时，每携带1件维式重锤回复8点技力；【{bond}】激活时调度中心的维式重锤为进阶版且免费。<休整期结束时>携带维式重锤的【{bond}】干员使【{bond}】层数+其阶级。<在场6名不同【{bond}】干员>上述干员还使自身其他已激活盟约的层数+2×其阶级；战斗开始时【{bond}】干员攻击力+(200 + 1.2×层数)%，获得最大生命值200%的屏障与抵抗。不再每25层获得维式重锤');
 
+/**
+ * The Damazti Isomorph+ cheat (GitHub #134, Fish's list): items that sound like an Alliance's give it to a bearer that
+ * also wears a 变形同构体 (`morphBondId`, read by shared/plugins/rules.js morphBondOf only). `plus` adds the first list,
+ * `plusplus` also Miniature Accelerator → Agile. Both forms of each item (`_a` / `_b`). The Isomorph's name gets "+" / "++".
+ */
+export const ISO_PLUS = Object.freeze({
+  morphIds: Object.freeze(['chess_item_6_09_e_a', 'chess_item_6_09_e_b']),
+  plus: Object.freeze({
+    chess_item_6_03_e: 'yanShip', // Tianshi's Cauldron
+    chess_item_6_05_e: 'victoriaShip', // Steam Heart
+    chess_item_6_06_e: 'kjeragShip', // Kjeragandr's Tears
+    chess_item_6_07_e: 'sargonShip', // Desert Compass
+    chess_item_6_04_e: 'egirShip', // Trench Test Subject
+    chess_item_6_10_e: 'kazimierzShip', // Chivalric Commandments
+    chess_item_6_11_e: 'siracusaShip', // Famiglia Insignia
+    chess_item_6_02_e: 'lateranoShip', // Gun-Knight's Might
+    chess_item_5_09_e: 'kazimierzShip', // Pegasian Helm
+    chess_item_6_01_e: 'kazimierzShip', // Pegasian Lance
+    chess_item_3_03_e: 'arcaneShip', // Laser Sighter
+  }),
+  plusplus: Object.freeze({
+    chess_item_4_03_e: 'skillfulShip', // Miniature Accelerator → Agile
+  }),
+});
+
+/**
+ * The Alliance the Damazti Isomorph+ cheat (GitHub #134) pairs the item `id` with at `level` ('plus' / 'plusplus'), or
+ * null. For a battle, whose item records are the unpatched ones (sim/content/support unitBonds).
+ */
+export function isoPlusBond(id, level) {
+  if ((level !== 'plus' && level !== 'plusplus') || typeof id !== 'string') return null;
+  const base = id.replace(/_[ab]$/, '');
+  if (base === id) return null;
+  return ISO_PLUS.plus[base] ?? (level === 'plusplus' ? ISO_PLUS.plusplus[base] ?? null : null);
+}
+
 /** Whether `rules` change any data record (the callers can skip the patch). */
 export const rulesChangeData = (rules) => !!(rules && (rules.virtuosaBonds === true || rules.blaze === true
   || rules.lateranoMod === 'B' || rules.victoriaMod === 'C' || rules.ccInvestorBench > 0 || rules.ccSwift > 0 || rules.ccJunk > 0 || rules.boosterPack === true || rules.itemBoosterPack === true
-  || rules.ccStrategyLate > 0));
+  || rules.ccStrategyLate > 0 || rules.isoPlus === 'plus' || rules.isoPlus === 'plusplus'));
 
 // The round numbers a Strategy's text names, in each language's data: zh / zh-TW 第4、7、10回合, en "Round(s) 4, 7 and 10",
 // ja 第4/7/10ラウンド (not "2ラウンドごと", every 2 rounds), ko 4/7/10라운드 (not "2라운드마다"). Each match is a group of numbers.
@@ -269,7 +305,7 @@ function strategyLateBands(bands) {
 /**
  * The records `rules` change: `{ chess, garrisons, bonds, items, bands: { [id]: record } }` — new objects, the inputs are not
  * touched; empty maps when nothing changes (or the data lacks what a change needs).
- * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object, bands?: object }} raw the raw data maps (id → record)
+ * @param {{ chess?: object, garrisons?: object, backups?: object, bonds?: object, bands?: object, items?: object }} raw the raw data maps (id → record)
  * @param {object} rules a shared/rules.js rules object
  * @param {{ text?: (msgid: string, params?: object) => string }} [opts] translates the made-up texts (the client passes t)
  */
@@ -278,6 +314,21 @@ export function ruleDataPatch(raw, rules, { text = (s, p) => s.replace(/\{(\w+)\
   if (!rulesChangeData(rules) || !raw) return { chess, garrisons, bonds, items, bands: {} };
   // SPA-CC Strategy 1: the Strategies' texts name their rounds one round later (only the client passes `bands`)
   const bands = rules.ccStrategyLate > 0 ? strategyLateBands(raw.bands) : {};
+  // the Damazti Isomorph+ cheat: more items pair with the Isomorph; its name says which level
+  if (rules.isoPlus === 'plus' || rules.isoPlus === 'plusplus') {
+    const pairs = { ...ISO_PLUS.plus, ...(rules.isoPlus === 'plusplus' ? ISO_PLUS.plusplus : {}) };
+    for (const [base, bondId] of Object.entries(pairs)) {
+      for (const form of ['a', 'b']) {
+        const rec = own(raw.items, `${base}_${form}`);
+        if (rec && !rec.giveBondId && !rec.canGiveBond) items[rec.id ?? `${base}_${form}`] = { ...rec, morphBondId: bondId };
+      }
+    }
+    const mark = rules.isoPlus === 'plusplus' ? '++' : '+';
+    for (const id of ISO_PLUS.morphIds) {
+      const rec = own(raw.items, id);
+      if (rec && typeof rec.name === 'string') items[id] = { ...rec, name: `${rec.name}${mark}` };
+    }
+  }
   // SPA-CC Junk: the Toxic Waste
   if (rules.ccJunk > 0) items[CC.junk.itemId] = cursedHammerRecord(rules.ccJunk, text);
   // the boosterPack cheat: the Booster Pack
