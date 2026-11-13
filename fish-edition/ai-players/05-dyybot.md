@@ -521,3 +521,20 @@ dyybot3's 160 normal games seed for seed). Code 1c88dbaa.
   changes 4 seeds.
 - `carry-hologram` never acted (博士投影 is Muelsyse's Strategy item; it seldom reaches a Du Yaoye seat).
 - The rest are within noise.
+
+## Queue26: iso-pair, and legacy on the same code (2026-11-13)
+
+Code 27002c44. Paired by seed.
+
+| | Against | Wins | Seeds better / worse | p |
+|---|---|---|---|---|
+| legacy + iso-pair, mu-scroll 80 | legacy 19 | 16 | 6 / 9 | 0.61 |
+| legmu3 + iso-pair, mu-scroll 80 | legmu3 13 | 12 | 1 / 2 | 1.00 |
+| legacy + iso-pair, normal 160 | legacy 20 | 20 | 1 / 1 | 1.00 |
+| dyybot + iso-pair, normal 160 | dyybot 17 | 16 | 0 / 1 | 1.00 |
+| **dyybot without dyy-shop**, normal 160 | **legacy 20** | **33** | **21 / 8** | **0.02** |
+
+- **iso-pair changes almost no game.** On a Du Yaoye board the Isomorphs have little to grant (05 above), so the
+  tactic stays a draft (not in any profile).
+- **dyybot without dyy-shop is the first Du Yaoye profile that beats legacy** (legacy reran on this code: 20 of 160,
+  as in the baseline). The full dyybot is legacy's equal (17 vs 20, n.s.).
