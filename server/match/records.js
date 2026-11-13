@@ -217,6 +217,8 @@ export function finishRecord(m, summary) {
       return {
         seat: `s${ps.seat}`, human: !ps.isBot, band: ps.bandId ?? null, roundsPassed: row ? row.roundsPassed : null,
         left: !!ps.left, autoplay: !!ps.autoplay, title: row?.title?.id ?? null, stats: row?.stats ?? null,
+        // (fork, GitHub #118) only for a player who set a public name and turned it on; every other seat stays anonymous
+        ...(ps.publicName ? { name: ps.publicName } : {}),
       };
     }),
     result: summary ? { victory: !!summary.victory, reason: summary.reason ?? null, roundsPassed: summary.roundsPassed ?? 0, hiddenReached: !!summary.hiddenReached, hiddenCleared: !!summary.hiddenCleared, teamLp: summary.teamLp ?? null } : null,

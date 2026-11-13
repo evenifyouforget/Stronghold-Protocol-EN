@@ -2895,5 +2895,9 @@
   "已锁定投票": "Vote Locked",
   "已投票给「{name}」": "Voted for \"{name}\"",
   "投票已结束": "Voting has ended",
-  "一策同心": "One for All"
+  "一策同心": "One for All",
+  "例如你的 Discord 名": "e.g. your Discord name",
+  "对局记录署名": "Name in match records",
+  "署名": "Public name",
+  "开启后，此后对局的记录会写入这个署名（服务器长期保存，用于整理 SPA-CC 等记录），你的对局记录将能被认出是你的。请不要填写真实姓名等个人信息。关闭后，新的对局记录不再包含署名；已保存的记录不会改变。": "When on, the records of your next matches carry this name (the server keeps records indefinitely, e.g. for the SPA-CC clears list), so your matches can be told apart as yours. Don't enter your real name or other personal information. When off, new match records carry no name; records already saved don't change."
 }
