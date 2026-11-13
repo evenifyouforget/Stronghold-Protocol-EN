@@ -16,6 +16,7 @@ import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '.
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
 import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
+import { loadPref, savePref } from '../store.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 const chessName = (id, fallback) => data.lookup('chess', id)?.name || fallback;
@@ -245,15 +246,24 @@ function RiskGrid({ rules, editable, onSet }) {
 }
 
 /** The strip between the seats and the bottom bar: the rules in force, the labels, and the button to the dialog. */
+/** GitHub #139: the rules button glows until this browser has opened the dialog once (`sp.pref.lobby.rulesSeen`). */
+export const RULES_SEEN_PREF = 'lobby.rulesSeen';
+
 export function RulesBar({ room, isHost, busy, onSet }) {
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(() => loadPref(RULES_SEEN_PREF, false) === true);
+  const openDialog = () => {
+    setOpen(true);
+    if (!seen) { setSeen(true); savePref(RULES_SEEN_PREF, true); }
+  };
   useData('chess', 'bonds', 'stages', 'backups');
   const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
   const on = rulesInForce(rules);
   const badges = ruleBadges(rules);
   return html`<div class="room-rules">
     <span class="room-bar__label">${t('自定义房间改动')}<${MicroLabel}>CUSTOM<//></span>
-    <${Button} variant="secondary" class="rules-open" onClick=${() => setOpen(true)}>${isHost ? t('调整') : t('查看')}<//>
+    <${Button} variant="secondary" class=${cx('rules-open', !seen && 'is-new')} onClick=${openDialog}
+      title=${!seen ? t('作弊、盟约调整与风险词条：开局前由创建者设置') : undefined}>${isHost ? t('调整') : t('查看')}<//>
     <div class="rules-summary">
       ${on.length ? on.map((k) => html`<span key=${k} class=${cx('rules-chip', `rules-chip--${ruleOf(k).category}`)}>${ruleLabel(k, rules)}</span>`)
         : html`<span class="t-dim">${t('原版规则')}</span>`}
