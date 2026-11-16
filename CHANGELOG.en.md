@@ -10,6 +10,7 @@ This server's own changes. Their numbers are the pull requests of [Fish Edition]
 
 - New cheat, Damazti Isomorph+ (#150): worn with the Isomorph, more items that sound like an Alliance's make the holder its member: Tianshi's Cauldron (Yan), Steam Heart (Victoria), Kjeragandr's Tears (Kjerag), Desert Compass (Sargon), Trench Test Subject (Aegir), Chivalric Commandments, Pegasian Helm and Pegasian Lance (Kazimierz), Famiglia Insignia (Siracusa), Gun-Knight's Might (Laterano) and Laser Sighter (Arcane). Isomorph++ also pairs the Miniature Accelerator with Agile. The items are still no Alliance items of their own.
 - Fixed SPA-CC Strategy's tag texts in the game: the Strategy texts now show the rounds that come later (#150).
+- Custom Lobby Modifications: a room you create starts with the rules you last used (remembered in this browser), and the rules dialog has a "Clear all" button (#148, issue #143).
 - Match records (for the server owner's analysis) now also log the shop a refresh leaves after its own effects, such as Du Yaoye's Yan offer; before, they held only the roll before those effects (#146, issue #90).
 - Fixed the LP loss shown during a battle (top bar, team list) and in the round's result box leaving out Last Line of Defense's extra 2 LP: a round with 10 or more leaks now shows −12, as the settlement charges. The LP tooltip names the extra LP (#145, issue #123).
 - Shared deck: the shop's new Deck button shows how many copies of each operator are left in the deck all players share (left / total), by class. It updates every round (#152).
