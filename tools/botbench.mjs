@@ -23,6 +23,8 @@
 //   --rules R   lobby rules for every match, as key=value pairs (shared/rules.js RULES; e.g. ccPatriot=1,ccBoss=2;
 //               a bare key = 1): the SPA-CC tags, cheats and other modifiers. The bot plays as usual (it does not know
 //               the tags), so this measures how much a tag costs a tag-unaware player
+//   --scenario F (fork) a scenario test as JSON (tools/scenario.mjs): gifts of operators, items or funds to the bot
+//               seats at a round's prep start, the same on every seed; records carry rec.scenario (what was given)
 //   --band ID   solo configs only: force the opening pickBand hook (e.g. band_cannot); keep gd.bandIds() and
 //               gd.bandBondIds() intact for later effects. Previously these were replaced with [ID] and [] for
 //               the entire match. These are different experiments; rerun both sides when comparing old results.
@@ -40,6 +42,7 @@
 // the SP_DRAFT callback in which a bot's pick landed. Wall-clock numbers depend on the host load: compare runs made
 // back to back with --jobs 1.
 
+import { parseScenario, applyScenario } from './scenario.mjs';
 import { toolVersion } from './versions/runtime.mjs';
 import { DEFAULT_VERSION } from '../shared/versions.js';
 import { performance } from 'node:perf_hooks';
@@ -93,6 +96,8 @@ const rules = opt.rules && opt.rules !== true
 // (fork) --profile: built once per thread from the same file, so every worker plays the same profile
 const profile = opt.profile ? profileFromData(JSON.parse(readFileSync(String(opt.profile), 'utf8'))) : null;
 if (profile && opt.bot) throw new Error('--bot and --profile: give one');
+const scenarioRaw = opt.scenario ? JSON.parse(readFileSync(String(opt.scenario), 'utf8')) : null;
+const scenario = scenarioRaw ? parseScenario(scenarioRaw) : null;
 const rehearsal = opt.rehearsal != null && opt.rehearsal !== true ? Math.max(0, Math.floor(Number(opt.rehearsal) || 0)) : undefined;
 
 async function runOne(cfg, seed) {
@@ -110,6 +115,7 @@ async function runOne(cfg, seed) {
   // Test-only band forcing overrides the selected picker, preserving real band metadata for custom strategies.
   if (opt.band && cfg.mode === 'solo') m.bot = defineBotStrategy({ id: m.bot.id, base: m.bot, pickBand: () => String(opt.band) });
   const rec = { config: cfg.name, botStrategy: m.bot.id, seed, stageId: m.stageId, bossId: m.bossId, preps: [], economy: [], picks: [], rounds: [], bounties: [] };
+  if (scenario) { parseScenario(scenarioRaw, m.gd); rec.scenario = { id: scenario.id, given: applyScenario(m, scenario) }; }
   if (toolVersion !== DEFAULT_VERSION) rec.version = toolVersion;
   const traceSnapshot = opt.layers ? traceLayers(m, rec) : null;
   // rehearsal stepping time (Battle.step of the rehearsal fields)
