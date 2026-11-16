@@ -52,6 +52,7 @@ export const RULES = Object.freeze([
   { key: 'itemBoosterPack', type: 'bool', category: 'cheat' },  // … and an Equipment Booster Pack (shared/ruleData.js ITEM_BOOSTER)
   { key: 'transmitterPlus', type: 'bool', category: 'cheat' },  // (GitHub #133) Transmitter+ (shared/ruleData.js TRANSMITTER_PLUS)
   { key: 'modZ', type: 'modules', options: MODZ.map((m) => m.id), category: 'cheat' }, // (draft) the Mod Z / W the room equips, one per operator (shared/modZ.js)
+  { key: 'isoPlus', type: 'choice', options: ['off', 'plus', 'plusplus'], category: 'cheat' }, // Damazti Isomorph+ / ++: more item → Alliance pairs (GitHub #134; shared/ruleData.js ISO_PLUS)
   // Alliance Modules: A = the original effect
   { key: 'lateranoMod', type: 'choice', options: ['A', 'B'], category: 'neutral' },
   { key: 'victoriaMod', type: 'choice', options: ['A', 'C'], category: 'neutral' },

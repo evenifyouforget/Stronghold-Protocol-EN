@@ -15,7 +15,7 @@ import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalizeRules, sameRuleValue } from '../../../shared/rules.js';
 import { loadPref, savePref } from '../store.js';
-import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
+import { VIRTUOSA, BLAZE, CC, ISO_PLUS, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 import { MODZ } from '../../../shared/modZ.js';
 
@@ -26,6 +26,29 @@ const bandName = (id) => data.lookup('bands', id)?.name || id;
 const opName = (charId) => data.get('backups')?.units?.[charId]?.name || charId;
 /** "Typhon Z": a Mod Z / W by its operator's name and kind. */
 const modZShort = (id) => { const m = MODZ.find((x) => x.id === id); return m ? `${opName(m.charId)} ${m.kind}` : id; };
+/** The Damazti Isomorph's own name (the room's records may say "+"). */
+const isoName = () => data.lookupBase('items', ISO_PLUS.morphIds[0])?.name || ISO_PLUS.morphIds[0];
+/** "item → Alliance" for each pair a level adds (GitHub #134). */
+const isoPairs = (pairs) => Object.entries(pairs).map(([base, b]) => `${data.lookupBase('items', `${base}_a`)?.name || base} → ${bondName(b)}`).join(t('、'));
+
+/** The Damazti Isomorph+ cheat (GitHub #134): off / + / ++, and what the chosen level adds. */
+function IsoPlusChoice({ rules, editable, onSet }) {
+  const v = rules.isoPlus;
+  const labels = { off: t('关'), plus: `${isoName()}+`, plusplus: `${isoName()}++` };
+  const desc = v === 'off' ? t('{name}还能与更多听起来属于某个盟约的装备搭配', { name: isoName() })
+    : t('与{name}一同装备时，以下装备也使携带者视为对应盟约成员：{list}', { name: isoName(), list: isoPairs({ ...ISO_PLUS.plus, ...(v === 'plusplus' ? ISO_PLUS.plusplus : {}) }) });
+  return html`<div class="rules-row">
+    <div class="rules-mod">
+      <b>${isoName()}</b>
+      <div class="rules-seg" role="radiogroup" aria-label=${isoName()}>
+        ${['off', 'plus', 'plusplus'].map((o) => html`<button key=${o} type="button" role="radio" aria-checked=${v === o ? 'true' : 'false'}
+          class=${cx('rules-seg__opt', v === o && 'is-active')} data-rule="isoPlus" data-value=${o} disabled=${!editable}
+          onClick=${() => onSet({ isoPlus: o })}>${labels[o]}</button>`)}
+      </div>
+    </div>
+    <p class="rules-row__desc">${desc}</p>
+  </div>`;
+}
 
 /** The short label of a rule in force (the strip, the result screen). */
 export function ruleLabel(key, rules) {
@@ -40,6 +63,7 @@ export function ruleLabel(key, rules) {
     case 'itemBoosterPack': return t('开局获得装备补充包');
     case 'transmitterPlus': return t('信标+');
     case 'modZ': return t('Z型/W型模组（草案）：{list}', { list: (v || []).map(modZShort).join(t('、')) });
+    case 'isoPlus': return `${isoName()}${v === 'plusplus' ? '++' : '+'}`;
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
     case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
@@ -291,8 +315,16 @@ export function restoreAction(room, isHost, remembered, seen = restoredRooms) {
 const sameRules = (a, b) => RULES.every((r) => sameRuleValue(a?.[r.key], b?.[r.key]));
 
 /** The strip between the seats and the bottom bar: the rules in force, the labels, and the button to the dialog. */
+/** GitHub #139: the rules button glows until this browser has opened the dialog once (`sp.pref.lobby.rulesSeen`). */
+export const RULES_SEEN_PREF = 'lobby.rulesSeen';
+
 export function RulesBar({ room, isHost, busy, onSet }) {
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(() => loadPref(RULES_SEEN_PREF, false) === true);
+  const openDialog = () => {
+    setOpen(true);
+    if (!seen) { setSeen(true); savePref(RULES_SEEN_PREF, true); }
+  };
   useData('chess', 'bonds', 'stages', 'backups');
   const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
   // GitHub #143: restore the last used rules into a new room; remember the host's changes
@@ -308,7 +340,8 @@ export function RulesBar({ room, isHost, busy, onSet }) {
   const badges = ruleBadges(rules);
   return html`<div class="room-rules">
     <span class="room-bar__label">${t('自定义房间改动')}<${MicroLabel}>CUSTOM<//></span>
-    <${Button} variant="secondary" class="rules-open" onClick=${() => setOpen(true)}>${isHost ? t('调整') : t('查看')}<//>
+    <${Button} variant="secondary" class=${cx('rules-open', !seen && 'is-new')} onClick=${openDialog}
+      title=${!seen ? t('作弊、盟约调整与风险词条：开局前由创建者设置') : undefined}>${isHost ? t('调整') : t('查看')}<//>
     <div class="rules-summary">
       ${on.length ? on.map((k) => html`<span key=${k} class=${cx('rules-chip', `rules-chip--${ruleOf(k).category}`)}>${ruleLabel(k, rules)}</span>`)
         : html`<span class="t-dim">${t('原版规则')}</span>`}
@@ -541,6 +574,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />
       <${Toggle} k="itemBoosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('itemBoosterPack', rules)} desc=${t('开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）')} />
       <${Toggle} k="transmitterPlus" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('transmitterPlus', rules)} desc=${t('信标更好用：独自一人时，第一次装备给六星干员必出缪尔赛思，其他时候必出一名你层数最多的盟约的干员；有队友但没人需要原干员时，改为给2名随机队友各送1名其主盟约的同阶干员；5人及以上的房间多送1人')} />
+      <${IsoPlusChoice} rules=${rules} editable=${editable} onSet=${onSet} />
       ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
     <//>` : null}
     ${tab === 'modZ' ? html`<${Section} title=${t('Z型/W型模组（草案）')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
