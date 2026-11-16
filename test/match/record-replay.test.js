@@ -44,7 +44,10 @@ test('--until stops at that round\'s prep; --bot finishes the match from there',
   assert.equal(stop.seats[0].lp, lp, 'the LP the record had after round 4');
   const bot = replayRecord(rec, { data: DATA, until: 5, bot: 'legacy' });
   assert.ok(bot.result, 'the bot finished the match');
-  assert.equal(bot.botFrom >= 5, true);
+  assert.equal(bot.botFrom, 5);
+  // Fish's seed re-randomisation: the same board continued on other seeds finishes too, and not always the same way
+  const ends = [1, 2, 3].map((seed) => JSON.stringify(replayRecord(rec, { data: DATA, until: 5, bot: 'legacy', reseed: seed }).result));
+  for (const e of ends) assert.notEqual(e, 'null');
 });
 
 test('a changed record diverges at the first difference', () => {

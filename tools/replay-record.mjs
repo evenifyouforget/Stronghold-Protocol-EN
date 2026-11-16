@@ -8,6 +8,9 @@
 //   node tools/replay-record.mjs FILE --until R --bot ID
 //                                                      … then hand every seat to the bot ID (AI 托管, server/match/
 //                                                      botStrategies.js) and play to the end; prints both results
+//   --reseed S  with --bot: the match continues on seed S from the handover (Fish's seed re-randomisation, #104): what
+//            is already drawn stays (stage, leader, the rounds' types, bans, the shop on screen); the shop rolls, drafts,
+//            battles and the bot's own draws after it come from S, so one human board gives many different endgames
 //   --json   the report as JSON
 //
 // It replays what the record keeps: the band and 机变 drafts, every prep action of every seat (bots and 托管 included),
@@ -30,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import { Match } from '../server/match/Match.js';
 import { VirtualScheduler } from '../server/match/scheduler.js';
 import { getData } from '../server/data.js';
+import { createRng, deriveSeed } from '../server/sim/rng.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -66,7 +70,7 @@ const refused = (res) => res && typeof res === 'object' && res.error;
  * @param {any} rec a record (readRecord)
  * @param {{ until?: number, bot?: string|null, data?: any, maxSteps?: number }} [opts]
  */
-export function replayRecord(rec, { until = Infinity, bot = null, data = null, maxSteps = 5e6 } = {}) {
+export function replayRecord(rec, { until = Infinity, bot = null, reseed = null, data = null, maxSteps = 5e6 } = {}) {
   const sched = new VirtualScheduler();
   const pid = (s) => `p_${Number(String(s).slice(1))}`;
   const seats = rec.seats.map((s) => ({
@@ -206,11 +210,12 @@ export function replayRecord(rec, { until = Infinity, bot = null, data = null, m
     stopped: { phase: m.phase, round: m.round }, seats: state(), errors: errors.slice(0, 5),
   };
   if (bot && !summary) {
+    out.botFrom = m.round;
+    if (reseed != null) reseedMatch(m, reseed);
     for (const ps of m.players.values()) if (!ps.left) m.setAutoplay(ps, true);
     readyBefore = -1; // the bot readies its seats itself
     checking = false;
     drive(() => summary != null);
-    out.botFrom = m.round;
   }
   if (summary || bot || !Number.isFinite(until)) {
     out.result = summary ? { victory: !!summary.victory, roundsPassed: summary.roundsPassed ?? 0, teamLp: summary.teamLp ?? null } : null;
@@ -220,6 +225,16 @@ export function replayRecord(rec, { until = Infinity, bot = null, data = null, m
   return out;
 }
 
+/**
+ * Continue `m` on another seed: the battle seeds (deriveSeed of m.seed) and the match's later draws (shop, waves, drafts,
+ * bots, effects) change; what was drawn at the setup stays.
+ */
+export function reseedMatch(m, seed) {
+  m.seed = (Number(seed) >>> 0) || 1;
+  for (const k of ['Shop', 'Waves', 'Draft', 'Bots', 'Meta']) m[`rng${k}`] = createRng(deriveSeed(m.seed, `reseed:${k.toLowerCase()}`));
+  m.reseeded = m.seed;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const flag = (k) => { const i = args.indexOf(k); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
@@ -227,13 +242,14 @@ async function main() {
   if (json) args.splice(args.indexOf('--json'), 1);
   const until = flag('--until');
   const bot = flag('--bot');
+  const reseed = flag('--reseed');
   const [file] = args;
   if (!file) {
     console.error('usage: node tools/replay-record.mjs FILE [--until R] [--bot ID] [--json]');
     process.exit(2);
   }
   const rec = readRecord(file);
-  const out = replayRecord(rec, { until: until != null ? Number(until) : Infinity, bot: bot ?? null });
+  const out = replayRecord(rec, { until: until != null ? Number(until) : Infinity, bot: bot ?? null, reseed: reseed != null ? Number(reseed) : null });
   if (json) { console.log(JSON.stringify(out, null, 1)); return; }
   console.log(`${path.basename(file)}: app ${out.app} (this checkout ${out.appNow}), ${rec.mode} ${rec.difficulty}, seed ${rec.seed}`);
   console.log(`replayed ${out.replayed} of ${out.total} actions; as recorded: ${out.checks.shops} shop rolls, ${out.checks.rounds} rounds (LP, level), ${out.checks.battles} battles`);
@@ -242,7 +258,7 @@ async function main() {
   for (const s of out.seats) console.log(`  ${s.seat}: ${s.alive ? 'alive' : 'out'}, LP ${s.lp}, level ${s.level}, funds ${s.funds}, ${s.layers} stacks, board ${s.board.join(' ')}`);
   if (out.result !== undefined) {
     const f = (r) => (r ? `${r.victory ? 'won' : 'lost'}, ${r.roundsPassed} rounds, team LP ${r.teamLp}` : 'not finished');
-    console.log(`${bot ? `bot ${bot} from R${out.botFrom}` : 'replay'}: ${f(out.result)}; record: ${f(out.recordResult)}`);
+    console.log(`${bot ? `bot ${bot} from R${out.botFrom}${reseed != null ? ` on seed ${reseed}` : ''}` : 'replay'}: ${f(out.result)}; record: ${f(out.recordResult)}`);
   }
   if (out.errors.length) console.log(`match errors: ${out.errors.join(' | ')}`);
 }
