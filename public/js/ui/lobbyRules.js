@@ -8,12 +8,13 @@
 // Every change is one room.setRules partial update. Names of operators and alliances come from the game data (each
 // language's official name). A room searching for teammates plays the original game (the server refuses rules then).
 
-import { useState } from '../../vendor/hooks.module.js';
+import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Modal, Icon, MicroLabel, Tooltip, Tabs } from './components.js';
 import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
 import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, modeIdFor } from '../../../shared/constants.js';
-import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent } from '../../../shared/rules.js';
+import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalizeRules, sameRuleValue } from '../../../shared/rules.js';
+import { loadPref, savePref } from '../store.js';
 import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
 import { MODZ } from '../../../shared/modZ.js';
@@ -37,6 +38,7 @@ export function ruleLabel(key, rules) {
     case 'tierStart': return t('开局获得各阶干员');
     case 'boosterPack': return t('开局获得补充包');
     case 'itemBoosterPack': return t('开局获得装备补充包');
+    case 'transmitterPlus': return t('信标+');
     case 'modZ': return t('Z型/W型模组（草案）：{list}', { list: (v || []).map(modZShort).join(t('、')) });
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
@@ -249,11 +251,59 @@ function RiskGrid({ rules, editable, onSet }) {
   </div>`;
 }
 
+// ---- the last used rules (GitHub #143, clientside) -----------------------------------------------------------------
+
+/** This browser's last used lobby rules (`sp.pref.lobby.rules`): what the host's last room was set to. */
+export const RULES_PREF = 'lobby.rules';
+/** The remembered rules, complete and checked (an unknown key or a bad value from an older version is dropped). */
+export function rememberedRules() {
+  const raw = loadPref(RULES_PREF, null);
+  return raw && typeof raw === 'object' ? normalizeRules(raw) : null;
+}
+/** Only the rules that differ from the original game: what a new room gets (an empty object: nothing to apply). */
+export function rulesToRestore(remembered) {
+  const out = {};
+  if (!remembered) return out;
+  for (const k of rulesInForce(remembered)) out[k] = remembered[k];
+  return out;
+}
+/** Every rule back to the original game (the dialog's "clear all"). */
+export const CLEARED_RULES = Object.freeze({ ...DEFAULT_RULES });
+// the rooms this page already decided for (applied, or found nothing to apply): a room is set up once
+const restoredRooms = new Set();
+
+/**
+ * GitHub #143: a host's new room starts with the last used rules — once per room, only while it is a plain room
+ * with none in force (not searching, no match) — and every change the host makes is remembered for the next one.
+ * Returns whether this render may save (false until the room was set up, so its first default state never overwrites
+ * the remembered rules).
+ */
+export function restoreAction(room, isHost, remembered, seen = restoredRooms) {
+  if (!room || !isHost || !room.code) return { apply: null, save: false };
+  if (seen.has(room.code)) return { apply: null, save: true };
+  seen.add(room.code);
+  const want = rulesToRestore(remembered);
+  const plain = !room.match && !room.searching && rulesInForce({ ...DEFAULT_RULES, ...(room.rules || {}) }).length === 0;
+  return { apply: plain && Object.keys(want).length ? want : null, save: !(plain && Object.keys(want).length) };
+}
+
+/** Whether two complete rules objects are the same. */
+const sameRules = (a, b) => RULES.every((r) => sameRuleValue(a?.[r.key], b?.[r.key]));
+
 /** The strip between the seats and the bottom bar: the rules in force, the labels, and the button to the dialog. */
 export function RulesBar({ room, isHost, busy, onSet }) {
   const [open, setOpen] = useState(false);
   useData('chess', 'bonds', 'stages', 'backups');
   const rules = { ...DEFAULT_RULES, ...(room.rules || {}) };
+  // GitHub #143: restore the last used rules into a new room; remember the host's changes
+  useEffect(() => {
+    const { apply, save } = restoreAction(room, isHost, rememberedRules());
+    if (apply) { onSet(apply); return; }
+    if (save && isHost && !room.searching) {
+      const now = normalizeRules(rules);
+      if (!sameRules(now, rememberedRules())) savePref(RULES_PREF, now);
+    }
+  }, [room.code, isHost, JSON.stringify(room.rules || null), !!room.searching]);
   const on = rulesInForce(rules);
   const badges = ruleBadges(rules);
   return html`<div class="room-rules">
@@ -478,7 +528,8 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     C: t(VICTORIA_C_TEXT, { bond: vic }),
   };
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('自定义房间改动')} micro="CUSTOM" width="13rem" class="rules-dialog"
-    actions=${html`<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
+    actions=${html`${editable && rulesInForce(rules).length ? html`<${Button} variant="ghost" class="rules-clear" onClick=${() => onSet(CLEARED_RULES)}>${t('全部清除')}<//>` : null}<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
+    ${editable ? html`<p class="rules-note">${t('新建同盟时会自动沿用你上次的设置')}</p>` : null}
     ${room.searching ? html`<p class="rules-note">${t('搜寻队友时使用原版规则')}</p>` : null}
     ${editable ? null : html`<p class="rules-note">${t('由创建者设置')}</p>`}
     <${Tabs} class="rules-tabs" size="sm" value=${tab} onChange=${setTab} items=${RULE_TABS.map((tb) => ({ id: tb.id, label: tabLabel[tb.id], badge: badge(tb) }))} />
@@ -489,6 +540,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
       <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />
       <${Toggle} k="itemBoosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('itemBoosterPack', rules)} desc=${t('开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）')} />
+      <${Toggle} k="transmitterPlus" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('transmitterPlus', rules)} desc=${t('信标更好用：独自一人时，第一次装备给六星干员必出缪尔赛思，其他时候必出一名你层数最多的盟约的干员；有队友但没人需要原干员时，改为给2名随机队友各送1名其主盟约的同阶干员；5人及以上的房间多送1人')} />
       ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
     <//>` : null}
     ${tab === 'modZ' ? html`<${Section} title=${t('Z型/W型模组（草案）')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
