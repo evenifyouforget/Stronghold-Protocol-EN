@@ -92,6 +92,33 @@ What it means:
   far more matches than 2,000; that's the PC run's job.
 - Next race here: the same pool plus the new tactics (queues 13–17), once they're measured.
 
+## The weekend race (2026-11-14 → 16, Fish's PC)
+
+`untracked/race-weekend/` (summary.md, holdout.md, gen-*.md, best.json). 19 iterations, 122,380 matches, solo Ultimate;
+stopped by hand during iteration 19.
+
+- **What the race converged on:** every iteration's winner from 11 on holds `sell-singles` (from round 8 or 9: sell
+  operators with no pair, tier ≤ 2–3) and almost all hold `plan-items` (buy consumables from round 5, keep ~9–10
+  funds). The final best is `sell-singles(fromRound=9) > plan-items(fromRound=5,reserve=9)` (`best.json`).
+  Tactics that never stuck: `plan-iso`, `merge-first`, the placement tactics, `bounty-gate`, `diy-picks`.
+- **Held-back seeds (5001–5300):** the final best won 103 of 240 against legacy's 94 (43 % vs 39 %), 35 seeds gained and
+  26 lost: p ≈ 0.31 (sign test). The best single holdout was iteration 13's (`sell-singles(fromRound=8)` +
+  `plan-items`): 37 / 23, p ≈ 0.09. Each iteration's best is about +2 to +9 points over legacy, never significant on its
+  own; the holdout rows share seeds, so they are not independent evidence.
+- **Reading:** the race found one consistent direction, an economy one (buy consumables mid-game, sell dead weight
+  late), worth maybe +3–4 points. It is the "small effects add up" picture again, not a new bot.
+- **Confirmation (2026-11-16):** the best against legacy on 400 fresh seeds (7001–7400), paired: 178 wins vs 163
+  (44.5 % vs 40.8 %), 67 seeds gained, 52 lost, p ≈ 0.20. With the 240 held-back seeds (independent of these): 102
+  gained, 78 lost, p ≈ 0.09. So: about +4 points, consistent in both sets, still not significant at 5 %. The race's
+  answer is "a small economy gain, probably real, not proven". Whether it goes into the bot selector as a profile
+  (e.g. 「经济」) is Fish's call; 1,000 more paired seeds would settle it (Fish's PC, ~3 h).
+- **Final confirmation (2026-11-17, plan fixed before results in `untracked/race-confirm/PLAN.txt`):** evobot (#159)
+  against legacy on 2,000 paired fresh seeds (7001–9000, includes the 400 above), solo Ultimate, 0 errors: **875 wins vs
+  815 (43.8 % ± 1.1 vs 40.8 % ± 1.1, 1σ)**, 332 seeds gained, 272 lost, sign test p = 0.016 (two-sided). With the 240
+  held-back seeds: 367 gained, 298 lost, **p = 0.008**. **Evobot is proven better than legacy, by about +3 points.**
+  (The holdout row is the weekend's final best; evobot is the same two tactics with `maxTier: 2`, `set: both` spelled
+  out.)
+
 ## For Fish's PC
 
 Fish (2026-11-12): "I ctrl+c to stop it whenever is convenient, wait hopefully not longer than a minute for it to clean
