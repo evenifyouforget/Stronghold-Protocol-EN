@@ -686,6 +686,17 @@ export const DIY_CHOICES = Object.freeze({
   // on tier 5": t5a / t5b take her as well)
   ascalon: Object.freeze({ charId: 'char_4132_ascln', skillIndex: 1, uniEquipId: null, items: Object.freeze(['chess_item_5_02_e_a']),
     chess: Object.freeze(['chess_char_3_20_a', 'chess_char_4_03_a']) }),
+  // (2026-11-17, #128 / #142) Mod Z / W picks (shared/modZ.js), each with the skill its team bench liked
+  // (fish-edition/operator-mod-z/<op>.md). The module counts only in a room whose `modZ` rule lists it; elsewhere the
+  // pick falls back to the operator's first module (shared/diy.js modZRulePicks).
+  typhonZ: Object.freeze({ charId: 'char_2012_typhon', skillIndex: 0, uniEquipId: 'uniequip_fishz_typhon' }),
+  typhonW: Object.freeze({ charId: 'char_2012_typhon', skillIndex: 0, uniEquipId: 'uniequip_fishw_typhon' }),
+  rosaZ: Object.freeze({ charId: 'char_197_poca', skillIndex: 2, uniEquipId: 'uniequip_fishz_poca' }),
+  eunectesZ: Object.freeze({ charId: 'char_416_zumama', skillIndex: 2, uniEquipId: 'uniequip_fishz_zumama' }),
+  fiammettaZ: Object.freeze({ charId: 'char_300_phenxi', skillIndex: 1, uniEquipId: 'uniequip_fishz_phenxi' }),
+  thornsZ: Object.freeze({ charId: 'char_293_thorns', skillIndex: 2, uniEquipId: 'uniequip_fishz_thorns' }),
+  zuoleZ: Object.freeze({ charId: 'char_4121_zuole', skillIndex: 1, uniEquipId: 'uniequip_fishz_zuole' }),
+  vivianaZ: Object.freeze({ charId: 'char_4098_vvana', skillIndex: 2, uniEquipId: 'uniequip_fishz_vvana' }),
 });
 const DIY_OPTIONS = ['none', ...Object.keys(DIY_CHOICES)];
 export const DIY_PICKS = defineTactic({

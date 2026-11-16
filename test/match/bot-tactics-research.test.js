@@ -509,3 +509,17 @@ test('diy-picks: while Ascalon is owned without a Nevermeltice, Kjera (who bring
     assert.ok(ps._botSelf.plan.buy.includes('chess_char_3_20_a') && ps._botSelf.plan.buy.includes('chess_char_4_03_a'), JSON.stringify(ps._botSelf.plan.buy));
   } finally { h.m.dispose(); }
 });
+
+test('diy-picks: a Mod Z pick keeps its module only in a room whose modZ rule lists it (#128, #142)', () => {
+  const bot = profileFromData({ id: 't-diy-modz', tactics: [{ tactic: 'diy-picks', params: { t5a: 'typhonZ', t5b: 'none' } }] });
+  for (const [lobbyRules, z] of [[{ modZ: ['uniequip_fishz_typhon'] }, true], [undefined, false]]) {
+    const h = soloBot({ botStrategy: bot, seed: 7, lobbyRules });
+    try {
+      h.start();
+      const pick = h.m.order[0].diy?.chess_char_5_diy1_a;
+      assert.equal(pick?.charId, 'char_2012_typhon', JSON.stringify(h.m.order[0].diy));
+      assert.equal(pick.uniEquipId === 'uniequip_fishz_typhon', z, JSON.stringify(pick));
+      assert.equal(pick.skillIndex, 0);
+    } finally { h.m.dispose(); }
+  }
+});

@@ -90,7 +90,8 @@ const seed0 = Number(opt.seed) || 1;
 const rules = opt.rules && opt.rules !== true
   ? Object.fromEntries(String(opt.rules).split(',').filter(Boolean).map((kv) => {
     const [k, v] = kv.split('=');
-    return [k, v === undefined ? 1 : v === 'true' ? true : v === 'false' ? false : Number.isNaN(Number(v)) ? v : Number(v)];
+    // (fork) a list (bans, modZ) as a+b+c
+    return [k, v === undefined ? 1 : v === 'true' ? true : v === 'false' ? false : v.includes('+') || /^uniequip_|^chess_/.test(v) ? v.split('+') : Number.isNaN(Number(v)) ? v : Number(v)];
   }))
   : undefined;
 // (fork) --profile: built once per thread from the same file, so every worker plays the same profile
