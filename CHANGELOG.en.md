@@ -11,6 +11,7 @@ This server's own changes. Their numbers are the pull requests of [Fish Edition]
 - Under SPA-CC Strategy 2, Ioleta's, Du Yaoye's and Amiya's Strategy texts now say what it changes for them (highlighted), as Strategy 1 already shows its later rounds (#147, leftover of issue #88).
 - Release zips carry the server's version information, so the title screen's version line, "What's new" and "About this server" work on a release install too (#147, leftover of issues #98–#100).
 - The Chinese player guide links Fish Edition's repository and issues instead of the upstream ones (#147).
+- Custom Lobby Modifications: a room you create starts with the rules you last used (remembered in this browser), and the rules dialog has a "Clear all" button (#148, issue #143).
 - Match records (for the server owner's analysis) now also log the shop a refresh leaves after its own effects, such as Du Yaoye's Yan offer; before, they held only the roll before those effects (#146, issue #90).
 - Fixed the LP loss shown during a battle (top bar, team list) and in the round's result box leaving out Last Line of Defense's extra 2 LP: a round with 10 or more leaks now shows −12, as the settlement charges. The LP tooltip names the extra LP (#145, issue #123).
 - Shared deck: the shop's new Deck button shows how many copies of each operator are left in the deck all players share (left / total), by class. It updates every round (#152).
