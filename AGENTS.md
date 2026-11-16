@@ -41,6 +41,9 @@ rooms) and a deterministic battle sim shared by the server and the browser. It a
 - **(fork) Changelog fragments.** A branch never edits `FORK-CHANGELOG.md`: it adds one file
   `changes/<what-it-changes>.md` ([changes/README.md](changes/README.md)); the lead folds them in on `dev-0.2` with
   `npm run changelog -- --write`.
+- **(Fish Edition) Collaborators.** Several people and agents work here and can't see each other's sessions: read
+  [fish-edition/COLLABORATION.md](fish-edition/COLLABORATION.md) and the pinned "Work board" issue before starting, and
+  sign what you write on GitHub.
 - **(fork) Server cost.** Every fragment ends with `Server cost: none` or the numbers (typical and worst case per
   player, per room and for 300 players: MB/s and GB/day, CPU %, memory MB, disk MB/day, bot ms/round, the cap,
   measured or estimated; [changes/README.md](changes/README.md) "Server cost"). `npm run server-cost` fails a branch
