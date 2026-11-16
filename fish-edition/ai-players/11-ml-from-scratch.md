@@ -216,3 +216,35 @@ magnitude more games or compute than we have before EOS, and none of them is bro
    rehearsal on paired seeds (time and win rate).
 
 That's a few hours of my time plus one job for your PC. Items 2 and 3 can wait for the result.
+
+## First measurement: the battle surrogate (2026-11-17)
+
+Fish (2026-11-17) asked whether there is a much better technique than evolution, and to start an investigation if it
+fits in 4 hours. Evolution can only tune the parameters of tactics we wrote; §6's battle surrogate is the step that can
+find play no tactic describes. This is step 1–2 of "A first step" above. Scripts and data:
+`untracked/ml-2026-11/surrogate/` (`extract.mjs`, `train.py`, `mut.sh`).
+
+- **Data.** The human records were in the scratchpad that the restart wiped, so this uses the 238 bot-match records in
+  `untracked/`: 10,642 recorded solo seat-battles (57 % without a leak), plus 12,000 mutants (a recorded board with 1–2
+  operators removed, re-simulated; 28 % without a leak). The mutants' Alliance counts are the recorded ones (not
+  recomputed): an approximation.
+- **Features.** About 40 rough hand-made numbers: round, unit count, tiers, elites, items, a crude attack and HP sum,
+  profession counts, active Alliances and stacks; the wave's enemy count, HP, attack, DEF / RES, flyers, elites, speed.
+- **Test.** 6 of the 30 seeds held out; every record of a held-out seed (all variant folders) is held out with it.
+
+| No-leak prediction (AUC) | held-out recorded | held-out mutants |
+|---|---|---|
+| Round only | 0.83 | 0.73 |
+| Logistic regression | 0.88 | 0.81 |
+| Boosted trees | **0.91** | **0.89** |
+
+Leaks, boosted trees: mean absolute error 2.6 against 5.5 for the mean.
+
+**Reading.** The 0.9 bar of step 3 is met on recorded boards and nearly on mutants, with crude features and little
+data. The mutants matter most: there the round says little, and the model still separates the boards that leak. So it
+values operators, not just the round. Not yet measured: whether it ranks a board above the same board minus one
+operator (the per-decision question), and whether it can rank layouts, which these features (no tiles) can't see.
+
+**Next.** Pair each mutant with its parent and measure the ranking; add tile and range features; then step 3 (rank
+layouts with the surrogate, rehearse the top 3, compare with legacy's rehearsal on paired seeds). Mutant generation runs
+at about 200 ms a battle here while the bench uses 9 cores; on Fish's PC it is about 36 ms.
