@@ -37,3 +37,10 @@ test('the match view names an AI player\'s bot; a human has none', () => {
     }
   } finally { h.m.dispose(); }
 });
+
+test('every room bot has a strength (GitHub #124: Ultimate solo win rate × 100)', () => {
+  for (const b of ROOM_BOTS) {
+    const s = BOT_INFO[b.id]?.strength;
+    assert.ok(Number.isInteger(s) && s >= 0 && s <= 100, `${b.id}: ${s}`);
+  }
+});

@@ -10,7 +10,8 @@ function BotBlock({ bot, current }) {
   const info = BOT_INFO[bot.id] || { about: [] };
   return html`<section class=${`botinfo__bot${current ? ' is-current' : ''}`} data-bot=${bot.id}>
     <h3 class="botinfo__name">${t(bot.label)}${bot.id === DEFAULT_ROOM_BOT ? html` <small>${t('默认')}</small>` : null}
-      ${current ? html` <small class="botinfo__here">${t('当前')}</small>` : null}</h3>
+      ${current ? html` <small class="botinfo__here">${t('当前')}</small>` : null}
+      ${Number.isFinite(info.strength) ? html` <span class="botinfo__strength" title=${t('强度：单人终极难度的胜率（%），80 局测试')}>(${info.strength})</span>` : null}</h3>
     <ul class="botinfo__about">${info.about.map((line) => html`<li key=${line}>${t(line)}</li>`)}</ul>
     ${info.tactics?.length ? html`<p class="botinfo__sub">${t('战术（从上到下优先，之后由基础 AI 决定）')}</p>
       <ol class="botinfo__tactics">${info.tactics.map((x) => html`<li key=${x.id}><code>${x.id}</code> ${t(x.text)}</li>`)}</ol>` : null}
@@ -21,7 +22,7 @@ function BotBlock({ bot, current }) {
 export function BotInfoModal({ open, current = null, onClose }) {
   if (!open) return null;
   return html`<${Modal} open=${true} class="botinfo" micro="AI PROFILES" title=${t('AI 方案')} width="min(36rem, 96vw)" onClose=${onClose}>
-    <p class="botinfo__intro">${t('创建者可以为每个 AI 队友选择方案。')}</p>
+    <p class="botinfo__intro">${t('创建者可以为每个 AI 队友选择方案。')} ${t('名称后的数字是强度：单人终极难度的胜率（%）。')}</p>
     ${ROOM_BOTS.map((b) => html`<${BotBlock} key=${b.id} bot=${b} current=${b.id === current} />`)}
   <//>`;
 }

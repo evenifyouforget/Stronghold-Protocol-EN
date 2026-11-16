@@ -404,6 +404,7 @@
 .botinfo__name { margin: 0 0 .04rem; font-size: calc(.17 * var(--t)); }
 .botinfo__name small { margin-left: .06rem; font-size: calc(.12 * var(--t)); font-weight: 400; color: #9fa6a3; }
 .botinfo__name .botinfo__here { color: #5df0c6; }
+.botinfo__strength { margin-left: .06rem; font-size: calc(.13 * var(--t)); font-weight: 600; color: #e8c872; }
 .botinfo__about, .botinfo__tactics { margin: 0; padding-left: 1.2em; line-height: 1.45; font-size: calc(.14 * var(--t)); }
 .botinfo__sub { margin: .06rem 0 .02rem; font-size: calc(.13 * var(--t)); color: #9fa6a3; }
 .botinfo__tactics code { font-size: calc(.12 * var(--t)); color: #9fa6a3; }
