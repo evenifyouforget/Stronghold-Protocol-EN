@@ -2901,6 +2901,8 @@
   "创建者可以为每个 AI 队友选择方案。": "The room creator picks a profile for each AI teammate.",
   "强度：单人终极难度的胜率（%），80 局测试": "Strength: the win rate (%) in Ultimate solo, over 80 test games",
   "名称后的数字是强度：单人终极难度的胜率（%）。": "The number after a name is its strength: the win rate (%) in Ultimate solo.",
+  "4 名此 AI 组队时终极难度的胜率（%），40 局测试": "The win rate (%) of 4 of this AI as a team in Ultimate, over 40 test games",
+  "第二个数字：4 名此 AI 组队时的胜率（%）。": "The second number: the win rate (%) of 4 of this AI as a team.",
   "选择一个主盟约，围绕它购买、合成并升级干员，按回合推进调度中心等级": "Picks one main Alliance and buys, merges and upgrades operators around it; levels the Dispatch Center up round by round",
   "避免购买队友正在收集的盟约干员（高星干员更是如此），不与队友争抢": "Avoids buying operators of Alliances its teammates are collecting (high-tier ones even more), so it doesn't compete with them",
   "也会买入能与已有干员合成的干员": "Also buys operators that merge with ones it already has",

@@ -42,5 +42,7 @@ test('every room bot has a strength (GitHub #124: Ultimate solo win rate × 100)
   for (const b of ROOM_BOTS) {
     const s = BOT_INFO[b.id]?.strength;
     assert.ok(Number.isInteger(s) && s >= 0 && s <= 100, `${b.id}: ${s}`);
+    const team = BOT_INFO[b.id]?.team;
+    assert.ok(Number.isInteger(team) && team >= 0 && team <= 100, `${b.id} team: ${team}`);
   }
 });
