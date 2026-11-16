@@ -37,7 +37,8 @@
 //                                               fx with a `form` (shared/protocol.js fxForm) switches the enemy's
 //                                               model to that clip set (render/units.js FORMS)
 //   view.setLocalFeed({ on, speed })            frames come from the local sim every frame (client-side combat):
-//                                               ~2-frame buffer at the battle's game speed
+//                                               the render clock trails them by LOCAL_LOOKAHEAD game s (at least
+//                                               ~2 frames), at the battle's game speed
 //   view.setFrozen(on)                          (fork) hold the battle on its newest frame (the dev sandbox's pause and
 //                                               frame step: a step's frame shows exactly, the units move only by it)
 //   view.highlightTiles(tiles, style)           [[r,c]] | [{row,col}]; style 'legal'|'illegal'|'range'|'rangeStand'|
@@ -157,7 +158,8 @@ import { FxSystem, ensureDamageFonts, projSpeed } from './fx.js';
 import { OfficialFx } from './vfx/system.js';
 import { FxWiring } from './vfx/wiring.js';
 import { PluginFxPlayer } from './vfx/pluginPlayer.js';
-import { resolveOfficialFx } from './vfx/tier.js';
+import { resolveOfficialFx, touchDevice } from './vfx/tier.js';
+import { impostorInterval, IMPOSTOR_BASE } from './crowd.js';
 import { NoteLayer } from './fx/notes.js';
 import { createDragController, pieceTile, dragStandTile } from './drag.js';
 import { backdropTextures, shadowTexture, refreshTierChips, refreshDownLabels, silhouetteTexture } from './textures.js';
@@ -165,7 +167,8 @@ import { TILE_H, TIER_COLORS, COLORS } from './style.js';
 import { loadBoardArt } from './boardArt.js';
 import { recordError } from '../diag.js';
 import { ImpostorAtlas } from './impostor.js';
-import { stepClipBounds } from './spine.js';
+import { stepClipBounds, clipBoundsBudget, clipBoundsSpentMs } from './spine.js';
+import { loadClipBoundsTable } from './clipBoundsTable.js';
 import { loadThree, loadBoardPack, loadScenePack, webgl2Available, boardArtListed } from './board3d/load.js';
 import { BoardScene } from './board3d/scene.js';
 import { layoutPen, penSignature } from './pen.js';
@@ -186,6 +189,13 @@ export { ensurePixi } from './app/pixi.js';
 
 /** fx.damage / fx.heal option: the official effect drew the hit (no procedural spark, slash or glow; numbers stay). */
 const NO_SPARK = Object.freeze({ noSpark: true });
+/**
+ * (fork) Game seconds the client-side combat render clock trails the local sim: the attack wind-up look-ahead
+ * (render/app/windup.js) sees an attack that far ahead, as network battles do (0.1 real s at rate 2). With only ~2
+ * frames (0.034 s × speed) an operator's attack loop dropped to rest just before each strike and restarted its wind-up
+ * at 2.5× (spine.js RHYTHM_DROP_MARGIN 0.08 game s): a visible twitch on every attack at 1× and most at 2×.
+ */
+export const LOCAL_LOOKAHEAD = 0.2;
 export { PEN_CAMERA_MS, LEADER_HIT_STYLE, DRAG_HOLD_TILES, DEPLOY_REPLAY_MS } from './app/tune.js';
 export { viewKind, boardArea, bandFor, fieldRows, penShown, showsPen, leaderShown, restView, flightView, boardPreference, switchableBox } from './app/view.js';
 export { FORCED_EXIT, showsDeathFx, renderInfo } from './app/info.js';
@@ -208,6 +218,7 @@ export async function createFieldView(host, options = {}) {
   signal?.throwIfAborted();
   const P = await withTimeout(ensurePixi(), null, signal);
   signal?.throwIfAborted();
+  loadClipBoundsTable();   // (fork) the precomputed impostor clip bounds, once per page, as a later load
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);
   const settings = { damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, quality: 'high', officialFx: 'auto', ...(opts.settings || {}) };
@@ -358,6 +369,10 @@ export async function createFieldView(host, options = {}) {
   const held = new Map();     // uid → world { x, y, z }: prep pieces pinned to a tile by the direction step (holdPiece)
   let hoverUnit = null;
   let frameMs = 16, fps = 60, lastNow = performance.now();
+  // (fork) the frame time without the clip-bounds sampling of the frame before (spine.js stepClipBounds): what the device
+  // needs for the game itself. The sampling budget and adaptLoad read it, so a larger sampling share never counts as a
+  // slow device and never feeds its own budget (Dev 7 review #3); frameMs / fps stay the real frame time.
+  let workMs = 16, sampledMs = 0;
   const layerPops = new Map();
   // prep field (render/prepfield.js): identity on the own board, the boss-field half in the Final Assault prep
   let prepXf = IDENTITY;
@@ -446,7 +461,7 @@ export async function createFieldView(host, options = {}) {
   let noteFrame = 0;
   // the official battle effects (设置「官方特效」, render/vfx): drawn on the 3D board only (the 2D board fallback keeps the
   // procedural fx), on the battle clock; their files load on demand (data/local-fx.json)
-  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt, fieldRect: fx.ctx.fieldRect });
+  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt, fieldRect: fx.ctx.fieldRect, rate: () => ctx.timeScale() });
   setupCleanup.push(() => ofx.destroy());
   layers.vfxGround.addChild(ofx.ground);
   layers.vfxOver.addChild(ofx.over);
@@ -464,6 +479,8 @@ export async function createFieldView(host, options = {}) {
     view: (id) => views.get(id) || null,
   });
   ctx.ofx = ofx;
+  // (fork) a unit's official skin (index.json skins) for its sort depth (units.js skinPlaneDepth); undefined until the index is in
+  ctx.skinOfView = (v) => (wiring.idx ? wiring.skinOf(wiring.unitOf(v)) : undefined);
   // Read the index only after the existing effects path loads it; role selection never calls ready()/index().
   ctx.skillAttackIndex = () => wiring.index;
   const pluginFx = new PluginFxPlayer({ P, layer: layers.vfxOver, assets, cam: () => cam, enabled: () => settings.officialFx !== 'off',
@@ -479,7 +496,9 @@ export async function createFieldView(host, options = {}) {
   ofx.init().then((ok) => { if (!destroyed && ok) { syncOfficialFx(); loadLater(() => (destroyed ? null : wiring.ready())); } }, () => {});
   // battle devices (crates / turrets as sim units): the official crate mesh in the 3D scene, else a Pixi box
   ctx.createBox = (spec) => switchableBox({ board: () => board3d, pixi: () => tiles.createBox(), spec });
-  const impostors = new ImpostorAtlas(app.renderer, { onError: (err) => recordError('render', err, 'impostor atlas pass failed') });
+  // (fork) a desktop gets more main pages: a Grand Alliance relay field's 70–90 impostors no longer run out of slots
+  const desktop = !touchDevice();
+  const impostors = new ImpostorAtlas(app.renderer, { onError: (err) => recordError('render', err, 'impostor atlas pass failed'), mainPages: desktop ? 5 : 3 });
   setupCleanup.push(() => impostors.destroy());
   ctx.impostors = impostors;
   tiles.setView(bandFor('prep'), camRect(), fieldRows('prep'));
@@ -956,7 +975,7 @@ export async function createFieldView(host, options = {}) {
           fx.promote(v, promoFrom.get(e.uid).filter((f) => Math.abs(f.x - w.x) + Math.abs(f.y - w.y) > 1e-3));
           promotions.push({ uid: e.uid, id: e.piece.id, area: e.area, row: e.row ?? null, col: e.col ?? null, idx: e.idx ?? null, copies: promoFrom.get(e.uid).length });
           if (promotions.length > 20) promotions.shift();
-        } else if (e.area === 'board' && prevBoard.size && !prevBoard.has(e.uid)) { landPiece(v, 'board'); fx.deploy(v); }
+        } else if (e.area === 'board' && prevBoard.size && !prevBoard.has(e.uid)) { landPiece(v, 'board'); prepBirth(v); }
         else if (before.length && (e.area === 'hand' || e.area === 'temp') && !before.some((g) => g.uid === e.uid)) {
           // an operator that just arrived on the bench — bought, a reward, a grant — lands there (PR #416); a summon that comes
           // with its owner's placement does not, nor does an item
@@ -974,7 +993,7 @@ export async function createFieldView(host, options = {}) {
           pending.delete(key);
           if (moved || Math.abs(v.x - w.x) + Math.abs(v.y - w.y) > 1e-3) v._tween = { fx: v.x, fy: v.y, fz: v.z, tx: w.x, ty: w.y, tz: w.z, t: 0 };
           v.lift = 0;
-          if (e.area === 'board' && !prevBoard.has(e.uid) && v.onDeploy) fx.deploy(v);
+          if (e.area === 'board' && !prevBoard.has(e.uid) && v.onDeploy) prepBirth(v);
         }
         // a piece this state puts on a board tile it was not on — from the bench, from another tile, a swap — lands (PR #416),
         // also while its drop is still held on that tile (the direction step pins it there, so `moved` is false); turned in
@@ -1008,6 +1027,16 @@ export async function createFieldView(host, options = {}) {
     if (dragState && !views.has(dragState.key)) { drag.reset(); endDragVisual(false); }
     holdScene(false); // the prep pieces reference their models now (a battle's hold ends here)
     return true;
+  }
+
+  /**
+   * (fork) A piece put on the board in prep: its official deploy effect (FxWiring.birth — the unit's own or the generic
+   * birth, its outfit's twin: 蕾缪安's Requiem Vesperis lemuen_birth_01), else the procedural flash.
+   */
+  function prepBirth(v) {
+    let drew;
+    try { drew = !!wiring.birth(v, { cache: false }); } catch { drew = false; }
+    if (!drew) fx.deploy(v);
   }
 
   /** Land a prep piece (UnitView.land, PR #416) and note it (`landings`, dev / tests); false when the view refused. */
@@ -1044,7 +1073,9 @@ export async function createFieldView(host, options = {}) {
       replayTimer = 0;
       if (destroyed || mode !== 'prep') return;
       const { uid, v } = queue[i++];
-      if (!globalThis.document?.hidden && views.get('p:' + uid) === v) landPiece(v, 'round');
+      // (fork) a landing is a deploy: its birth effect too, as a piece put on the board [ASSUMED: the round start's
+      // confirmed landing (DEPLOY_REPLAY_MS) plays the client's deploy effect with it]
+      if (!globalThis.document?.hidden && views.get('p:' + uid) === v && landPiece(v, 'round')) prepBirth(v);
       if (i < queue.length) replayTimer = setTimeout(turn, step);
     };
     replayTimer = setTimeout(turn, 0);
@@ -2039,9 +2070,14 @@ export async function createFieldView(host, options = {}) {
   function adaptLoad(dtRaw) {
     if (!(dtRaw > 0) || dtRaw > 0.25 || globalThis.document?.hidden) return;
     const busy = views.size + penViews.size > 8;
-    if (frameMs > 19.5 && busy) { slowFor += dtRaw; fastFor = 0; }
-    else if (frameMs < 17.6) { fastFor += dtRaw; slowFor = 0; }
-    if (slowFor > 1 && loadLevel < 3) { loadLevel++; slowFor = 0; fastFor = 0; impInterval = pickImpostorInterval(); }
+    if (workMs > 19.5 && busy) { slowFor += dtRaw; fastFor = 0; }
+    else if (workMs < 17.6) { fastFor += dtRaw; slowFor = 0; }
+    if (slowFor > 1 && loadLevel < 3) {
+      loadLevel++; slowFor = 0; fastFor = 0;
+      // (fork) frames fell behind with a crowd past the usual High base: back to that base until the crowd thins out
+      if (crowdUnits > IMPOSTOR_BASE.high) roomy = false;
+      impInterval = pickImpostorInterval();
+    }
     else if (loadLevel > 0 && (fastFor > 6 * loadLevel || !busy && fastFor > 2)) { loadLevel--; fastFor = 0; impInterval = pickImpostorInterval(); }
   }
   // Crowded fields render skeletons through staggered RenderTexture impostors (units.js): the interval grows with
@@ -2056,15 +2092,16 @@ export async function createFieldView(host, options = {}) {
     for (const v of views.values()) if (v.actor && v.actor.clipped && v.alive !== false) n++;
     return settings.quality === 'high' && n <= 1;
   }
+  // (fork) the rule itself is render/crowd.js: a desktop at High draws up to ROOMY_HIGH units directly while its frames
+  // keep up (`roomy`); the official effects get the same count for their crowd budget (render/vfx/system.js setCrowd)
+  let crowdUnits = 0, roomy = true;
   function pickImpostorInterval() {
-    if (settings.forceImpostors) return 2;
     let n = 0;
     for (const v of views.values()) if (v.actor && v.spineReady) n++;
-    const q = settings.quality;
-    const base = (q === 'low' ? 12 : q === 'medium' ? 26 : 44) / (1 + loadLevel);
-    if (n <= base) return 0;
-    // a struggling device (load level ≥ 2) may refresh a big crowd more rarely (10 Hz at worst)
-    return Math.min(loadLevel >= 2 ? 6 : 4, Math.max(2, Math.ceil(n / (base * 0.75))));
+    crowdUnits = n;
+    if (n <= IMPOSTOR_BASE.high) roomy = true;
+    ofx.setCrowd(n);
+    return impostorInterval(n, { force: !!settings.forceImpostors, quality: settings.quality, loadLevel, roomy: roomy && desktop });
   }
   function frame() {
     if (destroyed) return;
@@ -2088,7 +2125,9 @@ export async function createFieldView(host, options = {}) {
     const dt = Number.isFinite(playbackT) ? Math.max(0, playbackT - (frame.playbackT ?? playbackT)) : Math.min(0.1, Math.max(0, dtRaw));
     frame.playbackT = playbackT;
     let udt = dt;   // the units' / effects' frame time ((fork) frozen: the game time a step added, set below)
-    if (dtRaw < 0.25) frameMs = frameMs * 0.9 + dtRaw * 1000 * 0.1;
+    const workRaw = Math.max(0, dtRaw * 1000 - sampledMs);   // (fork) this frame without the last frame's sampling
+    sampledMs = 0;   // set again by this frame's stepClipBounds (a frame that skips it subtracts nothing next time)
+    if (dtRaw < 0.25) { frameMs = frameMs * 0.9 + dtRaw * 1000 * 0.1; workMs = workMs * 0.9 + workRaw * 0.1; }
     fps = 1000 / Math.max(1, frameMs);
     adaptLoad(dtRaw);
     vp.width = Math.max(1, host.clientWidth || 1); vp.height = Math.max(1, host.clientHeight || 1);
@@ -2153,7 +2192,8 @@ export async function createFieldView(host, options = {}) {
       if (leader && !leaderHidden) leader.view.update(udt, cam, clock);
       tiles.update(dt);
       fx.update(udt);
-      stepClipBounds();
+      stepClipBounds(clipBoundsBudget(workRaw));   // (fork) a larger share of a slow frame (its own sampling not counted)
+      sampledMs = clipBoundsSpentMs();
       impostors.flush();
     } catch (err) {
       if (!frame.warned) { frame.warned = true; console.error('[render] frame failed', err); }
@@ -2264,8 +2304,9 @@ export async function createFieldView(host, options = {}) {
     pushEvents,
     /**
      * Client-side combat glue (DESIGN §14): battle frames come from the local simulation (public/js/battle/runner.js)
-     * every animation frame instead of the network, so the render clock trails them by ~2 frames (not the 100 ms
-     * jitter buffer) and runs at the battle's game speed. `{ on: false }` restores the network settings.
+     * every animation frame instead of the network, so no jitter buffer is needed; the render clock still trails them
+     * by LOCAL_LOOKAHEAD game s (at least ~2 frames) and runs at the battle's game speed. `{ on: false }` restores the
+     * network settings.
      */
     /** (fork) Hold the battle still (the dev sandbox's pause and frame step); false resumes the normal render clock. */
     setFrozen(on) {
@@ -2276,7 +2317,7 @@ export async function createFieldView(host, options = {}) {
     setLocalFeed(o) {
       const on = !!(o && o.on);
       const speed = Number(o && o.speed) > 0 ? Number(o.speed) : 2;
-      interp.delay = on ? 0.034 : 0.1;
+      interp.delay = on ? Math.max(0.034, LOCAL_LOOKAHEAD / speed) : 0.1;
       interp.defaultRate = on ? Math.min(20, speed) : 2;
       interp.maxRate = on ? Math.max(8, speed * 1.5) : 8;
       return true;
@@ -2401,6 +2442,8 @@ export async function createFieldView(host, options = {}) {
       try { ro?.disconnect(); } catch { /* ignore */ }
       try { offAssets?.(); } catch { /* ignore */ }
       globalThis.document?.removeEventListener?.('visibilitychange', onVisible);
+      canvas.removeEventListener?.('webglcontextlost', onLost);
+      canvas.removeEventListener?.('webglcontextrestored', onRestored);
       removeInput();
       offShadow?.();
       signal?.removeEventListener('abort', onAbort);

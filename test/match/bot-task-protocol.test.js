@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateC2S, S2C } from '../../shared/protocol.js';
-import { BOT_GRACE_MS, BOT_PLAN_MS, BOT_RECEIPT_MS } from '../../server/match/match/botTasks.js';
+import { BOT_GRACE_MS, BOT_PLAN_MS, BOT_RECEIPT_MS, BOT_START_MS } from '../../server/match/match/botTasks.js';
 import { seatHash } from '../../server/match/botWorld.js';
 import { createBotRun, createBotWorkerEnv } from '../../server/match/botWorkerEnv.js';
 import { wire } from './fakeBotHost.js';
@@ -191,6 +191,79 @@ test('an executor looping frames cannot stall the prep: a repeated receipt or pl
   assert.equal(h.m.botTaskStats.stale, 0);
   h.sched.advance(frame.budgetMs / 2 + BOT_GRACE_MS + 1);
   assert.ok(active.entry.ps.ready, 'the window closed when the first plan said: the seat readies up');
+  h.m.dispose();
+});
+
+test('a Worker still starting: the plan window counts from b.botLoaded, and BOT_START_MS bounds the wait for it', () => {
+  const h = atPrep();
+  const active = toFirstTask(h);
+  const first = active.task.id;
+  send(h, 'p_0', { t: 'b.botReceived', taskId: first, starting: true });
+  h.sched.advance(BOT_PLAN_MS + 1);
+  assert.equal(active.executor, 'p_0', 'past the plan window: the Worker is still coming up');
+  h.sched.advance(BOT_START_MS - BOT_PLAN_MS - 2000);
+  send(h, 'p_0', { t: 'b.botLoaded', taskId: first });
+  h.sched.advance(BOT_PLAN_MS - 1);
+  assert.equal(active.executor, 'p_0', 'a full plan window from b.botLoaded, past BOT_START_MS from the receipt');
+  const frame = h.lastTo('p_0', 'b.botTask');
+  send(h, 'p_0', { t: 'b.botMoves', taskId: first, batch: 'plan', moves: playTask(frame).plan.moves });
+  assert.equal(h.lastTo('p_0', 'b.botAck').taskId, first);
+  assert.equal(h.m.botTaskStats.timeouts, 0);
+  assert.equal(h.m._botHostStrikes.get('p_0') ?? 0, 0, 'a slow start is no strike');
+  h.m.dispose();
+});
+
+test('a Worker that never comes up: BOT_START_MS after the receipt, a strike and the next human', () => {
+  const h = atPrep();
+  const active = toFirstTask(h);
+  const first = active.task.id;
+  send(h, 'p_0', { t: 'b.botReceived', taskId: first, starting: true });
+  h.sched.advance(BOT_START_MS - 1);
+  assert.equal(active.executor, 'p_0');
+  h.sched.advance(2);
+  assert.equal(active.executor, 'p_1');
+  assert.ok(h.allTo('p_0', 'b.botCancel').some((m) => m.taskId === first));
+  assert.equal(h.m._botHostStrikes.get('p_0'), 1);
+  assert.equal(h.m.botTaskStats.timeouts, 1);
+  h.m.dispose();
+});
+
+test('b.botLoaded opens the window once: never without a starting receipt, never twice, never after the plan', () => {
+  const h = atPrep();
+  const active = toFirstTask(h);
+  const first = active.task.id;
+  // a plain receipt: b.botLoaded is not a second chance
+  send(h, 'p_0', { t: 'b.botReceived', taskId: first });
+  h.sched.advance(BOT_PLAN_MS - 1000);
+  send(h, 'p_0', { t: 'b.botLoaded', taskId: first });
+  h.sched.advance(1001);
+  assert.equal(active.executor, 'p_1', 'the window from the plain receipt held');
+  // a starting receipt, then b.botLoaded looping
+  const frame = h.lastTo('p_1', 'b.botTask');
+  send(h, 'p_1', { t: 'b.botReceived', taskId: frame.taskId, starting: true });
+  send(h, 'p_1', { t: 'b.botLoaded', taskId: frame.taskId });
+  h.sched.advance(BOT_PLAN_MS - 1000);
+  send(h, 'p_1', { t: 'b.botLoaded', taskId: frame.taskId });
+  send(h, 'p_1', { t: 'b.botReceived', taskId: frame.taskId, starting: true });
+  h.sched.advance(1001);
+  assert.ok(active.entry.ps.ready, 'nobody left: a repeat re-armed nothing, and the seat keeps its board and readies up');
+  assert.equal(h.m.botTaskStats.timeouts, 2);
+  h.m.dispose();
+});
+
+test('a band pick whose Worker never comes up still ends: the next human, then the rule\'s own pick', () => {
+  const h = atPrep({ picks: false });
+  assert.ok(h.run(() => h.m._botActive?.entry.pick === 'band' || h.ended != null, { maxSteps: 3e6 }));
+  const active = h.m._botActive;
+  const { ps } = active.entry;
+  send(h, 'p_0', { t: 'b.botReceived', taskId: active.task.id, starting: true });
+  h.sched.advance(BOT_START_MS + 1);
+  assert.equal(h.m._botActive?.executor, 'p_1');
+  const next = h.m._botActive.task.id;
+  send(h, 'p_1', { t: 'b.botReceived', taskId: next, starting: true });
+  send(h, 'p_1', { t: 'b.botLoaded', taskId: next });
+  h.sched.advance(BOT_PLAN_MS + 1);
+  assert.ok(ps.bandId || h.m.draft?.picks[ps.playerId], 'the seat has a band');
   h.m.dispose();
 });
 
@@ -532,5 +605,67 @@ test('stale measure: a human refreshes against the shared pool in the gap of eve
   assert.ok(refreshes > 0);
   assert.equal(s.failovers, 0);
   assert.equal(s.errors, 0);
+  h.m.dispose();
+});
+
+test('(review) `starting` counts once per connection: after its Worker was up, a page claiming it again gets the plain plan window', () => {
+  const h = atPrep();
+  const active = toFirstTask(h);
+  const frame = h.lastTo('p_0', 'b.botTask');
+  send(h, 'p_0', { t: 'b.botReceived', taskId: frame.taskId, starting: true });
+  send(h, 'p_0', { t: 'b.botLoaded', taskId: frame.taskId });
+  const run = playTask(frame);
+  send(h, 'p_0', { t: 'b.botMoves', taskId: frame.taskId, batch: 'plan', moves: run.plan.moves });
+  send(h, 'p_0', { t: 'b.botMoves', taskId: frame.taskId, batch: 'final', ...run.rest() });
+  assert.ok(h.m._botWorkerUp.has('p_0'));
+  assert.ok(h.run(() => (h.m._botActive != null && h.m._botActive !== active) || h.m.phase !== 'PREP', { maxSteps: 1e6 }));
+  const next = h.m._botActive;
+  assert.equal(next.executor, 'p_0', 'the second bot seat goes to the same host');
+  send(h, 'p_0', { t: 'b.botReceived', taskId: next.task.id, starting: true });
+  h.sched.advance(BOT_PLAN_MS - 1);
+  assert.equal(next.executor, 'p_0');
+  h.sched.advance(2);
+  assert.equal(next.executor, 'p_1', 'BOT_PLAN_MS, not BOT_START_MS: the Worker was already up');
+  assert.equal(h.m._botHostStrikes.get('p_0'), 1, 'and a strike');
+  // a new connection: that page's Worker is cold again, so its next `starting` counts
+  h.m.onDisconnect('p_0');
+  assert.equal(h.m._botWorkerUp.has('p_0'), false);
+  h.m.dispose();
+});
+
+test('(review) every human Ready cuts a start window to BOT_PLAN_MS; b.botLoaded after the hurry opens nothing', () => {
+  const h = atPrep();
+  const active = toFirstTask(h);
+  const first = active.task.id;
+  send(h, 'p_0', { t: 'b.botReceived', taskId: first, starting: true });
+  h.sched.advance(2000);
+  h.ps('p_0').setReady(true);
+  h.ps('p_1').setReady(true);
+  assert.deepEqual(h.allTo('p_0', 'b.botHurry'), [{ t: 'b.botHurry', taskId: first }]);
+  h.sched.advance(BOT_PLAN_MS / 2);
+  send(h, 'p_0', { t: 'b.botLoaded', taskId: first });
+  h.sched.advance(BOT_PLAN_MS / 2 - 1);
+  assert.equal(active.executor, 'p_0');
+  h.sched.advance(2);
+  assert.notEqual(active.task.id, first, 'BOT_PLAN_MS from the hurry, not BOT_START_MS from the receipt');
+  // a starting receipt after the hurry gets BOT_PLAN_MS too
+  const frame = h.lastTo(active.executor, 'b.botTask');
+  send(h, active.executor, { t: 'b.botReceived', taskId: frame.taskId, starting: true });
+  const at = h.m._botActive.timerAt - h.sched.now();
+  assert.ok(at <= BOT_PLAN_MS, `${at} ms`);
+  h.m.dispose();
+});
+
+test('(review) a host whose page reconnects is warmed again; the rehearsal warm is skipped in host execution', () => {
+  const h = atPrep({ botRehearsalDelegate: true });
+  assert.equal(h.m.botRehearsalDelegate, true);
+  assert.equal(h.allTo('p_0', 'b.botWarm').length, 1);
+  assert.equal(h.allTo('p_0', 'b.rehearsalWarm').length, 0, 'host execution delegates no rehearsal');
+  h.m.onDisconnect('p_0');
+  h.m.onReconnect('p_0');
+  assert.equal(h.allTo('p_0', 'b.botWarm').length, 2, 'the reloaded page warms its bot Worker again');
+  h.m.onDisconnect('p_1');
+  h.m.onReconnect('p_1');
+  assert.equal(h.allTo('p_1', 'b.botWarm').length, 0, 'not the first executor: nothing to warm');
   h.m.dispose();
 });

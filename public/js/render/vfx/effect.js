@@ -112,7 +112,9 @@ export function compileEffect(desc, lib = {}) {
       const sub = nd.particleSystem.SubModule;
       if (sub && Array.isArray(sub.subEmitters)) for (const se of sub.subEmitters) if (se && se.emitter && se.emitter.node != null) def.subNodes.add(se.emitter.node);
     }
-    if (nd.particleSystemRenderer) def.psr[i] = psrInfo(nd.particleSystemRenderer);
+    if (nd.particleSystemRenderer) {
+      def.psr[i] = psrInfo(nd.particleSystemRenderer);
+    }
     if (nd.meshRenderer && nd.meshFilter !== undefined) {
       const r = nd.meshRenderer;
       def.mesh[i] = { enabled: r.m_Enabled !== false && r.m_Enabled !== 0, mesh: meshRef(nd.meshFilter),
@@ -160,6 +162,9 @@ export function compileEffect(desc, lib = {}) {
         case 'FollowOwner': case 'FollowOwnerRootTileHeight': case 'FollowTileHeight': if (!def.follow) def.follow = { mount: 0, keepRot: true, owner: true }; break;
         case 'FollowDirection': def.direction = { fourDir: on(f._useFourDir), leftIsDefault: on(f._leftIsDefault), reverseBack: on(f._reverseWhenFaceToBack) }; break;
         case 'OnPlayEmitter': case 'OnPlayEmitterIf': def.onPlay.push({ keys: (Array.isArray(f._effects) ? f._effects : []).map((k) => String(k).toLowerCase()), delay: num(f._preDelay, 0), cond: b.class === 'OnPlayEmitterIf' ? f : null }); break;
+        // (fork) a line's own end effects (LineEffectEmitterDynamic): `start` on its source, `end` on its target — 蕾缪安
+        // S2's aim line lemuen_skill_02_trail_01 puts lemuen_skill_02_crosshair_01 on the aimed enemy (SkillFx._line)
+        case 'LineEffectEmitterDynamic': def.lineEnds = { start: f._startEffect ? String(f._startEffect).toLowerCase() : null, end: f._endEffect ? String(f._endEffect).toLowerCase() : null }; break;
         case 'OnFinishEmitter': def.onFinish.push(...(Array.isArray(f._effects) ? f._effects : []).map((k) => String(k).toLowerCase())); break;
         case 'SwitchableBackEffect': def.switchable = { ...(def.switchable || {}), back: f._backEffect ? String(f._backEffect).toLowerCase() : null }; break;
         case 'SwitchableRightEffect': def.switchable = { ...(def.switchable || {}), right: f._rightEffect ? String(f._rightEffect).toLowerCase() : null, reverse: on(f._reverseLeftRight) }; break;
@@ -217,6 +222,10 @@ export function compileEffect(desc, lib = {}) {
   def.delayToFinish = Math.max(0, num(pe._delayToFinish, 0));
   def.maxLifetime = num(pe._maxLifetime, -1);
   def.isLoop = on(pe._isLoop);
+  // (fork) ParticleEffect `_usePlaybackSpeed` / `_limitedPlaybackSpeed`: it follows its ability's playback speed, capped
+  // (−1 = no cap) — Effect.setPlayback
+  def.usePlaybackSpeed = on(def.pe?._usePlaybackSpeed);
+  def.limitedPlaybackSpeed = num(def.pe?._limitedPlaybackSpeed, -1);
   def.spawn = num(def.pe?._spawnLocation, 0) | 0;
   // ParticleEffect `_holdByOwner`: its owner holds it — the effect moves with the unit (render/vfx/wiring.js playOn)
   def.holdByOwner = on(def.pe?._holdByOwner);
@@ -235,6 +244,13 @@ export function compileEffect(desc, lib = {}) {
   // authored behind its unit: the root's `static_offset` node pushed into the board (z > 0) — see behindUnits
   const so = nodes.find((nd) => nd && nd.name === 'static_offset' && nd.parent === (Number.isInteger(desc?.root) ? desc.root : 0));
   def.back = !!so && Array.isArray(so.pos) && num(so.pos[2], 0) > 0;
+  // (fork) a mesh under the root's static_offset authored behind its unit on its own: its node lies deeper in the board
+  // than the root (z > 0 in the root's frame) though the static_offset does not — Unity sorts each renderer by its own
+  // distance, so an order-0 mesh there is drawn before the unit too (Mostima's Ethereal Harmony S3 castle at z +0.075
+  // covered her and the units around her, hotfix 2026-11-10)
+  const soIdx = so ? nodes.indexOf(so) : -1;
+  const underSo = (i) => { for (let j = def.parent[i], g = 0; j >= 0 && g < 64; j = def.parent[j], g++) if (j === soIdx) return true; return false; };
+  for (let i = 0; i < n; i++) if (def.mesh[i]) def.mesh[i].back = soIdx >= 0 && underSo(i) && nodeDepth(def, i, rootIdx) > 1e-3;
   def.loops = def.isLoop || def.ps.some((p) => p && p.looping && p.playOnAwake !== false) || def.animators.some((a) => def.clips[a.clip]?.loop);
   def.material = (i, lite) => {
     const list = lite ? def.lite : def.materials;
@@ -281,7 +297,8 @@ export class Effect {
     this.groundZ = 0;
     this.time = 0;                                     // s since spawn (battle clock)
     this.delay = def.delayToPlay + (def.randomDelay > 0 ? Math.random() * def.randomDelay : 0);
-    this.state = 'play';                               // 'play' | 'stopping' | 'linger' | 'done'
+    this.state = 'play'; this.lateWake = false;      // 'play' | 'stopping' | 'linger' | 'done'
+    this.delayLead = 0;                              // (fork) s its FxDelay nodes already waited (a cast begun earlier)
     this.linger = 0;
     this.started = false;
     this.track = null;
@@ -289,7 +306,8 @@ export class Effect {
     this.pausedBy = false;                             // PauseAnotherEffect of another effect on its owner (system.js)
     this.owner = null;                                 // the unit it plays on (FxWiring.playOn; system.js pauses by it)
     this.tint = def.colorMod || null;
-    this.speed = 1;                                    // playback speed (1 = the battle clock)
+    this.speed = 1;                                    // playback speed (1 = the battle clock; setPlayback)
+    this.age = 0;                                      // battle s since it was started (`time` runs at `speed`)
     this.ttl = Infinity;                               // battle s after which a still-playing effect is stopped (a cap)
     this.onFinish = null;                              // callback (chained effects)
     this.data = null;                                  // the caller's own record (wiring)
@@ -327,8 +345,8 @@ export class Effect {
     this.time = 0;
     this.delay = def.delayToPlay + (def.randomDelay > 0 ? Math.random() * def.randomDelay : 0);
     this.state = 'play'; this.linger = 0; this.started = false; this.track = null; this.hidden = false; this.pausedBy = false; this.owner = null;
-    this.tint = def.colorMod || null; this.speed = 1; this.ttl = Infinity; this.onFinish = null; this.data = null;
-    this.handle = null; this.fade = 1; this.stopT = 0;
+    this.tint = def.colorMod || null; this.speed = 1; this.age = 0; this.ttl = Infinity; this.onFinish = null; this.data = null;
+    this.handle = null; this.fade = 1; this.stopT = 0; this.lateWake = false; this.delayLead = 0;
     const seed0 = (num(seed, 0) >>> 0) || ((Math.random() * 4294967296) >>> 0);
     for (let i = 0; i < n; i++) {
       const s = this.sys[i];
@@ -384,8 +402,46 @@ export class Effect {
     return this;
   }
 
+  /**
+   * (fork) Every LineRenderer of the prefab through the points `pts` ([[x, y, z]…], world space, Unity frame) — a path
+   * or a closed outline the game supplies (render/vfx/pathfx.js: 国度's kingdom edge, 谬因's S2 beam). The array is
+   * copied, so the caller may reuse its own.
+   */
+  setLinePoints(pts) {
+    const def = this.def;
+    if (!Array.isArray(pts) || pts.length < 2) return this;
+    for (let i = 0; i < def.n; i++) {
+      if (!def.line[i]) continue;
+      let p = this.linePts.get(i);
+      if (!p || p.length !== pts.length) { p = pts.map(() => [0, 0, 0]); this.linePts.set(i, p); }
+      for (let j = 0; j < pts.length; j++) { p[j][0] = pts[j][0]; p[j][1] = pts[j][1]; p[j][2] = pts[j][2]; }
+    }
+    return this;
+  }
+
   /** Content time (after `_delayToPlay`). */
   get ctime() { return this.time - this.delay; }
+
+  /**
+   * (fork) Play at an ability's playback speed, as the client does (GameAssembly of 2026-09-13, disassembled):
+   * Effect._PlayInternal caps `speed` at `_limitedPlaybackSpeed` / Time.timeScale (_LimitedPlaybackSpeed: −1 = no cap; the
+   * cap counts in real time, so at 2× battle speed a 2× cap allows 1× of the battle clock) and waits `_delayToPlay` /
+   * speed before the content starts, for every effect; with `_usePlaybackSpeed` the content runs at that speed too
+   * (ParticleEffect.UpdatePlaybackSpeed: each ParticleSystem's simulationSpeed, the Animator's speed, and through the base
+   * Effect.UpdatePlaybackSpeed every FxDelay's playbackSpeed — FxDelay waits delayTime / playbackSpeed). Call it right
+   * after the effect is started (FxHandle._start). `rate` = the battle speed (Time.timeScale).
+   */
+  setPlayback(speed, rate = 1) {
+    let s = Number.isFinite(speed) && speed > 0 ? speed : 1;
+    const lim = this.def.limitedPlaybackSpeed;
+    if (lim >= 0) s = Math.min(s, rate > 0 ? lim / rate : lim);
+    if (!(s > 0)) return this;   // a cap of 0: no prefab has one
+    const c = this.def.usePlaybackSpeed ? s : 1;
+    // `time` runs at `c`, so a delay of d / s battle s is d · c / s of it
+    this.delay = this.delay * c / s;
+    this.speed = c;
+    return this;
+  }
 
   /**
    * Stop (the game finishes it: a status or a skill ends, a projectile lands): a looping effect stops emitting and ends
@@ -394,6 +450,12 @@ export class Effect {
    */
   stop(o = {}) {
     if (this.state === 'done') return;
+    // (fork) `cast`: the end of a cast row's hold (wiring CAST_LOOP_S, skillfx SKILL_CAST_S — our own timer, no client
+    // data). Nodes still waiting on their FxDelay then wake and play once as authored: Mostima's Ethereal Harmony S3
+    // wave (mostma_skill_03_range_…#6: root FxDelay 0.8 s, `_isLoop`) was stopped at 0.6 s and never showed.
+    if (o.cast && this.state === 'play') {
+      for (const [nd, d] of this.def.fxDelay) if (!this.forcedOff[nd] && this.ctime + this.delayLead < d) { this.lateWake = true; break; }
+    }
     for (const nd of this.def.inactiveOnFinish) { this.forcedOff[nd] = 1; this.act[nd] = 0; }
     if (o.hit) for (const nd of this.def.inactiveOnHit) { this.forcedOff[nd] = 1; this.act[nd] = 0; }
     for (const s of this.sys) if (s) s.stopEmitting();
@@ -477,16 +539,20 @@ export class Effect {
   update(dt) {
     if (this.state === 'done') return;
     if (this.track) { try { this.track(this); } catch { /* the owner went away: the effect stays where it was */ } }
+    // (fork) the content runs at `speed` (setPlayback); the cap (ttl), a stop's fade and the `_delayToFinish` linger stay
+    // on the battle clock (`bdt`)
+    const bdt = dt;
+    this.age += bdt;
     dt *= this.speed;
     this.time += dt;
     const def = this.def;
     const ct = this.ctime;
     if (ct < 0) return;
-    if (this.state === 'play' && this.time >= this.ttl) this.stop();
+    if (this.state === 'play' && this.age >= this.ttl) this.stop();
     const first = !this.started;
     this.started = true;
     // FxDelay activations
-    for (const [nd, d] of def.fxDelay) if (!this.forcedOff[nd] && ct >= d) this.act[nd] = 1;
+    for (const [nd, d] of def.fxDelay) if (!this.forcedOff[nd] && ct + this.delayLead >= d) this.act[nd] = 1;
     // hierarchy activity (parents come before children in the node list)
     const n = def.n;
     for (let i = 0; i < n; i++) {
@@ -538,7 +604,10 @@ export class Effect {
       const frame = this._frame(i);
       if (!s.playing && !s.isSub) {
         const becameActive = !this.prevHier[i] || first;
-        if (becameActive && (s.def.playOnAwake || (first && def.hasPsAncestor[i])) && this.state === 'play') s.play(frame);
+        if (becameActive && (s.def.playOnAwake || (first && def.hasPsAncestor[i])) && (this.state === 'play' || this.lateWake)) {
+          s.play(frame);
+          if (this.state !== 'play' && s.def.looping) s.stopEmitting(); // a late wake plays once: its loops do not run on
+        }
       }
       if (s.playing) s.update(dt, frame);
       else if (s.isSub) s.setFrame(frame);
@@ -568,7 +637,7 @@ export class Effect {
       st.head = (st.head + 1) % 256;
       if (st.n < 255) st.n++;
     }
-    this._lifecycle(dt);
+    this._lifecycle(dt, bdt);
   }
 
   _tween(node, prop, dx, dy, keep) {
@@ -649,18 +718,18 @@ export class Effect {
     return f;
   }
 
-  _lifecycle(dt) {
+  _lifecycle(dt, bdt = dt) {
     const def = this.def;
     if (this.state === 'stopping') {
       // a stopped effect fades out within STOP_FADE (long-lived one-shot particles — a status ring of a 10 s
       // lifetime — must not outlive their status) [ASSUMED]
-      this.stopT += dt;
+      this.stopT += bdt;
       const end = Math.max(STOP_FADE, def.delayToFinish + 0.3);
       if (this.stopT >= end) { this.state = 'done'; return; }
       this.fade = Math.min(1, Math.max(0, (end - this.stopT) / 0.3));
     }
     if (this.state === 'linger') {
-      this.linger -= dt;
+      this.linger -= bdt;
       if (this.linger <= 0) this.state = 'done';
       return;
     }
@@ -673,7 +742,7 @@ export class Effect {
     // a trail keeps a stopped effect until it has faded; a playing one-shot ends with its systems and clips (its trail
     // fades during the `_delayToFinish` linger — a standing trail holds one point for ever)
     if (!busy && this.state === 'stopping') for (const t of this.trails.values()) if (t.n > 1) { busy = true; break; }
-    if (!busy) for (const [nd, d] of def.fxDelay) if (!this.forcedOff[nd] && ct < d) { busy = true; break; }
+    if (!busy) for (const [nd, d] of def.fxDelay) if (!this.forcedOff[nd] && ct + this.delayLead < d) { busy = true; break; }
     if (!busy && this.state === 'play') {
       for (const a of def.animators) {
         const c = def.clips[a.clip];
@@ -736,7 +805,7 @@ export class Effect {
       if (mr && mr.enabled && mr.mesh && (this.rendOv.get(i)?.enabled ?? true)) {
         const md = this.lib ? this.lib.mesh(mr.mesh) : null;
         if (md && md.submeshes) {
-          const flat = behindUnits(mr.layer, mr.order, def.back) || (isFlatMesh(md, w) && nearGround);
+          const flat = behindUnits(mr.layer, mr.order, def.back || mr.back) || (isFlatMesh(md, w) && nearGround);
           for (let k = 0; k < mr.mats.length; k++) {
             if (mr.mats[k] == null || !md.submeshes[k]) continue;
             const mat = def.material(mr.mats[k], lite);
@@ -917,6 +986,26 @@ function entry(part, node, submesh, mat, ov, order, layer, dist, ground, effect,
  */
 export function behindUnits(layer, order, back = false) {
   return layer < 0 || (layer === 0 && (order < 0 || (back && order === 0)));
+}
+
+/**
+ * A node's depth in its effect: the z of its origin in the root's frame (the authored positions, rotations and scales
+ * of the nodes between them; the root's own transform is the place it plays at). z > 0 lies deeper in the board.
+ */
+export function nodeDepth(def, i, rootIdx) {
+  const B = def.base;
+  let x = 0, y = 0, z = 0;
+  for (let j = i, guard = 0; j >= 0 && j !== rootIdx && guard < 64; j = def.parent[j], guard++) {
+    const o = j * 10;
+    // p = pos_j + rot_j * (scale_j * p)
+    const sx = x * B[o + 7], sy = y * B[o + 8], sz = z * B[o + 9];
+    const qx = B[o + 3], qy = B[o + 4], qz = B[o + 5], qw = B[o + 6];
+    const tx = 2 * (qy * sz - qz * sy), ty = 2 * (qz * sx - qx * sz), tz = 2 * (qx * sy - qy * sx);
+    x = B[o] + sx + qw * tx + (qy * tz - qz * ty);
+    y = B[o + 1] + sy + qw * ty + (qz * tx - qx * tz);
+    z = B[o + 2] + sz + qw * tz + (qx * ty - qy * tx);
+  }
+  return z;
 }
 
 /** Particles drawn flat on the board: world / vertical billboards, local quads (or flat meshes) lying in XY. */

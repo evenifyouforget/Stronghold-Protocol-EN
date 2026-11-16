@@ -91,8 +91,7 @@ const PLUGIN_TYPES = new Set(UI_PLUGIN_MESSAGES);
 const HOST_TYPES = new Set(UI_HOST_MESSAGES);
 
 /**
- * A client→server type (shared/protocol.js C2S): hello, ping, room.*, g.*, b.*, p2p.*, (fork, matchmaking) queue.* and
- * (fork, the Grand Alliance room browser) rooms.*.
+ * A client→server type (shared/protocol.js C2S): hello, ping, room.*, g.*, b.*, p2p.*, (fork, matchmaking) queue.* and (fork, the Grand Alliance room browser) rooms.*.
  * The unit test asserts every current C2S key matches.
  * @param {unknown} s
  */

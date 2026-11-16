@@ -117,7 +117,29 @@ FX_GENERIC = {
                'weaken': 'buff_weak', 'fragile': 'buff_ fragile_01', 'artsFragile': 'buff_ fragile_01',
                'physFragile': 'buff_ fragile_01', 'elemFragile': 'buff_ fragile_01', 'defDown': 'buff_defdown',
                'resDown': 'buff_magic_resistance_down', 'aspdDown': 'buff_attack_speed_reduction_01',
-               'disarm': 'common_disarm_01', 'invulnerable': 'common_invincible_01', 'poison': 'buff_poison'},
+               'disarm': 'common_disarm_01', 'invulnerable': 'common_invincible_01', 'poison': 'buff_poison',
+               # (fork) 麻痹 stacks: buff_table palsy[stack]'s overrideEffectKey (2026-11-10)
+               'palsy': 'common_061_numb_01'},
+    # (fork) element bursts (爆发), by `<sim element>.<side>.<role>`: side `enemy` = an enemy unit (the sim's
+    # isEnemyEntity), `char` = an operator / summon; role `hit` plays once at the burst, `loop` while the burst's
+    # `<element>Burst` lock lasts, `down` while erosion's permanent DEF cut (`erosionDown`) lasts. Read from the CN
+    # client (2026-11-10): ep_breakbuff_table names each element's buff (ep_break_<fire|sanity|water|dark>), whose
+    # template creates ep_break_<el>_<enemy|char>; the effects are those buffs' overrideEffectKey in buff_table.json
+    # (the enemy side: fire → common_firedamage_debuff for the lock, water → common_waterdamage_debuff with the
+    # permanent DEF −120, sanity → common_nerve_injury_01_hit, an IMMEDIATELY buff: once), their templates'
+    # ON_BUFF_START CreateEffect (the hits) and the overrideEffectKey of the buffs those templates create (the
+    # operator side). common_nerve_injury_01_hit does not loop: once on either side. FIRE = burn, SANITY = neural,
+    # WATER = erosion, DARK = apoptosis.
+    'burst': {'burn.enemy.hit': 'common_firedamage_hit', 'burn.enemy.loop': 'common_firedamage_debuff',
+              'burn.char.loop': 'buff_burn',
+              'neural.enemy.hit': 'common_nerve_injury_01_hit', 'neural.char.hit': 'common_nerve_injury_01_hit',
+              'erosion.enemy.hit': 'common_waterdamage_hit', 'erosion.enemy.down': 'common_waterdamage_debuff',
+              'erosion.char.hit': 'common_waterelementexplosion', 'erosion.char.down': 'buff_defdown',
+              'apoptosis.enemy.hit': 'common_darkdamage_hit', 'apoptosis.enemy.loop': 'common_darkdamage_debuff',
+              'apoptosis.char.hit': 'common_darkdamage_hit', 'apoptosis.char.loop': 'common_darkdamage_debuff'},
+    # (fork) one-shots for the sim's fx kinds (b.ev ['fx', kind, …] on the unit `id`): 'palsy' = a 麻痹 stack spent
+    # interrupting an attack (sim ai.js) — buff_table palsying's overrideEffectKey
+    'fx': {'palsy': 'common_061_numb_hit_01'},
 }
 FX_GENERIC_BUNDLES = ('battle/prefabs/effects/buff.ab',)   # every prefab of these is a generic key too
 
@@ -364,10 +386,32 @@ def skin_fx_map(keys, pairs=None):
     return out
 
 
+def skin_pairs_map(keys, by_outfit=None):
+    """index.json `skinPairs` (fork): {outfit id: {from: to}} — each outfit's own skinpack replacements over the exported
+    keys. The suffix alone does not name an outfit: operators share it (时代/LIX is 薇薇安娜's 还愿礼 and 号角's 初晓,
+    时代/XXXIX 薇薇安娜's and 风笛's), and a pair from a shared key (common_char_birth_01 → vvana_birth_01_epoque#59) is
+    that one outfit's, never every wearer's of the suffix — `skinFx` keeps them by suffix only for older clients."""
+    have, out = set(keys), {}
+    for oid, m in sorted((by_outfit or {}).items()):
+        for a, b in sorted(m.items()):
+            if a in have and b in have:
+                out.setdefault(oid, {})[a] = b
+    return out
+
+
+def pairs_by_suffix(by_outfit):
+    """{suffix: {from: to}} of skin_replace_pairs' {outfit id: …} (`<charId>@<suffix>`): skin_fx_map's `pairs`."""
+    out = {}
+    for oid, m in sorted((by_outfit or {}).items()):
+        out.setdefault(oid.split('@', 1)[-1], {}).update(m)
+    return out
+
+
 def skin_replace_pairs(ab_root, cabs, log=lambda _m: None):
-    """{outfit suffix: {from key: to key}} (lower case) of every skinpack's SkinEffectReplacer `_replaceEffectPairs`
+    """{outfit id: {from key: to key}} (lower case) of every skinpack's SkinEffectReplacer `_replaceEffectPairs`
     (fork) — the official outfit → effect mapping; a skinpack the client does not have, or that names none, adds
-    nothing. The suffix is read off the `to` key (skin_variant)."""
+    nothing. The outfit id is `<the skinpack's operator>@<suffix>` (data/outfits.json ids: skinpack/char_4098_vvana.ab
+    and the suffix read off the `to` key, skin_variant)."""
     out = {}
     root = Path(ab_root) / 'skinpack'
     if not root.is_dir():
@@ -385,7 +429,7 @@ def skin_replace_pairs(ab_root, cabs, log=lambda _m: None):
                         b = (p.get('toEffect') or '').lower() if isinstance(p, dict) else ''
                         sv = skin_variant(b)
                         if a and b and sv:
-                            out.setdefault(sv[1], {})[a] = b
+                            out.setdefault(f'{f.stem.lower()}@{sv[1]}', {})[a] = b
         except Exception as e:  # noqa: BLE001 — one unreadable skinpack keeps the name rule for its outfits
             log(f'  skip skinpack {f.name}: {e!r}')
     return out
@@ -928,11 +972,13 @@ def string_values(v, out):
 class Exporter:
     """Writes the descriptors, textures and meshes of the effect prefabs of one AssetEnv into <out>/fx."""
 
-    def __init__(self, env, out_root, log=print, texture_format='webp'):
+    def __init__(self, env, out_root, log=print, texture_format='webp', keep_existing=False):
         self.env = env
         self.out = Path(out_root) / FX_SUB
         self.log = log
         self.texture_format = texture_format
+        # (fork) an add-only run never rewrites a file already there (the texture and mesh names hash their content)
+        self.keep_existing = keep_existing
         self.textures = {}      # key → meta
         self.meshes = {}        # key → meta
         self._tex_keys = {}     # (file id, path id) → key
@@ -979,11 +1025,13 @@ class Exporter:
         meta.update({'wrapU': ['repeat', 'clamp', 'mirror', 'mirrorOnce'][min(3, ts.get('m_WrapU', 0))],
                      'wrapV': ['repeat', 'clamp', 'mirror', 'mirrorOnce'][min(3, ts.get('m_WrapV', 0))],
                      'filter': ['point', 'bilinear', 'trilinear'][min(2, ts.get('m_FilterMode', 1))], 'aniso': ts.get('m_Aniso', 0)})
-        save_texture(img, full, suffix)
+        if not (self.keep_existing and full.exists()):
+            save_texture(img, full, suffix)
         if t.m_Width >= HALF_MIN and t.m_Height >= HALF_MIN:
             size = (max(1, t.m_Width // 2), max(1, t.m_Height // 2))
             small = img.convert('RGBa').resize(size, Image.LANCZOS).convert('RGBA') if has_alpha else img.resize(size, Image.LANCZOS)
-            save_texture(small, half, suffix)
+            if not (self.keep_existing and half.exists()):
+                save_texture(small, half, suffix)
             meta['half'] = f'tex/half/{key}.{suffix}'
         self.textures[key] = meta
         return key
@@ -1028,7 +1076,8 @@ class Exporter:
         key = f'{FX_SAFE.sub("_", m.m_Name or "mesh").strip("._") or "mesh"}-{hashlib.sha1(body.encode()).hexdigest()[:8]}'
         if key not in self.meshes:
             path = self.out / 'mesh' / f'{key}.json'
-            write_atomic(path, body.encode('utf-8'))
+            if not (self.keep_existing and path.exists()):
+                write_atomic(path, body.encode('utf-8'))
             self.meshes[key] = {'name': m.m_Name, 'verts': h.m_VertexCount, 'file': f'mesh/{key}.json'}
         return key
 
@@ -1150,7 +1199,8 @@ class Exporter:
                'nodes': nodes, 'materials': ctx.materials, 'clips': ctx.clips, 'textures': sorted(ctx.tex_used),
                'meshes': sorted(ctx.mesh_used), 'refs': sorted(refs), 'stats': stats}
         body = json.dumps(doc, ensure_ascii=False, separators=(',', ':'))
-        write_atomic(self.out / 'prefabs' / f'{fx_file(key)}.json', body.encode('utf-8'))
+        if not (self.keep_existing and (self.out / 'prefabs' / f'{fx_file(key)}.json').exists()):
+            write_atomic(self.out / 'prefabs' / f'{fx_file(key)}.json', body.encode('utf-8'))
         spawn, follow = prefab_anchor(nodes)
         return {'file': f'prefabs/{fx_file(key)}.json', 'bundle': bundle, 'bytes': len(body),
                 'textures': sorted(ctx.tex_used), 'meshes': sorted(ctx.mesh_used), 'refs': sorted(refs), **stats,
@@ -1977,6 +2027,41 @@ def graph_effects(state, ek):
     return out
 
 
+def graph_branches(state, ek):
+    """(fork) {effect key: branch path} of the keys an action graph names inside a condition's branches (IfElse
+    `_succeedNodes` / `_failNodes`): one letter per condition from the outside in — 's' / 'f' (met / not met), and for a
+    target-side test (IfDamageTargetSide) 'E' / 'A' (the target is an enemy / an ally). A key outside every branch is
+    left out; a key named on several paths keeps the first."""
+    try:
+        nodes = json.loads(state) if isinstance(state, str) and state[:1] in '[{' else None
+    except ValueError:
+        return {}
+    out = {}
+
+    def walk(v, path):
+        if isinstance(v, dict):
+            if '_succeedNodes' in v or '_failNodes' in v:
+                c = v.get('_conditionNode') if isinstance(v.get('_conditionNode'), dict) else {}
+                side = str(c.get('$type') or '').endswith('IfDamageTargetSide')
+                enemy = 'ENEMY' in str(c.get('_sideMask') or '')
+                yes, no = (('E', 'A') if enemy else ('A', 'E')) if side else ('s', 'f')
+                walk(v.get('_succeedNodes'), path + yes)
+                walk(v.get('_failNodes'), path + no)
+                return
+            for k, x in v.items():
+                if k == '_conditionNode':
+                    continue
+                if isinstance(x, str) and ek(x) and path:
+                    out.setdefault(ek(x), path)
+                elif isinstance(x, (dict, list)):
+                    walk(x, path)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x, path)
+    walk(nodes, '')
+    return out
+
+
 def graph_nodes(state):
     """Every action node of an Odin-serialized action graph (a SerializedState JSON string), nested ones included (a
     condition's `_succeedNodes`, …): [(node type without its namespace, node dict)…]."""
@@ -2021,6 +2106,47 @@ def template_owner(tkey):
     return m.group(0) if m else None
 
 
+def unit_owner_codes(chars, enemies):
+    """(fork) The template owners of our units (template_owned): the operators' codes (`tocka` of char_4244_tocka; their
+    tokens' templates carry them too, mlyss_wtrman_s_1) and the enemies' as `enemy_<code>` (enemy_reid of
+    enemy_1539_reid: enemy_reid_cast_effect)."""
+    owners = {u.split('_', 2)[2] for u in chars if u.count('_') >= 2}
+    for e in enemies:
+        m = re.match(r'enemy_\d+_([a-z0-9]+)', e or '')
+        if m:
+            owners.add('enemy_' + m.group(1))
+    return owners
+
+
+def template_owned(tkey, owners, refs=()):
+    """(fork) Whether a buff template is one of our units' or our seasons': named after an owner code (unit_owner_codes;
+    an enemy's by its second word) or, without its `[…]` parts, a buff key our data names (`refs`: the seasons' bonds,
+    bands and items — act2autochess_bond_eff_kazimierz[ex][damage] of the Kazimierz bond)."""
+    own = template_owner(tkey)
+    if own == 'enemy':
+        m = re.match(r'enemy_([a-z0-9]+)(?=[_\[]|$)', tkey)
+        own = 'enemy_' + m.group(1) if m else None
+    return (own is not None and own in owners) or tkey in refs or str(tkey or '').split('[', 1)[0] in refs
+
+
+def graph_made_buffs(state, ek):
+    """(fork) The buffs an action graph creates and finishes itself: ({effect key: the created buff's life (buff_life,
+    with its `buff` key)} — a CreateBuff node's own BuffData, whose life is not its parent's: char_1026_gvial2 S3's
+    gvial2_s_3[final_bleed], LIMITED `final_duration`, made at ON_BUFF_FINISH —, [buff keys of its FinishBuffsById
+    nodes]). Its effect key: the BuffData's overrideEffectKey (the empty template's own effect is none)."""
+    made, finishes = {}, []
+    for typ, n in graph_nodes(state):
+        if typ == 'FinishBuffsById' and isinstance(n.get('_buffKey'), str) and n['_buffKey']:
+            finishes.append(n['_buffKey'])
+        b = n.get('_buff')
+        if typ.startswith('CreateBuff') and isinstance(b, dict) and isinstance(b.get('overrideEffectKey'), str):
+            key = ek(b['overrideEffectKey']) if b['overrideEffectKey'] else None
+            life = buff_life(b)
+            if key and life:
+                made.setdefault(key, {**life, **({'buff': b['buffKey']} if b.get('buffKey') else {})})
+    return made, finishes
+
+
 def graph_links(state):
     """What an action graph does to abilities, modes and buffs (v3): (abilities: [[action type, ability name | None (the
     buff's blackboard `ability_name`), 'cast' | 'stop']…] — TRIGGER_ACTION / STOP_ACTION nodes, switches: [[mode index |
@@ -2045,9 +2171,12 @@ def graph_links(state):
     return abilities, switches, creates
 
 
-def template_uses(tkey, template, on, buff):
+def template_uses(tkey, template, on, buff, templates=None, seen=()):
     """The uses of a buff template's action graph (a buff_templates() entry): its CreateEffect nodes play at their buff
-    event (BUFF_EVENT_ROLES; a target's buff starts when the target is hit), the buffs it creates loop."""
+    event (BUFF_EVENT_ROLES; a target's buff starts when the target is hit), the buffs it creates loop. (fork) With
+    `templates`: the templates its graph creates too (`creates`, three levels), their start actions at the event the
+    parent creates them (`createdAt`: a buff's ON_BUFF_START is its creation), on the parent's carrier [ASSUMED: the
+    graph tuple does not say whom a CreateBuff targets]."""
     uses = []
     for event, typ, field, key in template.get('graph', []):
         role = BUFF_EVENT_ROLES.get(event, 'trigger')
@@ -2057,9 +2186,89 @@ def template_uses(tkey, template, on, buff):
             role = 'range'
         if on == 'targets' and role == 'start':
             role = 'hit'
-        uses.append({'role': role, 'keys': [key], 'from': f'template {tkey}', 'event': event, 'action': typ,
-                     **({'on': on} if on else {}), 'buff': buff})
+        u = {'role': role, 'keys': [key], 'from': f'template {tkey}', 'event': event, 'action': typ,
+             **({'on': on} if on else {}), 'buff': buff}
+        # (fork) a buff this graph creates carries its own life (`made`; graph_made_buffs) — the use's `life` stays its
+        # parent's; `until: 'start'`: the template's own start finishes it again (FinishBuffsById at a start event:
+        # char_1046_sbell2's sbell2_s[idle_effect], char_4212_nasti S1's nasti_s1[effect_manager] — idle loops made at
+        # ON_BUFF_FINISH that the next cast removes)
+        made = (template.get('made') or {}).get(f'{event}|{key}') if typ.startswith('CreateBuff') else None
+        if made:
+            mb = made.get('buff')
+            if mb and any(f == mb and BUFF_EVENT_ROLES.get(ev) == 'start' for ev, f in template.get('finishes') or []):
+                made = {**made, 'until': 'start'}
+            u['made'] = made
+        uses.append(u)
+    if templates and len(seen) < 3:
+        for c in template.get('creates') or []:
+            if c in seen or c == tkey or c not in templates:
+                continue
+            at = (template.get('createdAt') or {}).get(c)
+            for u in template_uses(c, templates[c], on, buff, templates, seen + (tkey,)):
+                if at and BUFF_EVENT_ROLES.get(u['event']) == 'start' and u['action'].startswith('CreateEffect'):
+                    u['event'] = at
+                    u['role'] = BUFF_EVENT_ROLES.get(at, 'trigger')
+                    if on == 'targets' and u['role'] == 'start':
+                        u['role'] = 'hit'
+                u['from'] = f'template {tkey} → {u["from"]}'
+                uses.append(u)
     return uses
+
+
+# (fork) buff fields of an attack node that are no buff on its hit or its owner per attack: an aura's own lasting buffs
+ATTACK_BUFF_SKIP = ('_passiveBuffs',)
+
+
+def attack_buff_rows(buffs, templates):
+    """(fork) The rows of the buffs an attack puts on each target it hits or on its owner (parse_unit ability_entry's
+    `_buffs`): {'hit': [...], 'cast': [...]}. A target's buff whose template (or a template it creates as it starts)
+    plays a CreateEffect as it starts is a hit row of the attack — the client plays it on the target the blow lands on
+    (Pepe's pepe_attack_fx / pepe_s_3_fx, Executor the Ex Foedere S3's mark end, Specter the Unchained S3, Folinic S2,
+    Saga S3 …); a per-attack owner buff's start effect (BuffToOwner: Lee S3's knockback) a cast row on the owner. Lasting effects (CreateBuff overrideEffectKey: a
+    mark on the target), later buff events (trigger, finish) and a created buff of an owner's buff (whom it lands on is
+    not in the graph) stay unlinked: they need the sim's signal."""
+    out, seen, cands = {}, set(), {}
+    for b in buffs or []:
+        tkey, t = b['templateKey'], (templates or {}).get(b['templateKey'])
+        if not t:
+            continue
+        # an owner's buff per attack (BuffToOwner, a …ToOwner field); the other owner buffs last the cast or longer
+        # (BuffDuringCasting…: Lemuen S3_End's, which her skill's end row already plays) and give no row
+        owner = b['class'].startswith('BuffToOwner') or 'ToOwner' in b['field']
+        if not owner and buff_target(b['class'], b['field'], {}) == 'owner':
+            continue
+        direct = template_uses(tkey, t, 'owner' if owner else 'targets', b.get('buffKey'))
+        uses = direct if owner else template_uses(tkey, t, 'targets', b.get('buffKey'), templates)
+        side = 'A' if 'Heal' in b['class'] else 'E'
+        for u in uses:
+            if not str(u.get('action', '')).startswith('CreateEffect') or u.get('event') not in ('ON_BUFF_START', 'ON_BUFF_ENABLE'):
+                continue
+            if u.get('action') == 'CreateLineEffect':
+                continue
+            src = (templates or {}).get(u['from'].rsplit('template ', 1)[-1]) or t
+            for k in u['keys']:
+                if (owner, k) in seen:
+                    continue
+                # a key on a condition's branch (graph_branches): the client does not know the stacks / buffs the
+                # test reads, so the path where no condition is met wins (Pepe S3's first range, Vigil's wolves' first
+                # hit); a target-side test takes the side the attack hits (a heal: allies)
+                br = src.get('branches') or {}
+                path = br.get(f'{u["event"]}|{k}') or br.get(f'ON_BUFF_START|{k}') or ''
+                seen.add((owner, k))
+                row = {'directionType': 0, 'effects': [k], 'oneshot': 1, 'template': tkey,
+                       'from': f'{b["class"]}.{b["field"]} → {u["from"]}'}
+                if owner:
+                    row.update({'startEvent': 2, 'endEvent': 3})
+                cands.setdefault((tkey, owner), []).append((sum(c not in ('f', side) for c in path), row))
+    # per buff: the keys needing the fewest conditions met — the base path's when it has any (a filter whose only
+    # effect is on its met side, Specter the Unchained S3's hit at high HP, keeps that one)
+    for (tkey, owner), rows in cands.items():
+        best = min(n for n, _ in rows)
+        # the generic hit / heal sparks are the client's own (its generic hit by damage type)
+        keep = [r for n, r in rows if n == best and not r['effects'][0].lower().startswith('common_')]
+        if keep:
+            out.setdefault('cast' if owner else 'hit', []).extend(keep)
+    return out
 
 
 def behaviour_uses(cls, fields, ek, templates=None, node=None, ability=None):
@@ -2136,14 +2345,27 @@ def behaviour_uses(cls, fields, ek, templates=None, node=None, ability=None):
                 if isinstance(g, dict) and isinstance(g.get('effect'), str) and ek(g['effect']):
                     ev = event_name(ABILITY_EVENTS, g.get('playOnEvent', g.get('_playOnEvent', g.get('event'))))
                     add([g['effect']], name_role(ek(g['effect']), ev), f, startEvent=ev, by='name')
-        if isinstance(v, (dict, list)):
-            for b in buffs_in(v):
+        if isinstance(v, (dict, list)) or (isinstance(v, str) and 'buff' in f.lower() and v in templates):
+            found = buffs_in(v) if not isinstance(v, str) else []
+            # (fork) a buff list that names its buffs by key (冻河 S2 / S3 `_buffs`: ['tocka_s2[trigger]', …]: the
+            # client builds them from the template of that key [ASSUMED: buffKey = templateKey]), and the buffs of an
+            # action graph (its SerializedState: CreateBuff nodes' `_buff`)
+            if 'buff' in f.lower():
+                strs = [v] if isinstance(v, str) else v if isinstance(v, list) else []
+                found += [{'buffKey': x, 'templateKey': x, 'overrideEffectKey': None} for x in strs
+                          if isinstance(x, str) and x in templates]
+            if isinstance(v, dict) and isinstance(v.get('SerializedState'), str) and v['SerializedState'][:1] in '[{':
+                try:
+                    found += buffs_in(json.loads(v['SerializedState']))
+                except ValueError:
+                    pass
+            for b in found:
                 on, tkey = buff_target(cls, f, fields), b.get('templateKey') or None
                 t = templates.get(tkey) or {}
                 effect = b.get('overrideEffectKey') or t.get('effect')
                 life = buff_life(b)                             # the buff's life: every use it carries has it (v3)
                 add([effect], 'loop', f, on=on, buff=b.get('buffKey') or None, template=tkey, life=life)
-                for u in template_uses(tkey, t, on, b.get('buffKey') or None) if t else []:
+                for u in template_uses(tkey, t, on, b.get('buffKey') or None, templates) if t else []:
                     u['from'] = f'{cls}.{f} → {u["from"]}'
                     if node:
                         u['node'] = node
@@ -2171,6 +2393,55 @@ def skill_mode(fields):
                     return int(bb['value'])
     m = fields.get('_switchToMode')
     return m if isinstance(m, int) and not isinstance(m, bool) and m >= 0 else None
+
+
+def use_sig(u):
+    """(fork) What makes two uses the same for merge_added: role, keys, event, action, template, carrier, source."""
+    return json.dumps([u.get('role'), u.get('keys'), u.get('event'), u.get('action'), u.get('template'), u.get('on'), u.get('from')],
+                      ensure_ascii=False)
+
+
+def merge_added(old, new):
+    """(fork) A relink's records (--fx-relink): the earlier `old` as it was, plus what the new crawl adds — records and
+    fields it lacks, uses it does not have (use_sig; a record's `roles` / `effects` then follow its uses) and the fields
+    a use both have lacks in `old`, new list
+    entries (abilities matched by `node`); a value both have keeps the earlier one. So a relink only adds links: what an
+    extractor change since the earlier run would alter in an existing record stays for a full run to decide."""
+    if isinstance(old, dict) and isinstance(new, dict):
+        out = dict(old)
+        for k, v in new.items():
+            out[k] = v if k not in old else merge_added(old[k], v)
+        if isinstance(out.get('uses'), list) and isinstance(old.get('uses'), list):
+            have = {use_sig(u) for u in old['uses']}
+            added = [u for u in new.get('uses') or [] if isinstance(u, dict) and use_sig(u) not in have]
+            # a use both have gains the fields it lacks (a created buff's `made`, graph_made_buffs); its own stay
+            fresh = {}
+            for u in new.get('uses') or []:
+                if isinstance(u, dict):
+                    fresh.setdefault(use_sig(u), u)
+            kept = [{**u, **{k: v for k, v in fresh[use_sig(u)].items() if k not in u}}
+                    if isinstance(u, dict) and use_sig(u) in fresh else u for u in old['uses']]
+            out['uses'] = kept + added
+            if added and 'roles' in out:
+                out['roles'] = roles_of(out['uses'])
+            if added and isinstance(out.get('effects'), list):
+                ks = [k for u in added for k in list(u.get('keys') or []) + [x for x in u.get('slots') or [] if x]]
+                out['effects'] = sorted(set(out['effects']) | set(ks))
+        return out
+    if isinstance(old, list) and isinstance(new, list):
+        if all(isinstance(x, str) for x in old + new):
+            return old + [x for x in new if x not in old]
+        for idk in ('node', 'name'):                    # abilities by node; a unit's modes by name
+            if all(isinstance(x, dict) and idk in x for x in old + new):
+                by = {x[idk]: x for x in old}
+                merged = [merge_added(x, next((y for y in new if y[idk] == x[idk]), x)) for x in old]
+                return merged + [y for y in new if y[idk] not in by]
+        if all(isinstance(x, dict) for x in old + new):
+            # an attack's rows: the rows of its buffs' templates (attack_buff_rows: `template`) it lacks
+            have = {json.dumps(x, sort_keys=True, ensure_ascii=False) for x in old}
+            return old + [y for y in new if y.get('template') and json.dumps(y, sort_keys=True, ensure_ascii=False) not in have]
+        return old
+    return old
 
 
 def roles_of(uses):
@@ -2287,6 +2558,14 @@ def parse_unit(env, rel, name, kind):
             return a
         a['node'] = path_of[gkey(ago)]
         claimed.add(gkey(ago))
+        # (fork) the buffs the attack node's behaviours put on what it hits or on its owner (MeleeAttack _activeBuffs,
+        # _activeBuffsToMainTarget, BuffToCastTargets, BuffToOwner …): crawl_units turns their templates' effects into
+        # rows (attack_buff_rows) once the templates are known
+        raw = [{'class': cls, 'field': f, 'templateKey': b.get('templateKey'), 'buffKey': b.get('buffKey')}
+               for cls, o, d in mbs_of.get(gkey(ago), []) for f, v in d.items()
+               if 'buff' in f.lower() and f not in ATTACK_BUFF_SKIP for b in buffs_in(v) if b.get('templateKey')]
+        if raw:
+            a['_buffs'] = raw
         ems = node_emitters(ago)
         if len(ems) == 1 and ems[0][2] is None:
             a.update(ems[0][1])
@@ -2547,23 +2826,35 @@ def buff_templates(env, ek):
             for t in (env.tt(o).get('_templates') or []):
                 if not isinstance(t, dict) or not t.get('templateKey'):
                     continue
-                graph, abilities, switches, creates, shots = [], [], [], [], []
+                graph, abilities, switches, creates, shots, made_at = [], [], [], [], [], {}
+                made, finishes, branches = {}, [], {}
                 for it in ((t.get('eventToActions') or {}).get('_items') or []):
                     ev = event_name(BUFF_EVENTS, it.get('key')) or it.get('key')
                     state = (it.get('value') or {}).get('SerializedState')
+                    for key, path in graph_branches(state, ek).items():
+                        branches.setdefault(f'{ev}|{key}', path)
                     for typ, field, key in graph_effects(state, ek):
                         graph.append([ev, typ, field, key])
+                    m, f = graph_made_buffs(state, ek)
+                    for k, life in m.items():
+                        made.setdefault(f'{ev}|{k}', life)
+                    finishes += [[ev, b] for b in f]
                     ab, sw, cr = graph_links(state)
                     abilities += [[ev] + x for x in ab]
                     switches += [[ev] + x for x in sw]
                     creates += [x for x in cr if x not in creates]
+                    for x in cr:
+                        made_at.setdefault(x, ev)
                     shots += [x for x in graph_projectiles(state) if x not in shots]
                 effect = ek(t.get('effectKey')) if t.get('effectKey') else None
                 if effect or graph or abilities or switches or creates or shots:
                     out[t['templateKey']] = {'effect': effect, 'graph': graph, **({'abilities': abilities} if abilities else {}),
                                              **({'switches': switches} if switches else {}),
-                                             **({'creates': creates} if creates else {}),
-                                             **({'projectiles': shots} if shots else {})}
+                                             **({'creates': creates, 'createdAt': made_at} if creates else {}),
+                                             **({'projectiles': shots} if shots else {}),
+                                   **({'made': made} if made else {}),
+                                   **({'finishes': finishes} if finishes else {}),
+                                   **({'branches': branches} if branches else {})}
     return out
 
 
@@ -2675,10 +2966,12 @@ def skill_entry(env, root, ek, pk, effect_refs, templates):
     return e
 
 
-def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, template_owners=None):
+def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, template_owners=None, template_refs=None):
     """index.json's units / projectiles / skills / skins for `unit_ids`, and every effect key they reference.
-    `template_owners` (fork; operator codes): the projectiles that only a buff template of theirs fires (塔露拉 S3's
-    簇火: oxi_s_3_wave's graph, no prefab names it) get their records too, whichever units this run crawls."""
+    `template_owners` (fork; unit_owner_codes) and `template_refs` (fork; the seasons' buff keys, template_owned): the
+    projectiles that only a buff template of theirs fires (塔露拉 S3's 簇火: oxi_s_3_wave's graph, no prefab names it) get
+    their records too, and the effects only such a template names join the referenced keys, whichever units this run
+    crawls."""
     units, projectiles, skills, skins, referenced = {}, {}, {}, {}, set()
     shared = AssetEnv(ab_root, cabs)                           # [uc]projectiles.ab and [uc]skills.ab, loaded once
     proj_roots = shared.prefabs(PROJECTILES)
@@ -2726,6 +3019,16 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, tem
                     vals = [ek(x) for x in (d.get(src) or []) if isinstance(x, str) and x]
                     if vals:
                         entry.setdefault(dst, []).extend(vals)
+                # (fork) the buffs the projectile leaves on its target as it ends (_actionController._extraBuffsInTheEnd:
+                # Lappland the Decadenza S3's wolf shot, Stainless's pile): their start effects play with its hit (attack_buff_rows)
+                ac = d.get('_actionController')
+                if isinstance(ac, dict):
+                    raw = [{'class': cls, 'field': '_extraBuffsInTheEnd', 'templateKey': b.get('templateKey'),
+                            'buffKey': b.get('buffKey')} for b in buffs_in(ac.get('_extraBuffsInTheEnd')) if b.get('templateKey')]
+                    for r in attack_buff_rows(raw, templates).get('hit', []):
+                        k = ek(r['effects'][0])
+                        if k and k.lower() in eff and k not in (entry.get('onHit') or []):
+                            entry.setdefault('onHit', []).append(k)
             stack.extend(go_children(shared, go))
         entry['effects'] = effect_refs(strings)
         entry['projectiles'] = sorted({pk(x) for x in strings if pk(x) and pk(x) != key})
@@ -2795,6 +3098,11 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, tem
         return em
 
     def fix_attack(a, where):
+        for kind, rows in attack_buff_rows(a.pop('_buffs', None), templates).items():
+            have = {x.lower() for r in a.get(kind) or [] for x in r.get('effects') or [] if isinstance(x, str)}
+            rows = [r for r in rows if r['effects'][0].lower() not in have]
+            if rows:
+                a.setdefault(kind, []).extend(rows)
         for k in ('projectileKey', 'additionalProjectile'):
             if a.get(k):
                 a[k] = pk(a[k]) or a[k]
@@ -3026,10 +3334,14 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, tem
             if code:
                 sids |= {k for k in skill_roots if k.startswith(f'skchr_{code}_')}
             sids = {skill(sid) for sid in sorted(sids)} - {None}
+            # (fork) a mode the data gives to another skill is not guessed by name (莫斯提马: "S2" is her S3's mode;
+            # shared/fxModes.js applies the same rule to an index made before this)
+            claimed = {skills[s]['mode'] for s in sids if s in skills and skills[s].get('modeBy') == 'data'}
             for sid in sids:                     # no mode in the skill's data: the unit's mode named after the skill
                 m = re.match(r'skchr_.+_(\d+)$', sid)
                 names = [str(x.get('name') or '').lower() for x in u['modes']]
-                if sid in skills and skills[sid]['mode'] is None and m and f's{m.group(1)}' in names:
+                if (sid in skills and skills[sid]['mode'] is None and m and f's{m.group(1)}' in names
+                        and names.index(f's{m.group(1)}') not in claimed):
                     skills[sid]['mode'] = names.index(f's{m.group(1)}')
                     skills[sid]['modeBy'] = 'name'
             u['skills'] = {sid: skills[sid] for sid in sorted(sids) if sid in skills}
@@ -3111,10 +3423,21 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, tem
             f'({", ".join("{} {}".format(k, sum(1 for a in ab if a["kind"] == k)) for k in ("common", "general", "trait"))}); '
             f'when: {", ".join(f"{k} {v}" for k, v in sorted(whens.items(), key=lambda kv: str(kv[0])))}; '
             f'{sum(1 for n in [n for t in tk for n in t["nodes"]] + ab if n.get("triggers"))} with template triggers')
-    for tkey, t in sorted(templates.items()):
-        if template_owners and template_owner(tkey) in template_owners:
-            for p in t.get('projectiles') or []:
-                projectile(p)
+    # (fork) our units' and seasons' templates (template_owned) and the templates they create: their shots, and the
+    # effects only their graphs name (冻河 S2 / S3's buffs: CreateEffect / overrideEffectKey of a template no prefab reaches)
+    todo = sorted((k for k in templates if template_owners and template_owned(k, template_owners, template_refs or ())),
+                  reverse=True)
+    seen = set()
+    while todo:
+        tkey = todo.pop()
+        if tkey in seen or tkey not in templates:
+            continue
+        seen.add(tkey)
+        t = templates[tkey]
+        for p in t.get('projectiles') or []:
+            projectile(p)
+        referenced.update(k for k in [t.get('effect')] + [g[3] for g in t.get('graph') or []] if k)
+        todo.extend(k for k in reversed(t.get('creates') or []) if k not in seen)
     for p in projectiles.values():
         referenced.update(p['effects'])
     return units, projectiles, skills, skins, referenced
@@ -3127,10 +3450,10 @@ def _export_worker(args, keys_all=None):
     (entries, textures meta, meshes meta, log lines)."""
     if keys_all is not None:
         _init_worker(keys_all)
-    ab_root, out_root, cabs, rel, keys, texture_format = args
+    ab_root, out_root, cabs, rel, keys, texture_format, *rest = args
     lines = []
     env = AssetEnv(ab_root, cabs)
-    ex = Exporter(env, out_root, lines.append, texture_format=texture_format)
+    ex = Exporter(env, out_root, lines.append, texture_format=texture_format, keep_existing=bool(rest and rest[0]))
     entries = {}
     try:
         roots = env.prefabs(rel)
@@ -3172,6 +3495,19 @@ def game_data(root):
                     combined.setdefault(uid, rec)
         return combined
     chess, backups, enemies, tokens = load('chess.json'), load('backups.json'), load('enemies.json'), load('tokens.json')
+    # (fork) the seasons' own buff keys (bonds, bands, items: act2autochess_bond_eff_kazimierz…): template_owned
+    season_buffs = set()
+    for folder in [data] + sorted((data / 'versions').glob('*')):
+        for n in ('bonds.json', 'bands.json', 'items.json', 'effects.json'):
+            try:
+                text = (folder / n).read_text(encoding='utf-8')
+            except OSError:
+                continue
+            season_buffs.update(re.findall(r'"([a-z0-9]+autochess_[A-Za-z0-9_]+)"', text))
+    # an item's own template is named after its code (act1autochess_acarm045_buff), its data's global buff not
+    # (act1autochess_equip_acarm045_global_buff) [ASSUMED: by the names]
+    season_buffs |= {f'{m.group(1)}_{m.group(2)}_buff' for k in list(season_buffs)
+                     for m in [re.match(r'([a-z0-9]+autochess)_equip_(acarm\d+)_', k)] if m}
     chars, skills = [], {}
     for v in chess.values():
         cid = v.get('charId')
@@ -3219,7 +3555,7 @@ def game_data(root):
                 skills.setdefault(cid, set()).add(sid)
     return {'chars': chars, 'skills': {k: sorted(v) for k, v in skills.items()}, 'enemies': sorted(enemies), 'tokens': toks,
             'skillOverrides': skill_overrides(chars, char_table),
-            'tokenSkills': token_skills,
+            'tokenSkills': token_skills, 'seasonBuffs': sorted(season_buffs),
             'talentKeys': talent_keys(chars + toks, char_table,
                                       load_excel('battle_equip_table.json'), load_excel('uniequip_table.json')),
             'enemyTalentKeys': {k: enemy_talent_prefixes(v) for k, v in enemies.items() if isinstance(v, dict)}}
@@ -3303,12 +3639,15 @@ def _read_json(path):
 
 
 def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, jobs=None, root=None, fx_manifest=None,
-              texture_format='webp', add_only=False, skins_only=False):
+              texture_format='webp', add_only=False, skins_only=False, relink=False):
     """The fx run (extract.py --only fx): writes <out_root>/fx/** and `fx_manifest` (default <root>/data/local-fx.json:
     the groups FX_GROUPS, every file); returns the number of files written. `manifest` (the groups of
     data/local-assets.json) gets nothing: extract.py drops the fx groups an earlier run left there (ran_groups). A
     --fx-keys run (`keys`) updates those prefabs in the earlier set's index and file list."""
     check_texture_format(texture_format)
+    # (fork) a relink run (--fx-relink): every unit is crawled again and what its records add joins the index's
+    # (merge_added: links only, the earlier values stay); files are added only, as in an add-only run
+    add_only = add_only or relink
     t_start = time.time()
     ab_root = Path(ab_root)
     root = Path(root) if root else Path(__file__).resolve().parents[2]
@@ -3339,16 +3678,17 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
         unit_ids = list(FX_SAMPLE_UNITS)
     else:
         unit_ids = gd['chars'] + gd['enemies'] + gd['tokens']
-    if add_only:
+    if add_only and not relink:
         unit_ids = [uid for uid in unit_ids if uid not in ((previous or {}).get('units') or {})]
     enemy_idx = container_index(ab_root, (ENEMY_GLOB,), root / '.cache/fx/enemies.json', jobs, log) \
         if any(u.startswith('enemy_') for u in unit_ids) else {}
     token_idx = container_index(ab_root, (TOKEN_GLOB,), root / '.cache/fx/tokens.json', jobs, log) \
         if any(not u.startswith(('char_', 'enemy_')) for u in unit_ids) else {}
-    # (fork) a full or add-only `used` run: the operators' template-only projectiles (their effects join `referenced`)
-    owners = {u.split('_', 2)[2] for u in gd['chars'] if u.count('_') >= 2} if selection == 'used' and not keys else None
+    # (fork) a full or add-only `used` run: our units' and seasons' template-only projectiles and effects (template_owned)
+    owners = unit_owner_codes(gd['chars'], gd['enemies']) if selection == 'used' and not keys else None
     units, projectiles, skills, skins, referenced = crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log,
-                                                                template_owners=owners)
+                                                                template_owners=owners,
+                                                                template_refs=set(gd.get('seasonBuffs') or ()))
     timings['units'] = time.time() - t0
 
     generic = {v for group in FX_GENERIC.values() for v in group.values()}
@@ -3365,7 +3705,7 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
     wanted -= set(missing)
     wanted |= twins(wanted)
     # (fork) the outfits' own replacements (skinpack _replaceEffectPairs): their targets come along too, a crosswise or
-    # differently named one included; skin_fx_map lets them win over the name rule
+    # differently named one included; skin_fx_map lets them win over the name rule; skin_pairs_map keeps them per outfit
     t0p = time.time()
     replace_pairs = skin_replace_pairs(ab_root, cabs, log)
     wanted |= {b for m in replace_pairs.values() for a, b in m.items() if a in wanted and b in eff}
@@ -3386,7 +3726,7 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
             for k in sorted(todo):
                 by_bundle.setdefault(eff[k], []).append(k)
             log(f'fx: pass {rounds}: exporting {len(todo)} prefabs from {len(by_bundle)} bundles ({jobs} processes)')
-            work = [(str(ab_root), str(out_root), cabs, rel, ks, texture_format)
+            work = [(str(ab_root), str(out_root), cabs, rel, ks, texture_format, add_only)
                     for rel, ks in sorted(by_bundle.items(), key=lambda kv: -len(kv[1]))]
             results = list(pool.map(_export_worker, work)) if jobs > 1 and len(work) > 1 else [_export_worker(w, tuple(eff)) for w in work]
             done |= todo
@@ -3416,7 +3756,10 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
     prev = previous if add_only else _read_json(out / 'index.json') if keys else None
     if isinstance(prev, dict) and prev.get('format') == 'fx-index' and prev.get('version') == INDEX_VERSION:
         # a --fx-keys run: these prefabs replace their earlier copies; the earlier set's units, skills, prefabs stay
-        if add_only:
+        if relink:
+            units, projectiles, skills, skins = (merge_added(prev.get(k) or {}, v) for k, v in
+                                               zip(('units', 'projectiles', 'skills', 'skins'), (units, projectiles, skills, skins)))
+        elif add_only:
             units, projectiles, skills, skins = ({**v, **(prev.get(k) or {})} for k, v in
                                                zip(('units', 'projectiles', 'skills', 'skins'), (units, projectiles, skills, skins)))
         else:
@@ -3437,7 +3780,8 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
         'source': {'root': ab_root.name, 'client': client_version(ab_root)},
         'units': units, 'projectiles': projectiles, 'skills': skills, 'skins': skins,
         'generic': {**FX_GENERIC, 'keys': sorted(k for k in generic if k in summaries)},
-        'skinFx': skin_fx_map(summaries, replace_pairs),
+        'skinFx': skin_fx_map(summaries, pairs_by_suffix(replace_pairs)),
+        'skinPairs': skin_pairs_map(summaries, replace_pairs),
         'prefabs': dict(sorted(summaries.items())),
     }
     write_atomic(out / 'index.json', json.dumps(index, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))

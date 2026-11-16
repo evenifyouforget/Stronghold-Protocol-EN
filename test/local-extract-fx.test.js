@@ -59,6 +59,17 @@ describe('fx.py encodings (no UnityPy needed)', { skip: !PY && 'no python3' }, (
     assert.deepEqual(out['boc#1'], { birth: 'x_birth_boc#1' }, 'a differently named twin counts; an unexported one does not');
   });
 
+  test('(fork) skin_pairs_map: the skinpack pairs per outfit id — operators sharing a suffix keep their own (薇薇安娜 / 号角 epoque#59)', () => {
+    const keys = ['common_char_birth_01', 'vvana_birth_01_epoque#59', 'horn_hit', 'horn_hit_epoque#59'];
+    const byOutfit = { 'char_4098_vvana@epoque#59': { common_char_birth_01: 'vvana_birth_01_epoque#59' }, 'char_4039_horn@epoque#59': { horn_hit: 'horn_hit_epoque#59', gone: 'gone_epoque#59' } };
+    const out = py(`print(json.dumps([fx.skin_pairs_map(${JSON.stringify(keys)}, ${JSON.stringify(byOutfit)}), fx.pairs_by_suffix(${JSON.stringify(byOutfit)})]))`);
+    assert.deepEqual(out[0], {
+      'char_4098_vvana@epoque#59': { common_char_birth_01: 'vvana_birth_01_epoque#59' },
+      'char_4039_horn@epoque#59': { horn_hit: 'horn_hit_epoque#59' },
+    }, 'each outfit its own pairs; an unexported one is dropped');
+    assert.deepEqual(out[1], { 'epoque#59': { common_char_birth_01: 'vvana_birth_01_epoque#59', horn_hit: 'horn_hit_epoque#59', gone: 'gone_epoque#59' } }, 'skinFx\'s old by-suffix view');
+  });
+
   test('f6: six significant digits, -0 → 0, integers stay, NaN / ±inf → null', () => {
     const out = py(`print(json.dumps([fx.f6(x) for x in [1.0000004, -0.0, 3, 0.258819049, 1e-13, float('nan'), float('inf'), True, 2.0, 1234567.8]]))`);
     assert.deepEqual(out, [1, 0, 3, 0.258819, 0, null, null, true, 2, 1234570]);
@@ -299,6 +310,120 @@ print(json.dumps([fx.emit_role('hit', {}, 'x_hit'), fx.emit_role('attach', {}, '
       'ON_SPELL_ON', 'ON_OUTPUT_DAMAGE', null, 109]);
   });
 
+  test('(fork) merge_added: a relink adds links (uses, records, list entries) and keeps every earlier value', () => {
+    const out = py(`
+old = {'s1': {'effects': ['a'], 'uses': [{'role': 'loop', 'keys': ['a'], 'from': 'X._buffs'}], 'roles': {'loop': ['a']}, 'mode': 1,
+              'abilities': [{'node': 'n1', 'effects': ['a']}]}, 'gone_from_new': {'uses': []}}
+new = {'s1': {'effects': ['a2'], 'uses': [{'role': 'loop', 'keys': ['a'], 'from': 'X._buffs'}, {'role': 'start', 'keys': ['b'], 'from': 'X._buffs → template t'}],
+              'roles': {}, 'mode': 2, 'extra': True, 'abilities': [{'node': 'n1', 'effects': ['a', 'c']}, {'node': 'n2', 'effects': []}]},
+       's2': {'uses': []}}
+print(json.dumps(fx.merge_added(old, new)))`);
+    assert.deepEqual(out.s1.uses.map((u) => u.keys[0]), ['a', 'b'], 'the new use joins, the same one does not repeat');
+    assert.deepEqual(out.s1.roles, { start: ['b'], loop: ['a'] });
+    assert.deepEqual(out.s1.effects, ['a', 'a2', 'b'], 'effects: the earlier list, the new one\'s additions and the added uses\' keys');
+    assert.equal(out.s1.mode, 1, 'a value both have keeps the earlier one');
+    assert.equal(out.s1.extra, true);
+    assert.deepEqual(out.s1.abilities, [{ node: 'n1', effects: ['a', 'c'] }, { node: 'n2', effects: [] }]);
+    assert.ok(out.gone_from_new && out.s2, 'records only in one of them stay');
+  });
+
+  test('(fork) graph_made_buffs / template_uses `made`: a created buff\'s own life; `until: start` when the start finishes it; a relink adds it', () => {
+    const out = py(`${EK}
+def node(t, **kw): return dict({'$type': 'Torappu.Battle.Action.Nodes+' + t + ', Assembly-CSharp'}, **kw)
+start = json.dumps([node('FinishBuffsById', _buffKey='x_a[idle]')])
+finish = json.dumps([node('CreateBuff', _buff={'buffKey': 'x_a[idle]', 'templateKey': 'empty', 'overrideEffectKey': 'x_hit', 'lifeTimeType': 'INFINITY'}),
+                     node('CreateBuff', _buff={'buffKey': 'x_b[bleed]', 'templateKey': 'empty', 'overrideEffectKey': 'x_skill_buff', 'lifeTimeType': 'LIMITED',
+                                               'durationKey': 'final_duration'})])
+made = [fx.graph_made_buffs(start, ek), fx.graph_made_buffs(finish, ek)]
+tpl = {'effect': None, 'graph': [['ON_BUFF_FINISH', 'CreateBuff', 'overrideEffectKey', 'x_hit'], ['ON_BUFF_FINISH', 'CreateBuff', 'overrideEffectKey', 'x_skill_buff']],
+       'made': {'ON_BUFF_FINISH|' + k: v for k, v in made[1][0].items()}, 'finishes': [['ON_BUFF_START', 'x_a[idle]']]}
+uses = fx.template_uses('x_s', tpl, 'owner', 'x_s')
+old = {'s': {'uses': [{'role': 'loop', 'keys': ['x_hit'], 'event': 'ON_BUFF_FINISH', 'from': 't', 'life': {'type': 'LIMITED'}}]}}
+new = {'s': {'uses': [{'role': 'loop', 'keys': ['x_hit'], 'event': 'ON_BUFF_FINISH', 'from': 't', 'life': {'type': 'X'}, 'made': {'type': 'INFINITY'}}]}}
+print(json.dumps([made, [u.get('made') for u in uses], fx.merge_added(old, new)['s']['uses']]))`);
+    assert.deepEqual(out[0], [[{}, ['x_a[idle]']], [{ x_hit: { type: 'INFINITY', buff: 'x_a[idle]' },
+      x_skill_buff: { type: 'LIMITED', key: 'final_duration', buff: 'x_b[bleed]' } }, []]]);
+    assert.deepEqual(out[1], [{ type: 'INFINITY', buff: 'x_a[idle]', until: 'start' }, { type: 'LIMITED', key: 'final_duration', buff: 'x_b[bleed]' }]);
+    assert.deepEqual(out[2], [{ role: 'loop', keys: ['x_hit'], event: 'ON_BUFF_FINISH', from: 't', life: { type: 'LIMITED' }, made: { type: 'INFINITY' } }],
+      'a relink adds `made` to the same use and keeps its earlier life');
+  });
+
+  test('(fork) attack_buff_rows: an attack\'s target buffs start effects as hit rows, its owner buffs as cast rows', () => {
+    const out = py(`
+tpl = {'p_fx': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'p_hit_01'], ['ON_BUFF_START', 'CreateEffect', '_effectKey', 'p_hit_02'],
+                                          ['ON_BUFF_TRIGGER', 'CreateEffect', '_effectKey', 'p_later'], ['ON_BUFF_START', 'CreateBuff', 'overrideEffectKey', 'p_mark']],
+                'creates': ['p_child'], 'createdAt': {'p_child': 'ON_BUFF_START'}},
+       'p_child': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'p_child_hit'], ['ON_BUFF_START', 'CreateEffect', '_effectKey', 'p_hit_01']]},
+       'o_kb': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'o_range_hit']], 'creates': ['o_far'], 'createdAt': {'o_far': 'ON_BUFF_START'}},
+       'o_far': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'o_far_hit']]},
+       'l_lock': {'effect': None, 'graph': [['ON_BUFF_ENABLE', 'CreateLineEffect', '_effectKey', 'l_line']]},
+       'v_lvl': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', k] for k in ('v_3', 'v_2', 'v_1')],
+                 'branches': {'ON_BUFF_START|v_3': 's', 'ON_BUFF_START|v_2': 'fs', 'ON_BUFF_START|v_1': 'ff'}},
+       'f_hp': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'f_only']], 'branches': {'ON_BUFF_START|f_only': 's'}},
+       'h_side': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'h_dmg'], ['ON_BUFF_START', 'CreateEffect', '_effectKey', 'common_heal_hit_01']],
+                  'branches': {'ON_BUFF_START|h_dmg': 'E', 'ON_BUFF_START|common_heal_hit_01': 'A'}}}
+row = lambda cls, field, t: {'class': cls, 'field': field, 'templateKey': t, 'buffKey': t}
+rows = fx.attack_buff_rows([row('MeleeAttackWithSplashDmg', '_activeBuffsToMainTarget', 'p_fx'), row('BuffToOwner', '_buffs', 'o_kb'),
+                            row('BuffToCastTargets', '_buffs', 'l_lock'), row('MeleeAttack', '_activeBuffs', 'missing'),
+                            row('MeleeAttack', '_activeBuffs', 'v_lvl'), row('MeleeAttack', '_activeBuffs', 'f_hp'),
+                            row('BuffDuringCastingFixed', '_buffs', 'p_fx')], tpl)
+heal = fx.attack_buff_rows([row('RangedHeal', '_activeBuffs', 'h_side')], tpl)
+hurt = fx.attack_buff_rows([row('RangedAttack', '_activeBuffs', 'h_side')], tpl)
+pick = lambda rs: {k: [(r['effects'], r.get('startEvent'), r['template']) for r in v] for k, v in rs.items()}
+print(json.dumps([pick(rows), pick(heal), pick(hurt)]))`);
+    assert.deepEqual(out[0].hit, [[['p_hit_01'], null, 'p_fx'], [['p_hit_02'], null, 'p_fx'], [['p_child_hit'], null, 'p_fx'],
+      [['v_1'], null, 'v_lvl'], [['f_only'], null, 'f_hp']],
+      'start effects of the buff and of the template it creates as it starts, each key once; triggers, marks and lines stay out; '
+      + 'of a condition\'s branches the path with no condition met, else the fewest');
+    assert.deepEqual(out[0].cast, [[['o_range_hit'], 2, 'o_kb']], 'an owner buff\'s own start effect; whom its created buff lands on is not known');
+    assert.deepEqual(out[1], {}, 'a heal takes the ally side, whose only effect is the client\'s generic heal spark');
+    assert.deepEqual(out[2], { hit: [[['h_dmg'], null, 'h_side']] }, 'an attack on enemies takes the enemy side');
+  });
+
+  test('(fork) graph_branches: the branch path of every key inside a condition, target-side tests as E / A', () => {
+    const out = py(`${EK}
+state = json.dumps([{'$type': 'X+IfElse', '_conditionNode': {'$type': 'X+FilterByBuffStackCount'},
+  '_succeedNodes': [{'$type': 'X+CreateEffect', '_effectKey': 'x_hit'}],
+  '_failNodes': [{'$type': 'X+IfElse', '_conditionNode': {'$type': 'X+IfDamageTargetSide', '_sideMask': 'ENEMY'},
+                  '_succeedNodes': [{'$type': 'X+CreateEffect', '_effectKey': 'x_skill_buff'}], '_failNodes': []}]},
+  {'$type': 'X+CreateEffect', '_effectKey': 'x_tpl_start'}])
+print(json.dumps(fx.graph_branches(state, ek)))`);
+    assert.deepEqual(out, { x_hit: 's', x_skill_buff: 'fE' }, 'a key outside every branch is not listed');
+  });
+
+  test('(fork) merge_added: a relink adds an attack\'s template rows to the unit\'s modes (matched by name)', () => {
+    const out = py(`
+row = {'effects': ['e'], 'oneshot': 1}
+old = {'u': {'modes': [{'name': 'Default', 'attack': {'cast': [row]}}, {'name': 'S3', 'attack': {'hit': [row]}}]}}
+new = {'u': {'modes': [{'name': 'Default', 'attack': {'cast': [row], 'hit': [{'effects': ['t'], 'oneshot': 1, 'template': 'x'}]}},
+                       {'name': 'S3', 'attack': {'hit': [{**row, 'oneshot': 0}, {'effects': ['t3'], 'oneshot': 1, 'template': 'y'}]}}]}}
+print(json.dumps(fx.merge_added(old, new)))`);
+    assert.deepEqual(out.u.modes[0].attack, { cast: [{ effects: ['e'], oneshot: 1 }], hit: [{ effects: ['t'], oneshot: 1, template: 'x' }] });
+    assert.deepEqual(out.u.modes[1].attack.hit, [{ effects: ['e'], oneshot: 1 }, { effects: ['t3'], oneshot: 1, template: 'y' }],
+      'a changed earlier row stays as it was; only template rows join');
+  });
+
+  test('(fork) behaviour_uses: buffs named by key, buffs of a serialized action graph, and the templates a template creates', () => {
+    const out = py(`${EK}
+tpl = {'x_s2[trigger]': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'x_tpl_start']], 'creates': ['x_s2[child]'],
+                         'createdAt': {'x_s2[child]': 'ON_OUTPUT_DAMAGE'}},
+       'x_s2[child]': {'effect': None, 'graph': [['ON_BUFF_START', 'CreateEffect', '_effectKey', 'x_hit'],
+                                                ['ON_BUFF_FINISH', 'CreateEffect', '_effectKey', 'x_tpl_finish']], 'creates': ['x_s2[trigger]'],
+                       'createdAt': {'x_s2[trigger]': 'ON_BUFF_START'}},
+       'x_mark': {'effect': 'x_skill_buff', 'graph': []}}
+named = fx.behaviour_uses('ActiveBuffAbility', {'_buffs': ['x_s2[trigger]', 'not_a_template'], '_buffKey': 'x_mark'}, ek, tpl)
+graph = fx.behaviour_uses('AnimatedActionToTargetAbility', {'_actions': {'SerializedState': json.dumps([{'$type': 'X+CreateBuff',
+  '_buff': {'buffKey': 'b', 'templateKey': 'x_mark', 'overrideEffectKey': None}}])}}, ek, tpl)
+print(json.dumps([[(u['role'], u['keys'], u.get('event'), u['from']) for u in named], [(u['role'], u['keys'], u.get('template')) for u in graph]]))`);
+    assert.deepEqual(out[0], [
+      ['start', ['x_tpl_start'], 'ON_BUFF_START', 'ActiveBuffAbility._buffs → template x_s2[trigger]'],
+      ['hit', ['x_hit'], 'ON_OUTPUT_DAMAGE', 'ActiveBuffAbility._buffs → template x_s2[trigger] → template x_s2[child]'],   // made at the parent's event
+      ['end', ['x_tpl_finish'], 'ON_BUFF_FINISH', 'ActiveBuffAbility._buffs → template x_s2[trigger] → template x_s2[child]'],  // no loop back
+      ['loop', ['x_skill_buff'], null, 'ActiveBuffAbility._buffKey'],                                                     // a plain key field
+    ]);
+    assert.deepEqual(out[1], [['loop', ['x_skill_buff'], 'x_mark']]);
+  });
+
   test('behaviour_uses: emitter rows (directional slots, hooks), buffs with their carrier and template, mode switches', () => {
     const out = py(`${EK}
 tpl = {'burn': {'effect': None, 'graph': []}, 'empty': {'effect': 'x_skill_buff', 'graph': []},
@@ -402,6 +527,18 @@ print(json.dumps([fx.graph_projectiles(state), fx.graph_projectiles('not json'),
     assert.deepEqual(out[0], ['projectile_chr_oxi_s_3_heatwave', 'p2']);
     assert.deepEqual(out[1], []);
     assert.deepEqual(out[2], ['oxi', 'tocka', 'aglna2', null, null, null]);
+  });
+
+  test('(fork) unit_owner_codes / template_owned: our operators\', enemies\' and seasons\' templates (冻河 S3, a bond\'s sub-templates, an item by its code)', () => {
+    const out = py(`
+owners = fx.unit_owner_codes(['char_4244_tocka', 'char_249_mlyss', 'odd'], ['enemy_1539_reid', 'enemy_1005_yokai_2', 'nope'])
+refs = {'act2autochess_bond_eff_kazimierz', 'act1autochess_acarm045_buff'}
+print(json.dumps([sorted(owners), [fx.template_owned(k, owners, refs) for k in (
+  'tocka_s3[trigger]', 'mlyss_wtrman_s_1[effect_trigger]', 'enemy_reid_cast_effect', 'enemy_yokai[x]', 'enemy_mcnist_shield',
+  'act2autochess_bond_eff_kazimierz[ex][damage]', 'act1autochess_acarm045_buff', 'act2autochess_bond_eff_siracusa[ex][buff]',
+  'trap_ads_t_1', 'tockafoo_s1', '', None)]]))`);
+    assert.deepEqual(out[0], ['enemy_reid', 'enemy_yokai', 'mlyss', 'tocka']);
+    assert.deepEqual(out[1], [true, true, true, true, false, true, true, false, false, false, false, false]);
   });
 
   test('(fork) graph_projectiles: a blackboard default its emitter reads (凛御银灰 S3: the birds); other defaults are no shots', () => {
@@ -666,7 +803,11 @@ describe('extracted effects (when fx was extracted on this machine)', { skip: !f
       for (const m of u.modes) {
         for (const a of [m.attack, m.combat]) {
           if (!a?.emitters) continue;
-          for (const e of attackRows({ ...a, abilities: [] })) assert.ok(Number.isInteger(e.emitter) && e.emitter < a.emitters.length, `${u.prefab} ${m.name}: emitter index`);
+          // (fork) a row of a buff the attack puts on its target or owner (attack_buff_rows) names its template, no emitter
+          for (const e of attackRows({ ...a, abilities: [] })) {
+            assert.ok(typeof e.template === 'string' ? e.emitter === undefined : Number.isInteger(e.emitter) && e.emitter < a.emitters.length,
+              `${u.prefab} ${m.name}: emitter index`);
+          }
         }
       }
     }

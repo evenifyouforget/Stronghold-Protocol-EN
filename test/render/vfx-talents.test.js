@@ -13,10 +13,12 @@ import assert from 'node:assert/strict';
 import { FxWiring, pickAttacks } from '../../public/js/render/vfx/wiring.js';
 import { talentBindings, activeTalentKeys, formModes, toggleOn, triggerKinds, pointKinds, bindable } from '../../public/js/render/vfx/talents.js';
 import { skillPlan, lifeOf, shotOf, mountPointType } from '../../public/js/render/vfx/skills.js';
+import { UF } from '../../shared/constants.js';
 
 const BLOCKED = 1, STEALTH = 8, SKILL = 16;
 const LOOPING = new Set(['dep_buff', 'mode_buff', 'atk_buff', 'reb_loop', 'reb_inv', 'reb_post', 'common_invisible', 'blk_buff', 'unblk_buff', 'aura_loop', 'gen_loop', 'never_buff',
-  'bar_loop', 'enr_loop']);
+  'bar_loop', 'enr_loop', 'token_sum_buff', 'tgt_buff_fx', 'abl_loop',
+  'billro_skill_03_buff_03_01', 'billro_skill_03_buff_03_02', 'zebra_buff_01']);
 const KEYS = [...LOOPING, 'dep_birth', 'reb_end', 'reb_hit', 'doll_start', 'def_cast', 'stand_cast', 'sk_trig', 'exa_cast', 'exa_hit', 'pj_cast',
   'lv_hit', 'lv_lim', 'lv_inf', 'lv_once', 'g_hit', 'g_enemy', 'g_heal', 'g_die', 'g_birth', 'sh_cast', 'bomb_hit'];
 const PROJ = ['proj_a', 'proj_b', 'proj_c', 'proj_z_s1', 'proj_m'];
@@ -101,6 +103,33 @@ function makeIndex() {
           uses: [{ role: 'hit', keys: ['bomb_hit'], from: 'UberEffectEmitter._hitEffects', node: 'Others/Direction/CommonAbilities/TalentBomb', ability: 'MultiRangedAttack',
             list: 'hit', oneshot: true, endEvent: 'ON_CAST_END' }] }],
       },
+      // (fork) a summoner's passive ability whose only rows are on its summons (凯尔希's tokenEff on Mon3tr)
+      char_810_sum: {
+        kind: 'char', modes: [{ name: 'Default', attack: melee([]) }], skills: {}, talents: {},
+        abilities: [{ kind: 'general', name: 'tokenEff', node: 'Others/GeneralAbilities/tokenEff', class: 'GlobalAuraAbility', when: 'passive',
+          uses: [{ role: 'loop', keys: ['token_sum_buff'], from: 'GlobalAuraAbility._buffs', node: 'Others/GeneralAbilities/tokenEff', on: 'targets', life: { type: 'INFINITY' } }] }],
+      },
+      token_811_mon: { kind: 'token', modes: [{ name: 'Default', attack: melee([]) }], skills: {}, talents: {} },
+      // (fork) an ability whose rows sit on the units it buffs (帕拉斯's peak), one a template triggers (堤丰's Aim)
+      char_812_tgt: {
+        kind: 'char', modes: [{ name: 'Default', attack: melee([]) }], skills: {}, talents: {},
+        abilities: [
+          { kind: 'general', name: 'Aura', node: 'Others/GeneralAbilities/Aura', class: 'AuraAbility', when: 'passive',
+            uses: [{ role: 'loop', keys: ['tgt_buff_fx'], from: 'AuraAbility._buffs → template peak_performance[inf]', node: 'Others/GeneralAbilities/Aura', on: 'targets', buff: 'peak_performance[inf]', life: { type: 'INFINITY' } },
+            // (a buff with looks, STATE_BUFFS: 卡涅利安's S3 mark below and at its stack cap)
+            { role: 'loop', keys: ['billro_skill_03_buff_03_01'], from: 'AuraAbility._buffs', node: 'Others/GeneralAbilities/Aura', on: 'targets', buff: 'billro_s_3[mark_effect]', life: { type: 'INFINITY' } },
+            { role: 'loop', keys: ['billro_skill_03_buff_03_02'], from: 'AuraAbility._buffs', node: 'Others/GeneralAbilities/Aura', on: 'targets', buff: 'billro_s_3[mark_effect]', life: { type: 'INFINITY' } }] },
+          { kind: 'general', name: 'Aim', node: 'Others/GeneralAbilities/Aim', class: 'RangedAttack', when: null,
+            triggers: [{ template: 't_aim[switch]', event: 'ON_BUFF_START', action: 'TriggerAbilityUseSelector', name: 'Aim' }],
+            uses: [{ role: 'loop', keys: ['abl_loop'], from: 'BuffToOwner._buffs', node: 'Others/GeneralAbilities/Aim', on: 'owner', buff: 't_aim_fx', life: { type: 'INFINITY' } }] },
+        ],
+      },
+      // (fork) a unit whose only official rows are a state the sim signals (Heavyrain's S2 aura on her allies)
+      char_813_st: {
+        kind: 'char', modes: [{ name: 'Default', attack: melee([]) }], skills: {}, talents: {},
+        abilities: [{ kind: 'general', name: 'Aura', node: 'Others/GeneralAbilities/Aura', class: 'AuraAbility', when: 'passive',
+          uses: [{ role: 'loop', keys: ['zebra_buff_01'], from: 'AuraAbility._buffs', node: 'Others/GeneralAbilities/Aura', on: 'targets', buff: 'zebra_s_2[aura]', life: { type: 'INFINITY' } }] }],
+      },
       enemy_806_aura: {
         kind: 'enemy', skills: {}, modes: [{ name: 'Default', attack: null, combat: melee([]) }, { name: 'M2', attack: null, combat: melee([]) }],
         talents: { aoe: { nodes: [{ node: 'Talents/aoe', class: 'AppearSyncedTalent', ability: 'AuraAbility', when: 'deploy' }],
@@ -144,6 +173,9 @@ const RECS = {
   enemy_801_reb: { talents: { bb: { 'Reborn.invincible': 2, 'AtkUp.atk': 1 } }, skills: [] },
   char_805_exa: { charId: 'char_805_exa', talents: [{ index: 0 }] },
   char_804_doll: { charId: 'char_804_doll', talents: [] },
+  char_810_sum: { charId: 'char_810_sum', talents: [] },
+  char_812_tgt: { charId: 'char_812_tgt', talents: [] },
+  char_813_st: { charId: 'char_813_st', talents: [] },
   enemy_809_bar: { talents: { bb: { 'enrage.hp_ratio': 0.5 } }, skills: [] },
 };
 
@@ -174,6 +206,67 @@ async function setup(recs = RECS) {
   const live = (k) => handles.filter((h) => h.key === k && h.alive).length;
   return { w, ofx, log, handles, view, frame, live, index };
 }
+
+describe('(fork) abilities of a summoner on its summons (UnitInfo summonerId)', () => {
+  test('a passive ability whose only rows target summons plays them on each live summon of its owner, held while its skill is on', async () => {
+    const { w, view, frame, live } = await setup();
+    const own = view(1, 'char_810_sum');
+    const mon = view(2, 'token_811_mon', { v: { info: { id: 2, spine: 'token_811_mon', defId: 'token_811_mon', side: 'ally', kind: 'token', summonerId: 1 } } });
+    view(3, 'token_811_mon', { v: { info: { id: 3, spine: 'token_811_mon', defId: 'token_811_mon', side: 'ally', kind: 'token', summonerId: 99 } } });
+    frame(2);
+    assert.equal(live('token_sum_buff'), 0, 'held for the skill: not while it is off');
+    own.flags |= UF.SKILL; w.skill(own, true);
+    frame(2);
+    assert.equal(live('token_sum_buff'), 1, 'on her summon only, not on a summon of another unit');
+    mon.alive = false;
+    frame(2);
+    assert.equal(live('token_sum_buff'), 0, 'gone with the summon');
+  });
+
+  test('a b.snap fxs row of a talent buff plays the target row of its src on its carrier; a kit ability fx fires the node its template triggers', async () => {
+    const { w, view, frame, live } = await setup();
+    const own = view(1, 'char_812_tgt');
+    const ally = view(2, 'char_800_dep');
+    frame(2);
+    assert.equal(live('tgt_buff_fx'), 0);
+    ally.fxs = [['peak_performance[inf]', 1, null]];
+    frame(2);
+    assert.equal(live('tgt_buff_fx'), 1, 'on the carrier while the sim says it lasts');
+    ally.fxs = null;
+    frame(2);
+    assert.equal(live('tgt_buff_fx'), 0, 'gone with the row');
+    assert.equal(w.simFx('ability', 5, 5, { id: 1, name: 't_aim[switch]' }), true, 'the official node stands for the (silent) kit fx');
+    assert.equal(live('abl_loop'), 1);
+    assert.equal(w.simFx('ability', 5, 5, { id: 1, name: 'nothing' }), false);
+    void own;
+  });
+
+  test("a b.snap fxs row's look keeps that look's rows of the buff (STATE_BUFFS looks)", async () => {
+    const { view, frame, live } = await setup();
+    view(1, 'char_812_tgt');
+    const foe = view(2, 'char_800_dep');
+    foe.fxs = [['billro_s_3[mark_effect]', 1, 'part']];
+    frame(2);
+    assert.deepEqual([live('billro_skill_03_buff_03_01'), live('billro_skill_03_buff_03_02')], [1, 0], 'below the cap');
+    foe.fxs = [['billro_s_3[mark_effect]', 1, 'full']];
+    frame(2);
+    assert.deepEqual([live('billro_skill_03_buff_03_01'), live('billro_skill_03_buff_03_02')], [0, 1], 'at the cap');
+    foe.fxs = [['billro_s_3[mark_effect]', 1, null]];
+    frame(2);
+    assert.deepEqual([live('billro_skill_03_buff_03_01'), live('billro_skill_03_buff_03_02')], [1, 1], 'no look: every row');
+  });
+
+  test('a unit whose only official rows are sim-signalled states still plays them (its talent record holds them)', async () => {
+    const { view, frame, live } = await setup();
+    view(1, 'char_813_st');
+    const ally = view(2, 'char_800_dep');
+    frame(2);
+    assert.equal(live('zebra_buff_01'), 0);
+    ally.fxs = [['zebra_s_2[aura]', 1, null]];
+    frame(2);
+    assert.equal(live('zebra_buff_01'), 1, 'on the ally while the row lasts');
+  });
+});
 
 describe('talents in force and their bindings (talents.js)', () => {
   test("an operator's talents: the record's by talentKeys, the trait's, a module's only with it on; a node valid with another skill is left out", () => {
@@ -411,10 +504,11 @@ describe("skills' projectiles and buff lives, attacks' shots and group choice (i
     assert.deepEqual([0, 1, 2, 3].map((nth) => pickAttacks(g('loop'), { ranged: false }, 7, 0, nth)[1].n), [0, 1, 2, 0]);
     assert.deepEqual([0, 1, 2].map((nth) => pickAttacks(g('sequential'), { ranged: false }, 7, 0, nth)[1].n), [0, 1, 2]);
     const mem = new Map(), rnd = g('random', { diffFromLast: 1 });
-    // (fork) each attack has its own count (nth); its wind-up and its strike ask with the same one and get the same pick
-    const picks = [5, 5, 5, 5].map((seed, nth) => pickAttacks(rnd, { ranged: false }, seed, 0, nth, mem)[1].n);
+    // the same seed on attacks 0..3 (a pick that would repeat); one attack's second ask (its strike after its wind-up,
+    // the same count) keeps its pick
+    const picks = [0, 1, 2, 3].map((nth) => pickAttacks(rnd, { ranged: false }, 5, 0, nth, mem)[1].n);
     for (let i = 1; i < picks.length; i++) assert.notEqual(picks[i], picks[i - 1], `never the previous one: ${picks}`);
-    assert.equal(pickAttacks(rnd, { ranged: false }, 9, 0, 3, mem)[1].n, picks[3], 'the same attack asking again keeps its pick');
+    assert.equal(pickAttacks(rnd, { ranged: false }, 9, 0, 3, mem)[1].n, picks[3], 'the same attack asks again: the same pick');
     const fs = { class: 'AbilityFirstSucceedGroup', select: { method: 'firstSucceed' }, abilities: [{ class: 'RangedAttack', k: 'r' }, { class: 'MeleeAttack', k: 'm' }] };
     assert.equal(pickAttacks(fs, { ranged: false }, 0)[1].k, 'm');
     assert.equal(pickAttacks(fs, { ranged: true }, 0)[1].k, 'r');

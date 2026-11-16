@@ -12,7 +12,8 @@
 //   * Shared boss HP pool (DESIGN §20.10, §25.13.4, gamedata.js bossPoolShareOf): one pool shared by every boss field
 //     (official tip "所有人将一起对敌方领袖造成伤害"; notice 5114's "敌方领袖的总生命值不变" is about the mirrored copies of
 //     a pair field sharing it) = bloodPoint[difficulty] × the players alive when the fight starts (bots and AI 托管 seats
-//     count, eliminated and departed seats do not; solo × 1) — the owner's decision of 2026-10-06, adopting PR #209 by
+//     count, eliminated and departed seats do not; solo × 1; at most 4, or the seats a Grand Alliance room started
+//     with — bossPoolSeats) — the owner's decision of 2026-10-06, adopting PR #209 by
 //     @qingjingshenghuo, which replaces the fixed pool of 「保持固定血量」 (config bossHpScale perPlayer false / solo 0.25
 //     restores it); × the tuning bossHpMul when data/tuning.json still has one (docs/BALANCE.md); bosses are never scaled
 //     by enemyScale and their parts / escorts keep their own HP.
@@ -41,7 +42,7 @@ import { mirrorDir, normDir } from '../sim/dir.js';
 import { bossPoolShareOf } from './gamedata.js';
 import { CC } from '../../shared/ruleData.js';
 import { BossRiskState } from '../sim/bossRisk.js';
-import { scaleCount } from '../../shared/largeRoom.js';
+import { scaleCount, SQUAD_SEATS } from '../../shared/largeRoom.js';
 
 /**
  * BOSS_HIT ticker thresholds (activity_table autoChessData.broadcastList comment_boss_hit_1..3, paramList 0.2 / 0.5 /
@@ -88,8 +89,21 @@ export function pairPlayers(alive, rng, previous = null) {
   return groups;
 }
 
-/** Shared boss HP for a boss id with `aliveCount` alive players (GameData.bossPoolShare / bossPoolShareOf; omitted ⇒ a full team). */
-export function bossPoolHp(gd, bossId, aliveCount, rules = null, { patriotSkipped = false } = {}) {
+/**
+ * (fork) Seats a Grand Alliance room started with (shared/largeRoom.js roomScaleFor: players ÷ 4 above 4), the cap of the
+ * players a leader pool counts; undefined for every other room (the cap stays config aliveFull). Every caller of
+ * bossPoolHp for a match passes it, so the server's pool, the audit, the AI digest and the bots' rehearsal agree.
+ * @param {{ roomScale?: number }|null|undefined} m the match
+ * @returns {number|undefined}
+ */
+export const bossPoolSeats = (m) => (m && m.roomScale > 1 ? Math.round(SQUAD_SEATS * m.roomScale) : undefined);
+
+/**
+ * Shared boss HP for a boss id with `aliveCount` alive players (GameData.bossPoolShare / bossPoolShareOf; omitted ⇒ a full
+ * team); `seats` (bossPoolSeats) lifts the aliveFull cap in a Grand Alliance room. (fork) `rules`: the lobby rules (SPA-CC
+ * ccBoss); `patriotSkipped`: ccPatriot Undying 1.
+ */
+export function bossPoolHp(gd, bossId, aliveCount, rules = null, { patriotSkipped = false, seats } = {}) {
   const boss = gd.boss(bossId);
   const diff = gd.difficulty;
   let base = boss && boss.bloodPoint && Number.isFinite(boss.bloodPoint[diff]) ? boss.bloodPoint[diff] : null;
@@ -99,8 +113,8 @@ export function bossPoolHp(gd, bossId, aliveCount, rules = null, { patriotSkippe
   // SPA-CC ccBoss (shared/rules.js): the final bosses' pool +50 / 150 / 400 % (the Hidden Core's too)
   // and ccPatriot Undying 1: nobody took the round-9 Patriot → +200 %
   const risk = 1 + (CC.bossHp[rules?.ccBoss || 0] || 0) + (patriotSkipped ? CC.patriot.skipHp : 0);
-  const share = typeof gd.bossPoolShare === 'function' ? gd.bossPoolShare(aliveCount)
-    : bossPoolShareOf(gd.mode && gd.mode.bossHpScale, gd.config && gd.config.bossHpScale, !!gd.isSolo, aliveCount);
+  const share = typeof gd.bossPoolShare === 'function' ? gd.bossPoolShare(aliveCount, seats)
+    : bossPoolShareOf(gd.mode && gd.mode.bossHpScale, gd.config && gd.config.bossHpScale, !!gd.isSolo, aliveCount, seats);
   return Math.max(1, Math.round(base * share * tune * risk));
 }
 
@@ -147,6 +161,12 @@ export class SharedBossPool {
 
   /** Whether field `fieldId` holds the pool (United 2: a Degenbrecher alive there). */
   setHold(fieldId, on) { if (this.risk && this.risk.hold(fieldId, !!on)) this._riskChanged(['hold']); }
+
+  /**
+   * A field's cumulative damage to its Delegation Degenbrecher (the linked HP bar: bossRisk.js). No onRisk: the next
+   * b.pool carries it (b.progress reports call _broadcastPool), and server-run fields read riskView() directly.
+   */
+  noteDegen(fieldId, dealt, gate) { if (this.risk) this.risk.noteDegen(fieldId, dealt, gate); }
 
   /** The lockout's invulnerability ended (the match's timer). */
   releaseLock() { if (this.risk && this.risk.inv) { this.risk.release(); this._riskChanged(['release']); } }
@@ -195,6 +215,7 @@ export class CreditPool {
   get maxHp() { return this.pool.maxHp; }
   riskView() { return this.pool.riskView ? this.pool.riskView() : null; }
   setHold(fieldId, on) { if (this.pool.setHold) this.pool.setHold(fieldId, on); }
+  noteDegen(fieldId, dealt, gate) { if (this.pool.noteDegen) this.pool.noteDegen(fieldId, dealt, gate); }
 
   damage(playerId, amount, type) {
     const a = Number(amount);

@@ -5,12 +5,58 @@
 import { bondTimerView } from '../content/bonds/timers.js';
 import { EVENT_BUFFER_CAP } from '../constants.js';
 import { elementView } from '../attack.js';
-import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, statusView, shieldView, mysticView, layerView, chargeView } from '../snapshot.js';
+import { unitInfo, snapshotUnits, ammoView, wolfView, negView, moteView, coinView, statusView, shieldView, mysticView, layerView, chargeView, fxStateView } from '../snapshot.js';
 
 export class BattleEvents {
   fx(kind, params = {}) {
     const { x = 0, y = 0, ...extra } = params || {};
     this._ev(['fx', kind, Math.round(x * 100) / 100, Math.round(y * 100) / 100, extra]);
+  }
+
+  /**
+   * (fork) One tick of an official buff's periodic trigger (ON_BUFF_TRIGGER: a lasting skill's damage / heal tick), which
+   * the client otherwise never sees (a dmg / heal event names no source): fx 'tick' { id: the unit whose skill it is, on:
+   * the unit the official effect plays on, skill: the kit's tag, key?: only that effect key of the skill's tick rows }.
+   * Display only (render/vfx/skillfx.js plays the plan's 'tick' rows on `on`, also after the skill ended; audio.js
+   * fxSounds 'tick|<tag>' its sound; `src`: the unit whose sound table has it when `owner` is a summon).
+   */
+  tickFx(owner, on, skill, key = null, src = null) {
+    if (!owner || !on) return;
+    this.fx('tick', { x: on.x, y: on.y, id: owner.id, on: on.id, skill, ...(key ? { key } : {}), ...(src ? { src: src.id } : {}) });
+  }
+
+  /**
+   * (fork) The official buff `buff` (the client's key: buff_template_holder, index.json uses' `buff`) on `unit` turns on
+   * or off — the lasting effects of a moment the client never sees, shown while it lasts (b.snap `fxs`, snapshot.js
+   * fxStateView). `src`: the unit whose skill or talent made it (default: the carrier); `look`: the official branch the
+   * kit reached (skills.js STATE_BUFFS), changed in place by calling again; `dur`: it ends by itself that many seconds
+   * from now (the official buff's lifeTime). Display only: no sim state reads it, it sends no event and the golden canon
+   * leaves the snapshot table out. It lasts the unit's deployment at most.
+   */
+  fxState(unit, buff, on, { src = null, look = null, dur = Infinity } = {}) {
+    if (!unit || typeof buff !== 'string' || !buff) return;
+    if (!on) { unit.fxStates?.delete(buff); return; }
+    const srcId0 = src == null ? null : typeof src === 'object' ? src.id : src;
+    const srcId = srcId0 === unit.id ? null : srcId0;
+    const was = unit.fxStates?.get(buff);
+    const until = dur > 0 ? this.time + dur : Infinity;
+    if (was && was.src === srcId && was.look === look && was.seq === unit.deploySeq && was.until === until) return;
+    (unit.fxStates || (unit.fxStates = new Map())).set(buff, { src: srcId, look, seq: unit.deploySeq, until });
+  }
+
+  /**
+   * (fork) The same as fxState for a state the kit already keeps (a charge count, a mark, a mode …): `probe(unit)` is
+   * read only when a snapshot is taken (snapshot.js fxStateView) — false / null: off, true: on, a string: on, in that
+   * official branch (`look`), { src, look? }: on, given by unit (or id) src, in branch look. The giver: `src(unit)` when
+   * passed (a summon's owner), else the object's src; none / null / the carrier itself: the carrier. Nothing runs in the
+   * battle's ticks (the bots' budget). One probe per buff and unit (a later call replaces it).
+   */
+  fxProbe(unit, buff, probe, src = null) {
+    if (!unit || typeof buff !== 'string' || !buff || typeof probe !== 'function') return;
+    const list = unit.fxProbes || (unit.fxProbes = []);
+    const i = list.findIndex((p) => p.buff === buff);
+    const p = { buff, probe, src: typeof src === 'function' ? src : null };
+    if (i >= 0) list[i] = p; else list.push(p);
   }
 
   log(msg) {
@@ -86,6 +132,9 @@ export class BattleEvents {
    *         effect it shows;
    *   charges: [[id, stored, maximum]] — the charges an ally's charge skill stores (snapshot.js chargeView: 卡涅利安's): the
    *         official sand armour of her charges;
+   *   fxs: [[id, buff, src, look]] — (fork) the official buffs whose lasting effects a unit shows now (snapshot.js
+   *         fxStateView, Battle.fxState: the moments the client never sees), by the client's buff key; src the unit that
+   *         made it (null: itself), look the official branch (null: every effect of the buff);
    *   bondTimers: [[id, [{ id: effectId, count, remaining }]]] — selected-unit timed bond readouts (#746);
    *         count + next expiry in simulation seconds; omitted when no declared effect is active.
    *   motes: [[id, count, wide]] — the orbiting 「微尘」 of a unit (snapshot.js moteView; 魔王's T1 过往尘埃): how many
@@ -169,6 +218,8 @@ export class BattleEvents {
       const ch = chargeView(u);
     if (motes) snap.motes = motes;
       if (ch) (snap.charges || (snap.charges = [])).push([u.id, ch[0], ch[1]]);
+      const fs = u.fxStates?.size || u.fxProbes || u.buffs.length ? fxStateView(u, this.time) : null;
+      if (fs) for (const row of fs) (snap.fxs || (snap.fxs = [])).push([u.id, ...row]);
     }
     if (elem) snap.elem = elem;
     if (ammo) snap.ammo = ammo;

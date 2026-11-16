@@ -3,11 +3,12 @@
 // asserts its signature effect with numbers taken from the chess blackboards (data/chess.json).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, chessRec, checkInvariants, castNow, throughBegin } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { ELEMENT_GAUGE_MAX, PROJECTILE_SPEEDS, BOOMERANG_RETURN_SPEED, BLOCK_SPREAD } from '../../server/sim/constants.js';
 import { sortEnemyTargets, canTargetEnemy } from '../../server/sim/targeting.js';
 import { DRONE_TAG as ROCKROCK_DRONE } from '../../server/sim/content/kits/ops/chess_char_2_10-rockr.js';
+import { allyCastWindup } from '../../server/sim/ai.js';
 
 const ds = getDefaultSource();
 const raw = (id) => ds.rawChess(id);
@@ -83,14 +84,16 @@ test('1_01 隐现 elite: +self_ammo after `duration` s on field; a random other 
   done(h);
 });
 
-test('1_02 角峰: 抗寒体质 (重装 TAKE_DAMAGE) HP/DEF/RES ×(1+x); 雪原卫士 RES +flat (normal and elite)', () => {
+test('1_02 角峰: 抗寒体质 (重装 row ON_TAKE_DAMAGE + SKILL_RANGE_ENEMY) HP/DEF/RES ×(1+x); 雪原卫士 RES +flat (normal and elite)', () => {
   for (const id of ['chess_char_1_02_a', 'chess_char_1_02_b']) {
     const bb = bbOf(id), t = tal(id);
     const h = run({ defs: { enemies: { e: dummy('e', { atk: 100, bat: 1 }) } }, units: [{ chessId: id, row: 9, col: 5, carryState: READY }], enemies: [{ key: 'e', pos: [9, 5] }] });
     const u = h.unit(id);
     approx(u.s.res, u.base.res + t.magic_resistance, `${id} talent RES`);
-    assert.ok(h.runUntil(() => u.skill.active, 3), 'cast by the first hit');
-    assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'TAKE_DAMAGE');
+    // official 重装 row [ON_TAKE_DAMAGE, SKILL_RANGE_ENEMY] -> [TAKE_DAMAGE, SEARCH] (no skill grid: her own range)
+    assert.deepEqual(u.skill.rules, ['TAKE_DAMAGE', 'SEARCH']);
+    assert.ok(h.runUntil(() => u.skill.active, 3), 'cast as soon as the enemy she holds is in range (or at its first hit)');
+    assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'SEARCH', 'the enemy in range fires SEARCH before any hit');
     approx(u.s.maxHp, u.base.maxHp * (1 + bb.max_hp), 'HP');
     approx(u.s.def, u.base.def * (1 + bb.def), 'DEF');
     approx(u.s.res, (u.base.res + t.magic_resistance) * (1 + bb.magic_resistance), 'RES');
@@ -133,12 +136,12 @@ test('1_04 深巡: fin darts pierce attack@max_target enemies on the line + 1 s 
   });
   const u = h.unit(id);
   h.step();
-  // 技能策略 (issue #4; the deliberate deviation of DESIGN §21.29, and since 0.2.0 the owner's ACTIVE_RANGE on top): an
-  // enemy inside the 3-2 she attacks with is enough — no hit required
-  assert.equal(u.skill.rule, 'ACTIVE_RANGE', '行动能力剥夺 is an offensive ranged skill, not a 重装 TAKE_DAMAGE one');
+  // official 重装 row [ON_TAKE_DAMAGE, SKILL_RANGE_ENEMY]: 行动能力剥夺 = [TAKE_DAMAGE, SKILL_RANGE] on its skill range grid
+  // (the 3-2 she runs): an enemy inside it is enough — no hit required
+  assert.deepEqual(u.skill.rules, ['TAKE_DAMAGE', 'SKILL_RANGE']);
   h.run(3.5);
   assert.ok(u.skill.active);
-  assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'ACTIVE_RANGE', 'cast on its running range');
+  assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'SKILL_RANGE', 'cast on its skill range');
   approx(u.s.atk, u.base.atk * (1 + bb.atk));
   const firstAtk = h.hooksOf('attack').find((c) => c.attacker === u && c.isSkill);
   assert.equal(firstAtk.targets.length, bb['attack@max_target'], 'hits every enemy of the line');
@@ -151,18 +154,17 @@ test('1_04 深巡: fin darts pierce attack@max_target enemies on the line + 1 s 
   done(h);
 });
 
-test('1_04 深巡 / 1_20 雷蛇 S2 技能策略: both 哨戒铁卫 S2s cast with an enemy in range, no hit needed (issue #4); 深巡 on her 3-2', () => {
-  // both S2s are offensive (深巡: range up + ATK/ASPD + piercing darts; 雷蛇: ATK +125 % + arts on 3 + stun); the official
-  // 下半 重装 row (TAKE_DAMAGE for every MANUAL 重装 skill) made both wait for a hit, and the owner's deliberate deviation
-  // from it (DESIGN §21.29, after community feedback) gives them the basic strategy — 雷蛇's data and kit say DEFAULT;
-  // 深巡's 3-2 strictly contains her 2-2, so since 0.2.0 the owner's ACTIVE_RANGE rule casts it on the 3-2 (2026-10-05).
+test('1_04 深巡 / 1_20 雷蛇 S2 技能策略: both 哨戒铁卫 S2s cast with an enemy in range, no hit needed (official 重装 row); 深巡 on her 3-2', () => {
+  // official 重装 row [ON_TAKE_DAMAGE, SKILL_RANGE_ENEMY] for both S2s: a hit OR any enemy in the skill range casts them.
+  // 雷蛇 has no skill grid -> [TAKE_DAMAGE, SEARCH] (her own range); 深巡's skill range is the 3-2 she runs
+  // -> [TAKE_DAMAGE, SKILL_RANGE], so an enemy on the 3-2 beyond her 2-2 casts it.
   for (const id of ['chess_char_1_04_a', 'chess_char_1_04_b', 'chess_char_1_20_a', 'chess_char_1_20_b']) {
     const udflow = id.startsWith('chess_char_1_04');
     // (9,7) = [0,3]: on 深巡's 3-2, not on her 2-2
     const h = run({ units: [{ chessId: id, row: 9, col: 4, carryState: READY }], enemies: [{ key: 'e', pos: [9, udflow ? 7 : 6] }] });
     const u = h.unit(id);
-    const rule = udflow ? 'ACTIVE_RANGE' : 'DEFAULT';
-    assert.equal(u.skill.rule, rule, `${id}: an offensive skill, not the 重装 TAKE_DAMAGE row`);
+    const rule = udflow ? 'SKILL_RANGE' : 'SEARCH';
+    assert.deepEqual(u.skill.rules, ['TAKE_DAMAGE', rule], `${id}: the official 重装 row`);
     assert.ok(h.runUntil(() => u.skill.activations >= 1, 5), `${id}: casts while an enemy is in range and untouched`);
     assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, rule, `${id}: cast by ${rule}`);
     done(h);
@@ -340,7 +342,9 @@ test('1_09 跃跃 回环射手: each attack is a boomerang (out 15, back 3.75 ti
   assert.ok(u.s.interval < flight(3) / 2);
   const at = h.hooksOf('attack').filter((c) => c.attacker === u).map((c) => c.t);
   assert.ok(at.length >= 4 && at.length <= 7, `${at.length} attacks in 6 s`);
-  for (let i = 1; i < at.length; i++) assert.ok(Math.abs(at[i] - at[i - 1] - flight(3)) <= 2 * h.TICK, `gap ${(at[i] - at[i - 1]).toFixed(3)} ≈ ${flight(3)}`);
+  // the next cast waits for the catch, and its hit lands one wind-up after that cast (official cast → hit, ai.js allyCastWindup)
+  const pace = flight(3) + allyCastWindup(u);
+  for (let i = 1; i < at.length; i++) assert.ok(Math.abs(at[i] - at[i - 1] - pace) <= 2 * h.TICK, `gap ${(at[i] - at[i - 1]).toFixed(3)} ≈ ${pace}`);
   assert.ok(h.eventsOf('atk').filter((e) => e[1] === u.id).every((e) => e[3] === 'boomerang'));
   done(h);
   // 乐趣加倍: cnt boomerangs on the same path — cnt hits at the same moment, then one catch
@@ -398,6 +402,7 @@ test('1_12 艾丝黛尔: 舍身突击 ATK +atk and no healing from others; 自�
   const h = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 9, col: 5, carryState: READY }], enemies: [{ key: 'e', pos: [9, 6] }] });
   const u = h.unit(id);
   h.step();
+  throughBegin(h, u);
   assert.ok(u.skill.active);
   approx(u.s.atk, u.base.atk * (1 + bb.atk));
   u.hp = u.s.maxHp * 0.5;
@@ -465,12 +470,16 @@ test('1_14 格雷伊: 静电场 停顿 on the attacked target, ×talent_scale du
   const id = 'chess_char_1_14_a', bb = bbOf(id), t = tal(id);
   const h1 = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 10, col: 4 }], enemies: [{ key: 'e', pos: [10, 6] }] });
   h1.run(1);
+  // the hit (and its 停顿) lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h1.runUntil(() => statuses(h1, 'sluggish', (c) => c.source === h1.unit(id)).length > 0, 3));
   approx(statuses(h1, 'sluggish', (c) => c.source === h1.unit(id))[0].duration, t.sluggish);
   const h2 = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 10, col: 4, carryState: READY }], enemies: [{ key: 'e', pos: [10, 6] }] });
   h2.run(1);
   const u = h2.unit(id);
   assert.ok(u.skill.active);
   approx(u.s.aspd - u.base.aspd, bb.attack_speed);
+  // the hit (and its 停顿) lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h2.runUntil(() => statuses(h2, 'sluggish', (c) => c.source === u).length > 0, 3));
   approx(statuses(h2, 'sluggish', (c) => c.source === u)[0].duration, t.sluggish * bb.talent_scale);
   done(h1); done(h2);
 });
@@ -555,15 +564,20 @@ test('1_17 深靛: 光影迷宫 interval ×0.7, bound enemies take 12 % ATK ever
   const h = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 10, col: 4, carryState: READY }], enemies: [{ key: 'e', pos: [10, 6] }, { key: 'e', pos: [10, 7] }] });
   const u = h.unit(id);
   h.step();
+  throughBegin(h, u);
   assert.ok(u.skill.active);
   approx(u.s.interval, u.base.bat * bb.base_attack_time, 'interval');
   const [a, b] = h.enemies();
   h.b.applyStatus(a, 'bind', { duration: 30 });
   h.b.applyStatus(b, 'bind', { duration: 0.01 }); // b is free again right away
   const t0 = h.b.time;
+  // the bind is checked when each dot lands: a talent bind from the hit (one wind-up after the cast, ai.js allyCastWindup)
+  // can run out again before the end of the run
+  const boundAtDot = [];
+  h.b.on('damaged', (c) => { if (c.source === u && (c.dmg.tags || []).includes('dot')) boundAtDot.push(c.target === a || !!c.target.s.flags.bind); });
   h.run(6);
   const dot = dealt(h, u, (c) => c.t > t0 && (c.dmg.tags || []).includes('dot'));
-  assert.ok(dot.length >= 10 && dot.every((c) => c.target === a || c.target.s.flags.bind));
+  assert.ok(dot.length >= 10 && boundAtDot.length === dot.length && boundAtDot.every(Boolean));
   for (const c of dot.filter((c) => c.target === a)) approx(c.amount, u.s.atk * bb['indigo_s_2[damage].atk_scale']);
   const atks = h.hooksOf('attack').filter((c) => c.attacker === u && c.t > t0);
   assert.ok(atks.length > 0 && atks.every((c) => !c.targets.includes(a)), 'bound enemy never targeted');
@@ -638,7 +652,7 @@ test('1_20 雷蛇: 反击电弧 arts on up to 3 enemies, self-stun `stun` s afte
   const u = h.unit(id);
   h.run(3);
   assert.ok(u.skill.active);
-  assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'DEFAULT', 'an offensive skill: cast with an enemy in range');
+  assert.equal(h.hooksOf('skillStart').find((c) => c.unit === u).reason, 'SEARCH', 'official 重装 row [TAKE_DAMAGE, SEARCH]: cast with an enemy in range, no hit needed');
   approx(u.s.atk, u.base.atk * (1 + bb.atk));
   approx(u.s.interval, u.base.bat * (1 + bb.base_attack_time) * 100 / u.s.aspd, 'attack interval +70 % (PRTS 增大(+70%): a ratio, not +0.7 s)');
   const a0 = h.hooksOf('attack').find((c) => c.attacker === u && c.isSkill);
@@ -783,6 +797,8 @@ test('2_05 哈洛德: 重症优先 heals the heaviest element load first with ×
   low.hp = low.s.maxHp * 0.3;
   elem.elem.neural = 900;
   h.step();
+  // the heal lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h.runUntil(() => h.hooksOf('attack').some((c) => c.attacker === u), 5));
   const first = h.hooksOf('attack').find((c) => c.attacker === u);
   assert.equal(first.targets[0], elem, 'element-damaged ally first');
   approx(elem.elem.neural, 900 - u.s.atk * tbOf(id).ep_heal_ratio * bb.trait_scale, 'recovery ×1.6');
@@ -808,6 +824,8 @@ test('2_05 哈洛德 (user playtest #5 #3): 侵蚀 counts as element damage for 
   low.hp = low.s.maxHp * 0.3;
   eroded.elem.erosion = 900;
   h.step();
+  // the heal lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h.runUntil(() => h.hooksOf('attack').some((c) => c.attacker === u), 5));
   const first = h.hooksOf('attack').find((c) => c.attacker === u);
   assert.equal(first.targets[0], eroded, 'the eroded ally is the heaviest element load');
   const e0 = eroded.elem.erosion;
@@ -823,6 +841,8 @@ test('2_06 莎草: 巧思乍现 next heal heal_scale × ATK; 博览古卷 barrie
   h.step();
   yak.hp = yak.s.maxHp * 0.2;
   h.step();
+  // the heal lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h.runUntil(() => heals(h, u).length > 0, 5));
   const hh = heals(h, u)[0];
   approx(hh.amount, u.s.atk * bb.heal_scale, 'skill heal');
   approx(yak.findBuff('papyrs:shield').shield, u.s.atk * t['attack@scale'] * bb.shield_scale_skill, 'skill barrier');
@@ -832,6 +852,8 @@ test('2_06 莎草: 巧思乍现 next heal heal_scale × ATK; 博览古卷 barrie
   h2.step();
   y2.hp = y2.s.maxHp * 0.2;
   h2.step();
+  // the heal lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+  assert.ok(h2.runUntil(() => heals(h2, u2).length > 0, 5));
   approx(heals(h2, u2)[0].amount, u2.s.atk);
   approx(y2.findBuff('papyrs:shield').shield, u2.s.atk * t['attack@scale'], 'talent barrier');
   assert.equal(y2.findBuff('papyrs:shield').timeLeft <= t['attack@shield_duration'], true);
@@ -892,6 +914,7 @@ test('2_09 休谟斯: 高效处理 block +1 and 精力充沛 by HP thresholds; �
   const h = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 9, col: 5, carryState: READY }], enemies: [{ key: 'e', pos: [9, 6] }] });
   const u = h.unit(id);
   h.step();
+  throughBegin(h, u);
   assert.ok(u.skill.active);
   assert.equal(u.s.blockCnt, u.base.blockCnt + bb.block_cnt);
   approx(u.s.atk, u.base.atk * (1 + bb['humus_s_2[peak_2].peak_performance.atk']), '>80 %');
@@ -917,6 +940,7 @@ test('2_10 洛洛: 自负此轭 ASPD; 过载 half-way ATK +atk and funnel cap ×
   const u = h.unit(id);
   const cap0 = u.profile.funnel.max;
   h.step();
+  throughBegin(h, u);
   assert.ok(u.skill.active);
   approx(u.s.aspd - u.base.aspd, bb.attack_speed);
   const D = u.skill.duration;
@@ -938,6 +962,7 @@ test('2_11 风丸: 纸艺·双影 −50 % HP, ATK +atk, summons the <替身> who
   const h = run({ defs: { enemies: { e: dummy('e') } }, units: [{ chessId: id, row: 9, col: 5, carryState: READY }], enemies: [{ key: 'e', pos: [9, 6] }, { key: 'e', pos: [9, 9] }] });
   const u = h.unit(id);
   h.step();
+  throughBegin(h, u);
   assert.ok(u.skill.active);
   approx(u.hpRatio, 1 - bb.hp_ratio, 'HP loss');
   approx(u.s.atk, u.base.atk * (1 + bb.atk));
@@ -1206,7 +1231,7 @@ test('2_17 折桠: 生存决心 trembles ground enemies around, ATK/DEF up, hits
   done(h2);
 });
 
-test('2_18 灰毫: 炮术研习 ATK +atk (ground surroundings: ashlok_t_1.atk); skill ATK +atk cast with an enemy in range (DEFAULT, DESIGN §21.29); elite ×1.1 vs blocked', () => {
+test('2_18 灰毫: 炮术研习 ATK +atk (ground surroundings: ashlok_t_1.atk); skill ATK +atk cast with an enemy in range (official 重装 row: TAKE_DAMAGE + SEARCH); elite ×1.1 vs blocked', () => {
   const id = 'chess_char_2_18_a', bb = bbOf(id), t = tal(id);
   const h = run({ units: [{ chessId: id, row: 10, col: 5 }, { chessId: 'chess_char_2_18_b', row: 10, col: 3 }] });
   h.step();
@@ -1216,10 +1241,10 @@ test('2_18 灰毫: 炮术研习 ATK +atk (ground surroundings: ashlok_t_1.atk); 
   const h2 = run({ defs: { enemies: { e: dummy('e', { atk: 400 }) } }, units: [{ chessId: id, row: 10, col: 5, carryState: READY }], enemies: [{ key: 'e', pos: [10, 5] }] });
   const u = h2.unit(id);
   h2.runUntil(() => u.skill.active, 5);
-  // the owner's deliberate deviation from the 重装 TAKE_DAMAGE row: the basic strategy, no hit needed — she casts before the
-  // enemy she holds has hit her
-  assert.equal(u.skill.rule, 'DEFAULT');
-  assert.equal(h2.hooksOf('skillStart').find((c) => c.unit === u).reason, 'DEFAULT');
+  // official 重装 row [ON_TAKE_DAMAGE, SKILL_RANGE_ENEMY] -> [TAKE_DAMAGE, SEARCH]: the enemy she holds is in her range, so she
+  // casts before it has hit her
+  assert.deepEqual(u.skill.rules, ['TAKE_DAMAGE', 'SEARCH']);
+  assert.equal(h2.hooksOf('skillStart').find((c) => c.unit === u).reason, 'SEARCH');
   assert.ok(!h2.hooksOf('damaged').some((c) => c.target === u), 'not hit before the cast');
   approx(u.s.atk, u.base.atk * (1 + t['ashlok_t_1.atk'] + bb.atk));
   done(h2);
@@ -1246,7 +1271,7 @@ test('1_01 隐现 elite: the ally magazine bonus is one grant per deployment (ne
   const u = h.unit(id), l = h.unit('t_lat');
   const magazine = () => {
     if (l.skill.active) l.skill.end('test');
-    l.skill.activate('test', { free: true });
+    castNow(l, 'test', { free: true });
     const n = l.skill.ammoLeft;
     l.skill.end('test');
     return n;
@@ -1383,7 +1408,9 @@ test('2_10 洛洛: 自负此轭 drones stay locked on their target while the ski
   assert.equal(normal[0], other, 'without the lock the newcomer would be the target');
   const t0 = h.b.time;
   h.run(4);
-  const atks = h.hooksOf('attack').filter((c) => c.attacker === u && c.t > t0);
+  // an attack cast before the newcomer existed has its targets locked already (official cast → hit, ai.js allyCastWindup): only
+  // the attacks whose cast started after it count
+  const atks = h.hooksOf('attack').filter((c) => c.attacker === u && c.t - allyCastWindup(u) > t0 + 1e-9);
   assert.ok(atks.length > 0 && atks.every((c) => c.targets.length === 1 && c.targets[0] === other), 'body keeps normal targeting');
   const drones = h.hooksOf('damaged').filter((c) => c.source === u && c.t > t0 && c.dmg.tags?.includes(ROCKROCK_DRONE));
   assert.ok(drones.length > 0 && drones.every((c) => c.target === first && c.dmg.isSkill && !c.dmg.isAttack), 'drone stays locked');

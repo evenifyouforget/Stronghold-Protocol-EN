@@ -21,7 +21,7 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 export const GAME_FILES = ['config', 'assets', 'chess', 'bonds', 'items', 'bands', 'enemies', 'bosses', 'stages', 'tokens',
   'choices', 'effects', 'garrisons', 'factions', 'local', 'backups', 'terms',
   'outfits', // (fork, docs/OUTFITS.md) the summons' looks and the outfits' voice sets (ui/outfits.js)
-  'avatars']; // (fork) the profile icons on the team panel, the draft and the results (ui/avatars.js)
+  'avatars']; // (fork) the profile icons on the team panel, the draft and the results (ui/avatars.js; the server's file in every version)
 
 /**
  * Load every in-match data file; returns lookups (sync, null until loaded).
@@ -70,10 +70,25 @@ export function makeLookups(ready = true) {
  * <img> that swaps to a fallback node when the URL is missing or fails.
  * @param {{ src?: string|null, class?: string, alt?: string, fallback?: any, style?: string }} props
  */
-export function Img({ src, class: cls, alt = '', fallback = null, style }) {
+export function Img({ src, class: cls, alt = '', fallback = null, style, onLoad }) {
   const [bad, setBad] = useState(null);
   if (!src || bad === src) return fallback;
-  return html`<img class=${cls} src=${src} alt=${alt} draggable=${false} loading="lazy" style=${style} onError=${() => setBad(src)} />`;
+  return html`<img class=${cls} src=${src} alt=${alt} draggable=${false} loading="lazy" style=${style} onLoad=${onLoad} onError=${() => setBad(src)} />`;
+}
+
+/**
+ * (fork) `onContextMenu` for a container of operator pictures (the Operator Loadout's cards, its drawer, the outfit
+ * pickers): a long press on a phone opens no browser image menu (Open image in new tab / Download image — the user's
+ * report of 2026-11-09). Only the browser's own menu of a touch / pen press is refused: a mouse's right click keeps it,
+ * a synthetic long press (ui/device.js, iOS) is no browser menu and is left alone (refusing it would swallow the slow
+ * tap's click), and a text field keeps its own menu. Text selection and image drags are off already (css/theme.css
+ * user-select, Img's draggable=false, css/devices.css -webkit-user-drag / -webkit-touch-callout).
+ * @param {MouseEvent & { pointerType?: string }} e
+ */
+export function noImageMenu(e) {
+  if (!e?.isTrusted || e.pointerType === 'mouse' || e.defaultPrevented) return;
+  if (e.target?.closest?.('input, textarea, select, [contenteditable], .selectable')) return;
+  e.preventDefault();
 }
 
 /** Owner-aware operator pictures, with live selection / settings updates even on an already open card.

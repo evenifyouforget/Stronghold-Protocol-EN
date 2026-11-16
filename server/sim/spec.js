@@ -217,12 +217,24 @@ export class LocalBossPool {
     this.risk = risk && typeof risk === 'object' ? { ...risk } : null;
     this.typed = { arts: 0, phys: 0 };
     this.localHold = false;
+    /** Delegation: the HP this field took from its Degenbrecher so far (reported as b.progress `degen`) */
+    this.degenDealt = 0;
+    /** United 3: the gate steps its Degenbrecher has finished (reported as b.progress `degenGate`) */
+    this.degenGate = 0;
   }
 
   riskView() { return this.risk; }
 
   /** United 2: whether a Degenbrecher lives on this field (reported as b.progress `hold`). */
   setHold(fieldId, on) { void fieldId; this.localHold = !!on; }
+
+  /** Delegation: this field's cumulative damage to its Degenbrecher and her finished gate steps (bossRisk.js). */
+  noteDegen(fieldId, dealt, gate = 0) {
+    void fieldId;
+    const d = Number(dealt), g = Number(gate);
+    if (Number.isFinite(d) && d > this.degenDealt) this.degenDealt = d;
+    if (Number.isFinite(g) && g > this.degenGate) this.degenGate = Math.floor(g);
+  }
 
   get hp() {
     const h = this.serverHp - Math.max(0, this.cum - this.acked);
@@ -348,6 +360,7 @@ export function battleProgress(battle) {
     out.bossArts = pool.typed.arts;
     out.bossPhys = pool.typed.phys;
     out.hold = !!pool.localHold;
+    if (pool.risk.degen) { out.degen = pool.degenDealt || 0; out.degenGate = pool.degenGate || 0; }
   }
   if (battle && battle.kind === 'unite') {
     const left = uniteLeft(battle);

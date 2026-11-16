@@ -2,7 +2,7 @@
 // Every test runs a real battle through the harness and checks the signature effect of the kit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, chessRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { applyModuleRange } from '../../server/sim/content/kits/shared/tier4.js';
 
 const dummy = (o = {}) => enemyRec({ key: 'enemy_dummy', hp: 1e7, speed: 0, ...o });
@@ -86,6 +86,11 @@ test('蕾缪安: S3 locks 5 (+1 talent) targets every 0.5 s, then the shells lan
   });
   const u = h.unit('chess_char_6_01_a');
   const bb = u.def.skill.bb, t1 = u.def.talents[1].bb;
+  // official CASTER row [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY] -> SEARCH: the S3 casts the tick its SP is full with an enemy in
+  // range (19 s), no longer on the next attack (after the 20 s of talent 2). Two seconds more SP cost keep the first cast after
+  // the talent, as this scenario needs.
+  assert.deepEqual(u.skill.rules, ['SEARCH']);
+  u.skill.baseSpCost += 2;
   assert.ok(h.runUntil(() => u.skill.active, 60));
   assert.ok(h.b.time >= t1.interval, 'talent 2 active (20 s on field) before the first cast');
   const start = h.b.time;
@@ -1017,7 +1022,7 @@ test('余 (elite): 阻挡 ⇒ element ×1.15 (module, elementHit); S3 gives the 
   assert.ok(e.findBuff('burnBurst'));
   const hitOf = () => { const n = h.dmg.length; h.b.dealDamage(c, e, { amount: 1000, type: 'arts' }); return h.dmg.slice(n).find((d) => d.src === c.id && d.type === 'arts')?.amount; };
   const plain = hitOf();
-  u.skill.activate('test', { free: true });
+  castNow(u, 'test', { free: true });
   assert.ok(u.skill.active);
   const boosted = hitOf();
   const ds = u.def.raw.talents.find((t) => t.index === -1 && t.bb.damage_scale).bb.damage_scale;
@@ -1193,7 +1198,7 @@ test('异客: the S3 storm is range x-1 — the 13-tile diamond — around the t
     const tgt = h.spawn('enemy_dummy2', { pos: [10, 5], mods: { hpMul: 2 } });
     tgt.x = 5.4; tgt.y = 10.4;
     h.step();
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     const storm = h.eventsOf('fx').find((e) => e[1] === 'storm');
     assert.deepEqual([storm[2], storm[3]], [5, 10], 'the storm sits on the centre of the target\'s tile');
     h.b.dealDamage(null, tgt, { amount: 1e12, type: 'true' });
@@ -1265,7 +1270,7 @@ test('skill stat mods match the official text at both levels (normal Lv4 / elite
       const h = makeBattle({ units: [{ chessId: cid, row: 10, col: 4 }], timeLimit: 30 });
       h.step();
       const u = h.unit(cid);
-      assert.ok(u.skill.activate('test', { free: true }), `${cid} activates`);
+      assert.ok(castNow(u, 'test', { free: true }), `${cid} activates`);
       const m = String(u.def.skill.description).match(re);
       assert.ok(m, `${cid} text has ${re}`);
       const want = key === 'aspd' ? +m[1] : +m[1] / 100;
@@ -1306,7 +1311,7 @@ test('default skills: attack-interval rule of the AK calculator — a shortening
       const u = h.unit(cid);
       const v = u.def.skill.bb.base_attack_time;
       assert.ok(Number.isFinite(v) && v !== 0, `${cid} has base_attack_time`);
-      assert.ok(u.skill.activate('test', { free: true }), `${cid} activates`);
+      assert.ok(castNow(u, 'test', { free: true }), `${cid} activates`);
       const bat = rule === 'flat' ? u.base.bat + v : u.base.bat * (1 + v);
       assert.ok(near(u.s.interval, bat * 100 / u.s.aspd, 1e-9), `${cid} (${rule} ${v}): interval ${u.s.interval} ≠ ${bat * 100 / u.s.aspd}`);
       checkInvariants(h.b);

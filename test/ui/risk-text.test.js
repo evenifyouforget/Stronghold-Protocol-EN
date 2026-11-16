@@ -96,3 +96,29 @@ test('#88: the other languages: en, ja, ko, zh-TW', () => {
   assert.match(first(ko.band_harold.desc), /5라운드부터, 2라운드마다/);
   assert.match(first(late(bandsIn('zh-TW')).band_orchid.desc), /第11回合/);
 });
+
+test('balance update 2026-11: the changed tag levels carry α after their name, the unchanged ones not', () => {
+  const lv = (k, node) => ruleOf(k).nodes.indexOf(node);
+  const alpha = (k, l) => riskText(k, l).short.endsWith(' α');
+  assert.equal(alpha('ccSpRecovery', 1), false);
+  assert.equal(alpha('ccSpRecovery', 2), true);
+  assert.equal(alpha('ccSpRecovery', 3), true);
+  assert.equal(alpha('ccVengeance', 1), false);
+  assert.equal(alpha('ccVengeance', 3), true);
+  assert.equal(alpha('ccPatriot', lv('ccPatriot', 'undying1')), false);
+  assert.equal(alpha('ccPatriot', lv('ccPatriot', 'undying2')), true);
+  for (const n of ['cleaner', 'unending2', 'seasonal2', 'unending3', 'seasonal3']) assert.equal(alpha('ccFamiglia', lv('ccFamiglia', n)), true, n);
+  for (const n of ['united1', 'united2', 'united3']) assert.equal(alpha('ccDelegation', lv('ccDelegation', n)), true, n);
+  assert.equal(alpha('ccLockout', 1), false);
+  assert.equal(riskText('ccLockout', 1).short.includes('α'), false);
+});
+
+test('Cleaner 1 names both Silencer counts; Undying 3 names the final-round sub-wave, Undying 2 no longer', () => {
+  const lv = (k, node) => ruleOf(k).nodes.indexOf(node);
+  const cleaner = riskText('ccFamiglia', lv('ccFamiglia', 'cleaner')).full;
+  assert.ok(cleaner.includes(String(CC.silencers.count)) && cleaner.includes(String(CC.silencers.soloCount)), cleaner);
+  assert.equal(CC.silencers.count, 3);
+  assert.equal(CC.silencers.soloCount, 2);
+  assert.ok(riskText('ccPatriot', lv('ccPatriot', 'undying3')).full.includes('最终领袖回合'));
+  assert.ok(!riskText('ccPatriot', lv('ccPatriot', 'undying2')).full.includes('最终领袖回合出现'));
+});

@@ -63,7 +63,7 @@ function killAt(h, pos, key = 'enemy_weak') {
   return e;
 }
 
-test('死芒 in every 自选 form: her kit (all three skills authored), stats + module attributes, 3-1, blocks 1, ranged arts that hit air, 维多利亚, no 特质, the data triggers (S3 SKILL_RANGE on its 3-3); offered as a pick', () => {
+test('死芒 in every 自选 form: her kit (all three skills authored), stats + module attributes, 3-1, blocks 1, ranged arts that hit air, 维多利亚, no 特质, the data triggers (official SNIPER row [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY]: S1 / S2 SEARCH, S3 SEARCH + SKILL_RANGE on its 3-3); offered as a pick', () => {
   assert.equal(OPERATOR_KITS[NEC], KITS[NEC]);
   for (const f of FORMS_ALL) {
     const [tier, elite, mod] = f;
@@ -79,7 +79,10 @@ test('死芒 in every 自选 form: her kit (all three skills authored), stats + 
       done(h);
     }
   }
-  assert.deepEqual(formOf(6, true).skills.map((s) => s.trigger.rule), ['DEFAULT', 'DEFAULT', 'SKILL_RANGE']);
+  assert.deepEqual(formOf(6, true).skills.map((s) => s.trigger.rule), ['SEARCH', 'SEARCH', 'SEARCH']);
+  assert.deepEqual(formOf(6, true).skills.map((s) => s.trigger.official), Array(3).fill(['ATTACK_RANGE_ENEMY', 'SKILL_RANGE_ENEMY']));
+  assert.deepEqual(formOf(6, true).skills.map((s) => (s.trigger.also ?? []).map((a) => a.rule)), [[], [], ['SKILL_RANGE']]);
+  assert.deepEqual(formOf(6, true).skills[2].trigger.also[0].customRangeGrid, formOf(6, true).skills[2].rangeGrid, 'S3: SKILL_RANGE on its 3-3');
   assert.deepEqual([modOf(5, X).attr, modOf(6, X).attr], [{ maxHp: 120, atk: 35 }, { maxHp: 200, atk: 55 }]);
   const data = { chess: CHESS, backups: BACKUPS };
   assert.ok(KITTED_CHARS.includes(NEC));
@@ -386,5 +389,27 @@ test('复燃: a stealthed enemy knocked out on her range counts (天赋无视隐
   h.run(0.2);
   assert.equal(skels(u).length, 1, 'no free tile: no second summon');
   assert.ok(s1.findBuff('necras:upgrade'), '… the upgrade instead');
+  done(h);
+});
+
+test('display: every S2 tick sends fx tick { id: her, on: the linked enemy, skill necras:s2 } with its damage (the official necras_s_2 trigger: her hit effect and necras_skill_dot)', () => {
+  const { h, u } = field({ tier: 6, elite: true, skill: 1 });
+  const sent = [];
+  const fx = h.b.fx.bind(h.b);
+  h.b.fx = (kind, p) => { if (kind === 'tick') sent.push({ ...p, t: h.b.time }); return fx(kind, p); };
+  const a = h.spawn('enemy_dummy', { pos: [10, 5] });
+  const b = h.spawn('enemy_dummy', { pos: [9, 5] });
+  u.skill.gainSp(999);
+  assert.ok(h.runUntil(() => u.skill.active, 3), 'cast');
+  const t0 = h.b.time;
+  h.run(3.01);
+  const ticks = h.hooksOf('damaged').filter((x) => x.source === u && x.dmg.tags?.includes('necras:s2') && x.t > t0 - 1e-9);
+  const mine = sent.filter((p) => p.t > t0 - 1e-9);
+  assert.equal(mine.length, ticks.length, 'one tick fx per damage tick');
+  assert.ok(mine.length >= 12, `${mine.length} ticks`);
+  for (const p of mine) {
+    assert.deepEqual([p.id, p.skill, p.key], [u.id, 'necras:s2', undefined]);
+    assert.ok([a.id, b.id].includes(p.on), 'on a linked enemy');
+  }
   done(h);
 });

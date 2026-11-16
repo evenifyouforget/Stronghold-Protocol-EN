@@ -99,10 +99,14 @@ export const initialState = Object.freeze({
   emotes: [],
   /** (fork) match chat: the playerIds this page mutes (chatState.js) */
   chatMute: [],
+  /** (fork) room chat: the room screen's log (roomChat.js) — the room's code, its lines, a spam pause's end */
+  roomChat: { code: null, lines: [], pausedUntil: 0 },
   clock: { offset: 0, rtt: null, synced: false },
   ui: { pendingJoin: null, restoring: false, buildStale: false },
   // planned maintenance (sys.maintenance, ui/maintenance.js): { at, closed } or null
   maintenance: null,
+  // (fork) the lobby's live update news (sys.news, server/news.js; shared/news.js parseNews), null = the release's own
+  liveNews: null,
   // official versions (DESIGN §35.23, versions.js): welcome.versions (null: the switch is off), this browser's lobby choice
   // (the pref as stored — versions.js lobbyVersion checks it against the list) and the version of the stored match
   // 统计数据 replays (null when none: the lobby preference is never changed to show one). A match's version is its frames'

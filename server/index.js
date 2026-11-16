@@ -41,7 +41,8 @@
 // (maxConnectionsPerAddr, refused at upgrade with 429), rooms and running matches (lobby.js).
 //
 // Operator notices: announce.js watches logs/announce.json (option `noticeFile`, null disables). Planned maintenance:
-// maintenance.js watches logs/maintenance.json (option `maintenanceFile`, null disables; scripts/maintenance.mjs). presence.js sends
+// maintenance.js watches logs/maintenance.json (option `maintenanceFile`, null disables; scripts/maintenance.mjs). (fork) The
+// lobby's live update news: news.js watches logs/news.json (option `newsFile`, null disables; scripts/news.mjs). presence.js sends
 // the online count and the 搜寻队友 queue sizes (sys.online). Behind scripts/router.mjs (SP_GEN + SP_GEN_FILE, options
 // `gen` / `genFile`) generation.js retires this process once the router's generations.json names a newer one.
 //
@@ -75,6 +76,7 @@ import { MIME, COMPRESSIBLE, acceptsGzip, pickEncoding, parseRange } from './htt
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
 import { createTrafficCounter } from './http/traffic.js';
+import { createTrafficDetail, trafficMeterEnabled } from './http/trafficDetail.js';
 import { createLoopStats } from './http/loopStats.js';
 import { simMeter } from './match/simMeter.js';
 import { createAssetIndex } from './http/assetIndex.js';
@@ -84,6 +86,7 @@ import { createEventLoopMonitor } from './health/eventLoop.js';
 import { createRoomWorkerPool } from './workers/roomPool.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 import { NoticeBoard } from './announce.js';
+import { NewsBoard } from './news.js';
 import { AltArtLedger } from './altArt.js';
 import { RecordStore, recordsDirFrom } from './records.js';
 import { MaintenanceBoard } from './maintenance.js';
@@ -104,7 +107,7 @@ export {
 /**
  * Build and start the HTTP + WebSocket server.
  * @param {{
- *   port?: number, host?: string, quiet?: boolean, log?: object,
+ *   port?: number, host?: string, quiet?: boolean, log?: object, trafficMeter?: boolean,
  *   publicDir?: string, dataDir?: string, sharedDir?: string, packsDir?: string, pluginsDir?: string,
  *   MatchClass?: Function, seedFn?: () => number,
  *   lobbyGraceMs?: number, reconnectWindowMs?: number, heartbeatMs?: number, helloTimeoutMs?: number,
@@ -112,6 +115,7 @@ export {
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
  *   noticeFile?: string | null, noticePollMs?: number, maintenanceFile?: string | null, maintenancePollMs?: number,
+ *   newsFile?: string | null, newsPollMs?: number,
  *   presencePollMs?: number, presenceRefreshMs?: number,
  *   warmResources?: boolean, resourceHashCache?: string | null,
  *   gen?: string | null, genFile?: string | null, genPollMs?: number, altArtDir?: string | null,
@@ -128,14 +132,16 @@ export {
  *   versionVoteMs / versionRetryMs: the version vote's answer window and the guard after a declined or expired vote (tests;
  *   server/lobby.js header "Official versions")
  *   roomCode: a fixed alliance key for every new room (--room-code; four letters or digits — config.js parseRoomCode);
+ *   trafficMeter: (fork) the dev traffic meter on / off (default SP_TRAFFIC_METER=1 on a dev server: http/trafficDetail.js)
  * @returns {Promise<{ port: number, host: string, url: string, server: http.Server, wss: import('ws').WebSocketServer,
  *                     lobby: import('./lobby.js').Lobby, network: import('./net.js').Network,
  *                     registry: import('./net.js').SessionRegistry, packs: ReturnType<typeof createPluginRegistry>,
  *                     content: import('./plugins/identity.js').VanillaContent, visual: ReturnType<typeof createVisualSets>,
  *                     contents: ReturnType<typeof createContentSets>, hosts: ReturnType<typeof createMatchHosts>,
- *                     notices: NoticeBoard | null, presence: Presence, generation: GenerationWatch | null,
+ *                     notices: NoticeBoard | null, news: NewsBoard | null, presence: Presence, generation: GenerationWatch | null,
  *                     versions: ReturnType<typeof createVersionSets>, versionHosts: ReturnType<typeof createMatchHosts> | null,
- *                     traffic: ReturnType<typeof createTrafficCounter>, assetIndex: ReturnType<typeof createAssetIndex> | null,
+ *                     traffic: ReturnType<typeof createTrafficCounter>, trafficDetail: ReturnType<typeof createTrafficDetail> | null,
+ *                     assetIndex: ReturnType<typeof createAssetIndex> | null,
  *                     views: ReturnType<typeof createManifestViews> | null, studio: ReturnType<typeof createStudio> | null,
  *                     close: () => Promise<void> }>}
  */
@@ -149,6 +155,13 @@ export async function startServer(opts = {}) {
     if (strategy.id === 'external') validateExternalConfig();
   } catch (cause) {
     throw new Error(`Invalid SP_BOT_STRATEGY: ${cause.message}. Unset SP_BOT_STRATEGY to use the original bot (legacy).`, { cause });
+  }
+  try {
+    // (fork) host-run bots only (Match opts.hostBotStrategy); the external AI never runs in a browser
+    const strategy = getBotStrategy(String(process.env.SP_HOST_BOT_STRATEGY ?? '').trim());
+    if (strategy.id === 'external') throw new Error('external cannot run in a browser');
+  } catch (cause) {
+    throw new Error(`Invalid SP_HOST_BOT_STRATEGY: ${cause.message}. Unset SP_HOST_BOT_STRATEGY to give host-run bots SP_BOT_STRATEGY.`, { cause });
   }
   try {
     const seats = getBotStrategySeats(process.env.SP_BOT_STRATEGY_SEATS);
@@ -221,7 +234,9 @@ export async function startServer(opts = {}) {
         phase: [...phases].sort().join('+') || 'idle', rehearsals };
     },
   });
-  const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, resources, content, log, assetIndex, views, visual, contents, versions });
+  // (fork) this generation's prefixed code is immutable (static.js); the id is checked below with the rest of SP_GEN
+  const releaseGen = (opts.gen === undefined ? process.env.SP_GEN || null : opts.gen) || null;
+  const serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, resources, content, log, assetIndex, views, visual, contents, versions, releaseGen });
   // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
   // once it is used (hot reload), and rooms whose host is the author or alone follow a plugin's changes by themselves
   const studio = opts.studio === false ? null : createStudio({ publicDir, pluginsDir, dataDir, registry: packs, lobby, sessions: registry, log, fetch: opts.fetch });
@@ -238,10 +253,12 @@ export async function startServer(opts = {}) {
     ? new MaintenanceBoard({ file: maintenanceFile, registry, lobby, startedAt, pollMs: opts.maintenancePollMs, log })
     : null;
   lobby.maintenance = maintenance; // Lobby.startMatch & co. ask maintenance.closed()
-  if (notices || maintenance) {
+  const newsFile = opts.newsFile === undefined ? path.join(ROOT, 'logs', 'news.json') : opts.newsFile;
+  const news = newsFile ? new NewsBoard({ file: newsFile, registry, pollMs: opts.newsPollMs, log }) : null;
+  if (notices || maintenance || news) {
     const lobbyHello = lobby.onHello.bind(lobby);
     lobby.onHello = (session, info) => {
-      try { lobbyHello(session, info); } finally { notices?.onHello(session); maintenance?.onHello(session); }
+      try { lobbyHello(session, info); } finally { notices?.onHello(session); maintenance?.onHello(session); news?.onHello(session); }
     };
   }
   const presence = new Presence({ network, lobby, pollMs: opts.presencePollMs, refreshMs: opts.presenceRefreshMs });
@@ -264,6 +281,8 @@ export async function startServer(opts = {}) {
   // (fork) the link between regions and matchmaking across them (DESIGN §8.7, §90.2): needs SP_PEER_SECRET
   const peer = regions?.secret ? new PeerLink({ config: regions, network, lobby, gen, cs: content?.cs ?? null, log, pollMs: opts.peerPollMs, fetch: opts.peerFetch, isActive: generation ? () => generation.active() : null }) : null;
   presence.peer = peer;
+  // (fork) the room browser lists every region's Grand Alliance rooms (Lobby.roomList)
+  if (peer) { lobby.region = regions.self; lobby.peerRooms = () => peer.peerRooms(); }
   if (peer && regions.crossMatch) {
     lobby.crossTicket = (payload) => signTicket(regions.secret, payload);
     lobby.crossVerify = (ticket) => verifyTicket(regions.secret, ticket, lobby.now());
@@ -271,13 +290,17 @@ export async function startServer(opts = {}) {
   }
 
   const traffic = createTrafficCounter();
+  // (fork) the dev traffic meter (trafficDetail.js): SP_TRAFFIC_METER=1 on a dev server only; null = nothing wrapped
+  const trafficDetail = (opts.trafficMeter ?? trafficMeterEnabled(process.env))
+    ? createTrafficDetail({ roomOf: (ws) => network.conns.get(ws)?.session?.roomCode ?? null }) : null;
+  if (trafficDetail) log.info('[traffic] dev traffic meter on: GET /healthz?traffic=1 (trafficDetail), tools/traffic-report.mjs');
   const loop = createLoopStats(); // (fork) /healthz?traffic=1 `loop` and `sim`: what blocks the main thread
   // (fork) the site policy hashes this generation's rewritten import map too (shared/gen.js rewriteIndexHtml), else
   // the browser refuses /g/<gen>/'s map and the page never boots
   const csp = process.env.SP_CSP === 'off' ? null : siteCsp(publicDir, { gen, cfAnalytics: process.env.SP_CF_ANALYTICS === '1', connectSources: regionConnectSources(regions) });
-  const server = http.createServer(createRequestHandler({ serveStatic, csp, cspNonce: process.env.SP_CSP_NONCE === '1', health: { startedAt, network, registry, lobby, content, traffic, assetIndex, views, trusted: trustedRuntime?.health, generation, loop, sim: simMeter, maintenance, versions, versionHosts, regions, peer }, log, trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
+  const server = http.createServer(createRequestHandler({ serveStatic, csp, cspNonce: process.env.SP_CSP_NONCE === '1', health: { startedAt, network, registry, lobby, content, traffic, trafficDetail, assetIndex, views, trusted: trustedRuntime?.health, generation, loop, sim: simMeter, maintenance, versions, versionHosts, regions, peer }, log, trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
   server.on('clientError', answerClientError);
-  const wss = attachWebSocket(server, { network, log, traffic });
+  const wss = attachWebSocket(server, { network, log, traffic, trafficDetail });
 
   // The address actually bound. The default may fall back to IPv4; the returned host and url follow that.
   let boundHost;
@@ -334,6 +357,7 @@ export async function startServer(opts = {}) {
   server.on('error', (e) => log.error('[http] server error', e));
   notices?.start();
   maintenance?.start();
+  news?.start();
   presence.start();
   peer?.start();
   generation?.start();
@@ -352,6 +376,7 @@ export async function startServer(opts = {}) {
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       notices?.stop();
       maintenance?.stop();
+      news?.stop();
       presence.stop();
       peer?.stop();
       loop.stop();
@@ -375,7 +400,7 @@ export async function startServer(opts = {}) {
     return closing;
   }
 
-  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, notices, maintenance, presence, peer, generation, versions, versionHosts, traffic, assetIndex, views, studio, eventLoop, simPool, close };
+  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, notices, news, maintenance, presence, peer, generation, versions, versionHosts, traffic, trafficDetail, assetIndex, views, studio, eventLoop, simPool, close };
 }
 
 /**

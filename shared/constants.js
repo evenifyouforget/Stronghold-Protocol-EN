@@ -188,7 +188,7 @@ export const ERR = Object.freeze({
   NOT_IN_ROOM: 'NOT_IN_ROOM',
   ROOM_NOT_FOUND: 'ROOM_NOT_FOUND',
   ROOM_FULL: 'ROOM_FULL',
-  // (fork) a locked Grand Alliance room (shared/largeRoom.js): a join without its password, or a wrong one
+  // (fork) a private (locked) Grand Alliance room (shared/largeRoom.js): a join without its password, or a wrong one
   ROOM_LOCKED: 'ROOM_LOCKED',
   SERVER_FULL: 'SERVER_FULL',     // the online cap (SP_MAX_ONLINE) has no seat for a new player
   ROOM_STARTED: 'ROOM_STARTED',
@@ -253,7 +253,7 @@ export const ERR_TEXT = {
   SESSION_IN_USE: N_('此对局仍在其他窗口中，或当前浏览器无法安全恢复。请关闭原窗口后重试。'),
   BAD_MSG: N_('无效的请求'), RATE: N_('操作过于频繁'), NOT_IN_ROOM: N_('你不在房间中'), ROOM_NOT_FOUND: N_('未找到该同盟密钥对应的房间'),
   ROOM_FULL: N_('房间已满'),
-  ROOM_LOCKED: N_('该房间已上锁，请输入正确的密码'), // en: "This room is locked. Enter its password."
+  ROOM_LOCKED: N_('该房间为私密房间，请输入正确的密码'), // en: "This room is private. Enter its password."
   SERVER_FULL: N_('服务器已满'), ROOM_STARTED: N_('模拟已开始'), NOT_HOST: N_('只有房主可以操作'), NOT_READY: N_('仍有玩家未就绪'),
   ROOM_CODE_TAKEN: N_('固定同盟密钥已被另一个房间占用，请先关闭那个房间'),
   WRONG_PHASE: N_('当前阶段无法进行该操作'), NO_FUNDS: N_('资金不足'), HAND_FULL: N_('整备区已满'), BOARD_FULL: N_('已达到部署上限'),
@@ -368,5 +368,38 @@ export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bub
 export const CHAT_COOLDOWN_MS = 3000;  // [ASSUMED] one bubble's chatTime, so a message is not replaced before it is read
 export const CHAT_COOLDOWN_GRACE_MS = 500; // the server allows this much less, so network jitter never eats a line the page let through
 export const CHAT_MAX_LETTERS = 200;   // [ASSUMED] a safety ceiling for plugin waves; the official waves stay well under it
+// (fork) one chat line, match or room (user, 2026-11-11): at most 100 letters as a reader counts them (grapheme
+// clusters), and never more than 300 code points under them (a "letter" can be built from many: Korean jamo, marks).
+// Worst case ≈ 1 KB a frame; docs/design/network.md "Chat lines".
+export const CHAT_LINE_LETTERS = 100;
+export const CHAT_LINE_CODEPOINTS = 300;
+// (fork) the server's spam limits for a sender (server/chatLimit.js; the page is not trusted): a gap between lines, a burst
+// window, pauses that grow on repeat offences and are forgiven one step at a time, and a cap for every session of one
+// network together, so new tabs or tokens do not multiply it. Room chat's gap; match chat keeps CHAT_COOLDOWN_MS.
+export const ROOM_CHAT_GAP_MS = 1500;
+export const CHAT_BURST_LINES = 6;
+export const CHAT_BURST_MS = 15_000;
+export const CHAT_PAUSE_STEPS_MS = Object.freeze([30_000, 60_000, 120_000]);
+export const CHAT_PAUSE_FORGIVE_MS = 10 * 60_000;
+export const CHAT_DUPLICATE_MS = 10_000;
+export const CHAT_DUPLICATE_LINES = 3;
+export const CHAT_NETWORK_LINES = 20;
+// (fork) server cost (user, 2026-11-11: no build without a cap that bounds the worst case): a sender's lines in any 5 min,
+// and one budget for every chat line the server sends (room and match chat in this process together): bytes a second on
+// the wire, the frame plus CHAT_FRAME_OVERHEAD for TLS / TCP, to every recipient. Over it a line is dropped and its
+// sender told "chat is busy" (once per CHAT_BUSY_MS). 32 KB/s ≈ 2.8 GB/day at most, however many players.
+export const CHAT_LONG_LINES = 20;
+export const CHAT_LONG_MS = 5 * 60_000;
+export const CHAT_BUDGET_BYTES_PER_S = 32 * 1024;
+export const CHAT_FRAME_OVERHEAD = 80;
+export const CHAT_BUSY_MS = 3000;
+// (fork) who gets the budget (user, 2026-11-11, "per room fair share & match reserve"): one room (or match) may use at
+// most CHAT_ROOM_SHARE of it, so a spamming room only silences itself; CHAT_MATCH_RESERVE of it only match chat may use,
+// so lobby or room spam never blocks in-game chat. The operator's SP_CHAT_ROOM_SHARE / SP_CHAT_MATCH_RESERVE override them.
+export const CHAT_ROOM_SHARE = 0.25;
+export const CHAT_MATCH_RESERVE = 0.25;
+// (fork) room chat history (server memory only, never disk): the last lines of a room, for a member who reconnects
+export const ROOM_CHAT_HISTORY_LINES = 50;
+export const ROOM_CHAT_HISTORY_BYTES = 16 * 1024;
 /** [ASSUMED] A text bubble's time on screen: an emote's 3 s plus 100 ms a letter, so a long line can be read. */
 export const chatBubbleMs = (letters) => EMOTE_BUBBLE_MS + 100 * Math.max(0, letters);

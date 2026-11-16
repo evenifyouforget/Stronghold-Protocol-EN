@@ -667,6 +667,41 @@ the 2019-12-24 update a non-integer frame count is rounded (四舍五入; before
 non-integer count still ends on the tick that crosses 0 — ⌈30 × interval⌉ ticks (1.2 s = 36, 1.25 s = 38; 能天使's
 0.678 s is 21 here, 20 frames officially): an older difference from the official rounding, not changed by this rule.
 
+**Operator attacks: cast → hit** (fork, the official order: `AbilityStandard._DoCast` pre-delay → `ExecuteSpell` → post-delay;
+`EasyToStartAbility` `_waitForAttackEvent` — the pre-delay waits for the clip's attack event). When the cooldown is 0
+and a target is found (`ai.js updateAlly`, after `skill.onAboutToAttack()`: a "next attack" skill arms at the cast), the
+attack **casts**: the cooldown restarts at once (`interval`), `lastCastAt` is stamped, the targets are locked
+(`u.cast`) and `['atkCast', id, windUp, targetId]` is sent; the hit (`performAttack`: damage / heal, SP, the attack
+count, hooks, `'atk'`) lands **one wind-up later** (`allyCastTick`). Wind-up = `allyCastWindup`: the strike frame of the
+unit's attack clip × the official clip scale `clamp(interval / clipDur, 0.1, maxScale)` (`AbstractAnimatedAbility.
+UpdatePlaybackSpeed`, disassembled: `MIN_ANIM_SCALE` 0.1; `maxScale` = the attack ability's own `_maxAnimScale`, read
+from the client into `attackAnim.maxScale` — 1.0 on most operators, 1.1 / 1.2 / 2 on a few, −1 = no cap on 62 —;
+`ALLY_ANIM_SCALE_MAX` 2.5 only for a unit the client data lacks [ASSUMED]; the client's extra cap under an animation
+slow-down, 2.5 / `animSlowDown`, is not modelled), at most the interval, rounded up to whole ticks; the clip is the data's `attackAnim`
+(DATA.md; the default model's clip — outfits never change it). No `attackAnim` (summons the manifest lacks, the older
+versions' data, test stand-ins) = wind-up 0: the old rule, the hit as the cooldown ends. During the wind-up the cast is
+cut — no hit, `['atkCancel', id]`, the cooldown freed to 0 [ASSUMED: ResetCooldownStrategy not read] — by a stun /
+freeze / sleep (`canAct`), 缴械, death or retreat, or the attack switched off (`noAttack`). At the hit the locked
+targets still alive and selectable take it (a target that walked out of range is still hit — PRTS 作战机制, as an
+enemy's swing); none left ⇒ it picks again; nobody ⇒ cut (`_interuptIfTargetDead`). A skill that started or ended
+during the wind-up (`castMode`: skill on/off, heal or attack) picks again with the attack it has then. A kit's fixed
+cadence counts from the cast (`lastCastAt`: 逻各斯 S2's 0.5 s), as an ability's cooldown does. Bot and rehearsal battles
+run the same rule (it is gameplay); only the two events are display (`render/app/windup.js windCasts` plays the clip
+from frame 0 at the cast).
+
+**Skills with a begin clip: cast → start** (fork, the official order: `Character.States.SkillState.OnEnter` →
+`BasicSkill.OnBeforeSkillStart` → `PlayBeginAnimation`: the owner plays `_beginAnim` at time scale 1, `WaitForFixedSeconds`
+its length, then `DoStartSkill` → `Cast`). The skills the client marks `_playSkillBeginAnim` (tools/assets/
+skill-begin-anims.mjs, generated from `[uc]skills.ab` by tools/skill_begin.py: 211 skills, 138 of our
+operators' — 91 operators) carry their clip on the data skill (`beginAnim` { clip, dur }, the default model's length;
+DATA.md). Their activation (`skills.js activate`) is a cast first: `['skill', id, 1]` goes out (the client plays the
+clip and the cast sound), `starting` holds it, and the skill starts — SP spent, mods, `onStart`, `skillStart`, its
+duration — on the tick its clip ends (`tick`; no second event). Meanwhile the unit makes no attack (the client's Attack
+state is left: `ai.js updateAlly`) and an attack wind-up under way is cut (`atkCancel`, its cooldown freed) [ASSUMED:
+the ability is interrupted, as by a stun]. Leaving the Skill state first — stunned, frozen, asleep, knocked out,
+retreated (`canAct`, `SkillState.OnExit` → `InterruptStartIfNot`) — drops the cast: `['skill', id, 0]`, nothing spent,
+it may cast again. Skills with no begin clip start at their cast as before; the older versions' data has none.
+
 **Which bucket (PRTS 游戏数据基础 属性基本公式 / 作战机制, DESIGN §20.10).** `Σpct` is the official **直接乘算** class — its
 values are summed (`A = (A₀ + D_p)(1 + D_t)`, D_t = t₁ + … + tₙ): a skill's or talent's "攻击力+X%" **and** every "+X%"
 ATK / DEF / max HP bonus of the 卫戍 systems — 盟约, 策略 (bands), 装备, 机变 cards, the per-layer 特质 (PRTS
@@ -1666,6 +1701,16 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   `layers: [[id, n]]` and `charges: [[id, stored, max]]` (each only when non-empty; display only, 0.3.0 round 46) =
   `snapshot.js` `layerView` (the sum of a unit's buffs' `shieldHits`: 泥岩's 护盾 layers) and `chargeView` (an ally skill
   with maxCharges > 1: `skill.charges`), read by the official effects (DESIGN §33.16).
+  (fork) `fxs: [[id, buff, src, look]]` (only when non-empty; display only, the golden canon leaves it out; the server
+  streams it on change, `shared/fxsDiff.js`) = `snapshot.js`
+  `fxStateView`: the official buffs (client keys) whose lasting effects a unit shows now. A kit signals them with
+  `battle.fxState(unit, buff, on, { src, look, dur })` (a moment the sim marks: a kill, a fired trigger effect, an
+  overload), `battle.fxProbe(unit, buff, (u) => false | true | look | { src, look })` (a state the kit already keeps, read only when a
+  snapshot is taken — nothing runs in the ticks) or a buff's `fx` / `fxSrc` / `fxLook` (shown while the buff lasts);
+  `content/fxStates.js` holds the skill-wide probes (charge-count glows, a skill's own buff while it runs) and
+  `TOKEN_FX_STATES` (a summon wears its owner's skill buffs while that skill runs: `fxProbe`'s 4th argument `src(u)`
+  names the owner). Marks on targets (audit item 5): the kit tags the buff it puts on the target with `fx` / `fxSrc`, or
+  calls `fxState(target, buff, true, { src: unit, dur })`. A state lasts the unit's deployment at most.
   `notes: [[noteId, ownerId, x, y, hx, hy,
   look, state]]` (only while notes fly; display only) = the free-flight notes of `notes.js` (丰川祥子): position, heading, the
   owner's look key and 0 wander / 1 trace / 2 passby; `fever: [[memberId, fill, active]]` (only on a field with a gauge) = the
@@ -1712,7 +1757,7 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   skill effects, DESIGN §9). Since §35.57 an attack-turn cast appends `clip` (seconds, ≥ 0), with `dur` 0 when absent:
   the client plays that slot's clip once in place of the attack, or the attack clip when `clip` is 0 [ASSUMED: the
   official ability names no clip]. Plain cooldown / SP casts keep their existing tuple.
-- `UnitInfo = { id, kind, side, ownerId, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, motion?, boss?, uid?, form?, skillIndex?, moduleId?, items?, standInFor?, diy?, potential?, cultivate?, skin?, ownerCharId? }` (`skin`: the owner's skinId, display only — omitted when absent, no rule reads it, docs/SKINS.md; `ownerCharId`: a summon's owner operator charId — omitted when absent, display only; `potential` / `cultivate`: an ally operator's potential below 6 and its 练度 tier, 0.2.2 — a teammate's card composes its numbers from them) (`standInFor`: a 补位 stand-in's replaced operator charId — `spine` / `avatar` / `name` are the stand-in's, DATA.md §18; the prep scouting units of `Match.prepFieldMeta` carry it too, board and held pieces alike with the stand-in's art (the owner's recall of the official mode, 2026-10-06), and so do the m.result lineups; `diy`: a 自选 piece's pick `{ charId, skillIndex, uniEquipId }` — `defId` is its slot, `spine` / `avatar` / `name` the operator's; the prep scouting units of `Match.prepFieldMeta` and the m.result lineups carry it too (server/match/player/diy.js, the client composes the operator's card from it); `skillIndex`: an ally's equipped skill, DESIGN §16; `form`: the unit's current model form — `content/enemies/helpers.js setForm`: 掠海漂移体 `'crawl'`, 暴鸰 `'bombed'` after its drop, 转译基底·α's forms …; a 傀儡师 fighting as its 替身 `'doll'` — so a view built mid-battle from `fieldMeta()` starts on that clip set; `items`: an ally operator's equipped item ids — a 变形同构体 wearer is a member of the bond it grants on the client too, the bond popup and the detail card's chips)
+- `UnitInfo = { id, kind, side, ownerId, summonerId?, defId, name, tier, golden, spine, avatar, x, y, facing, dir, maxHp, motion?, boss?, uid?, form?, skillIndex?, moduleId?, items?, standInFor?, diy?, potential?, cultivate?, skin?, ownerCharId? }` (`skin`: the owner's skinId, display only — omitted when absent, no rule reads it, docs/SKINS.md; `ownerCharId`: a summon's owner operator charId — omitted when absent, display only; `potential` / `cultivate`: an ally operator's potential below 6 and its 练度 tier, 0.2.2 — a teammate's card composes its numbers from them) (`standInFor`: a 补位 stand-in's replaced operator charId — `spine` / `avatar` / `name` are the stand-in's, DATA.md §18; the prep scouting units of `Match.prepFieldMeta` carry it too, board and held pieces alike with the stand-in's art (the owner's recall of the official mode, 2026-10-06), and so do the m.result lineups; `diy`: a 自选 piece's pick `{ charId, skillIndex, uniEquipId }` — `defId` is its slot, `spine` / `avatar` / `name` the operator's; the prep scouting units of `Match.prepFieldMeta` and the m.result lineups carry it too (server/match/player/diy.js, the client composes the operator's card from it); `skillIndex`: an ally's equipped skill, DESIGN §16; `form`: the unit's current model form — `content/enemies/helpers.js setForm`: 掠海漂移体 `'crawl'`, 暴鸰 `'bombed'` after its drop, 转译基底·α's forms …; a 傀儡师 fighting as its 替身 `'doll'` — so a view built mid-battle from `fieldMeta()` starts on that clip set; `items`: an ally operator's equipped item ids — a 变形同构体 wearer is a member of the bond it grants on the client too, the bond popup and the detail card's chips)
   (`dir` = the unit direction, allies meaningful, enemies 'RIGHT'; `facing` = its horizontal sign for sprite flipping)
   (`spine`/`avatar` are asset ids from data).
 - flags: UF bits (blocked 1, stunned 2, frozen 4, stealth 8 — 隐匿 (an enemy's only while not blocked / revealed and not within 3 s of a block's end) or an ally's 迷彩 — skill 16, shield 32, invuln 64, cold 128, sleep 256, flying 512);

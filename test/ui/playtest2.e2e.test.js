@@ -31,6 +31,8 @@ const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Conte
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 const ONLY = process.env.SP_P2_ONLY || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// the settings gear (game.js): 作战统计 (.gm__metrics) and 玩法说明 (.gm__guide) share its .gm__gear look and come first / after
+const SETTINGS_GEAR = '.gm__gear:not(.gm__metrics):not(.gm__guide)';
 const skipUnless = (k) => (ONLY && ONLY !== k ? `SP_P2_ONLY=${ONLY}` : false);
 
 /** Viewports of item 8 (name, w, h). */
@@ -70,8 +72,78 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     page.on('response', (r) => { if (r.status() >= 400) problems.push(`http ${r.status()}: ${r.url()}`); });
     await gotoMock(page, `${base}/dev/game-mock.html?shot=1&render=${render}&${query}`);
     await page.waitForFunction(() => !!document.querySelector('.screen:not(.gload)') && !!globalThis.__SP_VIEW__, { timeout: 20000 });
-    await sleep(render === 'engine' ? 1600 : 700);
+    if (/(^|&)phase=PREP(&|$)/.test(query)) await piecesPlaced(page);
+    else await viewSettled(page, { kinds: BATTLE_VIEWS, mode: 'battle' }); // the battle cameras of item 6: no own pieces
     return { page, problems };
+  }
+
+  /** The engine view kinds of a battle camera (render/app/view.js). */
+  const BATTLE_VIEWS = ['normal', 'unite', 'boss'];
+
+  /**
+   * (fork) Wait until the engine view has settled on a camera, from what it exposes: `.gm[data-camera]` (when given) and
+   * the view's own camera kind (raw.debug.camKind) at their targets, the view in the phase's mode, its board drawn (a
+   * drawn 2D tile, and the 3D area when the 3D board is on), then the camera and the pen readings of penState (3D area,
+   * pen hidden, pen figures shown, drawn rows, band) the same over 3 polls in a row: a flight moves the camera every
+   * frame and applies the resting view (area, pen, rows) when it lands. Item 6 asserts absences (no pen figure, no pen
+   * row), which a page that has drawn nothing yet passes: this is the positive signal they need first. A view that never
+   * settles fails with its last reading.
+   */
+  async function viewSettled(page, { camera = null, kinds, mode }) {
+    try {
+      await page.waitForFunction((camera, kinds, mode) => {
+        const g = globalThis;
+        const raw = g.__SP_VIEW__?.raw;
+        const d = raw?.debug;
+        const st = raw?.stats?.();
+        const area = d?.board3d ? d.board3d.area : null;
+        const rows = d ? d.tiles.grid.map((row) => row.map((t) => (t.drawn ? 1 : 0)).join('')).join('|') : '';
+        const pens = d ? [...d.penViews.values()] : [];
+        g.__settleLast = { camera: document.querySelector('.gm')?.dataset.camera, kind: d?.camKind, mode: raw?.mode, area, drawn: rows.includes('1') };
+        const ready = !!d && raw.mode === mode && kinds.includes(d.camKind) && (!camera || g.__settleLast.camera === camera)
+          && rows.includes('1') && (!d.board3d || (Array.isArray(area) && area.length > 0));
+        const key = ready ? JSON.stringify([st.camera, area, st.penHidden, pens.length, pens.filter((v) => v.root && v.root.visible !== false).length, rows, d.tiles.band]) : null;
+        g.__settleN = key && key === g.__settleKey ? g.__settleN + 1 : 1;
+        g.__settleKey = key;
+        return !!key && g.__settleN >= 3;
+      }, { polling: 100, timeout: 20000 }, camera, kinds, mode);
+    } catch (err) {
+      const last = await page.evaluate(() => globalThis.__settleLast).catch(() => null);
+      throw new Error(`the view never settled on ${camera ?? kinds.join('/')} (${mode}): ${JSON.stringify(last)} (${err.message})`, { cause: err });
+    }
+  }
+
+  /**
+   * (fork) Wait until every own piece of the mock state (整备区, temp row, board) is laid out on screen: a non-empty
+   * view.pieceScreenRect (the engine has none until a piece is first drawn), on two polls in a row. A fixed sleep after
+   * the mount tapped the bench before it was laid out on a loaded machine ("piece … on screen").
+   */
+  const piecesPlaced = (page) => page.waitForFunction(() => {
+    const p = globalThis.__MOCK__?.S()?.priv;
+    const v = globalThis.__SP_VIEW__;
+    const uids = p && v ? [...(p.hand || []), ...(p.temp || []), ...(p.board || [])].filter((x) => x && Number.isInteger(x.uid)).map((x) => x.uid) : [];
+    const placed = uids.length > 0 && uids.every((u) => { const r = v.pieceScreenRect(u); return !!r && r.width > 0 && r.height > 0; });
+    globalThis.__piecesPolls = placed ? (globalThis.__piecesPolls || 0) + 1 : 0;
+    return globalThis.__piecesPolls >= 2;
+  }, { polling: 100, timeout: 30000 });
+
+  /**
+   * (fork) The mean colour of a unit-frame plate once it is painted. Until its sprite mask (underframe.js PlateIcon,
+   * `--uf-mask`) is painted the plate shows only its dark backing, and mid-way the frame's `uframe-in` fade or the detail
+   * panel's `panel-in-r` slide shows the board through it: every such sample is a neutral grey (channel spread 5-13
+   * measured). So: sample until two samples in a row agree and the colour is not a neutral grey. A wrong hue ends the
+   * wait (the caller's asserts fail on it); a plate still grey or white after 10 s is returned as it is, and fails there.
+   */
+  async function plateColor(page, sel, timeout = 10000) {
+    const end = Date.now() + timeout;
+    let prev = null;
+    for (;;) {
+      const r = await page.$eval(sel, (el) => { const b = el.getBoundingClientRect(); return { x: b.left + b.width * 0.2, y: b.top + b.height * 0.2, w: b.width * 0.6, h: b.height * 0.6 }; });
+      const c = await meanColor(page, r);
+      const same = !!prev && Math.abs(c.r - prev.r) < 4 && Math.abs(c.g - prev.g) < 4 && Math.abs(c.b - prev.b) < 4;
+      if ((same && Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) >= 30) || Date.now() > end) return c;
+      prev = c;
+    }
   }
 
   /** Mean RGB of a client rect of the page (screenshot decoded by the page itself). */
@@ -144,18 +216,14 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
       });
       await tapPiece(page, uids.chess);
       await page.waitForSelector('.uframe__btn--sell .uframe__plate', { timeout: 3000 });
-      await sleep(300); // (fork) the frame's uframe-in fade (200 ms): sampled mid-fade it reads as the board behind
-      const plate = await page.$eval('.uframe__btn--sell .uframe__plate', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.2, w: r.width * 0.6, h: r.height * 0.6 }; });
-      const c = await meanColor(page, plate);
+      const c = await plateColor(page, '.uframe__btn--sell .uframe__plate');
       assert.ok(!(c.r > 225 && c.g > 225 && c.b > 225), `sell plate is not white (${JSON.stringify(c)})`);
       assert.ok(c.r > c.b + 50 && c.g > c.b + 10, `sell plate reads amber (${JSON.stringify(c)})`);
       await page.screenshot({ path: path.join(OUT, `fix-sell-${render}.png`) });
       await page.keyboard.press('Escape');
       await tapPiece(page, uids.item);
       await page.waitForSelector('.uframe__btn--destroy .uframe__plate', { timeout: 3000 });
-      await sleep(300); // (fork) the frame's uframe-in fade (200 ms): sampled mid-fade it reads as the board behind
-      const dp = await page.$eval('.uframe__btn--destroy .uframe__plate', (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width * 0.2, y: r.top + r.height * 0.2, w: r.width * 0.6, h: r.height * 0.6 }; });
-      const d = await meanColor(page, dp);
+      const d = await plateColor(page, '.uframe__btn--destroy .uframe__plate');
       assert.ok(!(d.r > 225 && d.g > 225 && d.b > 225), `destroy plate is not white (${JSON.stringify(d)})`);
       assert.ok(d.r > d.g + 60 && d.r > d.b + 60, `destroy plate reads red (${JSON.stringify(d)})`);
       await page.screenshot({ path: path.join(OUT, `fix-destroy-${render}.png`) });
@@ -350,7 +418,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
       await page.click('.bpop__facts');
       assert.ok(await page.$('.bpop'), 'reading inside the popup keeps it open');
       assert.ok(await page.$(`.uframe[data-uid="${uid}"]`), 'reading the popup keeps its piece selected');
-      await page.click('.gm__gear'); await page.waitForSelector('.modal');
+      await page.click(SETTINGS_GEAR); await page.waitForSelector('.modal');
       assert.equal(await page.$('.bpop'), null, '#792: another HUD control still dismisses the popup');
       assert.equal(await page.$('.dpanel'), null, 'another HUD control dismisses the card');
       assert.equal(await page.$('.uframe'), null, 'another HUD control clears the selection');
@@ -418,7 +486,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
 
   test('6: the enemy pen shows with the prep board, in the pen view and after 返回战场 — never in a battle or the Final Assault prep', { skip: skipUnless('pen'), timeout: 5 * 60 * 1000 }, async () => {
     const { page, problems } = await open('phase=PREP', { w: 1920, h: 1080 });
-    await sleep(900);
+    await viewSettled(page, { camera: 'prep', kinds: ['prep'], mode: 'prep' });
     let s = await penState(page);
     assert.equal(s.camera, 'prep');
     assert.ok(s.pen > 0, 'the pen holds the next round\'s enemies');
@@ -431,7 +499,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     await page.screenshot({ path: path.join(OUT, 'fix-pen-prep.png') });
     await page.click('.enemybtn');
     await page.waitForFunction(() => document.querySelector('.gm')?.dataset.camera === 'pen', { timeout: 3000 });
-    await sleep(700);
+    await viewSettled(page, { camera: 'pen', kinds: ['pen'], mode: 'prep' });
     s = await penState(page);
     assert.ok(s.penVisible > 0, 'pen view: figures shown');
     assert.ok(s.penRowsDrawn, 'pen view: pen rows drawn');
@@ -440,7 +508,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     // 🔍◀◀ (tooltip 返回战场) back to the board: the pen stays where it stands
     await page.click('.gtop__iconbtn');
     await page.waitForFunction(() => document.querySelector('.gm')?.dataset.camera === 'prep', { timeout: 3000 });
-    await sleep(900);
+    await viewSettled(page, { camera: 'prep', kinds: ['prep'], mode: 'prep' });
     s = await penState(page);
     assert.equal(s.penHidden, false, 'back on the board (返回战场): the camera shows the pen');
     assert.ok(s.penVisible > 0, 'back on the board (返回战场): the pen\'s figures still shown');
@@ -453,7 +521,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
     // the Final Assault prep frames the boss field: no pen there
     {
       const o = await open('phase=PREP&variant=boss', { w: 1920, h: 1080 });
-      await sleep(1200);
+      await viewSettled(o.page, { kinds: ['bossPrep'], mode: 'prep' }); // .gm[data-camera] is asserted below
       const b = await penState(o.page);
       assert.equal(b.camera, 'bossPrep');
       assert.equal(b.penVisible, 0, 'Final Assault prep: no pen figure');
@@ -466,8 +534,7 @@ describe('user playtest #2 — UI fixes (mock harness, headless Chrome)', { skip
 
     // every battle camera
     for (const phase of ['COMBAT', 'UNITE', 'FINAL_ASSAULT', 'HIDDEN_CORE']) {
-      const o = await open(`phase=${phase}`, { w: 1920, h: 1080 });
-      await sleep(1200);
+      const o = await open(`phase=${phase}`, { w: 1920, h: 1080 }); // open() waits for the battle view to settle
       const b = await penState(o.page);
       assert.equal(b.penVisible, 0, `${phase}: no pen figure`);
       assert.equal(b.penRowsDrawn, false, `${phase}: pen rows not drawn`);

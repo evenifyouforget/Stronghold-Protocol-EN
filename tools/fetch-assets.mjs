@@ -72,7 +72,7 @@ import {
   processModels, findLocalEnemyModels, findLocalTokenModels, localSpineMeta, loadLocalSpines, LOCAL_ENEMY_SPINES_FILE,
   LOCAL_TOKEN_SPINES_FILE, LOCAL_ENEMY_SPINE_DIR, LOCAL_TOKEN_SPINE_DIR,
 } from './assets/spine.mjs';
-import { collectLeaves, downloadLeaves, resolveTemplate, totalBytes, contentHash, droppedEntries, MANIFEST_VERSION } from './assets/manifest.mjs';
+import { collectLeaves, downloadLeaves, resolveTemplate, totalBytes, contentHash, countStats, droppedEntries, MANIFEST_VERSION } from './assets/manifest.mjs';
 import { fontJobs, buildFonts } from './assets/fonts.mjs';
 import { statsTemplateJobs } from './assets/stats-template.mjs';
 import { skelParserAvailable } from './assets/skel.mjs';
@@ -128,6 +128,10 @@ const HELP = `Usage: node tools/fetch-assets.mjs [options]
                     sound that never plays); by default such a drop is only reported
   --add-only        download only files missing on disk; never re-download, rewrite or delete an existing
                     file, no font rebuild (a worktree sharing public/assets and public/fonts)
+  --refresh-units=ID,ID
+                    with --add-only: these units' sound entries (audio.sfx.units[id]) and model entries
+                    (chars[id].spine, outfits.chars[id@…].spine) are rebuilt from the plan instead of kept
+                    (a sound mapping or animation role change of those units)
   --local-spines    rewrite ${LOCAL_ENEMY_SPINES_FILE} and ${LOCAL_TOKEN_SPINES_FILE} from the
                     enemy and token models extracted by tools/local-extract/extract.py
                     (public/assets/local/spine/enemy/, public/assets/local/spine/token/)
@@ -151,10 +155,10 @@ function envFlag(value) {
 /**
  * Parse CLI flags.
  * @param {string[]} argv
- * @returns {{concurrency:number, force:boolean, offline:boolean, dryRun:boolean, refreshIndex:boolean, prune:boolean, allowShrink:boolean, strict:boolean, addOnly:boolean, localSpines:boolean, voiceLang:string, voiceAll:boolean, optionalVoice:boolean, help:boolean, source:string, sourceSnapshot:string}}
+ * @returns {{concurrency:number, force:boolean, offline:boolean, dryRun:boolean, refreshIndex:boolean, prune:boolean, allowShrink:boolean, strict:boolean, addOnly:boolean, refreshUnits:string[], localSpines:boolean, voiceLang:string, voiceAll:boolean, optionalVoice:boolean, help:boolean, source:string, sourceSnapshot:string}}
  */
 export function parseArgs(argv) {
-  const o = { concurrency: 16, force: false, offline: false, dryRun: false, refreshIndex: false, prune: false, allowShrink: false, strict: envFlag(process.env.SP_ASSETS_STRICT), addOnly: false, localSpines: false, voiceLang: 'cn', voiceAll: false, optionalVoice: true, help: false, source: process.env.SP_ASSET_SOURCE || 'direct', sourceSnapshot: '' };
+  const o = { concurrency: 16, force: false, offline: false, dryRun: false, refreshIndex: false, prune: false, allowShrink: false, strict: envFlag(process.env.SP_ASSETS_STRICT), addOnly: false, refreshUnits: [], localSpines: false, voiceLang: 'cn', voiceAll: false, optionalVoice: true, help: false, source: process.env.SP_ASSET_SOURCE || 'direct', sourceSnapshot: '' };
   for (const a of argv) {
     const [k, v] = a.split('=');
     if (k === '--concurrency') o.concurrency = Math.max(1, Math.min(64, parseInt(v, 10) || 16));
@@ -168,6 +172,7 @@ export function parseArgs(argv) {
     else if (k === '--allow-shrink') o.allowShrink = true;
     else if (k === '--strict') o.strict = true;
     else if (k === '--add-only') o.addOnly = true;
+    else if (k === '--refresh-units') o.refreshUnits = String(v || '').split(',').map((x) => x.trim()).filter(Boolean);
     else if (k === '--local-spines') o.localSpines = true;
     else if (k === '--voice-lang') { if (!VOICE_DIRS[v]) throw new Error(`unknown --voice-lang ${v} (cn | jp | en | kr)`); o.voiceLang = v; }
     else if (k === '--voice-all') o.voiceAll = true;
@@ -175,6 +180,7 @@ export function parseArgs(argv) {
     else if (k === '--help' || k === '-h') o.help = true;
     else throw new Error(`unknown option ${a}\n${HELP}`);
   }
+  if (o.refreshUnits?.length && !o.addOnly) throw new Error('--refresh-units needs --add-only (a full run rebuilds every unit anyway)');
   if (o.addOnly && (o.prune || o.force)) throw new Error(`--add-only never deletes or rewrites files: not with --prune / --force\n${HELP}`);
   if (o.sourceSnapshot && (o.offline || o.addOnly || o.localSpines)) throw new Error('--source-snapshot is incompatible with --offline / --add-only / --local-spines');
   if (!o.help) validateSource(o.source);
@@ -336,37 +342,6 @@ export function tidyVoiceTrees(m) {
     for (const id of Object.keys(a.voiceNativeLangType)) if (!a.voiceNative?.[id]) delete a.voiceNativeLangType[id];
     if (!Object.keys(a.voiceNativeLangType).length) delete a.voiceNativeLangType;
   }
-}
-
-function countStats(m, bytes, files) {
-  const vals = (o) => Object.values(o || {});
-  const spines = new Set();
-  for (const c of vals(m.chars)) for (const s of vals(c.spine)) spines.add(s.skel);
-  for (const e of vals(m.enemies)) if (e.spine) spines.add(e.spine.skel);
-  for (const t of vals(m.tokens)) if (t.spine) spines.add(t.spine.skel);
-  return {
-    files,
-    bytes,
-    chars: Object.keys(m.chars || {}).length,
-    charsWithBack: vals(m.chars).filter((c) => c.spine?.back).length,
-    enemies: Object.keys(m.enemies || {}).length,
-    enemiesWithSpine: vals(m.enemies).filter((e) => e.spine).length,
-    tokens: Object.keys(m.tokens || {}).length,
-    tokensWithSpine: vals(m.tokens).filter((t) => t.spine).length,
-    spineModels: spines.size,
-    bonds: Object.keys(m.bonds || {}).length,
-    items: Object.keys(m.items || {}).length,
-    bands: Object.keys(m.bands || {}).length,
-    skills: Object.keys(m.skills || {}).length,
-    modules: Object.keys(m.modules || {}).length,
-    ui: Object.keys(m.ui || {}).length,
-    sfxUnits: Object.keys(m.audio?.sfx?.units || {}).length,
-    voiceChars: Object.keys(m.audio?.voice || {}).length,
-    voiceJpChars: Object.keys(m.audio?.voiceJp || {}).length,
-    voiceEnChars: Object.keys(m.audio?.voiceEn || {}).length,
-    voiceKrChars: Object.keys(m.audio?.voiceKr || {}).length,
-    voiceNativeChars: Object.keys(m.audio?.voiceNative || {}).length,
-  };
 }
 
 /** Required assets whose absence makes the run fail (exit code 1). */
@@ -546,7 +521,30 @@ async function main() {
     : (verifier ? fonts.css : existsSync(join(FONTS, 'fonts.css'))) ? { css: '/fonts/fonts.css', faces: fontFaces } : { faces: fontFaces };
   if (opts.addOnly && current) {
     const { version, hash, generator, stats, ...previous } = current;
+    const planned = body;
     body = addManifestEntries(previous, body);
+    // (fork) --refresh-units: those units' sound entries as the plan builds them (a changed or removed slot too)
+    for (const id of opts.refreshUnits || []) {
+      const fresh = planned?.audio?.sfx?.units?.[id];
+      if (!body.audio?.sfx?.units) continue;
+      if (fresh) body.audio.sfx.units[id] = fresh; else delete body.audio.sfx.units[id];
+      log(`[refresh-units] ${id}: sound entries rebuilt from the plan`);
+      // … and its outfits' sound entries (sfx.outfits['<id>@<token>'], docs/OUTFITS.md): the same picks through the outfit's banks
+      const outfitsSfx = body.audio.sfx.outfits;
+      for (const k of Object.keys({ ...(outfitsSfx || {}), ...(planned?.audio?.sfx?.outfits || {}) })) {
+        if (!k.startsWith(`${id}@`)) continue;
+        const o = planned?.audio?.sfx?.outfits?.[k];
+        if (o) (body.audio.sfx.outfits ||= {})[k] = o; else if (outfitsSfx) delete outfitsSfx[k];
+      }
+      // their models (default and every outfit) as this run built them: a role fix (assets/spine.mjs PREFAB_SPINE_ROLES)
+      // reaches the manifest without a full run
+      let models = 0;
+      if (planned?.chars?.[id]?.spine && body.chars?.[id]) { body.chars[id].spine = planned.chars[id].spine; models++; }
+      for (const [k, o] of Object.entries(planned?.outfits?.chars || {})) {
+        if (k.startsWith(`${id}@`) && o?.spine && body.outfits?.chars?.[k]) { body.outfits.chars[k].spine = o.spine; models++; }
+      }
+      log(`[refresh-units] ${id}: ${models} model entr${models === 1 ? 'y' : 'ies'} rebuilt from the plan`);
+    }
     // Retained entries still participate in size accounting and orphan detection.
     const files = (v) => {
       if (typeof v === 'string' && v.startsWith('/assets/')) resolved.files.add(v.slice('/assets/'.length));
@@ -629,6 +627,10 @@ async function main() {
   if (opts.strict && droppedLeaves.length) {
     log(strictLeafDropError(droppedLeaves));
     log('  a plain run downloads them again (--refresh-index if the upstream index lost them); without --strict / SP_ASSETS_STRICT this is only a warning');
+  }
+  // (fork) the impostor clip bounds of every model now on disk (tools/assets/clip-bounds.mjs; SP_NO_CLIP_BOUNDS=1 skips)
+  if (process.env.SP_NO_CLIP_BOUNDS !== '1') {
+    try { await (await import('./assets/clip-bounds.mjs')).writeClipBounds({ log }); } catch (e) { log(`[clip-bounds] not written: ${e?.message || e} (run npm run clip-bounds)`); }
   }
   if (verifier && (dl.totals.error || fontErrors.length || downloadErrors.length)) return 1;
   return runExitCode({ requiredMisses: required.length, droppedLeaves: droppedLeaves.length, strict: opts.strict, manifestWritten: guard.write });

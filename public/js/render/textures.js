@@ -1341,8 +1341,8 @@ export function itemTexture(url, img, color, { invert = false } = {}) {
 /** Arc frames: `arcs[k]` covers k / RING_STEPS of the circle. */
 export const RING_STEPS = 48;
 /**
- * Element disc colours (official icons: 神经 teal, 侵蚀 steel blue, 灼燃 rust, 凋亡 charcoal) and glyph colours; `tint` =
- * the element's bright colour (the gauge bar refilling over a 爆发冷却, render/units.js).
+ * Element disc colours (official icons: 神经 teal, 侵蚀 steel blue, 灼燃 rust, 凋亡 charcoal) and glyph colours: the element
+ * gauge's stand-in while the client's art is missing (render/units.js EP_GAUGE); `tint` = the element's bright colour.
  */
 export const ELEMENT_RING = Object.freeze({
   neural: Object.freeze({ disc: '#13806c', glyph: '#bfe6df', tint: 0x1fae93 }),
@@ -1356,6 +1356,8 @@ const RC = 64;              // cell px
 const RING_R = 26, RING_W = 6.5, DISC_R = 21.5;
 /** The element disc's diameter as a share of its atlas cell (a sprite `d / HUD_DISC` px wide draws a `d` px disc). */
 export const HUD_DISC = (2 * DISC_R) / RC;
+/** The arcs' outer diameter as a share of their atlas cell (render/units.js EP_GAUGE stand-in). */
+export const RING_ARC = (2 * RING_R + RING_W) / RC;
 let _rings = null;
 
 /**
@@ -1464,6 +1466,56 @@ export function hudRings() {
   return _rings;
 }
 
+/** (fork) Steps of an official radial fill (epRadial) and the resolution its frames are cut at (× the sprite's px). */
+export const EP_STEPS = 60;
+export const EP_RADIAL_SCALE = 4;
+const _epRadial = new Map();
+
+/**
+ * (fork) An official UI sprite filled radially as the client's Image (Type Filled, Radial 360, origin Top, clockwise —
+ * the element gauge's fill in [uc]battlecommon enemy_ep_slider / char_ep_slider): the frame keeping `frac` of the
+ * sprite from 12 o'clock clockwise, rounded to EP_STEPS (a non-zero fraction is never empty, a partial one never
+ * full). The frames are cut once per url from the loaded image at EP_RADIAL_SCALE × its size (draw them at
+ * 1 / EP_RADIAL_SCALE); null until the image has loaded, or when it cannot be drawn (no art, a headless fake).
+ */
+export function epRadial(url, frac) {
+  let e = _epRadial.get(url);
+  if (!e) {
+    const t = uiArtTexture(url);
+    const src = t?.baseTexture?.resource?.source;
+    const w = t?.width | 0, h = t?.height | 0;
+    if (!src || typeof src !== 'object' || w < 2 || h < 2) return null;
+    const P = PIXI();
+    const cols = 8, rows = Math.ceil((EP_STEPS + 1) / cols), cw = w * EP_RADIAL_SCALE, ch = h * EP_RADIAL_SCALE;
+    const canvas = makeCanvas(cols * cw, rows * ch);
+    const c = canvas.getContext('2d');
+    const cell = [];
+    try {
+      for (let k = 0; k <= EP_STEPS; k++) {
+        const x = (k % cols) * cw, y = Math.floor(k / cols) * ch;
+        cell.push([x, y]);
+        if (!k) continue;
+        c.save();
+        if (k < EP_STEPS) {
+          const cx = x + cw / 2, cy = y + ch / 2, r = Math.hypot(cw, ch);
+          c.beginPath(); c.moveTo(cx, cy); c.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * k) / EP_STEPS); c.closePath();
+          c.clip();
+        }
+        c.drawImage(src, x, y, cw, ch);
+        c.restore();
+      }
+    } catch { return null; }
+    const base = P.BaseTexture.from(canvas);
+    e = { base, frames: cell.map(([x, y]) => new P.Texture(base, new P.Rectangle(x, y, cw, ch))) };
+    _epRadial.set(url, e);
+  }
+  const f = frac > 1 ? 1 : frac > 0 ? frac : 0;
+  let k = Math.round(f * EP_STEPS);
+  if (k === 0 && f > 0) k = 1;
+  if (k === EP_STEPS && f < 1) k = EP_STEPS - 1;
+  return e.frames[k];
+}
+
 /** Arc frame of a fraction 0..1 (rounded to the nearest step; a non-zero fraction never shows an empty ring). */
 export function ringArc(frac) {
   const r = hudRings();
@@ -1475,6 +1527,12 @@ export function ringArc(frac) {
 
 /** Redeploy-ring label style (the seconds left, "DP", "!"); `fill` is set per label. */
 export const DOWN_LABEL_STYLE = Object.freeze({ fontFamily: 'Bender, Oxanium, "Noto Sans SC", sans-serif', fontSize: 32, fontWeight: '700', fill: '#ffffff', stroke: '#0b0f0e', strokeThickness: 6 });
+/**
+ * (fork) The stored-charges count's style (render/units.js CHARGE_MARK), as the official `text_skill_cnt` label in
+ * [uc]battlecommon char_skill_mark_panel: Novecento Wide Normal (self-hosted, fonts.css), no outline, a half-black Shadow
+ * offset (1, -1). `trim` cuts the canvas to the drawn glyph, so anchor 0.5 centres the digit itself, not its line box.
+ */
+export const CHARGE_LABEL_STYLE = Object.freeze({ fontFamily: '"Novecento Wide", Bender, sans-serif', fontSize: 32, fontWeight: '400', fill: '#ffd900', trim: true, dropShadow: true, dropShadowColor: '#000000', dropShadowAlpha: 0.5, dropShadowAngle: Math.PI / 4, dropShadowDistance: 1.6, dropShadowBlur: 0 });
 const _downLabels = new Map();
 
 /**
@@ -1484,14 +1542,20 @@ const _downLabels = new Map();
  * same few numbers; the shared one is drawn once and kept, the same pixels. At most 80 counts (the longest respawn in
  * chess.json) + "DP" + "!" per resolution, ≈ 2.5 MB at resolution 2.
  */
-export function downLabel(label, fill, resolution = 1) {
-  const key = `${label}|${fill}|${resolution}`;
+export function downLabel(label, fill, resolution = 1, style = DOWN_LABEL_STYLE) {
+  const key = `${label}|${fill}|${resolution}|${style === DOWN_LABEL_STYLE ? '' : style.fontFamily}`;
   let t = _downLabels.get(key);
   if (!t) {
-    t = new (PIXI().Text)(label, { ...DOWN_LABEL_STYLE, fill });
+    t = new (PIXI().Text)(label, { ...style, fill });
     t.resolution = resolution;
     t.updateText(false);
     _downLabels.set(key, t);
+    // (fork) a face only a canvas asks for is never fetched by the page: load it, then redraw this label in it
+    const fonts = globalThis.document?.fonts;
+    const spec = `${style.fontWeight} ${style.fontSize}px ${style.fontFamily}`;
+    try {
+      if (fonts && !fonts.check(spec)) fonts.load(spec).then(() => { try { t.updateText(false); } catch { /* keep */ } }, () => {});
+    } catch { /* no font loading API */ }
   }
   return t.texture;
 }
@@ -1501,4 +1565,27 @@ export function refreshDownLabels() {
   for (const t of _downLabels.values()) {
     try { t.updateText(false); } catch { /* keep the old glyphs */ }
   }
+}
+
+const _uiArt = new Map();
+/**
+ * (fork) An official UI sprite by its manifest URL (assets.ui, e.g. battleUi/sprite_auto) as a texture once it has loaded,
+ * null before that, without a URL or when it failed — the caller draws its own stand-in meanwhile. Loaded once per URL.
+ */
+export function uiArtTexture(url) {
+  if (!url) return null;
+  let e = _uiArt.get(url);
+  if (!e) {
+    e = { tex: null, failed: false };
+    _uiArt.set(url, e);
+    try {
+      const t = PIXI().Texture.from(url);
+      if (t.baseTexture.valid) e.tex = t;
+      else {
+        t.baseTexture.once('loaded', () => { e.tex = t; });
+        t.baseTexture.once('error', () => { e.failed = true; });
+      }
+    } catch { e.failed = true; }
+  }
+  return e.failed ? null : e.tex;
 }

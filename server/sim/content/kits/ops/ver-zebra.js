@@ -21,7 +21,8 @@ function zebra(_bb, chess, def) {
           const t = cand[0];
           if (!t) return;
           const dur = rec?.duration > 0 ? rec.duration : 4;
-          battle.addBuff(t, { key, duration: dur, flags: { camou: true }, mods: { hpRegen: num(sbb.hp_recovery_per_sec) }, source: unit });
+          // (fork) fx: the official zebra_s_1 glow on it while it lasts (b.snap fxs)
+          battle.addBuff(t, { key, duration: dur, flags: { camou: true }, mods: { hpRegen: num(sbb.hp_recovery_per_sec) }, source: unit, fx: 'zebra_s_1', fxSrc: unit.id });
         },
       },
     };
@@ -33,7 +34,11 @@ function zebra(_bb, chess, def) {
         onStart({ battle, unit, skill: sk }) {
           const allies = alliesInGridOf(battle, unit, g);
           if (!allies.includes(unit)) allies.unshift(unit);
-          for (const a of allies) battle.addBuff(a, { key: `zebra:camou2:${unit.id}`, duration: sk.timeLeft, flags: { camou: true }, source: unit });
+          for (const a of allies) {
+            battle.addBuff(a, { key: `zebra:camou2:${unit.id}`, duration: sk.timeLeft, flags: { camou: true }, source: unit });
+            // (fork) the client's zebra_s_2[aura]: zebra_buff_01 on each ally it hides — display only
+            battle.fxState(a, 'zebra_s_2[aura]', true, { src: unit, dur: sk.timeLeft });
+          }
         },
       };
     }

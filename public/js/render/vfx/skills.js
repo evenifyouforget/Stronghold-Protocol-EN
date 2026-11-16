@@ -63,6 +63,8 @@
 //     each: { cast, hit },                 any attack of the owner while on (buff template actions)
 //     trigger,                             reactive: the owner taking damage while on
 //     cond,                                `[eff_cond]` state loops on the owner (COND_BUFFS, condState)
+//     state,                               (fork) a buff's effects at a moment the client never sees, held on its carrier
+//                                          while the sim says it lasts (STATE_BUFFS, b.snap `fxs`)
 //     targets,                             on other units (the skill's buffs on targets / aura members): no client signal
 //     unmapped: [{ key, role, reason, from }] }
 // `hit` lists are hit groups: [[entry…]…] — the k-th hit of one attack plays group min(k, last) (a plain attack has one
@@ -233,6 +235,8 @@
 // cast (a skill-level begin effect for the skill); buff loops on the owner last the skill (a buff's own duration is not
 // in index.json); hit groups beyond the last repeat the last; passive skills' loops follow the deploy.
 
+import { skillModeOf } from '../../../../shared/fxModes.js';
+
 /** Torappu.Battle.AbilityStandard/Event (DESIGN §33.12): index.json's skill uses write the names, units' Emit rows the numbers. */
 export const ABILITY_EVENTS = Object.freeze({
   ON_ATTACHED: 0, ON_DETACHED: 1, ON_CAST_START: 2, ON_CAST_END: 3, ON_SPELL_ON: 4, ON_SPELL_END: 5, ON_ATTACK_FINISH: 6,
@@ -269,7 +273,7 @@ export const UNMAPPED = Object.freeze({
   token: "a buff on the unit's summons: UnitInfo has no summoner link",
   tick: "a periodic tick of the skill's buff (ON_BUFF_TRIGGER): the sim sends no tick event (some kits send their own 'fx')",
   conditional: 'a buff template action at an event the client never sees (a condition check, would-die, a kill …)',
-  'after-end': 'a buff created when the skill ends: its duration is not in index.json',
+  'after-end': 'a buff created when the skill ends that nothing the client sees ends (index `made`: no LIMITED life, no next-start finish)',
   'hit-no-attack': "hits of a non-attack ability: no 'atk' event names its targets",
   'channel-hit': "a channel's damage ticks: the sim sends them without a source",
   path: 'a line / path effect: its points come from the game',
@@ -290,6 +294,7 @@ export const SIGNALS = Object.freeze({
   trigger: "b.ev ['dmg', ownerId, …] while the skill is on",
   targets: "the buffs of the skill's own attacks: that attack's 'atk' targets; the others none (the client is not told who carries them)",
   charge: 'b.snap energy [[id, stored, cap]] (PR #636; char_469_indigo / the shared mystic store only)',
+  state: "b.snap fxs [[carrier id, buff, src, look]] (sim Battle.fxState / a sim buff's `fx`; STATE_BUFFS)",
 });
 
 const lc = (k) => (typeof k === 'string' && k ? k.toLowerCase() : null);
@@ -506,8 +511,153 @@ function kindOf(srec, rootClass = null) {
 export const emptyPlan = (unitKey, skillId) => ({
   unitKey, skillId, mode: null, modeName: null, kind: null, rootClass: null, projectiles: [],
   start: [], loop: [], end: [], ready: [], range: [], attacks: [], each: { cast: [], hit: [[]] }, trigger: [], targets: [],
-  pulse: [], unmapped: [], cond: [],
+  pulse: [], unmapped: [], cond: [], state: [], after: [], idle: [], tokens: [],
 });
+
+/**
+ * (fork) The official buffs whose effects play at a moment the client never sees — a condition the buff's graph checks
+ * every tick, a would-die, a kill … (unmapped 'conditional') — and whose start and end a kit signals in the sim
+ * (Battle.fxState, or a sim buff's `fx`: b.snap `fxs` [[carrier, buff, src, look]]; effect gaps audit 2, item 4). Keyed
+ * by the client's buff key (index.json uses' `buff`, config/buff_template_holder.ab): `true` — every entry of that buff
+ * plays while the row lasts; `{ looks }` — the keys each official branch (the row's `look`) keeps, a null look all of
+ * them; `{ keys }` — only those keys are this buff's state rows (a shared buff name such as `stun`; the others keep their
+ * place, stateRow). render/vfx/skillfx.js holds the entries on the carrier from the plan of `src` (the unit whose skill made it;
+ * null: the carrier's own): a looping prefab loops, any other plays once per row. The kit names the branch the
+ * template's graph takes; the graphs are read from the client of 2026-10-15 (each entry's comment).
+ */
+const L = (o) => Object.freeze(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Object.freeze(v)])));
+export const STATE_BUFFS = Object.freeze({
+  // (fork) talents' and abilities' buffs on their targets (audit #7): the rows come from the src's talent bindings
+  // (talentfx.js targetRows), signalled by the kits
+  'peak_performance[inf]': true, 'pallas_s_3[peak]': true, 'texas2_s_1[dot]': true,
+  // Eunectes S2's blockee stun (op-zumama.js; her ability's _buffsToBlockee): only her row — every other skill's `stun` stays a target row
+  stun: Object.freeze({ keys: Object.freeze(['zumama_skill_02_buff_02']) }), 'halo2_s_3_link': true,
+  'heyak_s_3[hit_levitate]': true, 'inside_t_1[active]': true, 'shu_s_3[enemy][enter]': true, 'necras_t_1[upgrade]': true,
+  // Necrass S3's special skeleton (op-necras.js): [ASSUMED] the _01 pair below 3 upgrades, the _02 pair from the third
+  'necras_upgrade_dragon': { looks: L({ stage1: ['token_necras_skeltn2_buff_01', 'token_necras_skeltn2_buff_01_02'],
+    stage2: ['token_necras_skeltn2_buff_02', 'token_necras_skeltn2_buff_02_02'] }) },
+  // (fork) phase D (audit #7): the conditional talent rows, signalled by the kits / professions.js (fxState / fxProbe)
+  'papyrs_s_1[fx_ctrl]': true, 'lessng_a[s1_eff]': true, 'nasti_s2[update_shield]': true,
+  'haini_s_2[modify_talent]': true, 'zebra_s_2[aura]': true, 'swire2_tr': true, 'swire2_t_2': true,
+  'humus_trait': true, 'humus_t_1[effect]': true, 'aroma_s_2': true, 'tocka_t1[sp_and_heal]': true,
+  // librator traits by the ramp's stage (professions.js installLibrator, LIBRATOR_FX): Leizi the Thunderbringer's
+  // leizi2_tr_effect[b] / [c] from mid / max stacks; Młynar's three [ASSUMED: one per stage]
+  'leizi2_tr': { looks: L({ low: [], mid: ['leizi2_modao_buff_01'], max: ['leizi2_modao_buff_02'] }) },
+  'mlynar_tr': { looks: L({ low: ['mlynar_attack_01_buff_l_01'], mid: ['mlynar_attack_01_buff_l_02'], max: ['mlynar_attack_01_buff_l_03'] }) },
+  // Carnelian S3's mark on an enemy (chess_char_4_24-billro.js): [part] below the stack cap, [full] at it
+  'billro_s_3[mark_effect]': { looks: L({ part: ['billro_skill_03_buff_03_01'], full: ['billro_skill_03_buff_03_02'] }) },
+  // Lee's guard (op-lmlee.js, lmlee_tr → lmlee_t_2[bounce]): its loop while held, the hit as it cancels a stun
+  'lmlee_tr': { looks: L({ guard: ['lmlee_buff_02_start'], hit: ['lmlee_buff_02_hit'] }) },
+  // Horn S2 / S3 (chess_char_5_08-horn.js): the overload switch keeps _front / _back by facing while the mark lasts
+  'horn_s_2[overload_mark]': true,
+  'horn_s_3[overload_start_effect_2]': true,
+  // Leizi the Thunderbringer S1 (content/fxStates.js): a ring per stored charge
+  'leizi2_s_1[effect_controller]': { looks: L({ 1: ['leizi2_skill_01_buff_01'], 2: ['leizi2_skill_01_buff_01', 'leizi2_skill_01_buff_02'], 3: ['leizi2_skill_01_buff_01', 'leizi2_skill_01_buff_02', 'leizi2_skill_01_buff_03'] }) },
+  // Ascalon S2 (op-ascln.js): 死亡拘审's glow on the enemies, ascln_buff_02 added at max_stack_cnt (the kill burst
+  // ascln_skill_02_death_01 sits on the enemy that died: no row carries it)
+  'ascln_s_2[enemy]': { looks: L({ on: ['ascln_buff_01'], max: ['ascln_buff_01', 'ascln_buff_02'] }) },
+  // Тоска (char_4244_tocka, not on EN yet) S1–S3 (op-tocka.js): the buff a fired trigger effect gives its holder
+  'tocka_s1[trigger]': true,
+  'tocka_s2[trigger]': true,
+  'tocka_s3[trigger]': true,
+  // Lumen S2 / Gnosis S2 (content/fxStates.js): one stored charge, two
+  'lumen_s_2[eff_cond]': { looks: L({ 1: ['lumen_skill_02_buff'], 2: ['lumen_skill_02_buff_02'] }) },
+  'gnosis_s_2[eff_cond]': { looks: L({ 1: ['gnosis_skill_02_buff_01'], 2: ['gnosis_skill_02_buff_02'] }) },
+  // Mon3tr S1, Minimalist S2, Caper S1, Nearl the Radiant Knight S3 (content/fxStates.js): on / off
+  'monstr_s_1[ready]': true,
+  'malist_s_2[eff_cond]': true,
+  'caper_s_1[effect_trigger]': true,
+  'nearl2_s_3[effect]': true,
+  // Ch'en the Holungday S2 (content/fxStates.js): [half] / [full]
+  'chen2_s_2[eff_cond]': { looks: L({ half: ['chen2_skill_02_buff_01_01'], full: ['chen2_skill_02_buff_01_02'] }) },
+  // Angelina the Mellow Wish (char_1015_aglna2, not on EN yet) S3 (content/fxStates.js): the wing glow of her facing — the client's side (`byFacing`)
+  // and her weapon glow and range ring either side (audit item 5: the skill's ActiveBuffAbility on herself)
+  'aglna2_s_3[mode]': { byFacing: true, looks: L({
+    right: ['aglna2_skill_03_buff_right_01', 'aglna2_skill_03_buff_weapon_01', 'aglna2_skill_03_range_01'],
+    left: ['aglna2_skill_03_buff_left_01', 'aglna2_skill_03_buff_weapon_01', 'aglna2_skill_03_range_01'],
+  }) },
+  // Philae S2 (chess_char_3_06-philae.js): the ATK glow from the first element hit, its start burst once
+  'philae_s_2': true,
+  // Haruka (op-haruka.js): the bubble's glow (the parry burst plays when a bubble breaks, not here)
+  'haruka_t_1': { keys: Object.freeze(['haruka_talent_01_buff']) },
+  // Lessing S2 (op-lessng.js) and Vulpisfoglia S3 (chess_char_3_18-vulpis.js): CheckBlocked — blocking / not blocking
+  'lessng_s2[eff_manager]': true,
+  'vulpis_s_3[finish_checker]': true,
+  // marks on the units a kit names (b.snap fxs on the target; `src` the operator): Civilight Eterna S2's rope, Executor
+  // the Ex Foedere S3's aim, Muelsyse S3's water bind, Schwarz's DEF down, Bellone's 【手段】, Silence the Paradigmatic S3's
+  // shallow grave
+  'cetsyr_s_2': true,
+  'excu2_s_3': true,
+  'mlyss_s_3[buff]': true,
+  'shwaz_t_1': true,
+  'demetr_t1[def_dec]': true,
+  'slent2_s_3': true,
+  // Ch'en the Dawnstreak S2 (op-chen3.js): the respawn glows while its buff lasts
+  'chen3_s2[respawn_buff]': true,
+  // (audit item 5) marks on the units a skill names — the index's `on: 'targets'` rows, placed on the carrier the sim
+  // names (b.snap fxs; src the operator). Enemies: Lee S2's paper, Titi S3's sleepers (the wake burst as the row goes;
+  // its line and ticks are other items), Mostima S2's lock, Degenbrecher S2's slashes, Zima the Raging Tide S3's bind,
+  // Blemishine S2's sleep, Saria S3's calcification
+  'lmlee_s_2[paper]': true,
+  'titi_s_3[dmg_ticker]': true,
+  'mostma_s_1': true,
+  'blkkgt_s_2[check_block]': true,
+  'headb2_s_3[unmovable]': true,
+  'blemsh_s_2[sleep]': true,
+  'demkni_s_3': true,
+  // allies: Closure S1's shield, Titi S2's ward, Tin Man S2's heal zone, Entelechia S2's second scythes, Heavyrain S1's
+  // camouflage, Warfarin S2's plasma (her own too), Exusiai the New Covenant S2's stolen ASPD, Pith S2's Caster aura,
+  // Papyrus S2's lock (`mark`; `self` her mode's glow)
+  'closur_s_1[block]': true,
+  'titi_s_2': true,
+  'tinman_s_2[buff]': true,
+  'etlchi_s_2[aoe]': true,
+  'etlchi_s_2[eff]': true,
+  'zebra_s_1': true,
+  'bldsk_s_2': true,
+  'angel2_s_2[select_target]': true,
+  'accast_s_2': true,
+  'papyrs_s_2[switch_mode]': { looks: L({ self: ['papyrs_skill2_buff_02'], mark: ['papyrs_skill2_mark_01'] }) },
+  // the operator herself while the skill runs (content/fxStates.js): Pozëmka S1, Thorns S2, Swire S1, Papyrus S2,
+  // Gladiia S3, Mon3tr S3's move (begin / end; common_spine_hide is the client's own model hide)
+  'bfsnow_s_1[random_atk]': true,
+  'thorns_s_2': true,
+  'swire_s_1': true,
+  'swire_s_1[effect]': true,
+  'papyrs_s_2[fx]': true,
+  'glady_s3[effect]': true,
+  'monstr_s_3_buff[respawn]': { keys: Object.freeze(['monstr_skill_03_begin_03', 'monstr_skill_03_end_02']) },
+  // summons while their owner's skill runs (content/fxStates.js TOKEN_FX_STATES): Raidian's towers, Ling's souls,
+  // Stainless's device, Jessica the Liberated's shield, Magallan's drones
+  'radian_s_1[shield]': true,
+  'radian_s_2[token]': true,
+  'radian_s_3[token]': true,
+  'ling_s_1': true,
+  'ling_s_1[effect]': true,
+  'ling_s3[aoe]': true,
+  'ironmn_s_3[token]': true,
+  'ironmn_s_3[token_eff]': true,
+  'jesca2_s_1_token[def]': true,
+  'jesca2_s_3_token[def]': true,
+  'mgllan_s_2': true,
+  'mgllan_s_3': true,
+});
+
+/**
+ * (fork) A plan's `state` entries a b.snap `fxs` row shows (STATE_BUFFS): that buff's, narrowed to the spec's `keys` and
+ * the look's (a `byFacing` buff without a look: the carrier's side, `facing` −1 'left', else 'right').
+ */
+/** (fork) Whether a use of `buff` with prefab `key` is a STATE_BUFFS row (an entry's `keys`, when listed, narrow it). */
+export const stateRow = (buff, key) => { const s = STATE_BUFFS[buff]; return !!s && (!s.keys || s.keys.includes(key)); };
+
+export function stateEntries(list, buff, look, facing = 1) {
+  if (!Array.isArray(list) || !list.length) return [];
+  const spec = STATE_BUFFS[buff];
+  if (!spec) return [];
+  const lk = look ?? (spec.byFacing ? (facing === -1 ? 'left' : 'right') : null);
+  const keys = lk != null && spec !== true ? spec.looks?.[lk] : null;
+  return list.filter((e) => e.buff === buff && (!keys || keys.includes(e.key)) && (!spec.keys || spec.keys.includes(e.key)));
+}
 
 /**
  * The client's condition graphs of `[eff_cond]` buffs (config/buff_template_holder.ab, the template's ON_BUFF_TRIGGER —
@@ -531,6 +681,29 @@ export const COND_BUFFS = Object.freeze({
     on: ['billro_skill_03_buff_02_01', 'billro_skill_03_buff_01_01_02'],
     full: ['billro_skill_03_buff_01_02', 'billro_skill_03_buff_01_01_02'], ready: ['billro_skill_03_buff_01_01'],
   }),
+  // (fork) 薇薇安娜 S1's 蓄力 (char_4098_vvana, client 26-10-29): ToggleablePassiveBuffAbility toggles vvana_s_1[mode] on at
+  // SP ratio 1 of the second charge (`event`: its ON_BUFF_START use is the toggle's, not the skill's start) and the next
+  // cast — which spends every charge — ends it: its loop is the `full` state only (the sim's 蓄力, op-vvana.js)
+  'vvana_s_1[mode]': Object.freeze({ event: 'ON_BUFF_START', full: ['vvana_skill_01_s_buff'] }),
+});
+
+/**
+ * (fork) The ability a charge skill's cast uses (skills.js attackFx `node`), by the stored charges it was cast with: `charged`
+ * every one (the sim's 蓄力 cast), else `plain`. 薇薇安娜 S1 ([uc]skills skchr_vvana_1, an AbilitySelectableGroup the client's
+ * trigger picks): S1_Attack — Skill_1_Attack, 3 hits, the _s_ effects — after 蓄力, else S1_Attack2 — Attack, 2 hits, _l_.
+ */
+export const CHARGED_CASTS = Object.freeze({
+  skchr_vvana_1: Object.freeze({ charged: 'S1_Attack', plain: 'S1_Attack2' }),
+});
+
+/**
+ * (fork) The attack mode each cast of a skill runs in where the skill data names none (skills[id].mode null), by the
+ * cast's number in the deployment: the first, then every later one. 薇薇安娜 S3 (charpack Modes S3_1 / S3_2, skchr_vvana_3's
+ * vvana_s_3[check]: mode 3, from her second cast of a deployment mode 4 — PRTS "第二次及以后使用时…攻击变为三连击"; sim
+ * op-vvana.js S3_LATER_HITS): S3_1's 2-hit attack and its l_buff loop, then S3_2's 3-hit attack and its s_buff loops.
+ */
+export const CAST_MODES = Object.freeze({
+  skchr_vvana_3: Object.freeze(['S3_1', 'S3_2']),
 });
 
 /**
@@ -543,6 +716,16 @@ export function condState({ on = false, charged = false, charges = null } = {}) 
   const n = Array.isArray(charges) ? Number(charges[0]) || 0 : 0;
   return n >= 2 ? 'full' : n >= 1 ? 'ready' : null;
 }
+
+/**
+ * (fork) The skills whose kits send each tick of the official periodic trigger (sim battle.tickFx → fx 'tick'): their
+ * plan's 'tick' rows play there (SkillFx._tick), not on the skill's other kit fx (pulse path (2)).
+ */
+export const TICK_SIGNALED = new Set([
+  'skchr_necras_2', 'skchr_tinman_1', 'skchr_tinman_2', 'skchr_lumen_1', 'skchr_judge_2', 'sktok_phatm2_encdool_2',
+  'skchr_thorn2_2', 'skchr_hsgma2_2', 'skchr_svash2_2', 'skchr_haruka_1', 'skchr_tocka_3', 'skchr_closur_2', 'skchr_titi_3',
+  'skchr_yu_2', 'skchr_mlyss_3', 'skchr_acfend_3',
+]);
 
 /** Unmapped reasons whose entries a kit's own 'fx' of the skill may stand for (plan.pulse). */
 const PULSE = new Set(['tick', 'channel-hit', 'hit-no-attack']);
@@ -627,6 +810,15 @@ function tagCasts(plan, skill) {
  * @param {{ rec?: any, describe?: (key: string) => any }} [opts]  rec: our skill record (plan.kind); describe: key →
  *   prefab descriptor or summary, for each entry's `point` / `follow` (anchorOf)
  */
+/**
+ * (fork) Effects a skill's buff templates create that no use of the index names (crew-docs effect-gaps-audit: "never
+ * extracted", since extracted but not linked), by skill id: index uses added to its plan. 蕾缪安 S3: the template
+ * lemuen_s3_end (the skill's end) creates lemuen_skill_03_start_01 on her — the salute before the shells fall.
+ */
+export const TEMPLATE_ROWS = Object.freeze({
+  skchr_lemuen_3: Object.freeze([Object.freeze({ role: 'end', keys: Object.freeze(['lemuen_skill_03_start_01']), from: 'template lemuen_s3_end (buff_start: CreateEffect)', on: 'owner', oneshot: true })]),
+});
+
 export function skillPlan(idx, unitKey, skillId, opts = {}) {
   const id = lc(skillId);
   const plan = emptyPlan(unitKey || null, id);
@@ -636,10 +828,12 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
   if (!skill) return plan;
   plan.kind = kindOf(opts.rec, skill.rootClass);
   let attach = [];
-  if (Number.isInteger(skill.mode)) {
-    plan.mode = skill.mode;
-    plan.modeName = unit?.modes?.[skill.mode]?.name ?? null;
-    attach = attachUses(unit?.modes?.[skill.mode]);
+  // (fork) a mode the index only guessed by name loses to a skill the client data gives it (shared/fxModes.js)
+  const mode = unit?.skills?.[id] === skill ? skillModeOf(unit, id) : (Number.isInteger(skill.mode) ? skill.mode : null);
+  if (Number.isInteger(mode)) {
+    plan.mode = mode;
+    plan.modeName = unit?.modes?.[mode]?.name ?? null;
+    attach = attachUses(unit?.modes?.[mode]);
   }
   if (typeof skill.rootClass === 'string' && skill.rootClass) plan.rootClass = skill.rootClass;
   const projs = isObj(idx.projectiles) ? idx.projectiles : {};
@@ -648,6 +842,10 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     if (kk && projs[kk] && !plan.projectiles.includes(kk)) plan.projectiles.push(kk);
   }
   let uses = Array.isArray(skill.uses) ? skill.uses : [];
+  // (fork) TEMPLATE_ROWS: a row the index does not list yet (a later extraction that links it wins)
+  const named = new Set(uses.flatMap((u) => (Array.isArray(u?.keys) ? u.keys.map(lc) : [])));
+  const extra = (TEMPLATE_ROWS[id] || []).filter((u) => !u.keys.some((k) => named.has(lc(k))));
+  if (extra.length) uses = [...uses, ...extra];
   if (id === 'skchr_yu_3') {
     // Official ProjectileProbElimateBehaviour places annex_01 at the removed bullet, never on Yu's attacks.
     // GlobalAuraAbility's annex_02 requires the ally buff's ON_TAKE_DAMAGE trigger; no matching sim event exists.
@@ -656,6 +854,7 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
     plan.unmapped.push({ key: 'yu_skill3_annex_02', role: 'trigger', reason: 'conditional', from: 'GlobalAuraAbility._buffs' });
   }
   planUses(idx, plan, [...uses, ...attach], { ...opts, abilities: skill.abilities });
+  if (plan.idle.length) afterIdle(plan, unit);
   // EmptyEffect has no particles/loop flag, but FinishEffectViaOwnerBuff holds this controller for yu_s_3[effect].
   if (id === 'skchr_yu_3') for (const role of ['start', 'loop', 'range']) for (const e of plan[role]) {
     if (e.key === 'yu_skill3_range_01_source') { e.hold = 'skill'; e.loop = true; }
@@ -670,6 +869,51 @@ export function skillPlan(idx, unitKey, skillId, opts = {}) {
   attackLinePlan(idx, plan, FX_ATTACK_LINES[id]);
   if (isObj(opts.rec)) tagCasts(plan, skill);
   return plan;
+}
+
+/**
+ * (fork) The idle loops of a skill (plan.idle: a buff its start finishes and its end creates again — index `made.until`
+ * 'start'; char_1046_sbell2 S1–S3's sbell2_s[idle_effect] → sbell2_a[idle_effect], char_4212_nasti S1's
+ * nasti_s1[effect_manager] → nasti_s1[effect]): the same buff's passive copy — the skill's own (nasti's ExtraAbility0
+ * PassiveBuffAbility, planned as a skill loop) leaves plan.loop and the entry plays from the deploy (`deploy`); a unit
+ * ability's or talent's (sbell2's CommonAbilities/Effect) stays TalentFx's, which hides it while the skill is on
+ * (`talent`: SkillFx.idleOff) — so the loop shows while no skill is on, as the client's buffs do.
+ * @param {ReturnType<typeof emptyPlan>} plan
+ * @param {any} unit  the index unit
+ */
+function afterIdle(plan, unit) {
+  const passive = new Set();
+  for (const t of [...(Array.isArray(unit?.abilities) ? unit.abilities : []), ...Object.values(isObj(unit?.talents) ? unit.talents : {})]) {
+    for (const u of Array.isArray(t?.uses) ? t.uses : []) if (u?.buff) passive.add(u.buff);
+  }
+  for (const e of plan.idle) {
+    const buff = e.made?.buff;
+    if (!buff) continue;
+    if (passive.has(buff)) { e.talent = true; continue; }
+    const n = plan.loop.length;
+    plan.loop = plan.loop.filter((x) => x.buff !== buff || x.key !== e.key);
+    if (plan.loop.length < n) e.deploy = true;
+  }
+}
+
+/**
+ * (fork) A skill's plan as one cast runs it in mode `modeName` (CAST_MODES): the mode's attacks (plan.mode / modeName —
+ * FxWiring.mode) and its attach rows, held for the skill (attachUses, as skillPlan's own mode). The loops of that mode's
+ * passive general abilities (薇薇安娜 S3_1's vvana_skill_03_l_buff_01, S3_2's s_buff_01 / 02) are TalentFx's: it plays them
+ * while FxWiring.mode names the mode. Null when the unit has no such mode.
+ * @param {any} idx
+ * @param {ReturnType<typeof skillPlan>} plan  the skill's own plan
+ * @param {string} modeName
+ */
+export function castModePlan(idx, plan, modeName) {
+  const unit = plan?.unitKey && isObj(idx?.units) ? idx.units[plan.unitKey] : null;
+  const modes = Array.isArray(unit?.modes) ? unit.modes : [];
+  const at = modes.findIndex((m) => m?.name === modeName);
+  if (at < 0) return null;
+  const extra = emptyPlan(plan.unitKey, plan.skillId);
+  extra.kind = plan.kind;
+  planUses(idx, extra, attachUses(modes[at]), { mode: null });
+  return { ...plan, mode: at, modeName, loop: [...plan.loop, ...extra.loop], range: [...plan.range, ...extra.range] };
 }
 
 /** (fork) The rows and the flight of an FX_ATTACK_LINES entry; each only with its prefab in the index. */
@@ -761,7 +1005,8 @@ export function planUses(idx, plan, uses, opts = {}) {
     return a;
   };
   const eachHit = [];
-  const miss = (key, role, reason, u) => { plan.unmapped.push({ key, role, reason, from: u.from }); };
+  // (fork) `buff`: the client buff the row belongs to (a b.snap fxs row of it shows it: talentfx.js targetRows)
+  const miss = (key, role, reason, u) => { plan.unmapped.push({ key, role, reason, from: u.from, ...(u.buff ? { buff: u.buff } : null) }); };
 
   // an enemy skill held in several modes (index v2): its copies' uses name their `mode` — the plan of `opts.mode`
   // (default 'Default') keeps that copy's and the uses without one
@@ -784,7 +1029,22 @@ export function planUses(idx, plan, uses, opts = {}) {
       const e = entryOf(key, role, u, prefabs, opts.describe);
       if (hook) e.afterFirst = true;
       if (hooked) e.firstOnly = true;
-      const placed = place(plan, e, u, { attackOf, eachHit });
+      let placed = place(plan, e, u, { attackOf, eachHit });
+      // (fork) a buff of a moment the client never sees, whose start and end the sim signals (b.snap `fxs`)
+      if (placed === 'conditional' && e.buff && stateRow(e.buff, e.key) && (e.role === 'loop' || e.role === 'trigger')) {
+        e.at = 'carrier';
+        e.hold = 'state';
+        if (!plan.state.some((x) => x.key === e.key && x.buff === e.buff)) plan.state.push(e);
+        placed = null;
+      }
+      // (fork) a buff the skill gives the owner's summons (CreateBuffToToken: 可露希尔's base range, 伺夜's wolves, 麦哲伦-
+      // style tokens): `tokens`, played on each summon (UnitInfo summonerId) while the skill lasts — a loop held, an
+      // IMMEDIATELY one once (SkillFx._tokens)
+      if (placed === 'token' && u.on !== 'token') {
+        e.hold = u.life?.type === 'IMMEDIATELY' ? 'once' : 'skill';
+        if (!plan.tokens.some((x) => x.key === e.key)) plan.tokens.push(e);
+        placed = null;
+      }
       if (placed) {
         miss(key, role, placed, u);
         // a facing family's other variants are unmapped with it (dirFamilies)
@@ -832,7 +1092,8 @@ function entryOf(key, role, u, prefabs, describe) {
   // (v2: a group list's `group` / `groups`, a replace group's `anim`, the MultiHit choice flags, an enemy copy's `mode`)
   // (v3: a buff use's `life`, an emitter use's `projectileKey`)
   for (const f of ['node', 'ability', 'list', 'startEvent', 'endEvent', 'directionType', 'event', 'action', 'buff', 'on',
-    'group', 'groups', 'anim', 'useLoopHitEffect', 'useRandomHitEffect', 'keepBaseHitEffect', 'oncePerTarget', 'mode', 'life', 'projectileKey']) {
+    'group', 'groups', 'anim', 'useLoopHitEffect', 'useRandomHitEffect', 'keepBaseHitEffect', 'oncePerTarget', 'mode', 'life', 'projectileKey',
+    'made']) {
     if (u[f] != null) e[f] = u[f];
   }
   // where it sits on its owner: index v2's prefab summary (`spawn` / `follow`), without loading the descriptor
@@ -899,9 +1160,27 @@ function place(plan, e, u, { attackOf, eachHit }) {
   if (e.action === 'CreateBuffToToken' || u.on === 'token' || /_buffsToToken/.test(u.from)) return 'token';
   const onTargets = u.on === 'targets';
   const ev = u.event;
+  // (fork) a mark on the units the skill names, which the sim signals (b.snap `fxs` on the carrier, STATE_BUFFS): held
+  // while the row lasts, an `end` once when it goes; a line (CreateLineEffect) or a tick stays unmapped
+  if (onTargets && stateRow(u.buff, e.key) && u.action !== 'CreateLineEffect' && (role === 'loop' || role === 'start' || role === 'end')) {
+    e.at = 'carrier';
+    e.hold = 'state';
+    if (!plan.state.some((x) => x.key === e.key && x.buff === e.buff && x.role === e.role)) plan.state.push(e);
+    return null;
+  }
+  // (fork) a mode buff whose loops the stored charges hold, not the skill's start (COND_BUFFS `event`: 薇薇安娜's 蓄力)
+  if (role === 'loop' && ev && COND_BUFFS[u.buff]?.event === ev) { e.hold = 'cond'; plan.cond.push(e); return null; }
   if (ev && !START_EVENTS.has(ev)) {
     if (END_EVENTS.has(ev)) {
-      if (role === 'loop') return 'after-end';
+      if (role === 'loop') {
+        // (fork) a buff the end creates, with its own life (index `made`, fx.py graph_made_buffs): one the next start
+        // finishes again (`until: 'start'`) is the unit's idle loop — `idle`, on while no skill is (afterIdle) —, a
+        // LIMITED one plays its own time from the end — `after` (char_1026_gvial2 S3's bleed, final_duration) —, any
+        // other outlives the skill with nothing the client sees ending it
+        if (isObj(u.made) && u.made.until === 'start') { e.hold = 'idle'; plan.idle.push(e); return null; }
+        if (isObj(u.made) && u.made.type === 'LIMITED') { e.hold = 'made'; plan.after.push(e); return null; }
+        return 'after-end';
+      }
       if (onTargets) { e.at = 'targets'; e.hold = oneShotHold(e); plan.targets.push(e); return null; }
       e.hold = oneShotHold(e);
       plan.end.push(e);
@@ -944,13 +1223,15 @@ function place(plan, e, u, { attackOf, eachHit }) {
  * The effects of one attack of the owner while the skill is on: the skill prefab's attack ability that fits the attack
  * (a heal → a /Heal/ ability, a ranged shot → /Ranged/, a melee blow → /Melee/; else the first), plus `each`.
  * @param {ReturnType<typeof skillPlan>} plan
- * @param {{ heal?: boolean, ranged?: boolean }} [what]
+ * @param {{ heal?: boolean, ranged?: boolean, node?: string|null }} [what]  node: (fork) the ability of that node when the
+ *   plan has it (CHARGED_CASTS)
  * @returns {{ node: string|null, ability: string|null, cast: any[], range: any[], aim: any[], hit: any[][], hitOpts: any, projectile: string|null, shot: any }}
  */
-export function attackFx(plan, { heal = false, ranged = false } = {}) {
+export function attackFx(plan, { heal = false, ranged = false, node = null } = {}) {
   const list = plan?.attacks || [];
   const want = heal ? /Heal/ : ranged ? /Ranged/ : /Melee/;
-  const a = list.find((x) => want.test(x.ability)) || (heal ? null : list.find((x) => !/Heal/.test(x.ability))) || list[0] || null;
+  const a = (node && list.find((x) => x.node === node)) || list.find((x) => want.test(x.ability))
+    || (heal ? null : list.find((x) => !/Heal/.test(x.ability))) || list[0] || null;
   const each = plan?.each || { cast: [], hit: [[]] };
   const extra = each.hit?.[0] || [];
   const groups = a && a.hit.length ? a.hit.map((g) => [...g, ...extra]) : [extra];
@@ -1098,7 +1379,7 @@ export function slotKey(entry, dir) {
 export function planKeys(plan) {
   const out = new Set();
   const add = (e) => { if (!e) return; out.add(e.key); for (const s of e.slots || []) if (s) out.add(s); };
-  for (const g of ['start', 'loop', 'end', 'ready', 'range', 'trigger', 'targets']) for (const e of plan?.[g] || []) add(e);
+  for (const g of ['start', 'loop', 'end', 'ready', 'range', 'trigger', 'targets', 'tokens']) for (const e of plan?.[g] || []) add(e);
   for (const a of plan?.attacks || []) {
     for (const e of [...a.cast, ...a.range, ...(a.aim || [])]) add(e);
     for (const g of a.hit) for (const e of g) add(e);
@@ -1107,6 +1388,8 @@ export function planKeys(plan) {
   for (const g of plan?.each?.hit || []) for (const e of g) add(e);
   for (const e of plan?.pulse || []) add(e);
   for (const e of plan?.cond || []) add(e);
+  for (const e of plan?.state || []) add(e);
+  for (const e of [...(plan?.after || []), ...(plan?.idle || [])]) add(e);
   if (plan?.line) out.add(plan.line.key);
   return [...out];
 }
@@ -1328,19 +1611,40 @@ export function chargeKeys(plan) {
  *   projectile  the skill projectile whose reached effects (onReached, else onHit) play where the fx happens
  *   keys        else these prefabs (an official effect our projectile records do not list as reached: a projectile's
  *               main effect, a skill row the kit's moment stands for; a one-shot of the skill's own: its `at` 'target')
- *   at          'point': the fx's (x, y) on the ground (the unit `extra.id` names stands there: its feet); 'target': once
+ *   at          (fork) 'tiles': once on each [row, col] of the fx's `tiles`; 'point': the fx's (x, y) on the ground (the unit `extra.id` names stands there: its feet); 'target': once
  *               on the unit the fx names in `extra[target]` (`target`, default 'target'; else at the fx's point), turned
  *               by the owner's side (FLIP_TWO_SIDE) — such a key is no row of the skill on its owner (targetBound: the
  *               client creates it on the ability's target, the index writes it as a start row); else on the view
  *               `extra.id` names (the fx's point without one)
  *   hold        how long a looping reached effect stays: a blackboard key of our skill record (seconds), 'fx' — the
  *               fx's own `duration` / `dur` / `hold` (the kit's area or lock time) —, 'lock' — a lock mark's: on the
- *               enemy, at its last spot once it is gone, until its shell lands (SkillFx._lockOn) —, else `holdS`
+ *               enemy, at its last spot once it is gone, until its shell lands (SkillFx._lockOn) —, (fork) 'until' — no
+ *               timer: the binding's `until` kind (or the unit leaving) ends it —, 'life' — a mark that lasts as long as
+ *               its unit: on the unit `extra.id` names, one per unit and key, until that unit dies or leaves or the owner
+ *               does (SkillFx._lifeMark) —, else `holdS`
  *   cover       fx kinds of the same owner at that tile that the reached effect draws (skipped while it plays)
  *   shots       the fx's `lanes` ([x, y, wait, shot id]…; `dx`, `dy`, `len`, `speed`) fly `keys` along straight lines
  *               (SkillFx._lanes); `endsShot` on another kind: its `shot` stops that flight
  *   during      only while the skill lasts (SkillFx._lasts: on, its activation frame, COVER_AFTER_S after its end, or a
  *               binding of its owner still held — a lasting area's strikes); another fx of that kind is the kit's own
+ *   line        (fork) a line effect from the owner's muzzle to the unit the fx names, kept on both while the binding is
+ *               held (SkillFx._line: 蕾缪安 S2's aim line)
+ *   until       (fork) an fx kind from the same owner on the same unit that ends the held binding at once (her shot ends
+ *               her aim)
+ *   hit         (fork) with at 'target': a hit's role — a looping prefab there stops after SKILL_CAST_S
+ *   only        (fork) { field: value }: the binding stands only for an fx whose extra has those values (another fx of
+ *               that kind stays the kit's own)
+ *   fan         (fork) { projectile, from, to }: that projectile flies from the unit the fx's extra[from] names to each
+ *               unit of extra[to] (a list of ids) — a child shot that leaves the first target (空弦 S1's scatter)
+ *   keysBy      (fork) { field, map }: `keys` by the value of a field of the fx's extra (no entry: the kit's own fx)
+ *   keysIf      (fork) { field, yes, no }: `keys` by a field of the fx's extra (truthy: yes, else no)
+ *   none        (fork) the official client draws nothing at that moment (its sound only): the binding claims the fx and
+ *               plays nothing, so no procedural stand-in shows (塔露拉 S3's 过载)
+ *   flight      (fork) a projectile's flight between two points of the fx (SkillFx._flight): { side, up, down } — the
+ *               projectile for a way along the row / up (+row) / down, each [facing left, facing right] or [one] (the
+ *               client's branches on the unit's direction and faceLeft) —, from: 'from' (the fx's fromX / fromY; its
+ *               point the end) or 'point' (its point; tx / ty the end), speed (tiles / s; else the fx's `dur` sets it),
+ *               delay (s before it leaves), reached (its onReached effects play where it lands): its main effect flies
  * or, instead of a projectile (history §32.14.43):
  *   attack      the node of the plan attack the fx stands for: its cast / range rows play on the owner at the fx, its hit
  *               groups and aims on the damage the fx's frame deals after it (SkillFx kit hits)
@@ -1372,21 +1676,175 @@ export const FX_ATTACK_LINES = Object.freeze({
   }),
 });
 
+/**
+ * (fork) A skill whose attacks leave an official effect on the tile under each enemy hit, held while the skill lasts:
+ * render/vfx/skillfx.js _hitTile, one per tile. 烛煌 S2 (chess_char_5_03-blaze2.js: every hit adds the target's rounded
+ * tile to her burning tiles until the skill ends): her S2 mode's talent node BuffAfterAffecting (index talent 3, its
+ * only key unclassified) places blaze2_skill_02_hit_plot (looping, GROUND_CENTER) — the user's clip RjrtWhMKwAU
+ * 0:46–1:02, the fire on the struck tiles. The sim sends no fx for a tile (one would move the golden fx counts).
+ */
+export const FX_HIT_TILES = Object.freeze({
+  skchr_blaze2_2: Object.freeze(['blaze2_skill_02_hit_plot']),
+});
+
+/**
+ * (fork) Chain hops that leave one unit as another projectile's (wiring.js chain()): by skill id, `via` (the index unit
+ * key the hop leaves) → `projectile` (its ChainLightningEffectBehaviour line and hit draw the hop). Mon3tr S2
+ * (op-monstr.js chainFrom): a heal of hers on her 重构体 gives it monstr_s_2[proj], whose ON_BUFF_FINISH (lifeTime 0.6 s,
+ * the kit's second chain delay) fires projectile_chr_monstr_s2_extra from the 重构体 (FilterId token_10050_monstr_prosts):
+ * the hops from the 重构体 are that projectile's.
+ */
+export const CHAIN_RELAYS = Object.freeze({
+  skchr_monstr_2: Object.freeze({ via: 'token_10050_monstr_prosts', projectile: 'projectile_chr_monstr_s2_extra' }),
+});
+
+// (fork) 国度 T2 此身为界 (op-dminon.js boundary): the client's talent dminon_t_2 fires projectile_chr_dminon_dead when he is
+// knocked out (ON_OWNER_KILLED; life 0.7 s, the kit's KO_DELAY) and _withdraw when he leaves otherwise (ON_OWNER_FINISH,
+// 0.1 s); either plays dminon_talent_range_hit_01 on every tile of his range as it stops (_tileEffectKeyOnStop). The kit's
+// 'aoe' tagged dminon:boundary is that moment, `tiles` his range. A talent: bound under each of his skills.
+const DMINON_BOUNDARY = Object.freeze({ aoe: binding({ owner: 'id', only: Object.freeze({ skill: 'dminon:boundary' }), at: 'tiles',
+  oneshot: true, keys: ['dminon_talent_range_hit_01'] }) });
+
+// (fork) 塔露拉 T2 我即火焰 (op-oxi.js lease): her common ability oxi_fire_field_lease plays oxi_buff_01 (looping, on the
+// ground) on each tile it leases, for the lease's field_duration from its latest refresh. The kit's 'zone' tagged
+// oxi:footprint is a fresh lease (its tile, dur). A talent: bound under each of her skills.
+const OXI_FOOTPRINT = binding({ owner: 'id', only: Object.freeze({ skill: 'oxi:footprint' }), at: 'point', hold: 'fx', keys: ['oxi_buff_01'] });
+
+// (fork) 烛煌 T2 绝处重燃 (chess_char_5_03-blaze2.js): the client's blaze2_t_2 creates its buff at the fatal blow
+// (ON_BEFORE_TRY_SET_HP_ZERO: blaze2_revive_buff) and its [reborn_state] (blaze2_revive_buff_03) — the fire ring she kneels
+// in while downed (the user's clip RjrtWhMKwAU 0:29–0:34); standing up, blaze2[to_default_state]'s CauseStun cast plays
+// blaze2_revive_end_start. The kit's 'downed' is the fatal blow, its 'revive' the stand-up (`until` ends the ring). A
+// talent: bound under each of her skills; talentfx leaves these keys to the binding (KIT_HELD_TALENT_KEYS).
+const BLAZE2_REVIVE = Object.freeze({
+  downed: binding({ owner: 'id', hold: 'until', until: 'revive', keys: ['blaze2_revive_buff', 'blaze2_revive_buff_03'] }),
+  revive: binding({ owner: 'id', oneshot: true, keys: ['blaze2_revive_end_start'] }),
+});
+
+/**
+ * (fork) Talent prefab keys a kit fx binding plays (the talents' FX_BINDINGS entries above): talents.js leaves them out
+ * of the talent's own bindings — 烛煌's [reborn_state] ring read as a passive loop and burned at her feet from the deploy.
+ */
+export const KIT_HELD_TALENT_KEYS = Object.freeze(new Set([BLAZE2_REVIVE].flatMap((b) => Object.values(b)).flatMap((x) => x.keys || [])));
+
+// (fork) 蕾缪安 T1 跨境追缉许可 (chess_char_6_01-lemuen.js ensureWanted): the client's char_lemuen_laterano_range[tick] gives
+// an enemy char_lemuen_range_aim, whose first ON_BUFF_TRIGGER creates char_lemuen_range_aim[effect] (overrideEffectKey
+// lemuen_talent_buff_01, life infinity) — the Wanted mark, looping on the enemy while it is marked. The kit's 'wanted'
+// (id = the enemy, src = the Lemuen it counts for) is that moment; the sim drops a mark only when the enemy dies or its
+// Lemuen leaves, which is when the loop ends here. A talent: bound under each of her skills.
+const LEMUEN_WANTED = binding({ owner: 'src', keys: ['lemuen_talent_buff_01'], hold: 'life' });
+// (fork) 蕾缪安 T2 逃犯引渡手续: the client's lemuen_t_2 triggers its interval after the deploy and gives her lemuen_t_2[buff]
+// (ATK, overrideEffectKey lemuen_talent_buff_02, life infinity) — a loop on her for the rest of her deployment. The kit's
+// 'talent' named extradition (id = her) is that moment.
+const LEMUEN_EXTRADITION = binding({ owner: 'id', only: Object.freeze({ name: 'extradition' }), keys: ['lemuen_talent_buff_02'], hold: 'life' });
+
 export const FX_BINDINGS = Object.freeze({
+  // (fork) 烛煌 S1 炙手之援: the client's AnimatedActionToTargetAbility gives the operator it picks blaze2_s_1, whose
+  // effect blaze2_skill_01_hit_range (looping, GROUND_CENTER) burns around that operator for max_duration (the user's
+  // clip 0:10–0:34: the red smoke ring). The kit's 'aoe' tagged blaze2Aid is that pick (x, y: the operator's tile).
+  skchr_blaze2_1: Object.freeze({ ...BLAZE2_REVIVE,
+    aoe: binding({ owner: 'id', only: Object.freeze({ skill: 'blaze2Aid' }), at: 'point', hold: 'max_duration', keys: ['blaze2_skill_01_hit_range'] }) }),
+  skchr_blaze2_2: BLAZE2_REVIVE,
+  skchr_blaze2_3: BLAZE2_REVIVE,
+  skchr_oxi_1: Object.freeze({ zone: OXI_FOOTPRINT }),
+  skchr_dminon_1: DMINON_BOUNDARY, skchr_dminon_2: DMINON_BOUNDARY, skchr_dminon_3: DMINON_BOUNDARY,
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 塔露拉 S3 (op-oxi.js volley): the client's buff oxi_s_3_wave fires projectile_chr_oxi_s_3_heatwave down each lane; its
   // main effect oxi_skill_03_trail_01 is the 簇火, and its action graph's CreateEffectOnProjectile (_useCollisionTarget)
   // plays oxi_skill_03_hit_01 on the enemy it meets. The kit's 'heatwave' names the lanes, its 'blast' the shot and enemy.
+  // (fork) 塔露拉 S2 (op-oxi.js retaliate): the skill's UberEffectEmitter plays oxi_skill_02_hit_01 on its input target —
+  // the enemy her guard strikes back at. The kit's 'blast' tagged oxi:retaliate is that strike (target: the enemy); it
+  // comes in the frame of the cast, which would otherwise count it as covered by the start and draw nothing there.
+  skchr_oxi_2: Object.freeze({
+    zone: OXI_FOOTPRINT,
+    blast: binding({ owner: 'id', only: Object.freeze({ skill: 'oxi:retaliate' }), at: 'target', keys: ['oxi_skill_02_hit_01'] }),
+  }),
   skchr_oxi_3: Object.freeze({
+    zone: OXI_FOOTPRINT,
     heatwave: binding({ owner: 'id', shots: true, keys: ['oxi_skill_03_trail_01'] }),
     blast: binding({ owner: 'id', at: 'target', endsShot: true, keys: ['oxi_skill_03_hit_01'] }),
+    // (fork) 过载 (the kit's 'overload'): the client raises ON_CUSTOM_TRIGGER oxi_s_3_overload, a sound only — no effect of
+    // the skill or its buffs plays there (the index: start, oxi_skill_03_buff_01, the volley's projectile)
+    overload: binding({ owner: 'id', none: true }),
   }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it
   // three times ('blast', id = her, 0.5 / 1.5 / 2.5 s later). The client fires projectile_chr_clemnt_s3 at the marked
   // enemy (AttachToTarget, _immediatelyReach), whose reached effect clemnt_skill_03_mark_all_01 is the mark and its three
   // strikes (clips Mark_01_start 4.13 s and three Mark_trail_01), cleared when the projectile stops
   // (_clearReachedEffectWhenStop; its life time from the blackboard: projectile_life_time — the kit's tile lock)
+  // (fork) 克莱门莎 S2 (op-clemnt.js startCabin / finishCabin): the client's buff clemnt_s2[emit_projectile] fires
+  // projectile_chr_clemnt_s2_lr (CheckCharacterDefaultDirection LEFT / RIGHT) else _ud from her tile, flying her way
+  // (AdvancedMovement useSourceDirection); at its ON_PROJECTILE_STOP it fires projectile_chr_clemnt_s2_range there
+  // (_useSourceProjectileAsStartPoint), whose main effect is the vortex, kept until the buff ends (ON_BUFF_FINISH:
+  // FinishManagedProjectiles). The kit's 'anchor' is the cabin's way (from, to, dur), its 'tide' the vortex (dur: the
+  // skill's time left).
+  skchr_clemnt_2: Object.freeze({
+    anchor: binding({ owner: 'id', flight: Object.freeze({ side: ['projectile_chr_clemnt_s2_lr'], up: ['projectile_chr_clemnt_s2_ud'],
+      down: ['projectile_chr_clemnt_s2_ud'], from: 'from' }) }),
+    tide: binding({ owner: 'id', at: 'point', hold: 'fx', keys: ['clemnt_skill_02_bullet_range_01'], cover: ['tide'] }),
+  }),
+  // (fork) 机械师 S3 (op-mcnist.js chargeGraf): the token's buff mcnist_s_3_projectile_real throws it as
+  // projectile_chr_mcnist_s3_token* to its stop tile — by its direction (UP → _up, DOWN → _down, else the row's way) and
+  // faceLeft (left: the plain key, right: `_right`) —, `_delayToStart` 0.2 s, 20 tiles / s (the kit's CHARGE_DELAY /
+  // CHARGE_SPEED); its onReached hit plays where it lands. The kit's 'charge' names the token (id) and its stop (tx, ty).
+  skchr_mcnist_3: Object.freeze({
+    charge: binding({ owner: 'skill', flight: Object.freeze({
+      side: ['projectile_chr_mcnist_s3_token', 'projectile_chr_mcnist_s3_token_right'],
+      up: ['projectile_chr_mcnist_s3_token_up', 'projectile_chr_mcnist_s3_token_up_right'],
+      down: ['projectile_chr_mcnist_s3_token_down', 'projectile_chr_mcnist_s3_token_down_right'],
+      from: 'point', speed: 20, delay: 0.2, reached: true }) }),
+  }),
+  // (fork) 凯尔希·思衡托 S2 (op-kalts2.js s2Burst): projectile_chr_kalts2_s2_dmg, reaching an enemy, fires
+  // projectile_chr_kalts2_s2_sub_heal there (its indicator and delayed heal splash: kalts2_skill_02_indicator_damage_01,
+  // _range_heal_01_delay); _heal, reaching an ally, fires _sub_dmg (indicator_heal_01, range_damage_01_delay). The kit's
+  // 'healAoe' is that landing, `onEnemy` its side.
+  skchr_kalts2_2: Object.freeze({
+    healAoe: binding({ owner: 'id', at: 'point', oneshot: true, keysIf: Object.freeze({ field: 'onEnemy',
+      yes: ['kalts2_skill_02_indicator_damage_01', 'kalts2_skill_02_range_heal_01_delay'],
+      no: ['kalts2_skill_02_indicator_heal_01', 'kalts2_skill_02_range_damage_01_delay'] }) }),
+  }),
+  // (fork) 真言 S3 (op-mantra.js bounce): a 溢出麻痹 makes the client fire projectile_chr_mantra_s3_2 (BounceProjectile,
+  // _useTargetAsStartPoint) at its holder; its hit mantra_bounce_hit_01 plays there. The kit's 'mantraArc' names the holder
+  // (target). Its bounces on to the next enemies are kit projectiles the client is not told of: their trail is not drawn.
+  skchr_mantra_3: Object.freeze({
+    mantraArc: binding({ owner: 'id', at: 'target', keys: ['mantra_bounce_hit_01'] }),
+  }),
+  // (fork) 空弦 S1 (chess_char_3_21-archet.js): the arrow projectile_chr_archet_s1, reaching its target, fires its child
+  // projectile_chr_archet_s1_2 at the other enemies around (max_target − 1); the kit's 'volley' names them (targets) and
+  // the arrow's target (from).
+  skchr_archet_1: Object.freeze({
+    volley: binding({ owner: 'id', fan: Object.freeze({ projectile: 'projectile_chr_archet_s1_2', from: 'from', to: 'targets' }) }),
+  }),
+  // (fork) 魔王 T1 (chess_char_4_25 / 5_09-cetsyr.js): her talent's motes are projectile_chr_cetsyr_talent, the one her
+  // skill's buff names in its blackboard (`projectile`: _talent_s1 / _s2 during S1 / S2, _s3 with S3, a passive); a mote
+  // reaching a unit plays its hit there. The kit's 'mote' names that unit (id) and her (src). The motes' orbit is not
+  // drawn (the client has no orbit for an official projectile yet).
+  skchr_cetsyr_1: Object.freeze({ mote: binding({ owner: 'src', at: 'target', target: 'id', keys: ['cetsyr_hit_01'] }) }),   // _talent and _s1 share it
+  skchr_cetsyr_2: Object.freeze({ mote: binding({ owner: 'src', at: 'target', target: 'id', during: true, keys: ['cetsyr_skill_02_hit_01'] }) }),
+  skchr_cetsyr_3: Object.freeze({ mote: binding({ owner: 'src', at: 'target', target: 'id', keys: ['cetsyr_hit_01'] }) }),
+  // (fork) 老鲤 S2 (op-lmlee.js): RunePaper's projectile_chr_lmlee_s2 reaches the enemy it marks; its reached effect is
+  // the rune there. The kit's 'mark' names the enemy (id) and him (src).
+  skchr_lmlee_2: Object.freeze({ mark: binding({ owner: 'src', at: 'target', target: 'id', keys: ['lmlee_skill_02_range'] }) }),
+  // (fork) 仇白 S1 (chess_char_6_15-qiubai.js): when the bind ends the client fires projectile_chr_qiubai_s1_effect on the
+  // target; its reached effect is the burst. The kit's 'aoe' (her id) is that moment, where the target stands.
+  skchr_qiubai_1: Object.freeze({ aoe: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['qiubai_skill_01_buff_boom'] }) }),
+  // (fork) 赤刃明霄陈 S3 (op-chen3.js): the wave is projectile_chr_chen3_s3 (EmitProjectile); its hit plays on each enemy
+  // it meets — the kit's 'slash' tagged chen3:wave. Its trail is not drawn: the kit tells the client the wave's way only
+  // in 0.12 s pieces ('chen3Wave'), not as one flight.
+  skchr_chen3_3: Object.freeze({ slash: binding({ owner: 'id', only: Object.freeze({ skill: 'chen3:wave' }), at: 'point', oneshot: true,
+    keys: ['chen3_skill_03_hit_04'] }) }),
+  // (fork) 菲亚梅塔 S2 (op-phenxi.js): the shell is projectile_chr_phenxi_s2 (ProjectileToTileAbility), its reached
+  // effect the blast where it lands (the kit's 'aoe' tagged phenxi:s2); its child projectile_chr_phenxi_s2_2 lands on
+  // each mark along the way (reached: phenxi_skill_02_hit_buff; the kit's 'aoe' tagged phenxi:mark).
+  skchr_phenxi_2: Object.freeze({ aoe: binding({ owner: 'id', at: 'point', oneshot: true, keysBy: Object.freeze({ field: 'skill',
+    map: Object.freeze({ 'phenxi:s2': ['phenxi_skill_02_hit'], 'phenxi:mark': ['phenxi_skill_02_hit_buff'] }) }) }) }),
+  // (fork) 望 S3 (op-wang.js fire): a stone that sets off is projectile_chr_wang_stone3 (WangVisualStoneMarkAbility); its
+  // hit token_wang_skill_03_hit_02 plays there. The kit's 'explode' tagged wang_3 names the stone (id) and him (src).
+  skchr_wang_3: Object.freeze({ explode: binding({ owner: 'src', only: Object.freeze({ skill: 'wang_3' }), at: 'point', oneshot: true,
+    keys: ['token_wang_skill_03_hit_02'] }) }),
+  // (fork) 冻河 S2 (op-tocka.js): AnimatedActionToTargetAbility throws projectile_chr_tocka_s2 at the ally it arms; its hit
+  // plays on that ally (the buff's start burst with it). The kit's 'buff' names the ally (id) and her (src).
+  skchr_tocka_2: Object.freeze({ buff: binding({ owner: 'src', at: 'target', target: 'id', keys: ['tocka_skill_02_hit_01'] }) }),
   skchr_clemnt_3: Object.freeze({
     lock: binding({ owner: 'src', projectile: 'projectile_chr_clemnt_s3', at: 'point', hold: 'projectile_life_time', holdS: 5, cover: ['blast'] }),
   }),
@@ -1395,7 +1853,7 @@ export const FX_BINDINGS = Object.freeze({
   // looping), the flask on the ground (_token_01, looping) and the splash (_start_01 / _02)
   skchr_tinman_1: Object.freeze({ zone: binding({ owner: 'id', projectile: 'projectile_chr_tinman_s1', at: 'point', hold: 'fx', holdS: 8, during: true, cover: ['zone'] }) }),
   skchr_tinman_2: Object.freeze({ zone: binding({ owner: 'id', projectile: 'projectile_chr_tinman_s2', at: 'point', hold: 'fx', holdS: 8, during: true, cover: ['zone'] }) }),
-  // 引星棘刺 S1 / S3 (chess_char_5_15-thorn2.js: a 'zone' on each chosen ally's tile, id = her, duration): the unit she
+  // 引星棘刺 S1 / S3 (chess_char_5_15-thorn2.js: a 'zone' on each chosen ally's tile, id = him, duration): the unit he
   // throws (projectile_chr_thorn2_s1 / _s3) lands there — thorn2_token_start, the unit (thorn2_skill_0N_token, looping),
   // S1's ring (thorn2_skill_01_range). S2's unit drifts (its zone re-sent every second): not bound — the procedural area
   // stays (open)
@@ -1417,14 +1875,43 @@ export const FX_BINDINGS = Object.freeze({
   // 焰影苇草 S2 (a 'strike' from a fireball's carrier every cooldown: id = the enemy, src = the carrier): the fireball
   // projectile_chr_reed2_fire's hit reed2_skill_02_hit on the enemy
   skchr_reed2_2: Object.freeze({ strike: binding({ owner: 'skill', projectile: 'projectile_chr_reed2_fire', holdS: 2, during: true }) }),
+  // (fork) 焰影苇草 S3 (chess_char_6_08-reed2.js): an enemy that dies with the S3 灼痕 (buff reed2_t_1[skill_3_diffuse],
+  // ON_OWNER_KILLED) fires projectile_chr_reed2_aoe_effect at its feet, whose reached effect reed2_debuff_boom_01 is the
+  // blast on the ground there (_forceReachTargetGround); the index lists it as the skill's hit with no attack to play
+  // on. The kit's 'scorchBurst' (her id, the dead enemy's point) is that moment; her outfits' twins via skinKey.
+  skchr_reed2_3: Object.freeze({ scorchBurst: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['reed2_debuff_boom_01'] }) }),
   // 蕾缪安 S3: a 'lock' (id = the enemy, src = her) is the aim projectile on it (projectile_chr_lemuen_s3_aim: its
   // main lemuen_skill_03_crosshair_range and lemuen_skill_03_crosshair_02), held as the lock mark is (hold 'lock': on
   // the enemy, at its last spot once it is gone — the shell still falls there —, until that shell's 'bombard'; the
   // fx's `hold` is a flag: read as a duration of 1 s, the crosshair went before its shell); a 'bombard' (id = her, its point)
-  // is projectile_chr_lemuen_s3_attack's reached lemuen_skill_03_hit_01. The falling shell ('bombardShell': the attack
-  // projectile's flight, not flown here) stays procedural
+  // is projectile_chr_lemuen_s3_attack's reached lemuen_skill_03_hit_01. (fork) The lock also plays the lock-on mark
+  // lemuen_skill_03_crosshair_01 on the enemy (template lemuen_proj_s3_effect, buff_start CreateEffect; a one-shot held
+  // by its owner, so it ends on its own). The falling shell ('bombardShell', id = her, `t` its flight) is that attack
+  // projectile's main effect lemuen_skill_03_trail_02 at the spot — its clip drops the shell from 7.27 up to the ground
+  // in 0.27 s (the projectile's lifeTime 0.25, cleared when it reaches) —, held for the fx's flight. (fork) The aim
+  // projectile's EffectBehaviour._effectsToTargetWhenStart lemuen_skill_03_trail_01 is the aim beam: a local-space line
+  // from 4.31 above the target down onto it, played on the locked enemy as each lock starts and held with the lock
+  // (_clearPlayEffectOnStop: it goes with the projectile), so a target locked n times stands under n beams until the
+  // shells come (the official Requiem Vesperis S3 at 1:18.8–1:21.6 of the user's reference video)
+  // (fork) 蕾缪安 S2 (chess_char_6_01-lemuen.js): her aim at a Wanted enemy ('lock', id = the enemy, src = her) is the
+  // template lemuen_s2_aim_attack — lemuen_skill_02_crosshair_02 on the target (CreateBuffToCastedTargets, a loop) and the
+  // aim line lemuen_skill_02_trail_01 from her (CreateLineEffect) —, held for her aim time (attack@aim_duration) or until
+  // her shot ('crit', same pair); the shot is her S2 mode's aimed ability (binding `shot`, wiring.js KIT_SHOTS) — its cast rows
+  // lemuen_skill_02_start_02 (_back facing up) and _start_01 on her, projectile_chr_lemuen_s2 (trail_02) to the target and
+  // its hit lemuen_skill_02_hit_01 there [ASSUMED: drawn in flight although the kit deals the snipe at once]
+  skchr_lemuen_1: Object.freeze({ wanted: LEMUEN_WANTED, talent: LEMUEN_EXTRADITION }),
+  skchr_lemuen_2: Object.freeze({
+    wanted: LEMUEN_WANTED, talent: LEMUEN_EXTRADITION,
+    lock: binding({ owner: 'src', keys: ['lemuen_skill_02_crosshair_02'], hold: 'attack@aim_duration', holdS: 3.5, line: 'lemuen_skill_02_trail_01', until: 'crit', during: true }),
+    crit: binding({ owner: 'src', target: 'id', shot: 'projectile_chr_lemuen_s2', during: true, keys: ['lemuen_skill_02_start_02', 'lemuen_skill_02_start_02_back', 'lemuen_skill_02_start_01', 'lemuen_skill_02_trail_02', 'lemuen_skill_02_hit_01'] }),
+  }),
+  // (fork) 莫斯提马 S2 (chess_char_4_02-mostma.js): each second's strike on an enemy in her range ('timeLockHit', id = the
+  // enemy, src = her) plays the skill's hit mostma_skill_02_hit on it (index roles.hit: its ability's ON_ABILITY_HIT)
+  skchr_mostma_2: Object.freeze({ timeLockHit: binding({ owner: 'src', at: 'target', target: 'id', hit: true, during: true, keys: ['mostma_skill_02_hit'] }) }),
   skchr_lemuen_3: Object.freeze({
-    lock: binding({ owner: 'src', keys: ['lemuen_skill_03_crosshair_range', 'lemuen_skill_03_crosshair_02'], hold: 'lock', during: true }),
+    wanted: LEMUEN_WANTED, talent: LEMUEN_EXTRADITION,
+    lock: binding({ owner: 'src', keys: ['lemuen_skill_03_crosshair_range', 'lemuen_skill_03_crosshair_02', 'lemuen_skill_03_crosshair_01', 'lemuen_skill_03_trail_01'], hold: 'lock', during: true }),
+    bombardShell: binding({ owner: 'id', keys: ['lemuen_skill_03_trail_02'], at: 'point', hold: 'fx', holdS: 0.3, during: true }),
     bombard: binding({ owner: 'id', projectile: 'projectile_chr_lemuen_s3_attack', at: 'point', holdS: 2, during: true }),
   }),
   // 泡泡 S2 (chess_char_2_08-bubble.js): she makes no attack; every damage instance she takes strikes back at its source
@@ -1472,8 +1959,20 @@ export const FX_BINDINGS = Object.freeze({
  * projectile field its `part` names (`toTargetOnStart`: a projectile that plays its area on its target as it starts,
  * 萨卡兹枯朽战士's) —, lower case; [] without them.
  */
+/** (fork) Every projectile key a `flight` binding may fly. */
+export function flightProjectiles(f) {
+  return [...new Set(['side', 'up', 'down'].flatMap((k) => (Array.isArray(f?.[k]) ? f[k] : [])).map(lc).filter(Boolean))];
+}
+
 export function bindingEffects(idx, bind) {
   if (Array.isArray(bind?.keys)) return bind.keys.map(lc).filter(Boolean);
+  if (bind?.fan) { const p = idx?.projectiles?.[lc(bind.fan.projectile)]; return p ? (p.effects || []).map(lc).filter(Boolean) : []; }
+  if (bind?.keysBy) return Object.values(bind.keysBy.map).flat().map(lc).filter(Boolean);
+  if (bind?.keysIf) return [...bind.keysIf.yes, ...bind.keysIf.no].map(lc).filter(Boolean);
+  if (bind?.flight) {
+    const ps = flightProjectiles(bind.flight).map((k) => idx?.projectiles?.[lc(k)]).filter(Boolean);
+    return [...new Set(ps.flatMap((p) => [p.main, ...(bind.flight.reached ? p.onReached || [] : [])]).map(lc).filter(Boolean))];
+  }
   const p = bind?.projectile ? idx?.projectiles?.[lc(bind.projectile)] : null;
   if (!p) return [];
   const list = bind.part ? (Array.isArray(p[bind.part]) ? p[bind.part] : [])
@@ -1511,14 +2010,23 @@ export const BOUND_BY_SKILL = Object.freeze((() => {
  */
 export const FX_COVER = Object.freeze({
   skchr_yu_3: Object.freeze(['firewall']), // YuS3EffectBehaviour's per-grid wall, held for the skill
+  // (fork) 缇缇 S3 (chess_char_5_02-titi.js): a woken enemy's burst — the official wake hit (titi_skill_03_hit_02, fx 'tick') shows it
+  skchr_titi_3: Object.freeze(['wake']),
+  // (fork) 余 S2 (chess_char_6_03-yu.js): a teleported enemy — the official teleport effect (yu_skill2_teleport_02, fx 'tick') shows it
+  skchr_yu_2: Object.freeze(['teleport']),
   // 莫斯提马 S2: the zone at her feet — the skill's range rows (mostma_skill_02_range / _range_02) and loop show it
   skchr_mostma_2: Object.freeze(['zone']),
+  // (fork) 莫斯提马 S3: each attack's ripple — the skill's range row (mostma_skill_03_range, its outfits' twins) is the wave
+  skchr_mostma_3: Object.freeze(['ripple']),
   // 白面鸮 S2: the heal field at her — the client shows the skill's loop on her (plosis_attack_01_start), no area
   skchr_plosis_2: Object.freeze(['healField']),
   // 流明 S1: the heal field on his patient — the skill's buff on its target (lumen_skill_01_range) plays there with the heal
   skchr_lumen_1: Object.freeze(['healField']),
   // 凛御银灰 S2: the blast in front of her — her skill attack's own cast / range / hit (svash2_skill_02_*_01)
   skchr_svash2_2: Object.freeze(['aoe']),
+  // (fork) 烛煌 S3: each bolt's fire splash — her S3 mode attack's own hits (blaze2_skill_03_hit / _hit_02) are the
+  // explosion at the target; the procedural splash drew a stand-in orange ring on top (the user, 2026-11-10)
+  skchr_blaze2_3: Object.freeze(['splash']),
   // 远牙 S2, 溯光星源 S3: the link at the cast — the skills' loops (fartth_skill_02_buff; halo2_skill_03_buff_01 / _03)
   skchr_fartth_2: Object.freeze(['link']),
   skchr_halo2_3: Object.freeze(['link']),
@@ -1582,6 +2090,7 @@ export function enemyCoverOf(unitKey, prefabKey, kind) {
 export function bindingKeys(idx, skillId) {
   const out = new Set();
   for (const bind of Object.values(FX_BINDINGS[lc(skillId)] || {})) for (const k of bindingEffects(idx, bind)) out.add(k);
+  for (const k of FX_HIT_TILES[lc(skillId)] || []) out.add(lc(k));   // (fork) and its hit tiles (skillfx _hitTile)
   return [...out];
 }
 

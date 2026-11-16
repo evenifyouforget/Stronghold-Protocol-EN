@@ -162,7 +162,8 @@ function s2Burst(battle, unit, target, attackId, b2) {
     for (const a of battle.alliesInRadius(x, y, S2_RADIUS)) if (battle.allySelectable(a, unit)) battle.heal(unit, a, healAmt, { ignoreHealFree: true });
   };
   battle.fx('aoe', { x, y, radius: S2_RADIUS, id: unit.id, skill: TAG_S2 });
-  battle.fx('healAoe', { x, y, radius: S2_RADIUS, id: unit.id });
+  // (fork) onEnemy: the client's follow-up splash is the struck unit's side's (render/vfx/skills.js FX_BINDINGS)
+  battle.fx('healAoe', { x, y, radius: S2_RADIUS, id: unit.id, onEnemy });
   if (onEnemy) { hurt(); mend(); } else { mend(); hurt(); }
 }
 
@@ -217,6 +218,8 @@ function land(battle, unit) {
     battle.refreshRange(unit);
   }
   battle.fx('teleport', { x: unit.x, y: unit.y, id: unit.id, fromX: f.from.x, fromY: f.from.y });
+  // (fork) the client's RespawnBorn (kalts2_s_3[restore]): kalts2_skill_03_teleport_end_01 where she lands (talentfx 'ability')
+  battle.fx('ability', { x: unit.x, y: unit.y, id: unit.id, name: 'kalts2_s_3[restore]' });
 }
 
 /** S3 ①②: the 待投放 operators and the flight to `anchor`. */
@@ -242,6 +245,8 @@ function startTransport(battle, unit, anchor) {
   battle.releaseBlocked(unit);
   unit.hidden = true;
   battle.fx('disappear', { x: unit.x, y: unit.y, id: unit.id });
+  // (fork) the client's StartTransporting (kalts2_s3_trigger_transporting): its kalts2_skill_03_teleport_01 (talentfx 'ability')
+  battle.fx('ability', { x: unit.x, y: unit.y, id: unit.id, name: 'kalts2_s3_trigger_transporting' });
   collide(battle, unit, f);
   battle.after(T, () => land(battle, unit), { owner: unit });
 }
@@ -268,8 +273,7 @@ export default {
         [S1]: { kind: 'duration', mods: { atkPct: num(b1.atk), aspd: num(b1.attack_speed) } },
         [S2]: {
           kind: 'ammo',
-          // The larger active range contains attack targets as well as patients (#406).
-          trigger: { rule: 'ACTIVE_RANGE', grid: s2?.rangeGrid, enemies: true },
+          // 技能策略: the data's official trigger list (officialUnitBuilder officialTrigger, the owner's decision of 2026-11-10): an enemy or a patient (#406) in the skill's range
           ammo: Math.max(1, Math.floor(num(b2['attack@trigger_time'], 10))),
           mods: { atkPct: num(b2.atk) },
           targeting: s2?.rangeGrid ? { rangeGrid: s2.rangeGrid } : undefined,

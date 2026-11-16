@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
 
@@ -82,11 +82,13 @@ test('a 自选 pick: 斩业星熊 is offered at tiers 5 and 6 (she has a kit) an
     { ok: true, picks: { [SLOT[6]]: { charId: HSG, skillIndex: 2, uniEquipId: ASTX } } });
 });
 
-test('triggers: S1 (AUTO, self buff) fires at full SP with no enemy (the kit\'s SP_FULL); S2 (AUTO) keeps the data DEFAULT; S3 (MANUAL) the data\'s ACTIVE_RANGE on its x-2 (rawRule TAKE_DAMAGE): an enemy two tiles ahead casts it, a shot from outside the x-2 does not', () => {
+test('triggers: S1 (AUTO, self buff) fires at full SP with no enemy (the kit\'s SP_FULL); S2 (AUTO) keeps the data DEFAULT; S3 (MANUAL) the official 重装 row [ON_TAKE_DAMAGE, SKILL_RANGE_ENEMY] = TAKE_DAMAGE + SKILL_RANGE on its x-2: an enemy two tiles ahead casts it, and so does a shot from outside the x-2', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const form = formOf(tier, elite);
-    assert.deepEqual(form.skills.map((s) => [s.skillType, s.trigger.rule, s.trigger.rawRule]), [['AUTO', 'DEFAULT', 'DEFAULT'], ['AUTO', 'DEFAULT', 'DEFAULT'], ['MANUAL', 'ACTIVE_RANGE', 'TAKE_DAMAGE']], `T${tier}: data`);
-    assert.deepEqual(form.skills[2].trigger.customRangeGrid, form.skills[2].rangeGrid, `T${tier}: the running x-2`);
+    assert.deepEqual(form.skills.map((s) => [s.skillType, s.trigger.rule, s.trigger.rawRule]), [['AUTO', 'DEFAULT', 'DEFAULT'], ['AUTO', 'DEFAULT', 'DEFAULT'], ['MANUAL', 'TAKE_DAMAGE', 'ON_TAKE_DAMAGE']], `T${tier}: data`);
+    assert.deepEqual(form.skills[2].trigger.official, ['ON_TAKE_DAMAGE', 'SKILL_RANGE_ENEMY'], `T${tier}: official types`);
+    assert.deepEqual(form.skills[2].trigger.also.map((a) => a.rule), ['SKILL_RANGE'], `T${tier}: the second rule`);
+    assert.deepEqual(form.skills[2].trigger.also[0].customRangeGrid, form.skills[2].rangeGrid, `T${tier}: SKILL_RANGE on the running x-2`);
     // S1: no enemy at all
     const a = field({ tier, elite, skill: 0 });
     assert.deepEqual([a.u.skill.rule, a.u.skill.spType, a.u.skill.kind], ['SP_FULL', 'hurt', 'toggle'], `T${tier} S1`);
@@ -104,15 +106,18 @@ test('triggers: S1 (AUTO, self buff) fires at full SP with no enemy (the kit\'s 
     done(b.h);
     // S3: the x-2
     const c = field({ tier, elite, skill: 2 });
-    assert.equal(c.u.skill.rule, 'ACTIVE_RANGE', `T${tier} S3`);
-    c.h.spawn('enemy_shooter', { pos: [10, 9] });
-    c.u.skill.gainSp(999);
-    c.h.run(3);
-    assert.ok(c.h.hooksOf('damaged').some((x) => x.target === c.u), `T${tier} S3: she is being shot`);
-    assert.equal(c.u.skill.activations, 0, `T${tier} S3: a hit from outside the x-2 casts nothing`);
+    assert.deepEqual(c.u.skill.rules, ['TAKE_DAMAGE', 'SKILL_RANGE'], `T${tier} S3`);
     c.h.spawn('enemy_dummy', { pos: [10, 7] });
-    assert.ok(c.h.runUntil(() => c.u.skill.activations === 1, 1), `T${tier} S3: an enemy two tiles ahead (outside her 1-1) casts it`);
+    c.u.skill.gainSp(999);
+    assert.ok(c.h.runUntil(() => c.u.skill.activations === 1, 1), `T${tier} S3: an enemy two tiles ahead (outside her 1-1, on the x-2) casts it`);
     done(c.h);
+    // the TAKE_DAMAGE entry: a shot from outside the x-2 (the shooter stands 4 tiles away) sets it off at the hit
+    const d = field({ tier, elite, skill: 2 });
+    d.h.spawn('enemy_shooter', { pos: [10, 9] });
+    d.u.skill.gainSp(999);
+    assert.ok(d.h.runUntil(() => d.u.skill.activations === 1, 3), `T${tier} S3: a hit from outside the x-2 casts it (TAKE_DAMAGE)`);
+    assert.ok(d.h.hooksOf('damaged').some((x) => x.target === d.u), `T${tier} S3: she was shot`);
+    done(d.h);
   }
 });
 
@@ -156,10 +161,15 @@ test('S2 无始无明 (AUTO, attack SP 9 / 7): the cast\'s attack throws the shi
     // two enemies on her own tile, blocked: the shield (1.2 tiles out, radius 1.0) never reaches her centre
     const a = h.spawn('enemy_dummy', { pos: [10, 5] }), b = h.spawn('enemy_dummy', { pos: [10, 5] });
     assert.ok(h.runUntil(() => u.blocking.length === 2, 1), `T${tier}: both blocked`);
+    // SP only between two casts: a skill that starts inside a plain attack's wind-up (official cast → hit) does not replace that attack
+    assert.ok(h.runUntil(() => !u.cast, 2), `T${tier}: between casts`);
     u.skill.gainSp(999);
     const n0 = h.hooksOf('damaged').length;
     assert.ok(h.runUntil(() => u.skill.active, 3), `T${tier}: cast`);
+    // the cast's attack throws the shield one wind-up after the cast (official cast → hit): the flight is timed from the throw
+    assert.ok(h.runUntil(() => mine(h, u, n0).some((c) => c.dmg.isAttack), 2), `T${tier}: the throw`);
     const t0 = h.b.time;
+    h.run(0.3); // the 3 hits of the throw follow each other
     const throwHits = mine(h, u, n0).filter((c) => c.dmg.isAttack);
     assert.equal(new Set(throwHits.map((c) => c.dmg.attackId)).size, 1, `T${tier}: one attack`);
     for (const e of [a, b]) {
@@ -192,6 +202,8 @@ test('S2 shield: within 1.0 of it a targetable ground enemy slows it to 18°/s; 
     h.b.addBuff(u, { key: 'test:healFree', flags: { healFree: true, noHeal: true } }); // her 禁疗 (as in 我执)
     u.skill.gainSp(999);
     assert.ok(h.runUntil(() => u.skill.active, 3), `T${tier}: cast`);
+    // the shield is thrown by the cast's attack, one wind-up after the cast (official cast → hit): the turn is timed from the throw
+    assert.ok(h.runUntil(() => h.hooksOf('damaged').some((c) => c.source === u && c.dmg.isAttack), 2), `T${tier}: the throw`);
     const t0 = h.b.time;
     const atk = u.s.atk; // at full HP (no 坚忍): the hits and heals below use it
     h.runUntil(() => h.hooksOf('damaged').some((c) => c.source === u && c.dmg.tags?.includes('hsgma2:shield')), 1);
@@ -401,7 +413,7 @@ test('AST-X 无迹 trait (stages 1 and 3, during skill): every damage instance o
     if (x) assert.deepEqual(modOf(tier, ASTX).traitOverride.bb, { atk_scale: 0.1 }, label(f));
     const { h, u } = field({ tier, elite, mod, skill: 2 });
     noSp(h, u);
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     const e = h.spawn('enemy_dummy', { pos: [10, 6] });
     h.run(3.5);
     const atk = mine(h, u).filter((c) => c.dmg.isAttack);
@@ -422,7 +434,7 @@ for (const dodge of [false, true]) test(`AST-X output uses precomputed ADDITION/
   const { h, u } = field({ tier: 6, elite: true, mod: ASTX, skill: 2 });
   const b = h.b, e = h.spawn('enemy_dummy', { pos: [10, 7] });
   u.atkCd = 999;
-  assert.ok(u.skill.activate('test', { free: true }));
+  assert.ok(castNow(u, 'test', { free: true }));
   if (dodge) b.addBuff(e, { key: 'dodge', mods: { dodgeArts: 1 } });
   let calculations = 0;
   b.on('damageCalculate', c => { if (c.source === u) { calculations++; c.dmg.amount *= 2; } });
@@ -448,7 +460,7 @@ test('AST-X incoming reflection is precomputed NORMAL/NONE without a recursive o
   const { h, u } = field({ tier: 6, elite: true, mod: ASTX, skill: 2 });
   const b = h.b, e = h.spawn('enemy_dummy', { pos: [10, 7] });
   u.atkCd = 999;
-  assert.ok(u.skill.activate('test', { free: true }));
+  assert.ok(castNow(u, 'test', { free: true }));
   let calculations = 0;
   b.on('damageCalculate', c => { if (c.source === u) calculations++; });
   const out = [];
@@ -466,7 +478,7 @@ test('AST-X incoming reflection is precomputed NORMAL/NONE without a recursive o
 for (const attackType of ['SPLASH', 'BUFF', 'ADDITION', 'NONE']) test(`AST-X output excludes ${attackType} even with attack behavior`, () => {
   const { h, u } = field({ tier: 6, elite: true, mod: ASTX, skill: 2 });
   const b = h.b, e = h.spawn('enemy_dummy', { pos: [10, 7] });
-  assert.ok(u.skill.activate('test', { free: true }));
+  assert.ok(castNow(u, 'test', { free: true }));
   const out = [];
   b.on('damageOutput', c => { if (c.dmg.tags.includes('hsgma2:astx')) out.push(c); });
   b.dealDamage({ source: u, target: e, amount: 100, type: 'true', attackType, isAttack: true });
@@ -479,7 +491,7 @@ test('AST-X ADDITION does not retrigger Pegasus, while the original attack still
     items: ['chess_item_5_09_e_a', 'chess_item_6_01_e_a'] });
   const b = h.b, e = h.spawn('enemy_dummy', { pos: [10, 7] });
   u.atkCd = 999;
-  assert.ok(u.skill.activate('test', { free: true }));
+  assert.ok(castNow(u, 'test', { free: true }));
   const rows = [];
   b.on('damageApplied', c => { if (c.target === e) rows.push(c); });
   b.dealDamage({ source: u, target: e, amount: 100, type: 'phys', isAttack: true });

@@ -68,7 +68,7 @@ export function createBotRun(world, env) {
 
   const take = () => { const out = moves; moves = []; return out; };
   /** Step a generator to its end. */
-  const drive = (gen) => { let r; do { r = gen.next(); } while (!r.done); return r.value; }; // loop-cap: one pass per step of the bot's generator, which bounds its own steps
+  const drive = (gen) => { let r; do { r = gen.next(); } while (!r.done); return r.value; }; // loop-cap: generator
 
   let job = null;
   return {

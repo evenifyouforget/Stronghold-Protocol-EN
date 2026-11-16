@@ -113,6 +113,14 @@ const RANGE_RULES = new Set(['SEARCH', 'CUSTOM_RANGE', 'SKILL_RANGE', 'ACTIVE_RA
  */
 function targetMet(u) {
   const sk = u.skill;
+  if (ruleTargetMet(u)) return true;
+  // an official trigger list (skills.js `alsoRules`): any of its further rules, each on its own range (OR)
+  return (sk.alsoRules || []).some((e) => sk._withRule(e, () => ruleTargetMet(u)));
+}
+
+/** targetMet for the rule the skill holds now (`sk.rule`, its grid and ally flag). */
+function ruleTargetMet(u) {
+  const sk = u.skill;
   if (NO_TARGET_RULES.has(sk.rule)) return enemyInReach(u);
   if (RANGE_RULES.has(sk.rule)) return !!sk._tickRuleSatisfied();
   return sk.triggerAllies ? !!sk._allyTriggerSatisfied() : !!sk._defaultCondition();
@@ -190,17 +198,25 @@ function installShared(battle) {
 }
 
 /**
+ * (fork) The client's trigger-effect buffs whose fired buff glows on its holder (b.snap fxs; render/vfx/skills.js
+ * STATE_BUFFS): S1's tocka_s1[shield] (tocka_skill_01_buff_01, while the barrier lasts), S2's tocka_s2[auto_skill]
+ * (tocka_skill_02_buff_01, buff_duration), S3's tocka_s3[bonus] (tocka_skill_03_buff_04, bonus_duration) — each created
+ * by the template named here when the effect fires (config/buff_template_holder.ab). Display only.
+ */
+const STATE_FX = Object.freeze({ s1: 'tocka_s1[trigger]', s2: 'tocka_s2[trigger]', s3: 'tocka_s3[trigger]' });
+
+/**
  * S1's barrier on `holder`: max(its S1 barrier left, `amount`) — the old one cleared first (PRTS S1 备注) — losing a fixed
  * initial / `dur` every second until it is gone [ASSUMED: one-second steps].
  */
-function barrier(battle, holder, amount, dur, source) {
+function barrier(battle, holder, amount, dur, source) { // (fork) its glow: tocka_s1[shield] (STATE_FX)
   const old = holder.findBuff(BARRIER);
   const total = Math.max(amount, old ? old.shield : 0);
   if (old) battle.removeBuff(holder, old);
   if (!(total > 0)) return;
   const step = dur > 0 ? total / dur : 0;
   battle.addBuff(holder, {
-    key: BARRIER, shield: total, duration: dur > 0 ? dur : Infinity, source, tags: ['skill'],
+    key: BARRIER, shield: total, duration: dur > 0 ? dur : Infinity, source, tags: ['skill'], fx: STATE_FX.s1, fxSrc: source?.id ?? null,
     interval: step > 0 ? 1 : 0,
     onTick: step > 0 ? ({ battle: b, unit, buff }) => {
       buff.shield = Math.max(0, buff.shield - step);
@@ -216,6 +232,7 @@ function decayingAtk(battle, u, key, init, dec, dur, source) {
   if (!(init > 0) || !(dur > 0)) return;
   battle.addBuff(u, {
     key, duration: dur, mods: { atkPct: init }, interval: 1, source, data: { v: init }, tags: ['skill'],
+    fx: STATE_FX.s3, fxSrc: source?.id ?? null, // (fork) its glow: tocka_s3[bonus]
     onTick: ({ unit, buff }) => {
       buff.data.v = Math.max(0, buff.data.v - dec);
       buff.mods = { atkPct: buff.data.v };
@@ -252,7 +269,11 @@ export default {
       const hs = num(t0.heal_scale);
       const t = battle.injuredAlliesInKeys(tocka.rangeKeySet ?? tocka.rangeKeys, tocka)
         .filter((a) => isOp(a) && battle.allySelectable(a, tocka)).sort((a, b) => a.hpRatio - b.hpRatio || later(a, b))[0];
-      if (t && hs > 0) battle.heal(tocka, t, tocka.s.atk * hs);
+      if (t && hs > 0) {
+        battle.heal(tocka, t, tocka.s.atk * hs);
+        // (fork) the client's tocka_t1[sp_and_heal] heal hit (tocka_heal_01_hit_01, once) on the healed ally — display only
+        battle.fxState(t, 'tocka_t1[sp_and_heal]', true, { src: tocka, dur: 0.6 });
+      }
     };
 
     /** What each effect does when it fires (`ctx`: the injury event for S1). */
@@ -267,6 +288,7 @@ export default {
         if (!(dur > 0)) return;
         battle.addBuff(holder, {
           key: ASPD + tocka.id, duration: dur, mods: { aspd: num(b2.attack_speed) }, source: tocka, tags: ['skill'],
+          fx: STATE_FX.s2, fxSrc: tocka.id, // (fork) its glow: tocka_s2[auto_skill]
           onRemove: ({ unit }) => syncAutoOpen(unit), onExpire: ({ unit }) => syncAutoOpen(unit),
         });
         syncAutoOpen(holder);
@@ -299,7 +321,9 @@ export default {
         buff.onTick = ({ battle: b, unit, buff: held }) => { if (castable(unit) && targetMet(unit)) fire(b, unit, held, { reason: 'ready' }); };
       }
       battle.addBuff(holder, buff);
-      battle.fx('buff', { x: holder.x, y: holder.y, id: holder.id, kind: 'tocka' });
+      battle.fx('buff', { x: holder.x, y: holder.y, id: holder.id, kind: 'tocka', src: tocka.id });   // (fork) src: render/vfx FX_BINDINGS
+      // tocka_s3[trigger] ON_BUFF_START: tocka_skill_03_buff_start_02 on the holder (a row of the listener's trigger: plan 'tick')
+      if (kind === 's3') battle.tickFx(tocka, holder, 'tocka:s3', 'tocka_skill_03_buff_start_02');
       if (applied && up(tocka)) battle.addBuff(tocka, { key: SNOW_READY, tags: ['talent'] });
     }
 

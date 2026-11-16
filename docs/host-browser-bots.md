@@ -178,7 +178,8 @@ has no direct writes to board, hand, funds or pieces. That is what makes a move 
 
 `Match` gets one option, `botExecution: 'local' | 'host'`. `new Match()` defaults to `local`, so tests, tools and golden
 results stay as they are. `server/lobby.js` passes `host` when `SP_BOT_EXECUTION=host`. In `host` mode a guard throws if
-bot decision code runs on the server.
+bot decision code runs on the server. `SP_HOST_BOT_STRATEGY` (`opts.hostBotStrategy`) gives host-run bots a strategy of their
+own, e.g. `ioleta-adaptive`, without changing what server-run bots play (docs/BOT_STRATEGIES.md).
 
 **The player's UI never shows a bot's task data.** `botHost.js` hands `b.botTask` straight to the Worker. The frames never
 reach the page's game store, so no screen can draw a bot's shop or a teammate's hand from them. A test asserts this.
@@ -335,6 +336,7 @@ hundreds of milliseconds, not seconds. Piece 6 measures how often this happens i
 | Rehearsal slice | 50 ms, so the Worker can hear cancel and hurry without being killed |
 | Receipt ack | 5 s, else fail over (2 s lost tasks in a real two-browser game: a page's main thread can be that busy) |
 | Plan batch after the receipt | 10 s, else fail over (a first Worker start took about 3.4 s on the desktop) |
+| Worker start, after a `starting` receipt | 30 s for `b.botLoaded`, else fail over; the 10 s plan window counts from `b.botLoaded` (the Worker's 424 modules took about 16 s on 5 Mbps / 100 ms). Counted only until that human's Worker has been up once on this connection, and cut to 10 s once every human is Ready |
 | Grace on top of the budget | 3 s, else fail over |
 
 **On overrun, keep the best layout.** `RehearsalRun` keeps its best score so far, and the candidates are already ordered with
@@ -375,7 +377,18 @@ receipt, or a second `plan` batch for the same task, is ignored, so an executor 
 
 **As built (piece 7):** a pick is one `final` batch with one move. It has no budget of its own: the 5 s receipt and 10 s plan windows
 apply, and a timed draft turn still ends at its deadline. So the first pick of a match does not wait for a Worker to start, `b.botWarm`
-tells the first executor at the briefing, and the page starts the Worker when it is idle. The local path runs its picks on seat streams
+tells the first executor at the briefing, and the page starts the Worker when it is idle.
+
+**As built (bot warm order, 2026-11-09):** what the screen needs now loads first. The page builds the Worker for `b.botWarm` or a
+task only once the briefing and the band draft's art are in (`loadLater.js` `whenScreenSettled`, 10 s at most), because its
+module graph shared the link with that art: on 10 Mbps / 40 ms the band icons came 4 s later. A battle never waits. While the
+Worker is still starting, the receipt says `starting: true`, the server allows 30 s (`BOT_START_MS`) for `b.botLoaded`, and the
+10 s plan window counts from there. A slow start is no strike; a Worker that never comes up still fails over within 40 s, and
+the band pick then falls back to the next human and `timeoutBand`. (Review, 2026-11-09) `starting` counts only until that human's
+Worker has been up once on this connection (a `b.botLoaded`, a plain receipt or a plan): a page that claims it on every task gets
+the plain 10 s window, so it can't hold each seat for 40 s. A reconnect, a hidden tab or a departure clears it, since that page's
+Worker really is cold. Once every human is Ready, a seat still starting gets 10 s from the hurry, and the page stops waiting for
+the screen. A reconnecting first executor gets `b.botWarm` again. The local path runs its picks on seat streams
 too when `seatStreams` is on, which keeps the same-seed parity test meaningful.
 
 **The guard:** in host mode the match holds its strategies through `guardBotStrategy`, so `pickBand`, `pickCard`, `prepBegin` and
@@ -413,8 +426,11 @@ humans who left the match or humans who are only disconnected. **The user's rule
 with the 8-player mode in mind. The executor could fake such a field's result within the bounds check (`botField`); the user accepted
 that risk. A human who disconnects mid-battle hands their field to the same chain (`_authorityLost`, `_bossHandover`; a boss field
 goes on live from the field's clock). Back mid-battle, they watch: the executor's result stands, their own reports are ignored, and
-the board is theirs again at the next prep. A leaver's own battle ends at once with a synthetic result (中途退出, "quitting
-mid-match"), so no browser is asked for it. A Worker runs the spec headless and
+the board is theirs again at the next prep. Leaving (g.leave, or the rejoin window running out)
+eliminates in every room type, the Grand Alliance included (中途退出, "quitting mid-match"; user, 2026-11-11). A battle the
+leaver was fighting plays out to its natural end, handed at once to the same chain as a disconnect's (a boss field to the
+partner first): nobody waits for a silent field, and the server never runs it. From the next round on the seat has no
+field, no prep and no AI. During the rejoin window (only disconnected) nothing changes. A Worker runs the spec headless and
 sends the result early, and the server holds it until the battle's natural end with the existing `_armRelease`, so pacing and
 teammates' progress UI do not change.
 
@@ -424,7 +440,7 @@ teammates' progress UI do not change.
 | Timeout, or host gone | Next human, then a synthetic result (`syntheticResult`: no kills, no leaks). Never `_runOnServer`. |
 | Layer traits (`requiresTraitLayerAuthority`, `fields.js:793`) | A field with no connected human is exempt, and gains stay capped by the existing allowance. A field with a connected human keeps upstream's rule (the server runs it). |
 | A human's field with that human disconnected, at the start or mid-battle | A browser runs it like a bot field, never the server. With no browser at all, the synthetic result. |
-| A field whose humans all left | The same. A human who leaves is eliminated, so this is a field shared with bots that was running when they left. |
+| A field whose humans all left | The same: it was running when they left (leaving eliminates, so later rounds have no such field). It plays out in a browser. |
 | Bot-only boss field | Runs live in the Worker on the field's clock and reports at 4 Hz through `b.progress` and `b.result`, so the existing boss rules apply. A silent or lost executor hands it to the next human; with nobody left, a synthetic result stands (piece 9) |
 | Bot-only joint field (seen in the run: `ai_2+ai_1:server`) | Same burst path as a normal field |
 
@@ -437,6 +453,14 @@ Battle work and prep work never overlap, because they belong to different phases
 `SP_BOT_REHEARSAL_HOST`, `botRehearsalHost`, `canDelegateRehearsal`, the delegation's default-on and the fork's edits to `bot.js`, which
 now differs from upstream only by its CPU meter. **So without `SP_BOT_EXECUTION=host` nothing offers a rehearsal to a browser any more:
 with the live `SP_BOT_REHEARSAL=0`, bots keep their heuristic layout until the flag is on.**
+
+**One fork addition to the dormant path (2026-11-09):** with `SP_BOT_REHEARSAL=host`, the server sends the host `b.rehearsalWarm` at
+the briefing (and a new host on a host change), and `rehearsal.js` builds its Worker and hands it the data once the screen has settled.
+A prep's tasks arrive together, each with its own answer window, and a cancel terminates a running Worker, so a cold start answered
+none of round 1's tasks (`ioleta-adaptive-ws-delegation`). The windows, the timeout fallback and the cancel rules are unchanged.
+(Review, 2026-11-09) A host that reconnects is warmed again (its page dropped the Worker with the socket), a Worker that a cancel
+terminated is replaced by a warm one when nothing is queued, and host execution (`SP_BOT_EXECUTION=host`), where the server never
+runs a bot prep and so never delegates a rehearsal, sends no warm at all.
 
 | Item | Action |
 |------|--------|

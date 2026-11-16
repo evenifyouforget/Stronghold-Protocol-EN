@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, checkInvariants, castNow, throughBegin } from '../helpers/battleHarness.js';
+import { allyCastWindup } from '../../server/sim/ai.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
 import { canTargetAlly } from '../../server/sim/targeting.js';
@@ -53,7 +54,7 @@ function done(h) {
   assert.equal(h.b.errors.length, 0, JSON.stringify(h.b.errors[0]));
 }
 
-test('予愿安洁莉娜 in every 自选 form: her operator kit (all three skills authored), the form\'s stats, 2-2, melee physical that hits air units, blocks 2, 叙拉古, no 特质; S1 a timed deployment skill, S2 / S3 the data\'s ACTIVE_RANGE', () => {
+test('予愿安洁莉娜 in every 自选 form: her operator kit (all three skills authored), the form\'s stats, 2-2, melee physical that hits air units, blocks 2, 叙拉古, no 特质; S1 a timed deployment skill, S2 / S3 the official [DEFAULT, SKILL_RANGE on their own grid] (巡空者 row COMBAT_OR_ATTACK + SKILL_RANGE_ENEMY)', () => {
   assert.equal(OPERATOR_KITS[AGL], KITS[AGL]);
   for (const f of FORMS_ALL) {
     const [tier, elite] = f;
@@ -69,7 +70,9 @@ test('予愿安洁莉娜 in every 自选 form: her operator kit (all three skill
         assert.deepEqual(u.liveRangeGrid, form.skills[0].rangeGrid, `${label(f)}: 3-6 while it runs`);
       } else {
         assert.equal(u.skill.rule, form.skills[skill].trigger.rule, `${label(f)}: the data's trigger`);
-        assert.equal(u.skill.rule, 'ACTIVE_RANGE');
+        assert.deepEqual(u.skill.rules, ['DEFAULT', 'SKILL_RANGE']);
+        assert.deepEqual(form.skills[skill].trigger.official, ['COMBAT_OR_ATTACK', 'SKILL_RANGE_ENEMY']);
+        assert.deepEqual(u.skill.alsoRules[0].grid, form.skills[skill].rangeGrid, `${label(f)}: SKILL_RANGE on the skill's own grid`);
         assert.deepEqual(u.liveRangeGrid, form.rangeGrid, `${label(f)}: 2-2`);
         assert.ok(!u.s.flags.liftoff && !u.s.flags.blockFly, `${label(f)}: on the ground`);
       }
@@ -101,7 +104,7 @@ test('trait 巡空者: on the ground she blocks ground enemies, not flyers; airb
     assert.notEqual(fl.blockedBy, u, `${label(f)}: no air block on the ground`);
     h.b.kill(fl, null);
     // S2: take off (the walker walks on)
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     assert.ok(u.s.flags.liftoff && u.s.flags.blockFly, `${label(f)}: airborne`);
     assert.equal(w.blockedBy, null, `${label(f)}: the ground enemy released`);
     assert.equal(canTargetAlly(w, u, true), false, `${label(f)}: 对地规避`);
@@ -223,13 +226,13 @@ test('S1 极速送达 (被动 ON_DEPLOY): at each deployment she takes off for 5
   }
 });
 
-test('S2 重力自定义 (MANUAL, data ACTIVE_RANGE on 3-10): takes off; 2.5 s 吟唱 (no attack, 无敌, control statuses refused) while the sweep (3.0 wide, 1.3 thick, 6 tiles/s, 4 tiles ahead) 浮空s ground enemies 10 / 12 s and 缚地s flyers 20 / 22 s; then ATK +105 % / +135 %, interval −0.6 / −0.8 s, arts, 4 / 5 targets, range 3-10; 22 s', () => {
+test('S2 重力自定义 (MANUAL, data DEFAULT + SKILL_RANGE on 3-10): takes off; 2.5 s 吟唱 (no attack, 无敌, control statuses refused) while the sweep (3.0 wide, 1.3 thick, 6 tiles/s, 4 tiles ahead) 浮空s ground enemies 10 / 12 s and 缚地s flyers 20 / 22 s; then ATK +105 % / +135 %, interval −0.6 / −0.8 s, arts, 4 / 5 targets, range 3-10; 22 s', () => {
   for (const f of FORMS_ALL) {
     const [tier, elite] = f;
     const sk = skillOf(tier, elite, S2);
     assert.deepEqual([sk.duration, sk.bb.atk, sk.bb.base_attack_time, sk.bb['attack@max_target'], sk.bb.chant_duration, sk.bb.buff_duration_levitate, sk.bb.buff_duration_ground_bound, sk.spCost, sk.initSp, sk.rangeId],
       [22, elite ? 1.35 : 1.05, elite ? -0.8 : -0.6, elite ? 5 : 4, 2.5, elite ? 12 : 10, elite ? 22 : 20, elite ? 29 : 32, elite ? 20 : 17, '3-10'], label(f));
-    assert.deepEqual(sk.trigger.customRangeGrid, sk.rangeGrid);
+    assert.deepEqual(sk.trigger.also.map((e) => [e.rule, e.customRangeGrid]), [['SKILL_RANGE', sk.rangeGrid]]);
     const { h, u } = field({ tier, elite, skill: 1 });
     u.skill.gainSp(999);
     h.run(1);
@@ -239,7 +242,7 @@ test('S2 重力自定义 (MANUAL, data ACTIVE_RANGE on 3-10): takes off; 2.5 s �
     const fl = h.spawn('enemy_fly', { pos: [9, 6] });           // swept flyer
     const far = h.spawn('enemy_dummy', { pos: [10, 9] });       // 5 ahead: not swept
     const wide = h.spawn('enemy_dummy', { pos: [12, 6] });      // 2 aside: not swept
-    assert.ok(h.runUntil(() => u.skill.active, 1), `${label(f)}: cast with an enemy in 3-10 (none in her 2-2)`);
+    assert.ok(h.runUntil(() => u.skill.active, 1 + u.skill.beginDur), `${label(f)}: cast with an enemy in 3-10 (none in her 2-2)`);
     assert.ok(u.s.flags.liftoff, `${label(f)}: airborne`);
     assert.ok(u.s.flags.disarm && u.s.flags.invulnerable, `${label(f)}: 吟唱`);
     assert.equal(h.b.applyStatus(u, 'stun', { duration: 3, source: g }), false, `${label(f)}: control statuses refused while gliding`);
@@ -258,8 +261,11 @@ test('S2 重力自定义 (MANUAL, data ACTIVE_RANGE on 3-10): takes off; 2.5 s �
     approx(u.s.interval, (1.5 + sk.bb.base_attack_time) * 100 / u.s.aspd, `${label(f)}: interval`);
     for (const p of [[9, 7], [11, 5], [9, 8], [11, 8]]) h.spawn('enemy_dummy', { pos: p });
     const n0 = ANY_ATK(h, u).length;
+    // the attack cast just before the four appeared keeps its locked targets (official cast → hit): let it land, then take the next one
     assert.ok(h.runUntil(() => ANY_ATK(h, u).length > n0, 3));
-    const a1 = ANY_ATK(h, u)[n0];
+    const preId = ANY_ATK(h, u)[n0].dmg.attackId;
+    assert.ok(h.runUntil(() => ANY_ATK(h, u).some((c, i) => i >= n0 && c.dmg.attackId !== preId), 4));
+    const a1 = ANY_ATK(h, u).find((c, i) => i >= n0 && c.dmg.attackId !== preId);
     const one = ANY_ATK(h, u).filter((c) => c.dmg.attackId === a1.dmg.attackId);
     assert.equal(one.length, sk.bb['attack@max_target'], `${label(f)}: ${sk.bb['attack@max_target']} targets`);
     assert.ok(one.every((c) => c.type === 'arts'), `${label(f)}: arts`);
@@ -271,7 +277,7 @@ test('S2 重力自定义 (MANUAL, data ACTIVE_RANGE on 3-10): takes off; 2.5 s �
   }
 });
 
-test('S3 酸橙的心事 (MANUAL, data ACTIVE_RANGE on 3-9): 30 / 31 bullets, ATK +20 % / +30 %, 对空庇护 55 % / 60 %, range 3-9 + the 8 around her; each attack 275 % / 305 % on ≤ 3 ground enemies and flyers up to 4; flyers in range ×0.6 speed', () => {
+test('S3 酸橙的心事 (MANUAL, data DEFAULT + SKILL_RANGE on 3-9): 30 / 31 bullets, ATK +20 % / +30 %, 对空庇护 55 % / 60 %, range 3-9 + the 8 around her; each attack 275 % / 305 % on ≤ 3 ground enemies and flyers up to 4; flyers in range ×0.6 speed', () => {
   for (const f of FORMS_ALL) {
     const [tier, elite] = f;
     const sk = skillOf(tier, elite, S3);
@@ -360,4 +366,21 @@ test('S3 move: blocking nothing, she flies (2 tiles/s, 无敌, disarmed) to the 
     assert.deepEqual([u.tileR, u.tileC], at, 'no move while blocking');
     done(h);
   }
+});
+
+test('(fork) S3 takeoff fx: the original 3-9 of her deployment tile (`range`, [row, col]) and `around` 1 (the 8 tiles around her), for the client\'s range line (render/vfx/pathfx.js)', () => {
+  const { h, u } = field({ tier: 5, skill: 2 });
+  u.skill.gainSp(999);
+  h.spawn('enemy_dummy', { pos: [10, 6] });
+  assert.ok(h.runUntil(() => u.skill.active, 1), 'cast');
+  const fx = h.eventsOf('fx').filter((e) => e[1] === 'takeoff' && e[4]?.id === u.id);
+  assert.equal(fx.length, 1, 'one takeoff, at the cast');
+  const { range, around } = fx[0][4];
+  assert.equal(around, 1);
+  const keys = range.map(([r, c]) => r * 21 + c).sort((a, b) => a - b);
+  const sk = skillOf(5, false, S3);
+  assert.equal(keys.length, sk.rangeGrid.length, 'the 3-9, tile for tile');
+  for (const k of keys) assert.ok(u.rangeKeySet.has(k), 'each tile is in her running range');
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) assert.ok(u.rangeKeySet.has((10 + dr) * 21 + 4 + dc), `(${10 + dr}, ${4 + dc}) around her`);
+  done(h);
 });

@@ -21,6 +21,8 @@
 //   s.simFx(kind, x, y, extra)   a kit 'fx' tuple the official layer stands for (true: the procedural one is skipped)
 //   s.auraHit(v, claimed)        b.ev 'dmg' (HP) no attack owns: a hit of an enemy aura's tick of this frame (true: drawn)
 //   s.bindsReached(src, proj)    a skill binding of the shooter's places the projectile's reached effects (FxWiring._arrive)
+//   s.idleOff(v)                 (fork) the idle buffs a unit's talents must hide now: its skill's plan.idle `talent`
+//                                entries' while the skill is on (render/vfx/talentfx.js sync)
 //   s.keys(views)                every key to preload; s.clear()
 //
 // What plays when (skills.js header for the roles and signals):
@@ -90,10 +92,26 @@
 
 import {
   planFor, skillPlan, attackFx as planAttack, slotKey, planKeys, chargeKeys, chargeStep, skillProjectile, targetsOf, buffDuration,
-  eventNum, FX_BINDINGS, bindingEffects, bindingKeys, lifeOf, COND_BUFFS, condState, BOUND_BY_SKILL, coverOf, enemyCoverOf,
-  ENEMY_FX_BINDINGS, ENEMY_FX_KINDS, OWNER_NEAR, auraTargets, enemyBindingKeys, modeLoopKeys,
+  eventNum, FX_BINDINGS, CHAIN_RELAYS, bindingEffects, bindingKeys, lifeOf, COND_BUFFS, condState, BOUND_BY_SKILL, coverOf, enemyCoverOf,
+  ENEMY_FX_BINDINGS, ENEMY_FX_KINDS, OWNER_NEAR, auraTargets, enemyBindingKeys, modeLoopKeys, CHARGED_CASTS, CAST_MODES, castModePlan,
+  FX_HIT_TILES, stateEntries, TICK_SIGNALED,
 } from './skills.js';
 import { fxSpec } from '../fx/kinds.js';
+import { layerKeysOf } from './talentfx.js';
+
+/**
+ * (fork) Kit fx that a summon's own official effects stand for, by fx kind: the summon the fx names (`id`) of unit `unit`
+ * plays `keys` (its summoner's outfit twins) and, when it leaves the field, `gone`. 缪尔赛思's 流形 (token_10030_mlyss_wtrman):
+ * a copy's split ('split', chess_char_6_11-mlyss.js: id = the new 流形) is its spawn ability's _buffsToToken
+ * mlyss_wtrman_summon[trigger] — token_10030_mlyss_wtrman_split_start_01 — and that split 流形's end the
+ * mlyss_wtrman_summon[override] buff's ON_BUFF_FINISH — token_10030_mlyss_wtrman_c3_to_c0. Its _buffsToExistToken
+ * refresh (…_refresh_01) needs a refresh the sim does not make (a split always spawns): not played.
+ */
+export const SUMMON_FX = Object.freeze({
+  split: Object.freeze({ unit: 'token_10030_mlyss_wtrman', keys: Object.freeze(['token_10030_mlyss_wtrman_split_start_01']), gone: Object.freeze(['token_10030_mlyss_wtrman_c3_to_c0']) }),
+});
+import { unitPoint } from './mounts.js';
+import { PathFx } from './pathfx.js';
 import { UF, ANIM } from '../../../../shared/constants.js';
 
 /** Battle seconds a held (non-oneshot) row of a skill's single cast lasts (FxWiring's CAST_LOOP_S for attacks). */
@@ -109,6 +127,8 @@ const ARRIVAL = new Set(['summonBurst', 'summonStun', 'radiantSword', 'paperDoll
 /** The 驭械术士's kit fx: render/vfx/funnelfx.js decides them (its floating units). */
 const FUNNEL_KINDS = new Set(['drone', 'drones', 'droneLock', 'overload']);
 const lc = (k) => (typeof k === 'string' && k ? k.toLowerCase() : null);
+/** (fork) Plan kinds whose skill lasts (its loops are held for it); another's buff loops with a life run their own time. */
+const SKILL_LASTS = new Set(['lasting', 'ammo', 'passive']);
 /** Battle seconds after a release in which a stale energy reading is ignored (the next store takes an attack interval). */
 const RELEASE_GUARD_S = 0.35;
 /** A fx on the unit: its (x, y) within this many tiles (render/fx/simfx.js ANCHOR_SNAP). */
@@ -133,6 +153,11 @@ const LOCK_T = 5, LOCK_SHELL_NEAR = 3, MAX_LOCKS = 48;
  * enemy_cjhot_debuff: the client keeps it while the unit is in the aura — its ticks come every second) [ASSUMED].
  */
 export const AURA_HOLD_S = 1.25;
+/**
+ * (fork) Battle seconds after the stored charges were last seen full within which a cast still counts as made with every
+ * charge (CHARGED_CASTS): the snapshot that shows the cast's spent charges may come before its 'skill' event.
+ */
+export const CHARGED_GRACE_S = 0.35;
 
 /**
  * The index mode a unit's form (a sim setForm / a 傀儡师's 替身 — shared/protocol.js fxForm) fights in: the mode the data
@@ -151,6 +176,8 @@ export function formMode(unit, form, map = null) {
 }
 
 const idOf = (v) => v?.info?.id ?? v?.id;
+/** (fork) b.snap `charges` [stored, maximum] of a skill with several, every one stored. */
+const full = (c) => Array.isArray(c) && Number(c[1]) > 1 && Number(c[0]) >= Number(c[1]);
 /** A held entry that loops for its hold: hold 'skill' and a looping prefab (a one-shot prefab plays once at the start). */
 const isLoop = (e) => e.hold === 'skill' && e.loop !== false;
 /** The plan's attacks a normal attack can use: not the skill's own casts at its start / end (`when`, skills.js tagCasts). */
@@ -213,6 +240,8 @@ export class SkillFx {
     this.tloops = new Map();   // `${target id}|${key}` → { h, until, U, tgt, bySkill } (skills.js targetsOf `hit`)
     this.marks = [];           // FX_BINDINGS reached effects: { owner, r, c, until, h, cover }
     this.locks = [];           // FX_BINDINGS hold 'lock' crosshairs: { src, tv, x, y, shell, idle, hs } (_lockOn)
+    this.tiles = new Map();    // (fork) FX_HIT_TILES: `${owner id}|${row}|${col}` → { h, U } held while the skill lasts
+    this.untils = [];          // (fork) FX_BINDINGS `until`: held effects a later fx of that kind ends { kind, src, id, hs }
     this.shots = new Map();    // FX_BINDINGS `shots`: '<unit id>:<shot id>' → its flight's handle, null before its birth (_lanes)
     this.born = new Map();     // unit id → { frame, own } of its official birth effect (deployed: FxWiring.deploy's key)
     this.frame = 0;            // FxWiring.tick counts frames: events of one frame share a value
@@ -226,8 +255,14 @@ export class SkillFx {
     this.gone = new Map();     // unit id → { frame, key, x, y }: the frame's deaths / leaks / retreats (an enemy's death zone)
     this.auraWins = [];        // the frame's aura ticks the official layer stands for: { frame, x, y, r, src, tg } (auraHit)
     this.aloops = new Map();   // `${target id}|${key}` → { h, until, v }: an aura's looping buff effect on a unit in it
+    this.lives = new Map();    // (fork) FX_BINDINGS hold 'life': `${unit id}|${key}` → { h, v, src } (_lifeMark)
+    this.marked = new Map();   // (fork) SUMMON_FX: summon id → its binding, until it leaves (`gone` rows)
+    this.toks = new Map();     // (fork) plan.tokens on a summon: `${owner id}|${summon id}|${key}` → { h, once } (_tokens)
     this.viewList = [];        // the battle's views as the last sync gave them (an enemy binding's 'near' owner)
     this.modeWins = new Map(); // unit id → { hs, seq }: the loops of a mode an enemy binding's fx started (_modeWin)
+    this.paths = new PathFx(w); // (fork) line / path effects whose points a kit fx carries (pathfx.js PATH_BINDINGS)
+    this.sloops = new Map();   // (fork) b.snap fxs: `${carrier id}|${key}` → { h, e } held while the sim's row lasts (_states)
+    this.sends = new Map();    // (fork) the `end` entries of the rows on now: `${carrier id}|${key}` → { e, id }, played when the row goes
   }
 
   active() { return !!this.w.ofx.active && !!this.w.idx; }
@@ -235,7 +270,7 @@ export class SkillFx {
   // ---- resolution -------------------------------------------------------------------------------------------------
 
   /** The record of a battle unit (resolved once per battle id), or null when nothing official belongs to it. */
-  of(v) {
+  of(v, o = {}) {
     if (!v || !this.w.idx) return null;
     const id = idOf(v);
     if (id == null) return null;
@@ -249,6 +284,8 @@ export class SkillFx {
         const r = unitKey ? planFor(this.w.idx, { info, rec, unitKey }) : null;
         if (r && (r.plan || r.charge || r.enemy.length)) U = this._record(id, r, rec);
       }
+      // (fork) `cache: false`: a prep piece's look-up (FxWiring.birth) leaves no record in the battle's table
+      if (o.cache === false) return U;
       this.units.set(id, U);
     }
     if (U) U.v = v;
@@ -320,7 +357,7 @@ export class SkillFx {
     if (!k) return null;
     const held = e.hold === 'skill' || e.hold === 'ready' || e.hold === 'cast';
     const loop = (e.hold === 'skill' || e.hold === 'ready') && e.loop !== false;
-    return this.w.playOn(k, v, { follow: held, loop, important: held || !!o.important, toward: o.toward, flipFrom: o.flipFrom, skip: o.skip, strike: !!o.strike });
+    return this.w.playOn(k, v, { follow: held, loop, important: held || !!o.important, toward: o.toward, flipFrom: o.flipFrom, skip: o.skip, lead: o.lead, speed: o.speed, strike: !!o.strike });
   }
 
   /** Keep a started entry by its hold: the skill's loops, the ready loops, or stopped at the cast's end. */
@@ -389,6 +426,7 @@ export class SkillFx {
 
   /** b.ev ['skill', id, on] (module header). Returns true when the official layer shows this skill. */
   skill(v, on) {
+    if (!on) this.paths.skillOff(idOf(v));
     const U = this.of(v);
     if (!U || !U.plan) return false;
     const live = this.active();
@@ -412,12 +450,25 @@ export class SkillFx {
       U.startFrame = this.frame;
       U.atkN = 0;
       U.attacked = false;
+      // (fork) the mode this cast runs in (CAST_MODES: 薇薇安娜 S3's first / later casts) and whether every charge went
+      // into it (CHARGED_CASTS: her S1 after 蓄力)
+      if (CAST_MODES[U.skillId]) U.plan = this._castPlan(U, v);
+      if (CHARGED_CASTS[U.skillId]) U.charged = this._wasFull(U, v);
       if (!live) return false;
       this._stopReady(U);
       this._stopLoops(U);          // a cast while on (onEnd re-cast) starts afresh
       let drew = false;
       for (const e of uniq([...U.plan.start, ...U.plan.range, ...U.plan.loop])) {
         if (e.birth) continue;     // the deploy's (birthOf: FxWiring.deploy plays it)
+        // (fork) a loop the kit's layer count holds (talentfx.js FX_LAYERS: 塔露拉 S2's stack) is TalentFx's to play
+        if (U.plan.loop.includes(e) && layerKeysOf(this.w.unitKeyOf(v)).has(e.key)) continue;
+        // (fork) a buff loop on the owner with a life of its own (index v3 `life`: LIMITED, a time or our record's
+        // blackboard key) outlives a skill that does not last — 塔露拉 S2's oxi_s_2_stack, stack_duration 10 s, of a skill
+        // that is on and off in one tick: it runs its own time, as a target's buff loop does (_targetLoop)
+        if (!SKILL_LASTS.has(U.plan.kind) && U.plan.loop.includes(e) && (e.on === 'owner' || e.at === 'owner') && lifeOf(e.life, U.srec?.bb)?.s > 0) {
+          if (this._targetLoop(U, e, v)) drew = true;
+          continue;
+        }
         const h = this._play(e, v);
         if (h) { drew = true; this._keep(U, e, h); }
       }
@@ -443,6 +494,10 @@ export class SkillFx {
     if (was) this._endCast(U, v);
     this._stopLoops(U);
     for (const e of uniq(U.plan.end)) this._keep(U, e, this._play(e, v));
+    // (fork) the buffs the end creates (skills.js `after`, `idle`): a LIMITED one loops its own time on the owner
+    // (index `made`: char_1026_gvial2 S3's bleed, our record's final_duration); the idle loops come back (_idle)
+    for (const e of uniq(U.plan.after)) this._targetLoop(U, { ...e, life: e.made }, v);
+    if (was) U.ended = true;
     return U.drawsStart;
   }
 
@@ -507,7 +562,7 @@ export class SkillFx {
     if (k === 0) {
       for (const e of uniq(a.aim || [])) {
         const h = this._play(e, t, { toward: beyond(own, t), flipFrom: own });
-        if (h) { drew = true; if (e.hold === 'cast' || e.loop) later(this.w.ofx, SKILL_CAST_S, () => h.stop()); }
+        if (h) { drew = true; if (e.hold === 'cast' || e.loop) later(this.w.ofx, SKILL_CAST_S, () => h.stop({ cast: true })); }
       }
       for (const e of uniq(U.tHit.filter((x) => x.node == null || x.node === a.node))) if (this._targetLoop(U, e, t)) drew = true;
     }
@@ -606,8 +661,8 @@ export class SkillFx {
    * drawn); `own` — the skill's start plays it at the deploy (a passive's start one-shots, a held one for its while:
    * 斯卡蒂 S2's loop), else FxWiring.deploy plays it and the skill's start leaves it out.
    */
-  birthOf(v) {
-    const U = this.of(v);
+  birthOf(v, o = {}) {
+    const U = this.of(v, o);
     const e = U?.plan ? U.plan.start.find((x) => x.birth) : null;
     if (!e) return null;
     const key = this._key(e, v);
@@ -703,8 +758,18 @@ export class SkillFx {
     if (U) this._releaseU(U);
     for (const [slot, t] of this.tloops) if (idOf(t.tgt) === id) { t.h.stop(); this.tloops.delete(slot); }
     for (const [slot, t] of this.aloops) if (idOf(t.v) === id) { t.h.stop(); this.aloops.delete(slot); }
+    for (const [slot, t] of this.sloops) if (t.id === id) { t.h?.stop(); this.sloops.delete(slot); }
+    for (const [slot, t] of this.sends) if (t.id === id) this.sends.delete(slot);
+    // (fork) a held binding on it (`hold: 'until'`: 烛煌's downed ring) ends with it too
+    if (this.untils.length) this.untils = this.untils.filter((u) => { if (u.id !== id && u.src !== id) return true; for (const h of u.hs) h.stop(); return false; });
     this._modeEnd(v);
     if (id != null && v && Number.isFinite(v.x) && Number.isFinite(v.y)) this.gone.set(id, { frame: this.frame, key: this.w.unitKeyOf(v), x: v.x, y: v.y });
+    // (fork) a SUMMON_FX summon leaving: its end rows where it stood
+    const m = id != null ? this.marked.get(id) : null;
+    if (m) {
+      this.marked.delete(id);
+      for (const k of m.sf.gone) this.w.playOn(k, this._ground(v.x, v.y, v), { important: true, by: m.by });
+    }
   }
 
   _releaseU(U) {
@@ -719,6 +784,7 @@ export class SkillFx {
     U.passiveShots = false;
     U.passiveDone = false;
     U.on = null;
+    U.ended = false;
   }
 
   /** The status wiring draws `key` on v from now on: a skill's target loop of the same key hands over (never twice). */
@@ -745,7 +811,10 @@ export class SkillFx {
     const ranged = !!kind && kind !== 'none';
     const heal = !!tgt && !tgt.isEnemy && !src.isEnemy;
     // the skill's own casts at its start / end are no normal attack (tagCasts): the mode attacks while it is on
-    const fx = planAttack(perAttack(st.plan), { heal, ranged });
+    // (fork) the cast's ability by the charges it takes (CHARGED_CASTS) — asked by the wind-up before the cast's event too
+    const cc = CHARGED_CASTS[st.U?.skillId];
+    const charged = !!cc && (st.U.charged || this._wasFull(st.U, src));
+    const fx = planAttack(perAttack(st.plan), { heal, ranged, node: cc ? (charged ? cc.charged : cc.plain) : null });
     // the skill's own ability replaces the mode's rows when it is this kind of attack: a melee blow is no shield throw
     // (斩业星熊 S2: her MultiMelee mode attacks while the skill's AroundTargetRangedAttack throws on its own); in the frame
     // of an instant skill's activation its attack is the skill's whatever kind the sim made it (阿罗玛 S1's 'beam' is her
@@ -775,8 +844,10 @@ export class SkillFx {
         if ((phase === 'start' && !first) || (phase === 'strike' && first) || (onTarget && !tgt)) continue;
         if ((e.firstOnly && nth > 0) || (e.afterFirst && nth === 0)) continue;
         const skip = phase === 'start' ? info.skip : 0;
-        const h = onTarget ? this._play(e, tgt, { toward: beyond(src, tgt), flipFrom: src, skip }) : this._play(e, src, { toward: tgt, skip, strike: phase !== 'start' });
-        if (h && (e.hold === 'cast' || e.loop)) later(this.w.ofx, phase === 'start' && info.left > 0 ? Math.min(3, info.left) : SKILL_CAST_S, () => h.stop());
+        const lead = phase === 'all' && first ? info.lead : 0;   // (fork) FxWiring.attack: an attack not wound up
+        const speed = info.speed;                                // (fork) the attack's playback speed (FxWiring.abilitySpeed)
+        const h = onTarget ? this._play(e, tgt, { toward: beyond(src, tgt), flipFrom: src, skip, lead, speed }) : this._play(e, src, { toward: tgt, skip, lead, speed, strike: phase !== 'start' });
+        if (h && (e.hold === 'cast' || e.loop)) later(this.w.ofx, phase === 'start' && info.left > 0 ? Math.min(3, info.left) : SKILL_CAST_S, () => h.stop({ cast: true }));
       }
     }
   }
@@ -802,7 +873,38 @@ export class SkillFx {
       later(this.w.ofx, wait, () => { if (!v.destroyed) this._play(e, v, { flipFrom: m.src }); });
     }
     if (k === 0) for (const e of uniq(m.buffs)) if (this._targetLoop(m.U, e, v)) drew = true;
+    if (k === 0 && m.U && this.hitTile(m.U, v)) drew = true;
     return drew;
+  }
+
+  /** (fork) The owner's skill state when its skill is on and its hits mark the ground (FX_HIT_TILES), else null. */
+  tileOwner(src) {
+    const id = idOf(src);
+    const U = id != null ? this.units.get(id) : null;
+    return U && FX_HIT_TILES[U.skillId] && this._on(U) ? U : null;
+  }
+
+  /** (fork) A hit of U's skill attack on v: its FX_HIT_TILES effect on v's tile (an enemy's), while the skill is on. */
+  hitTile(U, v) {
+    return U && FX_HIT_TILES[U.skillId] && v?.isEnemy && this._on(U) ? this._hitTile(U, v) : null;
+  }
+
+  /**
+   * (fork) FX_HIT_TILES: the skill's tile effect on the tile under an enemy its attack hit (the sim's rounded body tile),
+   * one per tile, held while the skill lasts (tick) — 烛煌 S2's burning ground.
+   */
+  _hitTile(U, v) {
+    const r = Math.round(v.y), c = Math.round(v.x);
+    const slot = `${U.id}|${r}|${c}`;
+    const t = this.tiles.get(slot);
+    if (t && t.h.alive) return t.h;
+    let h = null;
+    for (const k0 of FX_HIT_TILES[U.skillId]) {
+      const k = this.w.skinKey(lc(k0), U.v) || lc(k0);
+      h = this.w.playOn(k, this._ground(c, r, null), { loop: true, important: true }) || h;
+    }
+    if (h) this.tiles.set(slot, { h, U });
+    return h;
   }
 
   /** A buff an attack of the skill put on v (targetsOf `hit`): its loop for the buff's duration, else while on. */
@@ -814,7 +916,7 @@ export class SkillFx {
     const life = lifeOf(e.life, U.srec?.bb);
     if (life?.once) {
       const h1 = this._play({ ...e, hold: null }, v, { flipFrom: U.v || undefined });
-      if (h1 && e.loop) later(this.w.ofx, SKILL_CAST_S, () => h1.stop());
+      if (h1 && e.loop) later(this.w.ofx, SKILL_CAST_S, () => h1.stop({ cast: true }));
       return h1;
     }
     const lasting = U.plan.kind === 'lasting' || U.plan.kind === 'ammo';
@@ -900,9 +1002,16 @@ export class SkillFx {
       this.tloops.clear();
       for (const t of this.aloops.values()) t.h.stop();
       this.aloops.clear();
+      // (fork) a 'life' mark is not started again (its fx came once): it is gone with the cleared effects
+      for (const t of this.lives.values()) t.h.stop();
+      this.lives.clear();
+      for (const t of this.toks.values()) if (!t.once) t.h?.stop();
+      this.toks.clear();
+      this._stopStates();
       // the held crosshairs too (PR #862 review): their handles died with the effects, a later lock starts afresh
       for (const L of this.locks) this._endLock(L);
       this.locks.length = 0;
+      this.paths.reset();
       this.tier = tier;
       this.wasActive = active;
     }
@@ -915,6 +1024,7 @@ export class SkillFx {
     const wins = this.windows;
     this.windows = [];
     if (!active) return;
+    this.paths.sync();
     for (const win of wins) {
       if (!win.inst || win.frame !== this.frame) continue;
       if (win.U.instPending === this.frame && !win.U.attacked && win.U.v) this._instCast(win.U, win.U.v, win);
@@ -927,7 +1037,7 @@ export class SkillFx {
       if (!U) continue;
       U.seen = sweep;
       const up = v.alive !== false && !v.destroyed && !v.down;
-      if (!up) { if (U.loopsOn || U.readyOn || U.passiveOn || U.energy || U.ewin) this._releaseU(U); continue; }
+      if (!up) { if (U.loopsOn || U.readyOn || U.passiveOn || U.energy || U.ewin || U.idle?.size) this._releaseU(U); continue; }
       if (U.enemy.length) {
         // an enemy's skill window: the snapshot's anim SKILL (the sim's 0.5 s after an ability fires); with no 'cast'
         // slot event, an enemy whose data record has a single skill opens that skill's window on it [ASSUMED]
@@ -962,11 +1072,14 @@ export class SkillFx {
       }
       if (U.charge) this._charge(U, v, Array.isArray(v.energy) ? Math.max(0, Math.floor(Number(v.energy[0]) || 0)) : 0);
       if (U.plan?.cond?.length) this._cond(U, v);
+      if (U.plan?.idle?.length) this._idle(U, v);
       U.quiet = false;
     }
     for (const U of this.units.values()) {
       if (U && U.seen !== sweep && (U.loopsOn || U.readyOn || U.passiveOn || U.energy || U.ewin)) this._releaseU(U);
     }
+    this._states(views);
+    for (const [slot, t] of this.tiles) if (!this._on(t.U) || !t.h.alive) { t.h.stop(); this.tiles.delete(slot); }
     for (const [slot, t] of this.tloops) {
       const tv = t.tgt;
       if (!tv || tv.destroyed || tv.alive === false || now >= t.until || (t.bySkill && !this._on(t.U)) || !t.h.alive) {
@@ -979,8 +1092,34 @@ export class SkillFx {
       const tv = t.v;
       if (!tv || tv.destroyed || tv.alive === false || now >= t.until || !t.h.alive) { t.h.stop(); this.aloops.delete(slot); }
     }
+    // (fork) a 'life' mark ends with its unit or its owner (dead, left, retreated)
+    for (const [slot, t] of this.lives) {
+      const gone = (v) => !v || v.destroyed || v.alive === false;
+      if (gone(t.v) || gone(this.units.get(t.src)?.v) || !t.h.alive) { t.h.stop(); this.lives.delete(slot); }
+    }
     if (this.marks.length) this.marks = this.marks.filter((m) => m.until > now);
     if (this.locks.length) this._syncLocks(now);
+    this._tokens();
+  }
+
+  /**
+   * (fork) The plan of the cast starting now in its mode (CAST_MODES; castModePlan, cached per mode): the mode of the
+   * cast's number in the deployment — the view's count of its skill starts (render/units.js UnitView.skillCasts, this one
+   * included). A view built mid-battle has seen no earlier cast: its first [ASSUMED].
+   */
+  _castPlan(U, v) {
+    const names = CAST_MODES[U.skillId];
+    U.basePlan ??= U.plan;
+    const n = Math.max(1, Number(v?.skillCasts) || 1);
+    const name = names[Math.min(names.length - 1, n - 1)];
+    const k = `cast:${name}`;
+    if (!U.modePlans.has(k)) U.modePlans.set(k, castModePlan(this.w.idx, U.basePlan, name));
+    return U.modePlans.get(k) || U.basePlan;
+  }
+
+  /** (fork) Whether a cast starting now took every stored charge: full now, or a moment ago (CHARGED_GRACE_S). */
+  _wasFull(U, v) {
+    return full(v?.charges) || this.w.ofx.time - (U.fullAt ?? -Infinity) <= CHARGED_GRACE_S;
   }
 
   /**
@@ -991,6 +1130,7 @@ export class SkillFx {
   _cond(U, v) {
     const on = this._on(U);
     if (!on) U.charged = false;
+    if (!on && full(v.charges)) U.fullAt = this.w.ofx.time;
     const st = condState({ on, charged: !!U.charged, charges: v.charges });
     const want = new Map();
     if (st) for (const e of U.plan.cond) if (COND_BUFFS[e.buff]?.[st]?.includes(e.key)) want.set(e.key, e);
@@ -1003,10 +1143,94 @@ export class SkillFx {
     }
   }
 
+  /**
+   * (fork) The lasting effects of the moments the client never sees (skills.js STATE_BUFFS, plan.state), reconciled each
+   * frame with b.snap `fxs` (sim Battle.fxState): each row [buff, src, look] of a unit holds that buff's entries of
+   * `src`'s plan (null: the unit's own) on it — a looping prefab looped (restarted if its handle died), any other once
+   * per row — and a row gone stops them; an `end` entry (a mark's ON_BUFF_FINISH) plays once then.
+   */
+  _states(views) {
+    let want = null, ends = null;
+    for (const v of views) {
+      if (!Array.isArray(v.fxs) || !v.fxs.length || v.alive === false || v.destroyed || v.down) continue;
+      const id = idOf(v);
+      for (const row of v.fxs) {
+        const src = row[1];
+        const sv = src == null ? v : this.w.view(src);
+        const U = sv ? this.of(sv) : this.units.get(src) || null;
+        // (fork) a talent's or an ability's buff on its targets (talents.js plan.targets, `buff`): the src's own bindings'
+        // rows of that buff (TalentFx.targetRows), when no skill state entry names it
+        let list = stateEntries(U?.plan?.state, row[0], row[2], v.facing);
+        if (!list.length && sv) list = this.w.talents?.targetRows?.(sv, row[0], row[2]) || [];
+        for (const e of list) {
+          const k = `${id}|${e.key}`;
+          if (e.role === 'end') { if (!(ends || (ends = new Map())).has(k)) ends.set(k, { e, id }); continue; }
+          if (!(want || (want = new Map())).has(k)) want.set(k, { e, v, id });
+        }
+      }
+    }
+    // an `end` entry plays once on the carrier when its row goes (the mark ran out, or the carrier fell with it)
+    for (const [k, t] of this.sends) {
+      if (ends?.has(k)) continue;
+      this.sends.delete(k);
+      const cv = this.w.view(t.id);
+      const key = cv && !cv.destroyed ? this._key(t.e, cv) : null;
+      if (key) this.w.playOn(key, cv, { follow: true, loop: false, important: true });
+    }
+    if (ends) for (const [k, t] of ends) if (!this.sends.has(k)) this.sends.set(k, t);
+    for (const [k, t] of this.sloops) {
+      if (want?.has(k) && !(t.loop && t.h && !t.h.alive)) continue;
+      t.h?.stop();
+      this.sloops.delete(k);
+    }
+    if (!want) return;
+    for (const [k, w] of want) {
+      if (this.sloops.has(k)) continue;
+      const loop = w.e.loop !== false && w.e.role !== 'trigger';
+      const key = this._key(w.e, w.v);
+      const h = key ? this.w.playOn(key, w.v, { follow: true, loop, important: true }) : null;
+      this.sloops.set(k, { h, loop: loop && !!h, id: w.id });
+    }
+  }
+
+  _stopStates() {
+    for (const t of this.sloops.values()) t.h?.stop();
+    this.sloops.clear();
+    this.sends.clear();
+  }
+
   _stopCond(U) {
+    if (U.idle) { for (const t of U.idle.values()) t.h.stop(); U.idle.clear(); }
     if (!U.cond) return;
     for (const t of U.cond.values()) t.h.stop();
     U.cond.clear();
+  }
+
+  /**
+   * (fork) The skill's idle loops (skills.js plan.idle, afterIdle): on while the skill is off — from the deploy when the
+   * skill's passive copy gave it then (`deploy`: char_4212_nasti S1), else from its first end —, gone while it is on, as
+   * the client's buff that the start finishes and the end creates again. A unit ability's copy (`talent`) is TalentFx's.
+   */
+  _idle(U, v) {
+    const off = !this._on(U);
+    const want = new Map();
+    if (off) for (const e of U.plan.idle) if (!e.talent && (e.deploy || U.ended)) want.set(e.key, e);
+    const map = U.idle || (U.idle = new Map());
+    for (const [k, t] of map) if (!want.has(k) || (!t.h.alive && t.e.loop)) { if (!want.has(k)) t.h.stop(); map.delete(k); }
+    for (const [k, e] of want) {
+      if (map.has(k)) continue;
+      const h = this.w.playOn(this._key(e, v) || k, v, { follow: true, loop: e.loop !== false, important: true });
+      if (h) map.set(k, { h, e });
+    }
+  }
+
+  /** (fork) The idle buffs v's talents hide now (module header): its skill's `talent` idle entries while it is on. */
+  idleOff(v) {
+    const U = this.units.get(idOf(v));
+    if (!U?.plan?.idle?.length || !this._on(U)) return null;
+    const out = new Set();
+    for (const e of U.plan.idle) if (e.talent && e.made?.buff) out.add(e.made.buff);
+    return out.size ? out : null;
   }
 
   // ---- kit fx -----------------------------------------------------------------------------------------------------
@@ -1015,12 +1239,37 @@ export class SkillFx {
   simFx(kind, x, y, extra) {
     if (!this.active() || !extra || typeof extra !== 'object' || typeof kind !== 'string') return false;
     const now = this.w.ofx.time;
+    // (fork) one tick of an official buff's periodic trigger (sim battle.tickFx): the plan's 'tick' rows on the unit it names
+    if (kind === 'tick') return this._tick(extra);
     // a skill start cast with every charge stored (the kit's `charged`: 卡涅利安) — the `[eff_cond]` state (_cond)
     if (extra.charged === true && extra.id != null) { const C = this.units.get(extra.id); if (C) C.charged = true; }
+    // (fork) a summon's own effects at its kit fx (SUMMON_FX)
+    const sf = SUMMON_FX[kind];
+    if (sf && extra.id != null) {
+      const sv = this.w.view(extra.id);
+      if (sv && this.w.unitKeyOf(sv) === sf.unit) {
+        const by = this.w.view(sv.info?.summonerId) || sv;
+        let drew = false;
+        for (const k of sf.keys) if (this.w.playOn(k, sv, { important: true, by })) drew = true;
+        if (sf.gone?.length) this.marked.set(extra.id, { sf, by });
+        if (drew) return true;
+      }
+    }
     // (0) an enemy's area: its zone's official prefabs at the fx's point, an aura tick its talent loops stand for
     if (this._enemyFx(kind, x, y, extra)) return true;
+    // (fork) a line / path effect whose points the fx carries (pathfx.js: 国度's kingdom, 谬因 S2's beam; 予愿安洁莉娜 S3's
+    // range outline is added beside the kit's own fx)
+    if (extra.id != null && this.paths.simFx(kind, x, y, extra, this.of(this.w.view(extra.id)))) return true;
     // a shell of a lock binding's shooter takes its lock; its landing ends it (the kit's fx, drawn as before)
     if ((kind === 'bombardShell' || kind === 'bombard') && this.locks.length) this._lockShell(kind, x, y, extra);
+    // (fork) a held binding's `until` kind from the same shooter on the same unit ends it (蕾缪安 S2: her shot ends the aim)
+    if (this.untils.length) {
+      this.untils = this.untils.filter((u) => {
+        if (u.kind !== kind || u.src !== (extra.src ?? extra.id) || u.id !== extra.id) return true;
+        for (const h of u.hs) h.stop();
+        return false;
+      });
+    }
     // (1) explicit bindings and what they cover
     for (const m of this.marks) {
       if (m.until > now && m.cover.includes(kind) && extra.id === m.owner && Math.round(y) === m.r && Math.round(x) === m.c) return true;
@@ -1028,16 +1277,25 @@ export class SkillFx {
     for (const field of ['src', 'id']) {
       const U = extra[field] != null ? this.units.get(extra[field]) : null;
       const bind = U ? FX_BINDINGS[U.skillId]?.[kind] : null;
+      if (bind && bind.only && Object.entries(bind.only).some(([k, val]) => extra[k] !== val)) continue;
       if (bind && bind.owner === field && (!bind.during || this._lasts(U))) {
+        if (bind.none) return true;   // (fork) the official draws nothing there (skills.js `none`)
         if (bind.attack) return this._boundAttack(U, bind);
+        if (bind.shot) return this._shot(U, bind, extra);
         if (bind.shots) return this._lanes(U, bind, extra);
+        if (bind.flight) return this._flight(U, bind, x, y, extra);
+        if (bind.fan) return this._fan(U, bind, extra);
         if (bind.endsShot) this._endShot(U, extra);
         return this._bound(U, bind, x, y, extra);
       }
     }
     // a binding whose fx names no owner: the unit whose skill of that id lasts
     for (const sid of BOUND_BY_SKILL[kind] || []) {
-      for (const Uo of this.units.values()) if (Uo && Uo.skillId === sid && Uo.v && this._lasts(Uo)) return this._bound(Uo, FX_BINDINGS[sid][kind], x, y, extra);
+      for (const Uo of this.units.values()) {
+        if (!Uo || Uo.skillId !== sid || !Uo.v || !this._lasts(Uo)) continue;
+        const b = FX_BINDINGS[sid][kind];
+        return b.flight ? this._flight(Uo, b, x, y, extra) : this._bound(Uo, b, x, y, extra);
+      }
     }
     // (6) a summon's arrival on a unit whose official birth effect drew in this frame
     if (extra.id != null && !FUNNEL_KINDS.has(kind) && (ARRIVAL.has(kind) || fxSpec(kind, extra).a === 'summon')) {
@@ -1051,9 +1309,11 @@ export class SkillFx {
     const a = fxSpec(kind, extra).a;
     const near = !Number.isFinite(x) || !Number.isFinite(y) || Math.hypot(v.x - x, v.y - y) <= ON_UNIT;
     const on = this._on(U);
-    // (2) the skill's pulse: the kit's own fx of the moment its plan's tick / hit rows have no event for
+    // (2) the skill's pulse: the kit's own fx of the moment its plan's tick / hit rows have no event for (a skill whose kit
+    // sends its ticks, TICK_SIGNALED, keeps its 'tick' rows for those)
     if (extra.skill != null && on && plan.pulse.length && !NOT_PULSE.has(a)) {
-      const list = plan.pulse.filter((e) => (e.at === 'owner') === near);
+      const ticked = TICK_SIGNALED.has(plan.skillId);
+      const list = plan.pulse.filter((e) => (e.at === 'owner') === near && !(ticked && e.reason === 'tick'));
       if (list.length) {
         const at = near ? v : (this.w.view(extra.target ?? extra.to) || { id: 'fx:point', x, y, z: 0 });
         let drew = false;
@@ -1068,7 +1328,53 @@ export class SkillFx {
     return extra.skill != null && on && (U.loops.some((h) => h.alive) || !!U.ewin?.loops.some((h) => h.alive));
   }
 
+  /**
+   * (fork) fx 'tick' { id: the skill's owner, on, key? } (sim battle.tickFx): its plan's 'tick' rows (`key`: only that one)
+   * on the unit `on`, one-shot — also after the skill ended or its owner left (Lumen S1's heals outlast the instant cast;
+   * a summon's ticks run after it is gone: its record stays in the battle's table). Claimed even when nothing plays.
+   */
+  _tick(extra) {
+    const U = extra.id != null ? (this.units.get(extra.id) ?? this.of(this.w.view(extra.id))) : null;
+    const at = extra.on != null ? this.w.view(extra.on) : null;
+    const plan = U?.plan;
+    if (!plan || !at) return true;
+    let rows = plan.pulse.filter((e) => e.reason === 'tick' && (!extra.key || e.key === extra.key));
+    // a talent's tick the index reaches through one skill only (遥's bubbles: S1's selector) plays with any skill equipped
+    if (!rows.length && extra.key && plan.unitKey) rows = this._tickRows(plan.unitKey, extra.key);
+    const from = U.v && U.v !== at && Number.isFinite(U.v.x) ? U.v : undefined;
+    for (const e of uniq(rows)) {
+      const h = this._play(e, at, { flipFrom: from });
+      if (h && (e.loop || e.hold === 'cast')) later(this.w.ofx, SKILL_CAST_S, () => h.stop());
+    }
+    return true;
+  }
+
+  /** (fork) The 'tick' rows of `key` in any skill plan of the unit (cached per battle). */
+  _tickRows(unitKey, key) {
+    const memo = this.tickRowMemo || (this.tickRowMemo = new Map());
+    const k = `${unitKey}|${key}`;
+    if (memo.has(k)) return memo.get(k);
+    let rows = [];
+    for (const sid of Object.keys(this.w.idx?.units?.[unitKey]?.skills || {})) {
+      rows = skillPlan(this.w.idx, unitKey, sid).pulse.filter((e) => e.reason === 'tick' && e.key === key);
+      if (rows.length) break;
+    }
+    memo.set(k, rows);
+    return rows;
+  }
+
   /** An FX_BINDINGS `attack` entry: that plan attack's rows on the owner now, its hits on the damage that follows. */
+  /**
+   * (fork) An FX_BINDINGS `shot` (a KIT_SHOTS projectile): the owner's mode attack of that shot on the unit the fx names,
+   * as FxWiring.attack draws an 'atk' — its cast rows by facing, its projectile, its hit on arrival (蕾缪安 S2's aimed shot).
+   */
+  _shot(U, bind, extra) {
+    const src = U?.v, tgt = this.w.view(extra[bind.target || 'id']);
+    if (!src || !tgt) return false;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    return !!this.w.attack(src, tgt, bind.kind || 'ranged', now, false, { only: bind.shot });
+  }
+
   _boundAttack(U, bind) {
     const a = U.plan?.attacks.find((x) => x.node === bind.attack);
     const v = U.v;
@@ -1108,13 +1414,32 @@ export class SkillFx {
    * says; a binding's own `keys` at 'target' once on the unit the fx names.
    */
   _bound(U, bind, x, y, extra) {
-    const keys = bindingEffects(this.w.idx, bind).filter((k) => this.w.ofx.lib.has(k));
+    const pick = bind.keysIf ? (extra[bind.keysIf.field] ? bind.keysIf.yes : bind.keysIf.no)
+      : bind.keysBy ? bind.keysBy.map[extra[bind.keysBy.field]] || [] : null;
+    // (fork) as the owner's outfit plays them (its skinpack twins, FxWiring.skinKey): 蕾缪安 S3's crosshairs and shell
+    // hits in her Ambience Synesthesia outfit (ambienceSynesthesia#7) played the default look
+    const keys = (pick ? pick.map(lc) : bindingEffects(this.w.idx, bind)).map((k) => this.w.skinKey(k, U?.v) || k)
+      .filter((k) => this.w.ofx.lib.has(k));
     if (!keys.length) return false;
     if (bind.at === 'target') {
       // once on the unit the fx names (泡泡's attacker, 归溟幽灵鲨 S1's ally), else where it happens; turned by the owner's side
       const tv = this.w.view(extra[bind.target || 'target']) || { id: 'fx:point', x, y, z: 0 };
       let drew = false;
-      for (const k of keys) if (this.w.playOn(k, tv, { flipFrom: U.v || undefined })) drew = true;
+      for (const k of keys) {
+        const h = this.w.playOn(k, tv, { flipFrom: U.v || undefined });
+        if (!h) continue;
+        drew = true;
+        // (fork) `hit`: a hit's role — a looping prefab there stops after SKILL_CAST_S, as FxWiring stops one on an
+        // attack's one-shot row (莫斯提马's Ethereal Harmony S2 hit loops: 69 of them ran 4 s each and filled the budget)
+        if (bind.hit) later(this.w.ofx, SKILL_CAST_S, () => { if (this.w.ofx.lib.def(h.key)?.isLoop) h.stop({ cast: true }); });
+      }
+      return drew;
+    }
+    if (bind.at === 'tiles') {
+      let drew = false;
+      for (const t of Array.isArray(extra.tiles) ? extra.tiles : []) {
+        if (Array.isArray(t)) for (const k of keys) if (this.w.playOn(k, this._ground(t[1], t[0], null), { important: true })) drew = true;
+      }
       return drew;
     }
     const tv = this.w.view(extra.id);
@@ -1124,20 +1449,110 @@ export class SkillFx {
       for (const k of keys) if (this.w.playOn(k, at, { important: true })) drew = true;
       return drew;
     }
+    if (bind.hold === 'life') return this._lifeMark(U, keys, tv);
     if (bind.hold === 'lock') return this._lockOn(U, keys, at, tv, x, y);
     const bb = U.srec?.bb || {};
-    const fxS = Number(extra.duration ?? extra.dur ?? extra.hold);
+    const fxS = Number(extra.duration ?? extra.dur ?? extra.hold ?? extra.t);   // (fork) `t`: 蕾缪安's shell flight
     const holdS = bind.hold === 'fx' ? (fxS > 0 ? fxS : bind.holdS || SKILL_CAST_S)
       : Number(bb[bind.hold]) > 0 ? Number(bb[bind.hold]) : bind.holdS || SKILL_CAST_S;
     let drew = false;
+    const held = [];
+    // (fork) `hold: 'until'` (with `until`): no timer — the `until` kind of the same unit ends it (FxWiring.release too)
+    const timed = !(bind.hold === 'until' && bind.until);
     for (const k of keys) {
       const h = this.w.playOn(k, at, { loop: true, important: true });
       if (!h) continue;
       drew = true;
+      held.push(h);
+      if (!timed) continue;
       later(this.w.ofx, holdS, () => h.stop());
       this.marks.push({ owner: U.id, r: Math.round(y), c: Math.round(x), until: this.w.ofx.time + holdS, h, cover: bind.cover || [] });
     }
+    // (fork) `line`: a line effect from the owner's muzzle to the unit the fx names, kept on both while it is held
+    const line = drew && bind.line ? this._line(U, bind.line, tv, holdS) : null;
+    if (line) held.push(line);
+    if (drew && bind.until) this.untils.push({ kind: bind.until, src: U.id, id: extra.id, hs: held });
     return drew;
+  }
+
+  /**
+   * (fork) plan.tokens (skills.js: CreateBuffToToken — a buff the skill gives the owner's summons): on each live summon
+   * (UnitInfo summonerId) while the owner's skill lasts — a loop held to its end, a one-shot (IMMEDIATELY) once per
+   * activation; a summon that comes during the skill gets them then.
+   */
+  _tokens() {
+    const want = new Set();
+    const views = this.viewList || [];
+    for (const U of this.units.values()) {
+      if (!U?.plan?.tokens?.length || !U.v || !this._on(U)) continue;
+      for (const s of views) {
+        if (s?.info?.summonerId !== U.id || s.alive === false || s.destroyed) continue;
+        const sid = s.info.id ?? s.id;
+        for (const e of U.plan.tokens) {
+          const k = `${U.id}|${sid}|${e.key}`;
+          want.add(k);
+          if (this.toks.has(k)) continue;
+          const once = e.hold === 'once';
+          const h = this.w.playOn(e.key, s, { loop: !once, follow: true, important: true, by: U.v });
+          this.toks.set(k, { h, once });
+        }
+      }
+    }
+    for (const [k, t] of this.toks) if (!want.has(k)) { if (!t.once) t.h?.stop(); this.toks.delete(k); }
+  }
+
+  /**
+   * (fork) An FX_BINDINGS hold 'life' (蕾缪安's Wanted mark, skills.js LEMUEN_WANTED): its loops on the unit the fx names
+   * until that unit or the owner is gone (sync). One per unit and key: a mark already on it is kept (true). False without
+   * the unit's view or a prefab: the procedural fx stays.
+   */
+  _lifeMark(U, keys, tv) {
+    const id = tv?.id ?? tv?.info?.id;
+    if (!tv || id == null || tv.destroyed || tv.alive === false) return false;
+    let drew = false;
+    for (const k of keys) {
+      const slot = `${id}|${k}`;
+      if (this.lives.get(slot)?.h.alive) { drew = true; continue; }
+      const h = this.w.playOn(k, tv, { loop: true, important: true });
+      if (!h) continue;
+      this.lives.set(slot, { h, v: tv, src: U.id });
+      drew = true;
+    }
+    return drew;
+  }
+
+  /**
+   * (fork) A binding's `line` (蕾缪安 S2's aim, lemuen_skill_02_trail_01 — its template's CreateLineEffect): its line
+   * renderers from the owner's muzzle to the target's hit point, following both, for `holdS` (or until stopped).
+   */
+  _line(U, key0, tv, holdS) {
+    const src = U?.v;
+    const key = this.w.skinKey(lc(key0), src);
+    if (!src || !tv || !this.w.ofx.lib.has(key)) return null;
+    const ss = this.w.skinOf(this.w.unitOf(src)), ts = this.w.skinOf(this.w.unitOf(tv));
+    const a = unitPoint(ss, 'muzzle', this.w.pose(src)), b = unitPoint(ts, 'hit', this.w.pose(tv));
+    const h = this.w.ofx.spawn(key, { pos: a.slice(), groundZ: -(src.z || 0) }, {
+      loop: true, important: true,
+      track: (fx) => {
+        if (!src.destroyed && src.alive !== false) unitPoint(ss, 'muzzle', this.w.pose(src), a);
+        if (!tv.destroyed && tv.alive !== false) unitPoint(ts, 'hit', this.w.pose(tv), b);
+        fx.anchor[0] = a[0]; fx.anchor[1] = a[1]; fx.anchor[2] = a[2];
+        fx.linkLines(a, b);
+      },
+    });
+    if (!h) return null;
+    // (fork) the line's own end effects (its LineEffectEmitterDynamic: effect.js `lineEnds`) on the source / the target,
+    // the owner's outfit twins, for as long as the line shows
+    const ends = this.w.ofx.lib.def?.(key)?.lineEnds;
+    const extra = [];
+    for (const [k, v] of [[ends?.start, src], [ends?.end, tv]]) {
+      const ek = k ? this.w.skinKey(k, src) : null;
+      const e = ek && this.w.ofx.lib.has(ek) ? this.w.playOn(ek, v, { loop: true, important: true }) : null;
+      if (e) extra.push(e);
+    }
+    const all = { stop: (o) => { h.stop(o); for (const e of extra) e.stop(o); }, get alive() { return h.alive; } };
+    later(this.w.ofx, holdS, () => all.stop());
+    return all;
   }
 
   /**
@@ -1168,6 +1583,47 @@ export class SkillFx {
     const l = U?.plan?.line;
     if (!l || !src || !tgt) return false;
     return !!this.w.playOn(l.key, src, { toward: tgt, strike: true, important: true, artYaw: l.artYaw });
+  }
+
+  /**
+   * (fork) An FX_BINDINGS `flight` entry (skills.js FX_BINDINGS): the main effect of the projectile for the way's axis
+   * and its unit's facing flies between the fx's points — from its fromX / fromY to its point, or from its point to its
+   * tx / ty —, at the binding's speed (else in the fx's `dur`), after its delay; its onReached effects play where it
+   * lands (`reached`). False without the prefab, or for a way of no length.
+   */
+  _flight(U, bind, x, y, extra) {
+    const f = bind.flight;
+    const [x0, y0, x1, y1] = f.from === 'point' ? [x, y, Number(extra.tx), Number(extra.ty)] : [Number(extra.fromX), Number(extra.fromY), x, y];
+    const ddx = x1 - x0, ddy = y1 - y0, len = Math.hypot(ddx, ddy);
+    const speed = f.speed > 0 ? f.speed : len / Number(extra.dur);
+    if (!Number.isFinite(len) || !(len > 1e-6) || !(speed > 0) || !U.v) return false;
+    const list = Math.abs(ddy) > Math.abs(ddx) ? (ddy > 0 ? f.up : f.down) : f.side;   // UP is +row (server/sim/dir.js)
+    if (!Array.isArray(list) || !list.length) return false;
+    const fv = this.w.view(extra.id) || U.v;
+    const left = Math.abs(ddy) > Math.abs(ddx) ? (fv.visFacing ?? fv.facing ?? 1) < 0 : ddx < 0;
+    const p = this.w.idx?.projectiles?.[lc(list.length > 1 && !left ? list[1] : list[0])];
+    const key = lc(p?.main);
+    if (!key || !this.w.ofx.lib.has(key)) return false;
+    const go = () => this.w.flyLane(key, U.v, {
+      x: x0, y: y0, dx: ddx / len, dy: ddy / len, len, speed,
+      onEnd: () => { if (f.reached) for (const k of p.onReached || []) this.w.playOn(lc(k), this._ground(x1, y1, null), { important: true }); },
+    });
+    if (f.delay > 0) later(this.w.ofx, f.delay, go); else go();
+    return true;
+  }
+
+  /** (fork) An FX_BINDINGS `fan` entry: its projectile flies from one unit of the fx to each of its others. */
+  _fan(U, bind, extra) {
+    const p = this.w.idx?.projectiles?.[lc(bind.fan.projectile)];
+    const from = this.w.view(extra[bind.fan.from]);
+    const to = Array.isArray(extra[bind.fan.to]) ? extra[bind.fan.to] : [];
+    if (!p || !from || !to.length || !this.w.ofx.lib.has(lc(p.main))) return false;
+    let drew = false;
+    for (const id of to) {
+      const tv = this.w.view(id);
+      if (tv && this.w._fly(p, from, tv, 'arrow', this.w.ofx.time, {}) != null) drew = true;
+    }
+    return drew;
   }
 
   /** An `endsShot` fx: the flight of the shot it names stops (the projectile clears its main effect as it hits). */
@@ -1453,12 +1909,15 @@ export class SkillFx {
     for (const v of views) {
       // an enemy's areas (ENEMY_FX_BINDINGS: its zones' prefabs, its aura's buff effects on the units in it)
       for (const k of enemyBindingKeys(idx, this.w.unitKeyOf(v))) out.add(k);
+      // (fork) a summon's own SUMMON_FX rows
+      for (const sf of Object.values(SUMMON_FX)) if (sf.unit === this.w.unitKeyOf(v)) for (const k of [...sf.keys, ...(sf.gone || [])]) { out.add(k); out.add(this.w.skinKey(k, this.w.view(v.info?.summonerId) || v) || k); }
       const U = this.of(v);
       if (!U) continue;
       if (U.plan) {
         for (const k of planKeys(U.plan)) out.add(k);
         for (const pk of U.plan.projectiles) proj(pk);
-        for (const k of bindingKeys(idx, U.skillId)) out.add(k);
+        for (const k of bindingKeys(idx, U.skillId)) { out.add(k); out.add(this.w.skinKey(k, v) || k); } // and its outfit twin (_bound)
+        proj(CHAIN_RELAYS[U.skillId]?.projectile);
       }
       for (const en of U.enemy) {
         for (const k of planKeys(en.plan)) out.add(k);
@@ -1480,19 +1939,30 @@ export class SkillFx {
   clear() {
     this.units.clear();
     this.tloops.clear();
+    this._stopStates();
+    for (const t of this.tiles.values()) t.h.stop();
+    this.tiles.clear();
     this.marks = [];
     for (const h of this.shots.values()) h?.stop();
     this.shots.clear();
     for (const L of this.locks) this._endLock(L);
     this.locks = [];
+    for (const u of this.untils) for (const h of u.hs) h.stop();
+    this.untils = [];
     this.hitLog = [];
     this.windows = [];
     this.born.clear();
     this.gone.clear();
     this.auraWins = [];
     this.aloops.clear();
+    for (const t of this.lives.values()) t.h.stop();
+    this.lives.clear();
+    for (const t of this.toks.values()) if (!t.once) t.h?.stop();
+    this.toks.clear();
+    this.marked.clear();
     this.viewList = [];
     for (const m of this.modeWins.values()) for (const h of m.hs) h.stop();
     this.modeWins.clear();
+    this.paths.clear();
   }
 }

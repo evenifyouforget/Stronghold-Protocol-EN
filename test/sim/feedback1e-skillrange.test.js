@@ -17,7 +17,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { absoluteRangeKeys, extendedGrid } from '../../server/sim/targeting.js';
 import { buildBattleSpec, createBattleFromSpec } from '../../server/sim/spec.js';
@@ -51,24 +51,37 @@ test('data: 烛煌 S3 众恶的焚场 is the default skill (index 2), skill rang
     assert.equal(c.skill.index, 2);
     assert.equal(c.rangeId, '3-1');
     assert.equal(c.skill.rangeId, '4-11');
-    assert.equal(c.skill.trigger.rule, 'DEFAULT', 'an attack-range change keeps the basic strategy (§20.2); 4-11 does not contain 3-1, so no ACTIVE_RANGE');
+    // official row (CN season 3, CASTER class): [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY] = an enemy in the initial 3-1 OR one in the skill range 4-11
+    assert.deepEqual(c.skill.trigger.official, ['ATTACK_RANGE_ENEMY', 'SKILL_RANGE_ENEMY']);
+    assert.equal(c.skill.trigger.rule, 'SEARCH');
+    assert.equal(c.skill.trigger.rawRule, 'ATTACK_RANGE_ENEMY');
+    assert.deepEqual(c.skill.trigger.also.map((a) => a.rule), ['SKILL_RANGE']);
+    assert.ok(c.skill.trigger.also[0].customRangeGrid.length > 0, 'the second rule reads the skill range grid');
   }
   assert.equal(C[BLAZE].skill.bb['attack@trigger_time'], 18);
   assert.equal(C.chess_char_5_03_b.skill.bb['attack@trigger_time'], 21);
 });
 
-test('烛煌 S3 attacks with the skill range: an enemy only in 4-11 is hit while it runs, an enemy only in 3-1 is not; the cast needs an enemy in 3-1', () => {
+test('烛煌 S3 attacks with the skill range: an enemy only in 4-11 is hit while it runs, an enemy only in 3-1 is not; either one casts (official [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY])', () => {
   // (10,7) = [0,4]: S3 only; (11,3) = [1,0]: base range only
+  {
+    // an enemy only in the skill range 4-11 casts it (the SKILL_RANGE_ENEMY entry), with nothing in 3-1
+    const h2 = blazeArena([{ key: 'enemy_far', pos: [10, 7] }]);
+    const u2 = h2.unit(BLAZE);
+    h2.step();
+    u2.skill.gainSp(1000);
+    assert.ok(h2.runUntil(() => u2.skill.active, 5), 'an enemy only in 4-11 casts it');
+    assert.equal(h2.hooksOf('skillStart').length, 1);
+    done(h2);
+  }
   const h = blazeArena([{ key: 'enemy_far', pos: [10, 7] }]);
   const u = h.unit(BLAZE);
   h.step();
   u.skill.gainSp(1000);
-  h.run(5);
-  assert.equal(h.hooksOf('skillStart').length, 0, 'no enemy in the initial range: no cast (DEFAULT, "即将进行普通攻击")');
-  assert.equal(h.hooksOf('damaged').filter((c) => c.source === u).length, 0, 'nothing in reach of 3-1');
   const near = h.spawn('enemy_far', { pos: [11, 3] });
-  assert.ok(h.runUntil(() => u.skill.active, 5), 'an enemy in 3-1: she casts on her next attack');
+  assert.ok(h.runUntil(() => u.skill.active, 5), 'enemies in 4-11 and in 3-1: she casts');
   assert.ok(sameSet(new Set(u.rangeKeys), keysOf(s3Grid(), u)), 'the range keys are 4-11');
+  h.run(1);                                       // the attack she had begun on the 3-1 enemy before the cast lands first
   const mark = h.hooksOf('damaged').length;
   h.run(2);
   const hit = new Set(h.hooksOf('damaged').slice(mark).filter((c) => c.source === u && c.dmg.isAttack).map((c) => c.target));
@@ -85,6 +98,7 @@ test('烛煌 S3 "攻击变为群体攻击" = one target + a 1.7 splash (PRTS 备
     h.step();
     u.skill.gainSp(1000);
     assert.ok(h.runUntil(() => u.skill.active, 5), 'cast');
+    h.run(1);                                     // official SKILL_RANGE_ENEMY casts at once; the attack begun on the 3-1 enemy lands first
     const mark = h.hooksOf('attack').length;
     const dmark = h.hooksOf('damaged').length;
     h.run(3);
@@ -151,8 +165,9 @@ test('烛煌 S3: the +60 % ATK elemental damage hits every enemy of the attack i
   assert.ok(h.runUntil(() => u.skill.active, 5));
   h.b.applyStatus(out, 'burnBurst', { duration: 10 });
   assert.ok(out.findBuff('burnBurst'));
+  h.run(1);                                       // the cast is immediate now (enemy in 4-11); skip the attack begun before it
   const mark = h.hooksOf('damaged').length;
-  h.run(1.5);
+  h.run(2);
   const bonus = h.hooksOf('damaged').slice(mark).filter((c) => c.source === u && (c.dmg.tags || []).includes('blazeBurn'));
   assert.ok(bonus.some((c) => c.target === out), 'the splashed burning enemy takes the bonus');
   for (const c of bonus.filter((x) => x.target === out)) assert.ok(Math.abs(c.dmg.amount - u.s.atk * u.def.skill.bb['attack@atk_scale']) < 1e-6);
@@ -170,8 +185,10 @@ test('烛煌 S3: the burst bonus is dealt BEFORE the attack\'s damage (PRTS 备�
   assert.ok(h.runUntil(() => u.skill.active, 5));
   h.b.applyStatus(main, 'burnBurst', { duration: 10 });
   h.b.applyStatus(low, 'burnBurst', { duration: 10 });
+  // (fork) her S3 cast cut the attack begun before it (the begin clip, skills.js activate): S3's own first attack is
+  // the first to land, so the window opens at once
   const mark = h.hooksOf('damaged').length;
-  h.run(1.5);
+  h.run(3);
   const ev = h.hooksOf('damaged').slice(mark).filter((c) => c.source === u);
   const isBonus = (c) => (c.dmg.tags || []).includes('blazeBurn');
   assert.ok(ev.some((c) => c.target === low && isBonus(c)), 'the enemy the hit kills still takes the bonus');
@@ -223,7 +240,9 @@ test('烛煌 S3: a burn burst refills 2 ammo but never above the skill\'s ammo (
     h.step();
     u.skill.gainSp(1000);
     assert.ok(h.runUntil(() => u.skill.active, 5));
-    const first = u.skill.ammoLeft;                 // the casting attack already fired one bullet
+    // the cast is immediate now (official SKILL_RANGE_ENEMY: enemies in 4-11); the first bullet follows with her first S3 attack
+    assert.ok(h.runUntil(() => u.skill.ammoLeft === max - 1, 5), 'the first bullet fired');
+    const first = u.skill.ammoLeft;
     assert.equal(first, max - 1);
     h.b.dealDamage(null, h.enemy('enemy_main'), { type: 'element', element: 'burn', amount: 1000 });
     assert.equal(u.skill.ammoLeft, max, `${id}: +1 only — ${max} is the cap (it was ${first + 2})`);
@@ -326,7 +345,7 @@ test('audit: every selectable attack-range change attacks with the official grid
       const want = keysOf(grid, u, own ? (NO_EXTEND.has(s.skillId) ? 0 : permExt) : ext);
       if (permExt) extended++;
       if (s.skillType !== 'PASSIVE' && !/被动效果：攻击范围扩大/.test(s.desc)) {
-        assert.ok(u.skill.activate('test', { free: true }), `${tag}: cast`);
+        assert.ok(castNow(u, 'test', { free: true }), `${tag}: cast`);
         h.step();
         assert.ok(u.skill.active, `${tag}: running`);
       }
@@ -352,7 +371,7 @@ test('信仰搅拌机 SPT-Y "攻击距离+1（部分技能不受此影响）": S
     const tag = `S${skillIndex + 1} ${mid}`;
     assert.ok(sameSet(new Set(u.rangeKeys), keysOf(C[id].rangeGrid, u, plus)), `${tag}: before the cast 2-2${plus ? ' + 1' : ''}`);
     assert.ok(sameSet(new Set(u.baseRangeKeys), keysOf(C[id].rangeGrid, u, plus)), `${tag}: the initial range`);
-    assert.ok(u.skill.activate('test', { free: true }), `${tag}: cast`);
+    assert.ok(castNow(u, 'test', { free: true }), `${tag}: cast`);
     h.step();
     const want = skillIndex === 2 ? keysOf(C[id].skills[2].rangeGrid, u, 0) : keysOf(C[id].rangeGrid, u, plus);
     assert.equal(u.rangeKeys.length, want.size, `${tag}: ${want.size} tiles while it runs`);
@@ -380,7 +399,7 @@ test('S3 counter of 信仰搅拌机 with SPT-Y reaches 3-13 only: an enemy on th
   });
   const u = h.unit(id);
   h.step();
-  assert.ok(u.skill.activate('test', { free: true }));
+  assert.ok(castNow(u, 'test', { free: true }));
   h.step();
   const e = h.enemy('enemy_far');
   assert.ok(!u.rangeKeySet.has(tileKey(e)), 'the +1 tile is outside S3');
@@ -395,7 +414,7 @@ test('荒芜拉普兰德 S1 慵怠者悲鸣 (no rangeId, no 攻击范围 text): 
     const h = makeBattle({ units: [{ chessId: id, row: 10, col: 5, dir: 'RIGHT', skillIndex: 0 }], autoFinish: false, timeLimit: 30 });
     const u = h.unit(id);
     h.step();
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     h.step();
     assert.ok(u.skill.active);
     assert.ok(u.rangeKeys.length > 100, 'the sim selects targets field-wide');
@@ -405,15 +424,16 @@ test('荒芜拉普兰德 S1 慵怠者悲鸣 (no rangeId, no 攻击范围 text): 
   }
 });
 
-test('audit: the DEFAULT trigger of an attack-range change reads the INITIAL range (PRTS "技能就绪，且即将进行普通攻击")', () => {
-  // an enemy on [0,4]: inside 4-11, outside 3-1
+test('audit: the official CASTER row [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY] — an enemy on [0,4] (inside 4-11, outside 3-1) casts through the skill-range entry', () => {
+  // the old DEFAULT trigger read the INITIAL range only (PRTS "技能就绪，且即将进行普通攻击") and did not cast here
   for (const id of [BLAZE, 'chess_char_5_03_b']) {
     const h = blazeArena([{ key: 'enemy_far', pos: [10, 7] }], { id });
     const u = h.unit(id);
+    assert.deepEqual(u.skill.rules, ['SEARCH', 'SKILL_RANGE']);
     h.step();
     u.skill.gainSp(1000);
-    h.run(4);
-    assert.equal(h.hooksOf('skillStart').length, 0, `${id}: no cast`);
+    assert.ok(h.runUntil(() => u.skill.active, 4), `${id}: casts`);
+    assert.equal(h.hooksOf('skillStart').length, 1);
     done(h);
   }
 });
@@ -433,19 +453,32 @@ test('real product path: a BattleSpec (S3 by loadout) on act2 m01 with a real wa
   const b = createBattleFromSpec(spec, ds, { recordEvents: false, quiet: true });
   const u = b.allyUnits.find((x) => x.uid === 1);
   assert.equal(u.def.skill.id, 'skchr_blaze2_3');
-  let picks = 0, offGrid = 0, splashOut = 0, casts = 0;
+  let picks = 0, offGrid = 0, splashOut = 0, casts = 0, lastCast = null;
+  const castChecked = new Set();
   b.on('skillStart', (c) => { if (c.unit === u) casts++; });
   b.on('attack', (c) => {
     if (c.attacker !== u || !u.skill.active) return;
     const s3 = keysOf(s3Grid(), u);
     // in 4-11 by its 0.1 collider (the range test since 0.3.0), or blocked by her
-    for (const t of c.targets) { picks++; if (!bodyInRange(t, s3) && t.blockedBy !== u) offGrid++; }
+    // official cast → hit: the targets are locked at the cast start, so a target that walked out of 4-11 during the
+    // wind-up still takes the hit; it was checked on 4-11 at the cast start (below). Any other target is checked now.
+    for (const t of c.targets) { picks++; if (!castChecked.has(t) && !bodyInRange(t, s3) && t.blockedBy !== u) offGrid++; }
   });
   b.on('damaged', (c) => {
     if (c.source !== u || !u.skill.active || !c.dmg.isSplash) return;
     if (!keysOf(s3Grid(), u).has(tileKey(c.target))) splashOut++;
   });
-  for (let i = 0; i < 110 * 30 && !b.finished; i++) b.step();
+  for (let i = 0; i < 110 * 30 && !b.finished; i++) {
+    b.step();
+    if (u.cast && u.cast !== lastCast) {   // a cast just started: its locked targets stand on 4-11 now
+      castChecked.clear();
+      if (u.skill.active) {
+        const s3 = keysOf(s3Grid(), u);
+        for (const t of u.cast.targets) { if (bodyInRange(t, s3) || t.blockedBy === u) castChecked.add(t); else offGrid++; }
+      }
+    }
+    lastCast = u.cast;
+  }
   assert.equal(b.errors.length, 0);
   assert.ok(casts >= 1, `S3 cast (${casts})`);
   assert.ok(picks > 10, `S3 attacks (${picks})`);

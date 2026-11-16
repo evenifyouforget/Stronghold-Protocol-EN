@@ -109,13 +109,15 @@ export class MatchInfra {
    * A player's bounties for this round's wave plus the SPA-CC Risk tag extras (shared/rules.js; numbers: CC). Every wave
    * builder takes its bounties from here; `boss`: the wave of a final boss round (Final Assault / Hidden Core).
    *   ccFamiglia Cleaner   rounds 10–13: the alive player with the fewest stacks in all (Σ of its alliance layers; a tie:
-   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人, no bounty; Unending 3 /
+   *                        the earliest seat, Fish 2026-10-15) gets CC.silencers.count 家族暗影灭迹人 (solo: soloCount), no
+   *                        bounty; Unending 3 /
    *                        Seasonal 3: and Zaaro (his leak costs CC.famiglia.zaaro.leakLp, riskLoss)
    *   ccPatriot            Undying 1: the round-9 Improv's Patriot card (riskPatriotCard) is an ordinary bounty card;
-   *                        Undying 3: 5 Guerrilla Shieldguards join the Patriot who took it, and in the final boss rounds
-   *                        Patriot and his escort come again, once per field (bossSubWave)
-   *   ccDelegation         the final boss rounds: Degenbrecher, 10 Delegation Shieldbearers and 10 Delegation Centurion
-   *                        Champions once per field (bossSubWave), HP × 2 / 3 / 5, ATK × 1.5 from United 2
+   *                        Undying 2: 2 Guerrilla Shieldguards join the Patriot who took it; Undying 3: in the final boss
+   *                        rounds Patriot and his escort come again, once per field, taken or not (bossSubWave)
+   *   ccDelegation         the final boss rounds: Degenbrecher (at the round's start), 2 Delegation Shieldbearers and 2
+   *                        Delegation Centurion Champions once per field (bossSubWave); the Degenbrecher's HP × 1 / 2 / 3
+   *                        per alive player, her ATK × 1.5 from United 2
    * @param {import('../PlayerState.js').PlayerState} ps
    * @param {{ boss?: boolean, field?: string[] }} [o] `field`: the boss field's player ids, left first (bossSubWave)
    */
@@ -129,7 +131,7 @@ export class MatchInfra {
     if (!this.lobbyRules || !ps.alive) return [];
     const out = [];
     const pt = CC.patriot;
-    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying3') && this.gd.enemy(pt.escort.key)
+    if (tagHas(this.lobbyRules, 'ccPatriot', 'undying2') && this.gd.enemy(pt.escort.key)
       && ps.bounties.some((b) => b.card && b.card.effectId === RISK_PATRIOT_CARD && b.roundsLeft > 0)) {
       out.push(riskCard('risk:patriotEscort', pt.escort.key, pt.escort.count));
     }
@@ -174,9 +176,12 @@ export class MatchInfra {
     const dg = CC.delegation;
     if (tagHas(this.lobbyRules, 'ccDelegation', 'united1')) {
       const has = (n) => tagHas(this.lobbyRules, 'ccDelegation', n);
-      const hpMul = has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1;
-      const atkMul = has('united2') ? dg.atkMul.united2 : 1;
-      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { riskMods: { hpMul, atkMul }, leftFirst: true }));
+      // the Degenbrecher only: HP × hpMul per alive player (her copies share one HP bar), ATK × degenAtkMul from United 2
+      const alive = [...this.players.values()].filter((p) => p && p.alive).length || 1;
+      const hpMul = (has('united3') ? dg.hpMul.united3 : has('united2') ? dg.hpMul.united2 : dg.hpMul.united1) * alive;
+      const degenMods = { hpMul, ...(has('united2') ? { atkMul: dg.degenAtkMul } : {}) };
+      // the Degenbrecher at the round's start (waves.js bountyPlan `atStart`): United 2's hold is never waiting on her
+      for (const w of dg.wave) if (this.gd.enemy(w.key)) cards.push(riskCard(`risk:delegation:${w.key}`, w.key, w.count, { leftFirst: true, ...(w.key === dg.degen ? { atStart: true, riskMods: degenMods } : {}) }));
     }
     // ccVengeance: always at least 1, by the highest active alliance of any alive player, once per field
     const v = this.vengeanceCount(this.alivePlayers(), { boss: true });
@@ -193,7 +198,7 @@ export class MatchInfra {
     let low = alive[0];
     for (const p of alive) if (stackTotal(p) < stackTotal(low)) low = p;
     if (low !== ps) return [];
-    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: s.count, coin: 0, payout: 'kill', rounds: 1 } }];
+    const out = [{ id: 'risk:silencers', roundsLeft: 1, card: { effectId: 'risk:silencers', enemyKey: s.key, count: this.isSolo ? s.soloCount : s.count, coin: 0, payout: 'kill', rounds: 1 } }];
     // ccFamiglia Unending 3 / Seasonal 3: Zaaro joins the sub-wave
     const z = CC.famiglia.zaaro;
     if ((tagHas(this.lobbyRules, 'ccFamiglia', 'unending3') || tagHas(this.lobbyRules, 'ccFamiglia', 'seasonal3')) && this.gd.enemy(z.key)) {

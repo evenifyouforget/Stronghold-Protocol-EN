@@ -53,6 +53,8 @@
 // while it runs.
 
 const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+/** (fork) The clip scale cap of an attack ability (`_maxAnimScale`) when the unit's data has none: SpineActor.abilitySpeed. */
+export const ABILITY_MAX_ANIM_SCALE = 1;
 
 /** Longest wind-up compression (× the rhythm speed) when the look-ahead is shorter than the natural wind-up. */
 export const MAX_WIND_SPEEDUP = 2.5;
@@ -65,6 +67,8 @@ const RHYTHM_DROP_MARGIN = 0.08;
 // strike frame, for at most SKILL_HOLD_MAX game s, then gives up (back to rest, no new prediction until a strike)
 const SKILL_HOLD_BEFORE = 0.05;
 const SKILL_HOLD_MAX = 1;
+/** (fork) How long (game s) a cast's clip loops on past its end (castAttack): a steady rhythm's next cast restarts it. */
+const CAST_HOLD = 0.12;
 
 /**
  * (fork) The melee clip of a model whose manifest attack is its ranged one (SpineActor.shot 'melee'), first present
@@ -306,9 +310,27 @@ const unionBox = (a, b) => (a ? [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Mat
 export const CLIP_SAMPLE_HZ = 60;
 export const CLIP_SAMPLE_MAX = 48;
 export const CLIP_BOUNDS_BUDGET_MS = 2.5;
+/**
+ * (fork) The sampling budget of one frame (render/app.js), from the time since the last frame: CLIP_BOUNDS_BUDGET_MS
+ * while frames come quickly; past CLIP_BOUNDS_SLOW_FRAME_MS a share of the frame (CLIP_BOUNDS_FRAME_SHARE), at most
+ * CLIP_BOUNDS_BUDGET_MAX_MS. A crowd that arrives at once (a battle's start, 联防, a boss) queues ~60 skeletons' clips
+ * (≈ 3 s of posing with the clips' key times); while they wait its units are drawn directly, not as impostors, and the
+ * frames are slow (`frameMs` here is the frame without the sampling itself: render/app.js subtracts clipBoundsSpentMs, so
+ * the budget never feeds on itself) — at 2.5 ms a frame and ~10-17 fps that took 50 s to over 2 minutes (render-demo stress: 120 units,
+ * 59 skeletons, 359 clips, 34,859 poses, 0.08-0.3 ms each); a third of a slow frame (at most 33 ms) empties it in
+ * 22-30 s. Same samples, same boxes; the queue only empties sooner (stepClipBounds also takes the skeletons that the most
+ * waiting units need first). Nothing to sample: stepClipBounds returns at once. [ASSUMED] the share and the cap.
+ */
+export const CLIP_BOUNDS_SLOW_FRAME_MS = 20;
+export const CLIP_BOUNDS_FRAME_SHARE = 1 / 3;
+export const CLIP_BOUNDS_BUDGET_MAX_MS = 33;
+export function clipBoundsBudget(frameMs) {
+  if (!(frameMs > CLIP_BOUNDS_SLOW_FRAME_MS)) return CLIP_BOUNDS_BUDGET_MS;
+  return Math.min(CLIP_BOUNDS_BUDGET_MAX_MS, Math.max(CLIP_BOUNDS_BUDGET_MS, frameMs * CLIP_BOUNDS_FRAME_SHARE));
+}
 const ATT_REGION = 0, ATT_MESH = 2;      // pixi-spine AttachmentType
 const boundsOf = new WeakMap();          // skeleton data → { data, Skeleton, skel, rects: Map<clip, rect|null|false>, todo, job, users, failed }
-const boundsQueue = [];                  // records with clips still to sample, oldest request first
+const boundsQueue = [];                  // records with clips still to sample, in request order (promoteClipBounds picks the next)
 const nowMs = () => (globalThis.performance ? globalThis.performance.now() : Date.now());
 const emptyRect = () => [Infinity, Infinity, -Infinity, -Infinity];
 const rectOk = (r) => !!r && Number.isFinite(r[0]) && Number.isFinite(r[1]) && Number.isFinite(r[2]) && Number.isFinite(r[3]) && r[0] <= r[2] && r[1] <= r[3];
@@ -396,9 +418,95 @@ function boundsRecord(data, Skeleton) {
     rec.failed = true;
     rec.skel = null;
   }
+  if (!rec.failed) seedRecord(rec);
   boundsOf.set(data, rec);
   return rec;
 }
+
+// (fork) Precomputed clip bounds (tools/assets/clip-bounds.mjs → data/clip-bounds.json, loaded by
+// render/clipBoundsTable.js): the same sampling run at build time on every skeleton of public/assets with the same
+// Spine runtime, each rect rounded outward to `step` units (never smaller than the runtime's). A skeleton whose Spine
+// hash (its first CLIP_BOUNDS_KEY_CHARS) and signature (bones · slots · animations) match an entry starts with those
+// clips measured; a clip the entry
+// lacks, a skeleton it does not know (plugins, DIY, another server's local art) or a table made by another sampler
+// (CLIP_BOUNDS_SAMPLER) is measured at runtime as before.
+/** Bumped whenever the sampling (clipTimes, poseRect, the constants above) changes what a clip measures. */
+export const CLIP_BOUNDS_SAMPLER = 1;
+/** The key a precomputed table must carry to be used: the sampler version and its constants. */
+export function clipBoundsSamplerKey() {
+  return [CLIP_BOUNDS_SAMPLER, CLIP_SAMPLE_HZ, CLIP_SAMPLE_MAX, CLIP_SAMPLE_KEYS, CLIP_KEY_LEAD_S].join('|');
+}
+/** A skeleton data's shape, checked next to its Spine hash: bones · slots · animations. */
+export function skeletonSignature(data) {
+  const n = (a) => (Array.isArray(a) ? a.length : 0);
+  return `${n(data && data.bones)}.${n(data && data.slots)}.${n(data && data.animations)}`;
+}
+/** Characters of the Spine hash a table keys its skeletons by (tools/assets/clip-bounds.mjs CLIP_BOUNDS_KEY_CHARS). */
+export const CLIP_BOUNDS_KEY_CHARS = 8;
+let seedTable = null;   // the loaded table: { step, names, skeletons: { [hash key]: [signature, flat] } }
+/**
+ * The precomputed clips of skeleton data `data`: Map clip → rect (skeleton units) | null, or null without an entry.
+ * `flat`: per clip its index in `names` and its rect in steps, or -(index + 1) for a clip that draws nothing.
+ */
+function seedClips(data) {
+  const hash = data && typeof data.hash === 'string' ? data.hash : '';
+  const sk = seedTable && seedTable.skeletons;
+  if (!sk || hash.length < CLIP_BOUNDS_KEY_CHARS) return null;
+  const key = hash.slice(0, CLIP_BOUNDS_KEY_CHARS);
+  if (!Object.prototype.hasOwnProperty.call(sk, key)) return null;
+  const e = sk[key];
+  if (!Array.isArray(e) || e[0] !== skeletonSignature(data) || !Array.isArray(e[1])) return null;
+  const { names, step } = seedTable, flat = e[1], out = new Map();
+  for (let i = 0; i < flat.length;) {
+    const k = flat[i++];
+    if (!Number.isInteger(k)) return null;
+    if (k < 0) { const n = names[-k - 1]; if (typeof n !== 'string') return null; out.set(n, null); continue; }
+    const n = names[k];
+    if (typeof n !== 'string' || i + 4 > flat.length) return null;
+    const r = [flat[i] * step, flat[i + 1] * step, flat[i + 2] * step, flat[i + 3] * step];
+    i += 4;
+    if (!r.every(Number.isFinite) || r[0] > r[2] || r[1] > r[3]) return null;
+    out.set(n, r);
+  }
+  return out;
+}
+/** Fill record `rec` from the table: its measured clips, what it still has queued dropped. @returns {number} clips seeded */
+function seedRecord(rec) {
+  const clips = seedClips(rec.data);
+  if (!clips) return 0;
+  let n = 0;
+  for (const [name, r] of clips) {
+    if (rec.rects.has(name)) continue;
+    rec.rects.set(name, r);
+    n++;
+  }
+  if (n) {
+    rec.todo = rec.todo.filter((name) => !rec.rects.has(name));
+    if (rec.job && rec.rects.has(rec.job.name)) rec.job = null;
+    if (!rec.todo.length && !rec.job) {
+      const i = boundsQueue.indexOf(rec);
+      if (i >= 0) boundsQueue.splice(i, 1);
+      rec.skel = null;
+    }
+  }
+  return n;
+}
+/**
+ * Use a precomputed table (data/clip-bounds.json, format 1): records made from now on start from it, and records
+ * already queued take what it has. A table of another format or sampler, or no table, changes nothing.
+ * @param {any} table { format: 1, sampler, step, names, skeletons: { [hash key]: [signature, flat] } }
+ * @returns {number} clips seeded into the records already queued (-1: the table was not used)
+ */
+export function seedClipBounds(table) {
+  if (!table || table.format !== 1 || table.sampler !== clipBoundsSamplerKey() || !(table.step > 0) || !Array.isArray(table.names)
+    || !table.skeletons || typeof table.skeletons !== 'object') return -1;
+  seedTable = { step: table.step, names: table.names, skeletons: table.skeletons };
+  let n = 0;
+  for (const rec of [...boundsQueue]) n += seedRecord(rec);
+  return n;
+}
+/** (dev / tests) Forget the precomputed table. */
+export function clearClipBoundsSeed() { seedTable = null; }
 
 /**
  * Start sampling clip `name`: { name, anim, d, n, i, r } (posed at t = d·i/n for i = 0…n; `r` grows), or null when the
@@ -491,15 +599,40 @@ function useBounds(rec, delta) {
 }
 
 /**
+ * (fork) Bring to the front of the queue the record whose clips the most waiting units need per clip left (`users` per
+ * pending clip): a unit becomes an impostor only once every clip of its skeleton is measured, so the crowd converts
+ * soonest — and its frames speed up, which gives the sampler more of them. A clip in progress is finished first; ties
+ * keep the order of the requests. Only the order changes: every queued clip is still sampled the same way.
+ */
+function promoteClipBounds() {
+  if (boundsQueue.length < 2 || boundsQueue[0].job) return;
+  const score = (r) => r.users / Math.max(1, r.todo.length + (r.job ? 1 : 0));
+  let best = 0, top = score(boundsQueue[0]);
+  for (let i = 1; i < boundsQueue.length; i++) { const v = score(boundsQueue[i]); if (v > top) { top = v; best = i; } }
+  if (best > 0) boundsQueue.unshift(boundsQueue.splice(best, 1)[0]);
+}
+
+/**
  * Sample queued clips for up to `budgetMs` (render/app.js calls it once per frame): pose after pose, a clip resumed on the
  * next call when the budget runs out inside it; at least one pose per call.
  * @returns {number} clips finished
  */
 export function stepClipBounds(budgetMs = CLIP_BOUNDS_BUDGET_MS) {
+  spentMs = 0;
   if (!boundsQueue.length) return 0;
-  const end = nowMs() + budgetMs;
+  const start = nowMs();
+  try { return sampleClipBounds(budgetMs, start); } finally { spentMs = nowMs() - start; }
+}
+
+/** (fork) ms the last stepClipBounds call spent (render/app.js leaves it out of the device's frame time). */
+export function clipBoundsSpentMs() { return spentMs; }
+let spentMs = 0;
+
+function sampleClipBounds(budgetMs, start) {
+  const end = start + budgetMs;
   let finished = 0, posed = 0;
   while (boundsQueue.length) {
+    promoteClipBounds();
     const rec = boundsQueue[0];
     if (!rec.job) {
       const name = rec.todo.shift();
@@ -575,6 +708,7 @@ export class SpineActor {
     this.attackVariant = null;    // (fork) the clip the next / current attack plays by the official pick (FxWiring.attackClip)
     this.skillVariant = null;     // (fork) that clip when it stands in for the skill role's loop (_attackClip, _isSkillLoop)
     this.runMode = false;         // move on the model's own Run cycle (setRunMode)
+    this.castRole ??= null;       // (fork) the skill role of the cast to come (setCastRole), over the skill slot's
     this.formRoles = null;        // the clip set of the form in force (setForm), over the unit's own roles
     this.skillOn = false;
     this.skillClipOnce = false;    // skillBegin: the skill's own clip plays once (a clip with no Begin / own Idle)
@@ -647,6 +781,16 @@ export class SpineActor {
    * A fast mover walks on its model's own Run cycle (`anims.run`; PR #275 by @xcdoge): 猎狗pro (moveSpeed 1.9, 行动速度很快)
    * ships Move_Loop 0.80 s next to Run_Loop 0.53 s. Composes with setSkillIndex; a model without a Run cycle is unchanged.
    */
+  /**
+   * (fork) The skill role of the cast to come in place of the skill slot's (render/units.js vvanaSkillRole: 薇薇安娜's S3
+   * _A / _B clip sets, her S1 cast that is an attack); null = the slot's again. `keepAttack`: the cast is an attack — the
+   * skill's end lets its swing play out (setSkill).
+   */
+  setCastRole(role) {
+    this.castRole = role || null;
+    this._applyRoles();
+  }
+
   setRunMode(on) {
     this.runMode = !!on;
     this._applyRoles();
@@ -657,8 +801,9 @@ export class SpineActor {
     const anims = this.entry?.anims || {};
     const clip = Number.isInteger(this.skillIndex) && anims.skills ? anims.skills[String(this.skillIndex)] : null;
     const run = this.runMode && anims.run ? anims.run : null;
-    const base = clip || run ? { ...anims } : anims;
+    const base = clip || run || this.castRole ? { ...anims } : anims;
     if (clip) base.skill = clip;
+    if (this.castRole) base.skill = this.castRole;
     if (run) base.move = run;
     this.baseRoles = base;
     this.roles = this.formRoles ? { ...base, ...this.formRoles } : base;
@@ -888,7 +1033,23 @@ export class SpineActor {
    * cast (no rhythm): the clip plays once at its own speed from its strike frame, then the resting state.
    */
   attack(interval, once = false) {
+    this.strikeLead = undefined;   // (fork) set below once this attack's clip is known (render/vfx/wiring.js attack)
     if (this.dead || this.mode === 'stun' || this.mode === 'die' || this.mode === 'change') return;   // a form change plays out
+    // (fork) the hit of a cast (castAttack): the clip already reached its strike frame at the cast's speed — it plays on
+    if (this.windCast && this.mode === 'attack' && !once) {
+      const e = this.spine.state.tracks[0];
+      const loop = this.current;
+      const dur = this.dur(loop), hit = this._hitTime(loop, dur), ts = this.windTs || 1;
+      this.windCast = false;
+      this.wound = false;
+      this.windUntil = null;
+      if (e) e.timeScale = ts;
+      this.attackUntil = this.clock + Math.max(0, dur - hit) / ts + CAST_HOLD;
+      this.strikeLead = hit / ts;
+      this.lastStrikeAt = this.clock;
+      this.skillAhead = false;
+      return;
+    }
     if (!once) this.interval = clampN(Number.isFinite(interval) && interval > 0 ? interval : this.interval, 0.08, 8);
     const clip = this._attackClip();
     if (!clip) return;
@@ -903,6 +1064,10 @@ export class SpineActor {
     // rhythm loop still running goes on, re-phased below)
     const wasAttacking = this.mode === 'attack' && this.current === loop
       && (this.wound || (rhythm && !!this.spine.state.tracks[0]?.loop));
+    // (fork) an attack not wound up: how long before this strike its cast began, in game s at the clip's own speed
+    // (windSkip's rule) — its cast effects' FxDelay counts from there (render/vfx/wiring.js attack `lead`); 0 when the
+    // whole clip plays from its start
+    this.strikeLead = (per && !once && this.interval >= loopDur && !wasAttacking) ? 0 : hit / (once ? 1 : clampN(loopDur / Math.max(0.08, this.interval), 1, 4));
     this.mode = 'attack';
     this.attackUntil = rhythm ? this._rhythmUntil(this.clock, ts, loopDur) : this.clock + Math.max(0, loopDur - hit) / ts;
     this.windUntil = null;
@@ -936,6 +1101,60 @@ export class SpineActor {
         }
       }
     }
+  }
+
+  /**
+   * (fork) An attack cast (the sim's ['atkCast'], the official cast → hit order): the attack clip from its first frame
+   * (`elapsed` game s into it when the cast is rendered late), at `hit / windUp` so its strike frame lands with the hit —
+   * the official AbstractAnimatedAbility scale, the clip stretched to the attack time —, then the rest of the clip at
+   * that speed; it loops on for CAST_HOLD past its end, where the next cast of a steady rhythm restarts it from frame 0,
+   * else back to rest. A clip with no strike frame returns false (the attack plays as it comes). True once started.
+   */
+  castAttack(windUp, elapsed = 0) {
+    if (this.dead || this.mode === 'stun' || this.mode === 'die' || this.mode === 'change' || !(windUp > 0)) return false;
+    const clip = this._attackClip();
+    if (!clip) return false;
+    const loop = this._shot(clip.loop);
+    const dur = this.dur(loop);
+    const hit = this._hitTime(loop, dur);
+    if (!(hit > 0) || !(dur > 0)) return false;
+    const speed = clampN(hit / windUp, 0.1, 10);
+    const into = clampN(elapsed, 0, windUp);
+    this.mode = 'attack';
+    this._play(loop, true, { timeScale: speed, start: Math.min(hit, into * speed), mix: 0.06 });
+    this.windTs = speed;
+    this.windUntil = this.clock + (windUp - into);
+    this.attackUntil = this.windUntil + Math.max(0, dur - hit) / speed + CAST_HOLD;
+    this.windCast = true;
+    this.wound = true;
+    this.windSingle = null;
+    this.interval = clampN(dur / speed, 0.08, 8);
+    // the official cast effects (render/vfx/wiring.js castStart): this cast from its first frame, at the clip's speed
+    this.windSkip = into;
+    this.windCastLeft = (windUp - into) + Math.max(0, dur - hit) / speed;
+    return true;
+  }
+
+  /**
+   * (fork) The next cast of this unit is in sight (render/app/windup.js windCasts): an attack clip still playing past its
+   * hit loops on at least `sec` more (real s) instead of dropping to rest, so that cast restarts it from frame 0 with no
+   * rest pose between — the clip fills the whole interval (the official scale), and the render clock may run a little
+   * behind the clip's at high game speed. Nothing else: a resting unit stays at rest until its cast is rendered.
+   */
+  holdCast(sec) {
+    if (this.mode === 'attack' && !this.wound && this.attackUntil > this.clock) this.attackUntil = Math.max(this.attackUntil, this.clock + sec);
+  }
+
+  /**
+   * (fork) A wound-up swing whose attack never came (the sim's ['atkCancel'] → UnitView.cancelWindUp): it drops to rest on
+   * the next update, by the same path as an unconfirmed rhythm loop. True when there was one.
+   */
+  cancelWindUp() {
+    if (this.mode !== 'attack' || !this.wound) return false;
+    this.attackUntil = this.clock;
+    this.windUntil = null;
+    this.windCast = false;
+    return true;
   }
 
   /** (fork) When an operator's rhythm loop, striking at `strikeAt` at `ts`, drops to its resting state: just before
@@ -1071,6 +1290,28 @@ export class SpineActor {
     if (!base || !v || base === this.strike || v === base.loop || !this.has(v)) return base;
     this.skillVariant = base === this.roles.skill ? v : null;
     return { ...base, loop: v };
+  }
+
+  /**
+   * (fork) The playback speed of this unit's attack ability, as the client gives it to the attack's effects
+   * (AbstractAnimatedAbility.UpdatePlaybackSpeed, disassembled: speed = 1 / animScale, animScale = clamp(attack time /
+   * clip length, MIN_ANIM_SCALE 0.1, the ability's `_maxAnimScale`); the clip's own speed, not our drawn one). `interval`
+   * = the attack interval in battle s (the sim's, UnitInfo.atkInterval). The clip: the one this attack plays
+   * (_attackBase), else the skill's attack clip (`skillAttackMode().animKey`: 莫斯提马's S3, whose loop has no strike).
+   * 1 when neither is known. `maxScale`: the ability's `_maxAnimScale` (the unit's data `attackAnim.maxScale`, read from
+   * the client: research table 15, attack-anim-scale, via tools/build-data.mjs; −1 = no cap), ABILITY_MAX_ANIM_SCALE when the data has none. [ASSUMED: a
+   * skill's attack has its normal attack's cap; the ability's extra speed factor is 1]
+   */
+  abilitySpeed(interval, maxScale) {
+    const iv = Number(interval);
+    if (!(iv > 0)) return 1;
+    let name = this._attackBase()?.loop || null;
+    if (!name && this.skillOn) name = this.skillAttackMode?.()?.animKey || null;
+    const dur = name ? this.dur(this._shot(name)) : 0;
+    if (!(dur > 0)) return 1;
+    const m = Number(maxScale);
+    const cap = maxScale != null && Number.isFinite(m) ? (m < 0 ? Infinity : m) : ABILITY_MAX_ANIM_SCALE;
+    return 1 / clampN(iv / dur, 0.1, cap);
   }
 
   /** The clip the roles name for this attack, before any pick; the skill role itself when that is the clip (_skillIdle). */
@@ -1237,6 +1478,9 @@ export class SpineActor {
         this.skillEndAfterAttack = true;
         return;
       }
+      // (fork) a cast that is an attack (setCastRole `keepAttack`: 薇薇安娜 S1, the sim's 'skill' 1 / 'atk' / 0 in one
+      // tick): its swing plays out, then the resting state (update) — the base clip now would cut it at its strike
+      if (sk.keepAttack && this.mode === 'attack' && this.clock < this.attackUntil) return;
       if (this.has(sk.end)) {
         this.mode = 'skillEnd';
         this._play(sk.end, false, { mix: 0.08 });

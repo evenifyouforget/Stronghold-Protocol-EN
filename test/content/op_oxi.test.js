@@ -5,6 +5,7 @@
 // of kits/README.md item by item.
 // Run: node --test test/content/op_oxi.test.js
 
+import { allyCastWindup } from '../../server/sim/ai.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -71,9 +72,10 @@ test('塔露拉 in every 自选 form: her operator kit (all three skills authore
       assert.deepEqual([u.base.maxHp, u.base.atk, u.base.def, u.base.res], [form.stats.maxHp, form.stats.atk, form.stats.def, form.stats.res], `${label(f)}: stats`);
       assert.deepEqual([u.s.blockCnt, u.profile.attack, u.profile.canHitFly, u.profile.dmgType, u.base.bat], [2, 'melee', false, 'arts', form.stats.bat], `${label(f)}: 本源近卫, 绝不妥协`);
       assert.deepEqual(u.liveRangeGrid, form.rangeGrid, `${label(f)}: 1-1`);
-      // S1 / S3: the data's DEFAULT; S2: never by the strategy (the prefab's NeverTrigger — its guard casts it)
-      assert.equal(u.skill.rule, skill === 1 ? 'NEVER' : 'DEFAULT', `${label(f)}: trigger`);
-      assert.equal(sk.trigger.rule, 'DEFAULT', 'the data rule');
+      // S1: the data's DEFAULT (AUTO); S2: never by the strategy (the prefab's NeverTrigger — its guard casts it); S3: SP_FULL,
+      // the official CN season 3 operator row (char_4247_oxi skillIndex 2 ALWAYS, tools/versions/official-skill-triggers.json)
+      assert.equal(u.skill.rule, ['DEFAULT', 'NEVER', 'SP_FULL'][skill], `${label(f)}: trigger`);
+      assert.deepEqual([sk.trigger.rule, sk.trigger.rawRule], [skill === 2 ? 'SP_FULL' : 'DEFAULT', skill === 2 ? 'ALWAYS' : 'DEFAULT'], 'the data rule');
       assert.deepEqual([u.skill.spCost, u.skill.maxCharges, u.skill.initSp], [sk.spCost, sk.maxChargeTime, sk.initSp], `${label(f)}: SP`);
       assert.equal(u.skill.kind, ['instant', 'charges', 'duration'][skill], `${label(f)}: kind`);
       done(h);
@@ -291,6 +293,7 @@ test('S1 照霎白夜 (AUTO, DEFAULT): her next attack hits every ground enemy o
     const main = h.spawn('enemy_dummy', { pos: [10, 6] }), mate = h.spawn('enemy_dummy', { pos: [10, 6.3] });
     const fly = h.spawn('enemy_fly', { pos: [10, 5.8] }), next = h.spawn('enemy_dummy', { pos: [10, 7] });
     assert.ok(h.runUntil(() => u.skill.activations === 1, 2), `${label(f)}: cast on her attack`);
+    h.run(allyCastWindup(u) + 0.05); // the hit lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
     const hits = h.hooksOf('damaged').filter((c) => c.source === u && c.dmg?.isAttack);
     assert.deepEqual(hits.map((c) => c.target.id).sort(), [main.id, mate.id].sort(), `${label(f)}: the ground enemies of that tile`);
     for (const c of hits) {
@@ -486,7 +489,7 @@ test('S2 centre: without a source an enemy she blocks, else a ground enemy of he
   done(h);
 });
 
-test('S3 日冕重烈 (MANUAL, DEFAULT, 36 s): ATK +atk, no attack; a volley at once and every 80 frames, 过载 from half its duration (a volley at once, then every 60 frames); it runs its full duration', () => {
+test('S3 日冕重烈 (MANUAL, SP_FULL, 36 s): ATK +atk, no attack; a volley at once and every 80 frames, 过载 from half its duration (a volley at once, then every 60 frames); it runs its full duration', () => {
   for (const f of FORMS_ALL) {
     const [tier, elite] = f;
     const sk = skillOf(tier, elite, 2), b = sk.bb;
@@ -510,6 +513,21 @@ test('S3 日冕重烈 (MANUAL, DEFAULT, 36 s): ATK +atk, no attack; a volley at 
     const want = [0, 80, 160, 240, 320, 400, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020];
     assert.deepEqual(rel, want, `${label(f)}: 80 frames (2.67 s), from 18 s 60 frames`);
     assert.ok(volleys.every(([, n]) => n === 4), `${label(f)}: every row of the field (4 < 5)`);
+    done(h);
+  }
+});
+
+test('S3 trigger SP_FULL (CN season 3 ALWAYS): cast once her SP is full, after the battle-start operation cooldown, with no enemy near her; never before', () => {
+  for (const f of FORMS_ALL) {
+    const [tier, elite] = f;
+    const sk = skillOf(tier, elite, 2);
+    const { h, u } = field({ tier, elite, skill: 2 });
+    h.spawn('enemy_dummy', { pos: [2, 12] });   // far outside her 1-1 (and the S3 lanes do not need it)
+    const ready = (sk.spCost - sk.initSp) / formOf(tier, elite).stats.spRecovery;   // 7 s: 38 → 45 at 1 SP/s
+    assert.ok(!h.runUntil(() => u.skill.active, ready - 0.2), `${label(f)}: not before its SP is full`);
+    assert.ok(h.runUntil(() => u.skill.active, 1), `${label(f)}: cast at ${ready} s with no enemy in her range`);
+    const at = h.hooksOf('skillStart').find((c) => c.unit === u).t;
+    assert.ok(Math.abs(at - ready) <= h.b.dt + 1e-6, `${label(f)}: at ${at} (ready ${ready}, one tick either way)`);
     done(h);
   }
 });
@@ -539,6 +557,36 @@ test('S3 lanes: across her facing within normal_half_width (overload_half_width 
     assert.deepEqual(lanes(u), [9, 10, 11, 12].map((r) => [10, r, -1, 0, 10 + b.wave_exit_distance]), 'facing left: from col min(10, 5 + 11) to 0 − 5');
     done(h);
   }
+});
+
+test('display: fx buffLayers sends her 【怒火】 and S2 layer counts at every change (one fx per change, the last one 0), for the client\'s loops', () => {
+  const { h, u } = field({ skill: 1 });
+  const sent = [];
+  const fx = h.b.fx.bind(h.b);
+  h.b.fx = (kind, p) => { if (kind === 'buffLayers') sent.push({ ...p, rage: rageOf(u), stack: u.findBuff('skill:oxi:stack')?.stacks ?? 0 }); return fx(kind, p); };
+  const t = talentOf(6, true, 0), b = skillOf(6, true, 1).bb, max = Math.round(t.arcane_max / t.arcane_step);
+  h.run(7);
+  const rage = sent.filter((p) => p.skill === 'oxi:rage');
+  assert.deepEqual(rage.map((p) => p.n), [1, 2, 3, 4, 5, 6], '怒火 1 → 6, once each');
+  for (const p of rage) assert.deepEqual([p.id, p.max, p.n], [u.id, max, p.rage], 'the count it reached');
+  // a normal attack takes one layer: 5
+  const e = h.spawn('enemy_dummy', { pos: [10, 6] });
+  assert.ok(h.runUntil(() => sent.some((p) => p.skill === 'oxi:rage' && p.n === 5), 3), 'the attack sends 5');
+  h.b.kill(e, null);
+  // S2: a hit casts it — one layer, then two; they run out one per stack_duration s, the last one sends 0
+  const src = h.spawn('enemy_fly', { pos: [11, 9] });
+  for (let i = 0; i < 2; i++) {
+    u.skill.gainSp(999);
+    inTick(h, () => h.b.dealDamage(src, u, { amount: 100, type: 'phys' }));
+    h.run(b.skill_duration + 0.1);
+  }
+  h.run(2 * b.stack_duration + 0.5);
+  const stack = sent.filter((p) => p.skill === 'oxi:stack');
+  assert.deepEqual(stack.map((p) => p.n), [1, 2, 1, 0], 'S2 layers 1, 2, then down to 0');
+  for (const p of stack) assert.deepEqual([p.id, p.max, p.n], [u.id, b.max_stack_cnt, p.stack], 'the count it holds');
+  assert.equal(u.findBuff('skill:oxi:stack'), null, 'no layer left');
+  assert.deepEqual(JSON.parse(JSON.stringify(sent[0])), sent[0], 'plain data on the wire');
+  done(h);
 });
 
 test('S3 簇火: the volley fx names every lane and the blast its shot and enemy, for the client to draw them (no outcome moves)', () => {

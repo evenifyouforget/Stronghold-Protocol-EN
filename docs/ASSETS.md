@@ -92,6 +92,7 @@ npm run assets       # = node tools/vendor.mjs && node tools/fetch-assets.mjs
 | `--allow-shrink` | Write `data/assets.json` even when it loses entries the current one has (see "The manifest never shrinks by accident" below). |
 | `--strict` | Exit 1 when a leaf was dropped for having no file on disk, instead of only reporting it (see "A dropped leaf is reported" below). The same as the environment variable `SP_ASSETS_STRICT=1` — for CI and packaging builds. |
 | `--add-only` | For a checkout whose `public/assets/` and `public/fonts/` are shared with another one (a git worktree with symlinked asset folders): download only the files missing on disk and never re-download, rewrite or delete an existing file — atlases already on disk are left as they are, the fonts are not rebuilt (the manifest keeps its current `fonts`). Not with `--prune` / `--force`. |
+| `--refresh-units=ID,…` | With `--add-only`: the sound entries of these units (`audio.sfx.units[id]`, and their outfits' `audio.sfx.outfits['<id>@…']`) are rebuilt from the plan instead of kept, so a changed or removed slot of theirs reaches the manifest (a sound mapping change in `tools/assets/plan.mjs` for those units). |
 | `--local-spines` | Rewrite `tools/assets/local-enemy-spines.json` and `tools/assets/local-token-spines.json` (the metadata of the enemy and token models only the local client has, see "Enemy aliases" and "Token models from the local client") from the models `tools/local-extract/extract.py` extracted to `public/assets/local/spine/enemy/` and `public/assets/local/spine/token/`. Run it after a game update changed them; without it the committed files are used and a differing extraction only gets a warning. |
 
 ### Source snapshot verification
@@ -293,6 +294,28 @@ containing the plugin JSON and roster; `--only plugin-art/<charId>` narrows the 
 
 `--game <install dir or AB root>` selects a local game explicitly; otherwise the existing local-install detection applies.
 
+### English and Korean voice lines the mirror lacks (fork)
+
+`audio.voiceEn` / `audio.voiceKr` are downloaded from ArknightsAssets2 `voice_en/` / `voice_kr/`, a dump of the CN
+client, which gets an English or Korean dub some time after the EN server ships it. A voice set the EN server already
+plays can therefore be missing from the mirror: the run drops those leaves (`.cache/assets-report.json`
+`droppedLeaves`) and the client plays the line in Chinese or Japanese instead. On 2026-11-09 寻翼之歌
+(`char_1041_angel2_iteration#6`) was such a set. Fill them from a local **EN** client, which carries both dubs:
+
+```sh
+.venv-extract/Scripts/python.exe -I -B tools/local-extract/voice.py --game <EN install dir> --dry-run
+.venv-extract/Scripts/python.exe -I -B tools/local-extract/voice.py --game <EN install dir>
+node tools/fetch-assets.mjs --add-only
+```
+
+`voice.py` writes only the lines of a set the tree lacks and never touches a file on disk. It reads the hot-update
+bundles (`Arknights_Data/PersistentData/Bundles/audio/sound_beta_2/voice_en|voice_kr/<set>.ab`) before the shipped
+ones, and encodes mp3 like the mirror's (mono, 44.1 kHz, 64 kbit/s; ffmpeg on PATH). A set that is not in the client
+either (an operator or outfit not out on EN yet) is listed and skipped. The written files exist only on this disk, so
+they go to the server with the art upload like any other file under `public/assets/`. A fetch-assets run keeps a leaf
+whose file is on disk whether or not the mirror has it. Review the `data/assets.json` diff before committing: a run
+also adds anything else the plan wants but has never been fetched.
+
 ### Re-extracting scenes after an update
 
 Scene extraction version **4** removes complete, exact redundant renderers (GitHub #684, DESIGN §34.24).
@@ -394,6 +417,14 @@ version; base/E2 avatars and half-body portraits are mandatory where the data se
   - Ark-Models enemy atlases get `pma: true`, because their textures are premultiplied. pixi-spine reads this and sets `ALPHA_MODES.PMA`.
   - Page names are sanitized to safe file names.
   - All of this is idempotent.
+- **Impostor clip bounds** (fork, `tools/assets/clip-bounds.mjs` → `data/clip-bounds.json`, git-ignored): after the
+  art is on disk, every `*.skel` under `public/assets/` (with its `.atlas`) is read with `@pixi-spine/runtime-3.8` and each
+  of its clips measured by `public/js/render/spine.js` itself (requestClipBounds / stepClipBounds: the browser's own
+  sampling). Rects are rounded outward to 4 skeleton units and keyed by the first 8 characters of the skeleton's Spine
+  hash plus its bones · slots · animations count; the page (`render/clipBoundsTable.js`) seeds them and measures only
+  what the table does not match. `npm run assets` and `npm run assets:release-local` run it at their end; after a
+  local-client extraction run `npm run clip-bounds`. Format and guards: the header of `tools/assets/clip-bounds.mjs`,
+  `test/render/clip-bounds-table.test.js` (`CLIP_BOUNDS_FULL=1`: every skeleton on disk).
 - **Page art fixes** (fork, `tools/assets/texture-fixes.mjs RIM_FIXES`): after the atlas is normalized, a listed
   model's eyelid regions (found by name in its atlas) get their dark outer rim painted skin-coloured, keeping the
   pixels within `keep` px of the eye hole. 铃兰 Suzuran's default model (`F_Face_Default_h` / `_i`) drew those rims as
@@ -528,9 +559,13 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
                 pools?: { [attack|hit]: bankId }, attackPools?: {[skillIndex]: bankId}, hitPools?: {[skillIndex]: bankId},
                 groups?: { [skill|die|born]: mixerGroup }, skillGroups?: {[skillIndex]: mixerGroup},  // (fork) mixer groups
                 fxSounds?: {['<fx kind>|<skill tag>']: { url, pool?: bankId }},  // fork: a kit fx's official sound (塔露拉 S3's 簇火, overload)
+                // (fork) a skill's own sounds at its start / end (public/js/audio.js _skillEdge); `hold`: cut when the skill ends,
+                // `loop`: its bank loops until then, `more`: the edge's other banks
+                skillOn?: {[skillIndex]: { url, pool?: bankId, hold?: true, loop?: true, more?: [{ url, pool? }] }}, skillOff?: {[skillIndex]: …},
                 // (fork) an operator with a choice of skills has `skills`; its absent index casts silently, `skill` does not stand in
                 stings?: {[skillIndex]: { clips: [{ url, w }], pool?: bankId, loop?: url, loopGroup?: mixerGroup }},  // (fork) 丰川祥子's skill stings
                 notes?: {[look]: { born?: url, bornPool?: bankId, hit?: url, hitPool?: bankId }} } },  // (fork) her per-note sounds
+      burst?: { ['<element>.<char|enemy>']: [{ url, pool?: bankId, vol? }] },  // (fork) element burst sounds (plan.mjs BURST_SOUND_BANKS), all play at once
       pools: { [bankId]: { maxSoundAllowed, popOldest, group?: mixerGroup,
                 spatial?: true,  // (fork) a 3D bank (audio_data sounds is2D: false): its mono clips play 3 dB lower
                 sounds: { [pathUnderSoundBeta2]: { minPitch, maxPitch, delay } } } },
@@ -552,6 +587,10 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
   // swing p_atk_silver_n, community report of 2026-10-06); one that numbers its default mode takes those banks (`attack.0`,
   // `attack.0.1` …, START before ON) before any other number, so a shallower skill bank never wins (弑君者's S3 `attack.3`
   // smoke impact was her normal one until 0.3.2, DESIGN §35.38); enemies and tokens take the first attack-like bank
+  // (fork) every skill's own ability banks (tools/assets/skillSounds.mjs; ON_ABILITY_START / _ON / _HIT / _END and
+  // ON_SKILL_FINISH.<skillId>), for every operator: a p_atk_ file is the skill's swing (`attacks`), a p_imp_ file its
+  // impact (`hits`), any other a cast — the sting (`skills`) when the skill has no ON_SKILL_START, else `skillOn`; a
+  // looping bank holds until the skill ends; the end banks are `skillOff`. A per-operator table in plan.mjs wins for its skill
   fonts: { css: '/fonts/fonts.css', faces: { [name]: { family, weight, woff2?, original } } }
 }
 ```
@@ -814,6 +853,32 @@ bandwidth, layer 1) the server hands out a view of each (`server/http/assetIndex
   nothing of a plugin folder but the files its overlay names is served. A player's personal plugins come the same way
   and are laid over whatever the page draws. Neither committed manifest, nor the views above, ever change with a plugin:
   without one a page loads exactly what it loaded before.
+
+### Merging branches (fork)
+
+`data/assets.json` is one line of about 3.6 MB, and its `hash` and `stats` change on every rebuild, so git's line merge
+conflicts whenever two branches both changed any entry. The same went for the three totals `test/audio-pools-data.test.js`
+used to hold. Neither is merged by hand any more:
+
+- **Entry by entry.** `tools/merge-generated.mjs` merges the parsed JSON three ways. An entry only one side changed
+  takes that side, both sides' new entries are kept, and an entry both sides changed differently is a real conflict
+  (ours is kept and the path is printed). For the manifest it then recomputes `hash` (`contentHash` of the merged body)
+  and `stats` (`countStats`; `files` and `bytes` are the base plus both sides' change). `.gitattributes` names the
+  files (`merge=generated-json`); register the driver once per clone, and every worktree uses it:
+  `npm run merge:generated -- --setup`.
+- **The pool snapshot.** `test/audio-pools-data.snapshot.json` (`npm run assets:pool-snapshot -- --update`) holds the
+  attack / hit reference count of every unit and outfit and the sound count of every pool, one per line. The test holds
+  the manifest to it. A change that moves them updates it in the same commit, and its diff names each unit and pool
+  that moved. Branches that touch different units merge cleanly, even without the driver.
+- **After every merge** that touched either file: run `npm run merge:generated`. It resolves either file if git left it
+  conflicted (a clone without the driver), then rewrites the snapshot from the merged manifest. It exits 1 on a real
+  conflict, and also when one side changed the asset generator (`tools/assets/`, `tools/fetch-assets.mjs`) while the
+  other side changed manifest entries. Those entries were built by the old generator and an entry-by-entry merge keeps
+  them as they were (replaying merge `3e3cd159` this way would have kept Eyjafjalla's removed S2 swing slot), so it prints the
+  units and the command that rebuilds them with the merged generator on the art already on disk:
+  `node tools/fetch-assets.mjs --offline --add-only --refresh-units=<ids>`. After that, run
+  `npm run merge:generated -- --rebuilt`, which skips the check. Then run `node --test test/audio-pools-data.test.js
+  test/merge-generated.test.js` and commit.
 
 ## Player-initiated predownload
 

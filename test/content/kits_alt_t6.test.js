@@ -4,7 +4,7 @@
 // and the elite's non-default module choices (Y / RA modules, or 'none') change what the kit does.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, enemyRec, chessRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, chessRec, checkInvariants, castNow } from '../helpers/battleHarness.js';
 import { getDefaultSource } from '../../server/sim/simdata.js';
 import { KITS, skillSpecSource } from '../../server/sim/content/index.js';
 import { kitCoverage } from '../../tools/kit-coverage.mjs';
@@ -256,7 +256,7 @@ test('6_02 圣聆初雪 S2 霜涛覆岭: toggle; group attacks at atk_scale_s2 �
 // =================================================================================================================
 // 6_03 余
 
-test('6_03 余 S1 今日做东: taunt +1 while carried; TAKE_DAMAGE cast, HP/DEF +, every attack taken burns the attacker (ep_damage_ratio × ATK)', () => {
+test('6_03 余 S1 今日做东: taunt +1 while carried; official 重装 row [TAKE_DAMAGE, SEARCH] cast, HP/DEF +, every attack taken burns the attacker (ep_damage_ratio × ATK)', () => {
   for (const id of both('chess_char_6_03')) {
     const sid = 'skchr_yu_1', bb = bbOf(id, sid);
     const h = run({
@@ -267,8 +267,10 @@ test('6_03 余 S1 今日做东: taunt +1 while carried; TAKE_DAMAGE cast, HP/DEF
     usesSkill(u, sid);
     h.step();
     assert.equal(u.s.taunt, bb.taunt_level, 'passive taunt');
-    assert.ok(h.runUntil(() => u.skill.active, 10), 'cast when hit');
-    assert.equal(started(h, u)[0].reason, 'TAKE_DAMAGE');
+    assert.deepEqual(u.skill.rules, ['TAKE_DAMAGE', 'SEARCH']);
+    assert.ok(h.runUntil(() => u.skill.active, 10), 'cast (a hit, or the enemy on her tile)');
+    // the enemy already stands on her tile: the SEARCH entry (SKILL_RANGE_ENEMY without a rangeGrid) casts it before the first hit
+    assert.equal(started(h, u)[0].reason, 'SEARCH');
     approx(skillBuff(u).mods.hpPct, bb.max_hp);
     approx(skillBuff(u).mods.defPct, bb.def);
     const t0 = h.b.time;
@@ -479,20 +481,20 @@ test('6_06 佩佩 S2 阻遏混乱锤: skill range, ATK/ASPD +, random targets; e
     h.step();
     const as0 = u.s.aspd;
     const aspdAt = () => { u.markDirty(); return u.s.aspd; };
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     approx(aspdAt(), as0 + bb.attack_speed, '1st use');
     approx(skillBuff(u).mods.atkPct, bb.atk);
     assert.ok(u.rangeKeySet.has(10 * COLS + 6), 'skill range reaches 2 tiles');
     h.run(2.5);
     assert.ok(dealt(h, u, (c) => c.dmg.isAttack).some((c) => c.target.x > 5.5), 'hits the enemy only the skill range reaches');
     u.skill.end('test');
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     approx(aspdAt(), as0 + bb.attack_speed + bb.attack_speed_extra, '2nd use');
     u.skill.end('test');
-    assert.ok(u.skill.activate('test', { free: true }));
+    assert.ok(castNow(u, 'test', { free: true }));
     approx(aspdAt(), as0 + bb.attack_speed + bb.attack_speed_extra * bb.max_stack_cnt, '3rd use (max stacks)');
     u.skill.end('test');
-    u.skill.activate('test', { free: true });
+    castNow(u, 'test', { free: true });
     approx(aspdAt(), as0 + bb.attack_speed + bb.attack_speed_extra * bb.max_stack_cnt, 'capped');
     done(h);
   }
@@ -868,8 +870,10 @@ test('6_14 流明 S1 沐雨: the next heal gives its target and the allies aroun
     h.step();
     a1.hp = a1.s.maxHp * 0.3; a2.hp = a2.s.maxHp * 0.9; far.hp = far.s.maxHp * 0.9;
     assert.ok(h.runUntil(() => started(h, u).length > 0, 5));
-    h.run(0.5);
     const key = `lumen:rain:${u.id}`;
+    // the heal (and its rain) lands one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
+    assert.ok(h.runUntil(() => a1.findBuff(key), 5));
+    h.run(0.5);
     assert.ok(a1.findBuff(key) && a2.findBuff(key), 'target and its neighbour');
     assert.ok(!far.findBuff(key), 'not a distant ally');
     approx(a1.findBuff(key).duration, bb['aura.projectile_life_time']);
@@ -970,7 +974,12 @@ test('6_16 溯光星源 S1 星图闪烁: ATK +; every attack bounces 3 more time
     const ch = dealt(h, u, tagged('chain')).slice(0, bb['attack@chain.max_target']);
     for (let i = 1; i < ch.length; i++) assert.notEqual(ch[i].target, ch[i - 1].target, 'never twice in a row');
     assert.equal(ch[0].target, ch[2].target, 'back and forth');
-    for (const x of ch) approx(x.amount, u.s.atk, 'full hits');
+    // the hit lands one wind-up after the cast, so the enemy in her range (10,6) already carries 能源解析's 脆弱
+    // (damage_scale, refreshed every 0.25 s while it stays there) and the one outside it (10,7) does not: full hits
+    const frag = tal(id, null, 1)['halo2_t_1[weak].damage_scale'];
+    const fragile = (e) => e.buffs.some((x) => x.status === 'fragile');
+    assert.deepEqual(ch.map((x) => fragile(x.target)), [false, true, false], '脆弱 on the in-range enemy only');
+    for (const x of ch) approx(x.amount, u.s.atk * (fragile(x.target) ? frag : 1), 'full hits');
     done(h);
   }
 });
@@ -989,11 +998,13 @@ test('6_16 溯光星源 S2 星束引力: the target farthest from its goal, atk_
     const x0 = 5;
     h.run(1);
     const hit = dealt(h, u, (c) => c.target === main && c.dmg.isAttack && c.dmg.isSkill)[0];
-    approx(hit.amount, u.s.atk * bb.atk_scale, 'atk_scale');
+    // 能源解析's 脆弱 is on the in-range main target by the time the delayed hit lands (cast → hit, ai.js allyCastWindup)
+    const frag = tal(id, null, 1)['halo2_t_1[weak].damage_scale'];
+    approx(hit.amount, u.s.atk * bb.atk_scale * frag, 'atk_scale (×脆弱)');
     assert.ok(statuses(h, 'sluggish', (c) => c.source === u && c.target === main && Math.abs(c.duration - bb.sluggish) < 1e-9).length === 1, '3 s 停顿');
     const link = dealt(h, u, (c) => c.target === side && (c.dmg.tags || []).includes('link'));
     assert.equal(link.length, 1, 'linked neighbour hit');
-    approx(link[0].amount, u.s.atk * bb.atk_scale_link, 'link');
+    approx(link[0].amount, u.s.atk * bb.atk_scale_link * frag, 'link (×脆弱: the neighbour stands in her range too)');
     assert.ok(side.x > x0 + 0.05 || main.x < side.x, `pulled toward the target (${x0} → ${side.x})`);
     done(h);
   }

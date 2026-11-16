@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeBattle, chessRec, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, chessRec, enemyRec, checkInvariants, castNow as castSkill } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool } from '../../shared/diy.js';
 
@@ -44,6 +44,8 @@ const ALLIES = {
   ally_c: ally('ally_c', { spCost: 10, initSp: 0, duration: 0, maxChargeTime: 3 }),
   ally_p: ally('ally_p', { skillType: 'PASSIVE', spCost: 0, duration: 0 }),
   ally_n: chessRec({ id: 'ally_n', stats: { def: 0, res: 0 }, skill: null }),
+  // an official trigger list (COMBAT_OR_ATTACK + SKILL_RANGE_ENEMY): DEFAULT, then SKILL_RANGE on a 1×5 row ahead
+  ally_l: ally('ally_l', { spCost: 10, initSp: 0, duration: 5, trigger: { rule: 'DEFAULT', also: [{ rule: 'SKILL_RANGE', customRangeGrid: ROW_AHEAD(5) }] } }),
   ally_k: ally('ally_k', { spCost: 10, initSp: 0, duration: 5, trigger: { rule: 'SKILL_RANGE', customRangeGrid: ROW_AHEAD(5) } }),
   ally_r: ally('ally_r', { spCost: 10, initSp: 0, duration: 5, trigger: { rule: 'ACTIVE_RANGE', customRangeGrid: ROW_AHEAD(4) } }),
   ally_t: ally('ally_t', { spCost: 10, initSp: 0, duration: 5, trigger: { rule: 'TAKE_DAMAGE' } }),
@@ -91,9 +93,10 @@ test('冻河 in every 自选 form: her operator kit (all three skills authored),
       assert.deepEqual([u.base.maxHp, u.base.atk, u.base.def], [form.stats.maxHp, form.stats.atk, form.stats.def], `${label(f)}: stats`);
       assert.deepEqual([u.profile.attack, u.profile.dmgType, u.profile.projectile, u.profile.canHitFly, u.base.bat], ['ranged', 'phys', 'arrow', true, 2.1], `${label(f)}: 游击手`);
       assert.deepEqual(u.liveRangeGrid, form.rangeGrid, `${label(f)}: 3-18`);
-      // S1 / S2 AUTO: the kit's own cast (trigger NEVER), S3 MANUAL: the data's DEFAULT
+      // S1 / S2 AUTO: the kit's own cast (trigger NEVER), S3 MANUAL: the data's SP_FULL (official bearer row ALWAYS)
       assert.deepEqual([u.skill.kind, u.skill.rule, u.skill.manual, u.skill.spCost, u.skill.initSp],
-        [skill === 2 ? 'duration' : 'instant', skill === 2 ? 'DEFAULT' : 'NEVER', skill === 2, rec.spCost, rec.initSp], `${label(f)}: S${skill + 1}`);
+        [skill === 2 ? 'duration' : 'instant', skill === 2 ? 'SP_FULL' : 'NEVER', skill === 2, rec.spCost, rec.initSp], `${label(f)}: S${skill + 1}`);
+      if (skill === 2) assert.deepEqual([rec.trigger.official, u.skill.rules], [['ALWAYS'], ['SP_FULL']], `${label(f)}: S3 official list`);
       if (skill === 2) approx(u.skill.duration, rec.duration, `${label(f)}: 20 s`);
       done(h);
     }
@@ -325,11 +328,11 @@ test('S2 意欲呼啸之心 (AUTO): at full SP the effect goes on the latest cre
   const [m1, m2] = [h.unit(2), h.unit(3)];
   assert.ok(m2.aggroSeq > m1.aggroSeq);
   m2.skill.gainSp(10, 'init');
-  assert.ok(m2.skill.activate('test') && m2.skill.active);
+  assert.ok(castSkill(m2, 'test') && m2.skill.active);
   castNow(h, u, 1);
   assert.deepEqual([m1, m2].map((x) => !!x.findBuff(eff('s2', u))), [true, false], 'uid 3 is casting');
   m1.skill.gainSp(10, 'init');
-  assert.ok(m1.skill.activate('test'));
+  assert.ok(castSkill(m1, 'test'));
   assert.ok(m1.findBuff(`tocka:s2:aspd:${u.id}`), 'uid 2 fired (its skill start)');
   h.run(5.5);
   assert.ok(!m1.skill.active && !m2.skill.active);
@@ -379,11 +382,12 @@ test('S2 effect: once its holder\'s skill can open — SP ready and its own targ
   }
 });
 
-test('S2 effect: "不需要目标/满足目标条件" by its holder skill\'s rule — SKILL_RANGE / ACTIVE_RANGE an enemy on their own range, DEFAULT on its attack range, and the rules with no target of their own (SP_FULL, TAKE_DAMAGE) an enemy on its attack range too (the owner\'s test: "技能/攻击范围内有敌人就自动放，没敌人不会放"); met while the battle-start operation cooldown still holds the skill, the 0.2 s check fires it first and the auto-open lets the cast through', () => {
+test('S2 effect: "不需要目标/满足目标条件" by its holder skill\'s rule list — SKILL_RANGE / ACTIVE_RANGE an enemy on their own range, DEFAULT on its attack range, a list (DEFAULT + SKILL_RANGE) either of them, and the rules with no target of their own (SP_FULL, TAKE_DAMAGE) an enemy on its attack range too (the owner\'s test: "技能/攻击范围内有敌人就自动放，没敌人不会放"); met while the battle-start operation cooldown still holds the skill, the 0.2 s check fires it first and the auto-open lets the cast through', () => {
   const holders = [
     // [rule, record, the holder's tile, an enemy tile outside its condition, one inside]
     ['DEFAULT', 'ally_c', [11, 6], [11, 9], [11, 7]],
     ['SKILL_RANGE', 'ally_k', [12, 3], [10, 9], [12, 7]],
+    ['DEFAULT+SKILL_RANGE', 'ally_l', [12, 3], [10, 9], [12, 7]],   // the SKILL_RANGE part of the list: beyond the 1×2 attack range
     ['ACTIVE_RANGE', 'ally_r', [9, 3], [10, 9], [9, 6]],
     ['SP_FULL', 'ally_f', [11, 6], [11, 9], [11, 7]],
     ['TAKE_DAMAGE', 'ally_t', [11, 6], [11, 9], [11, 7]],
@@ -391,7 +395,7 @@ test('S2 effect: "不需要目标/满足目标条件" by its holder skill\'s rul
   for (const [rule, id, [row, col], out, inside] of holders) {
     const { h, u } = field({ skill: 1, flags: { startOpCooldown: 30 }, others: [{ uid: 2, chessId: id, row, col }] });
     const m = h.unit(2);
-    assert.deepEqual([m.skill.rule, m.skill.manual], [rule, true]);
+    assert.deepEqual([m.skill.rules.join('+'), m.skill.manual], [rule, true]);
     castNow(h, u, 1); // S2 is AUTO: no operation cooldown of its own
     assert.ok(m.findBuff(eff('s2', u)));
     h.b.retreat(u);
@@ -422,7 +426,7 @@ test('S2 effect: its holder opening its skill fires it at once (T1: her `sp` SP)
   castNow(h, u, 1);
   const sp0 = u.skill.sp;
   m.skill.gainSp(10, 'init');
-  assert.ok(m.skill.activate('test'));
+  assert.ok(castSkill(m, 'test'));
   assert.ok(!m.findBuff(eff('s2', u)) && m.findBuff(`tocka:s2:aspd:${u.id}`), '技能开启时: fired at its skill start');
   approx(u.skill.sp - sp0, t0.sp, '夜的哑然 SP');
   assert.equal(m.skill.manual, false);
@@ -445,16 +449,19 @@ test('S2 effect: its holder opening its skill fires it at once (T1: her `sp` SP)
   done(two.h);
 });
 
-test('S3 踽踽独行之春 (MANUAL, 20 s, data DEFAULT): ASPD +attack_speed, every attack hits attack@max_target enemies (air too) for attack@atk_scale × ATK physical and stuns each attack@stun s; one plain target after', () => {
+test('S3 踽踽独行之春 (MANUAL, 20 s, data SP_FULL — official bearer row ALWAYS: cast as soon as the SP is full, no enemy needed): ASPD +attack_speed, every attack hits attack@max_target enemies (air too) for attack@atk_scale × ATK physical and stuns each attack@stun s; one plain target after', () => {
   for (const f of FORMS_ALL) {
     const [tier, elite] = f;
     const sk = skillOf(tier, elite, S3), bb = sk.bb;
     const { h, u } = field({ tier, elite, skill: 2 });
-    u.skill.gainSp(999, 'init');
-    h.run(2);
-    assert.equal(u.skill.activations, 0, `${label(f)}: no enemy, no cast`);
+    // SP_FULL: no enemy needed — a full SP casts it at once (a separate field, so the main one still casts with targets)
+    const bare = field({ tier, elite, skill: 2 });
+    bare.u.skill.gainSp(999, 'init');
+    assert.ok(bare.h.runUntil(() => bare.u.skill.active, 1), `${label(f)}: no enemy, cast at full SP`);
+    done(bare.h);
     const es = [[10, 7], [10, 6], [9, 6]].map((pos) => h.spawn('dummy', { pos })).concat([h.spawn('fly', { pos: [11, 5] })]);
-    assert.ok(h.runUntil(() => u.skill.active, 3), `${label(f)}: cast with an enemy in her range`);
+    u.skill.gainSp(999, 'init');
+    assert.ok(h.runUntil(() => u.skill.active, 3), `${label(f)}: cast at full SP with enemies in her range`);
     approx(u.skill.timeLeft, sk.duration, `${label(f)}: ${sk.duration} s`, 0.01);
     approx(u.s.aspd, 100 + bb.attack_speed, `${label(f)}: ASPD`);
     assert.equal(u.findBuff('tocka:snow'), null, `${label(f)}: nobody to place an effect on`);
@@ -499,14 +506,14 @@ test('S3 effect: at its start it goes on the ally operator of her range with the
     const [a, b, c, d] = [2, 3, 4, 5].map((id) => h.unit(id));
     // true ratios: uid 2 2 of 3 charges ≈ 0.67, uid 3 8 / 10, uid 4 9.5 / 10 (outside her range), uid 5 casting: 0
     a.skill.gainSp(20, 'init'); b.skill.gainSp(8, 'init'); c.skill.gainSp(9.5, 'init'); d.skill.gainSp(10, 'init');
-    assert.ok(d.skill.activate('test'));
+    assert.ok(castSkill(d, 'test'));
     const holder = () => h.allies().filter((x) => x.findBuff(eff('s3', u)));
     u.skill.gainSp(999, 'init');
-    assert.ok(u.skill.activate('test'));
+    assert.ok(castSkill(u, 'test'));
     assert.deepEqual(holder(), [b], `${label(f)}: uid 3 (0.8)`);
     assert.ok(u.findBuff('tocka:snow'), `${label(f)}: placed: her next attack armed`);
     b.skill.gainSp(5, 'init');
-    assert.ok(b.skill.activate('test'));
+    assert.ok(castSkill(b, 'test'));
     for (const x of [b, u]) assert.deepEqual(x.findBuff(`tocka:s3:atk:${u.id}`)?.mods, { atkPct: bb.bonus_init_atk }, `${label(f)}: uid ${x.uid} ATK +${bb.bonus_init_atk * 100} %`);
     approx(u.s.atk, u.base.atk * (1 + bb.bonus_init_atk), `${label(f)}: her ATK`);
     assert.deepEqual(holder(), [a], `${label(f)}: moved to uid 2 (0.67 > 0)`);
@@ -521,7 +528,7 @@ test('S3 effect: at its start it goes on the ally operator of her range with the
     h.runUntil(() => !u.skill.active, 25);
     assert.deepEqual(holder(), [a]);
     u.skill.gainSp(999, 'init');
-    assert.ok(u.skill.activate('test'));
+    assert.ok(castSkill(u, 'test'));
     assert.deepEqual(a.findBuff(`tocka:s3:atk:${u.id}`)?.mods, { atkPct: bb.bonus_init_atk }, `${label(f)}: fired at her S3 start`);
     // uids 3 and 5 are both full again (ratio 1): the latest created of the two (uid 3: col 5 deploys bottom row first)
     assert.deepEqual([b, d].map((x) => x.skill.spTotal / (x.skill.maxCharges * x.skill.spCost)), [1, 1]);
@@ -533,10 +540,10 @@ test('S3 effect: at its start it goes on the ally operator of her range with the
   const { h, u } = field({ skill: 2, others: [{ uid: 2, chessId: 'ally_m', row: 9, col: 5 }, { uid: 3, chessId: 'ally_m', row: 10, col: 9 }] });
   const b = h.unit(2);
   u.skill.gainSp(999, 'init');
-  u.skill.activate('test');
+  castSkill(u, 'test');
   assert.ok(b.findBuff(eff('s3', u)));
   b.skill.gainSp(10, 'init');
-  b.skill.activate('test');
+  castSkill(b, 'test');
   assert.ok(b.findBuff(`tocka:s3:atk:${u.id}`));
   assert.equal(h.allies().filter((x) => x.findBuff(eff('s3', u))).length, 0, 'uid 3 is outside her range: none left');
   done(h);

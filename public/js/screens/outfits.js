@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, MicroLabel, Modal, Spinner } from '../ui/components.js';
-import { Img } from '../ui/gameComponents.js';
+import { Img, noImageMenu } from '../ui/gameComponents.js';
 import { data, useData } from '../data.js';
 import { useStore } from '../store.js';
 // (fork) Not imported from assets.js: main.js reaches this screen at boot, and the asset store loads only when it is
@@ -17,7 +17,8 @@ import { useStore } from '../store.js';
 const obj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const text = (v) => (typeof v === 'string' && v ? v : null);
 const outfitOf = (m, id) => (text(id)?.includes('#') ? (m?.outfits?.chars?.[id] || m?.outfits?.tokens?.[id] || null) : null);
-const outfitArtUrl = (m, id, kind) => text(outfitOf(m, id)?.[kind]);
+/** An outfit's art of `kind` ('avatar' / 'art' / …) in the manifest, or null. (fork) Also the card view's outfit column. */
+export const outfitArtUrl = (m, id, kind) => text(outfitOf(m, id)?.[kind]);
 const defaultArtUrl = (m, charId) => text(m?.outfits?.defaults?.[charId]?.art);
 const hasModel = (sp) => obj(sp) && typeof sp.skel === 'string' && typeof sp.atlas === 'string';
 const hasSpine = (m, id) => {
@@ -29,6 +30,7 @@ import { serializeOutfits, parseOutfitsImport, OUTFITS_IMPORT_MAX_BYTES } from '
 import { copyText } from '../ui/clipboard.js';
 import { seedAssets } from '../ui/fieldHost.js';
 import { toast } from '../ui/toasts.js';
+import { speakOutfit } from '../ui/loadoutVoice.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
 const IO_TITLE = {
@@ -202,16 +204,18 @@ function ArtViewer({ src, name, onClose }) {
 }
 
 /**
- * The cards of one operator: 默认, then its outfits; a click wears one (ui/outfits.js setOutfit). No hooks: the panel
+ * The cards of one operator: 默认, then its outfits; a click wears one (ui/outfits.js setOutfit) and the voice rule of an outfit change applies
+ * (ui/loadoutVoice.js speakOutfit). No hooks: the panel
  * and the 自选编队 picker (OutfitPickSection) draw it, and the tests can too.
- * @param {{ m: any, charId: string, name?: string, list: any[], worn: string|null, compact?: boolean }} p
+ * `onPick` (the dev sandbox: a per-unit outfit) replaces the wear-it-now default.
+ * @param {{ m: any, charId: string, name?: string, list: any[], worn: string|null, compact?: boolean, onPick?: ((id: string|null) => void)|null }} p
  */
-export function OutfitCards({ m, charId, name = '', list, worn, compact = false }) {
+export function OutfitCards({ m, charId, name = '', list, worn, compact = false, onPick = null }) {
   const card = (id, rec) => {
     const on = (id || null) === worn;
     const avatar = id ? outfitArtUrl(m, id, 'avatar') : null;
     return html`<button key=${id || 'default'} type="button" role="radio" aria-checked=${on ? 'true' : 'false'} data-outfit=${id || 'default'}
-        class=${cx('ofit-card', on && 'is-on')} onClick=${() => setOutfit(charId, id)}>
+        class=${cx('ofit-card', on && 'is-on')} onClick=${() => { if (onPick) onPick(id || null); else if (!on) { setOutfit(charId, id); speakOutfit({ charId }); } }}>
       <span class="ofit-card__ava">${id ? html`<${Img} src=${avatar} fallback=${html`<b>${[...(rec?.name || '?')][0]}</b>`} />`
         : html`<${Img} src=${m?.chars?.[charId]?.avatarE2 || m?.chars?.[charId]?.avatar} fallback=${html`<b>${[...(name || '?')][0]}</b>`} />`}</span>
       <span class="ofit-card__text">
@@ -221,7 +225,7 @@ export function OutfitCards({ m, charId, name = '', list, worn, compact = false 
       ${on ? html`<span class="lo-badge lo-badge--def ofit-card__on">${t('穿着中')}</span>` : null}
     </button>`;
   };
-  return html`<div class=${cx('ofit-list', compact && 'ofit-list--compact')} role="radiogroup" aria-label=${t('选择时装')}>
+  return html`<div class=${cx('ofit-list', compact && 'ofit-list--compact')} role="radiogroup" aria-label=${t('选择时装')} onContextMenu=${noImageMenu}>
     ${card(null, null)}
     ${list.map((r) => card(r.id, r))}
   </div>`;
@@ -273,7 +277,7 @@ export function OutfitPanel({ m, chess }) {
   const artName = wornRec?.name || chess.name || charId;
   const model = worn && hasSpine(m, worn) ? worn : charId;
   // the artwork button: '点击查看大图' // en: "Click to view full size" · '查看大图：{name}' // en: "View full size: {name}"
-  return html`<div class="lo-detail__body ofit" data-testid="outfit-panel">
+  return html`<div class="lo-detail__body ofit" data-testid="outfit-panel" onContextMenu=${noImageMenu}>
     <section class="ofit-stage">
       ${art ? html`<button type="button" class="ofit-art" data-testid="outfit-art" onClick=${() => setViewing(true)}
           title=${t('点击查看大图')} aria-label=${t('查看大图：{name}', { name: artName })}>

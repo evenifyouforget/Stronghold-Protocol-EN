@@ -1,7 +1,7 @@
 // (fork) The first tactics and profiles (botTactics.js), from the hypothesis tests of fish-edition/ai-players.md:
 // humans level from round 1 and by the mode's own boss round (H4, H7), and their boards beat the bot's mainly by the
 // tier-6 operators they field (the tier-6 dose-response). Each acts through PlayerState's validated intents only.
-import { defineTactic, defineProfile } from './botTactics.js';
+import { defineTactic, defineProfile, PASS } from './botTactics.js';
 import { freeSlot } from './board.js';
 
 const ok = (fn) => { try { const r = fn(); return !!(r && r.ok); } catch { return false; } };
@@ -67,7 +67,25 @@ export const BUY_TIER = defineTactic({
   },
 });
 
-export const BASIC_TACTICS = Object.freeze([LEVEL_CURVE, BUY_TIER]);
+/**
+ * SPA-CC ccPatriot Undying 1: take the round-9 Improv's Patriot card whenever it is offered (match/infra.js
+ * riskPatriotCard: id 'risk:patriot', worth 0 Funds), so a bench measures Patriot when he is taken, not only the
+ * skip penalty (legacy prices him as an ordinary bounty and nearly always leaves him). Any other pick: legacy's, with
+ * legacy's RNG draws.
+ */
+export const TAKE_PATRIOT = defineTactic({
+  id: 'take-patriot',
+  describe: "take the Patriot card (SPA-CC Undying 1) when offered; else legacy's pick",
+  at: {
+    pickCard(ctx) {
+      const [cards, available] = ctx.args;
+      const i = (available || []).find((j) => cards && cards[j] && cards[j].id === 'risk:patriot');
+      return i === undefined ? PASS : i;
+    },
+  },
+});
+
+export const BASIC_TACTICS = Object.freeze([LEVEL_CURVE, BUY_TIER, TAKE_PATRIOT]);
 
 /** Opt-in profiles, by `SP_BOT_STRATEGY` / `SP_BOT_STRATEGY_SEATS` / `botbench --bot`. legacy below each. */
 export const FISH_PROFILES = Object.freeze([
@@ -75,5 +93,7 @@ export const FISH_PROFILES = Object.freeze([
   defineProfile({ id: 'fish-level', tactics: [LEVEL_CURVE] }),
   // the tier-6 finding: level 6 when the curve gets there, and tier-6 operators bought first
   defineProfile({ id: 'fish-tier6', tactics: [BUY_TIER, { tactic: LEVEL_CURVE, params: { maxLevel: 6 } }] }),
+  // SPA-CC balance benches: legacy that always takes Patriot (not a room choice)
+  defineProfile({ id: 'fish-patriot', tactics: [TAKE_PATRIOT] }),
 ]);
 

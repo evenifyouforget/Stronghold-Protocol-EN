@@ -47,11 +47,18 @@ import { TalentFx } from './talentfx.js';
 import { FunnelFx } from './funnelfx.js';
 import { YuWall, YU_WALL_SOURCE } from './yuwall.js';
 import { formModes } from './talents.js';
-import { shotOf } from './skills.js';
+import { shotOf, CHAIN_RELAYS } from './skills.js';
 import { UF } from '../../../../shared/constants.js';
 
 /** Battle seconds a non-oneshot cast effect lasts without its end event. */
 export const CAST_LOOP_S = 0.6;
+/**
+ * (fork) Game s an attack's cast began before its strike when nothing knows (an attack not wound up whose actor has no
+ * attack clip of its own: 莫斯提马's S3 swings are her skill's animation): at most one attack interval, at most this —
+ * the delayed parts of its cast effects, authored to land with the blow, show at the strike; one authored to come
+ * longer after the cast than an attack lasts still waits [ASSUMED].
+ */
+export const UNWOUND_LEAD = 2;
 /** Battle seconds a melee blow waits for its damage. */
 const MELEE_WINDOW = 0.4;
 /** Battle seconds a projectile's arrival covers the damage event it stands for. */
@@ -79,6 +86,16 @@ const HP_TYPES = new Set(['phys', 'arts', 'true']);
 const ID_ROT = Object.freeze([0, 0, 0, 1]);
 
 const lc = (k) => (typeof k === 'string' && k ? k.toLowerCase() : null);
+
+/**
+ * (fork) The side of an element burst (index generic.burst `<element>.<side>.<role>`, tools/local-extract/fx.py): 'enemy'
+ * for an enemy unit, as the sim's isEnemyEntity decides which burst terms apply (server/sim/units.js), else 'char' (an
+ * operator, a summon, an enemy's token).
+ */
+export function burstSide(v) {
+  const i = v?.info || {};
+  return i.kind === 'enemy' || String(i.defId || '').startsWith('enemy_') ? 'enemy' : 'char';
+}
 /** Torappu.SharedConsts.Direction order (a directional emitter row's `slots`). */
 const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
 /** Cast rows starting at these ability events start with the cast (0 ON_ATTACHED, 2 ON_CAST_START); 4 ON_SPELL_ON … at the strike. */
@@ -208,6 +225,26 @@ function abilityFits(a, kind, depth = 0) {
 }
 
 /**
+ * (fork) Of a random group's sub-abilities that differ only in how many hits they deal — the same cast rows, each one's
+ * hit rows (by group) the start of the widest one's —, that widest one, else null. 薇薇安娜 S2 (charpack Modes/S2:
+ * Attack_Once's hit vvana_skill_02_hit_01, Attack_Twice's groups hit_01 / hit_02; the sim rolls attack@prob_twice): the
+ * client cannot see the roll, only the hits that land, and the widest one's group k on the k-th hit IS the narrower
+ * one's look for fewer hits. The only such group of the client 26-10-29 index (24 random groups).
+ * @param {any[]} pool
+ */
+export function hitSuperset(pool) {
+  if (!Array.isArray(pool) || pool.length < 2) return null;
+  const cast = (x) => JSON.stringify((x.cast || []).map((c) => c.effects || []));
+  const hits = (x) => (x.hit || []).map((h) => (h.effects || []).join('+'));
+  const c0 = cast(pool[0]);
+  if (!pool.every((x) => cast(x) === c0)) return null;
+  const wide = pool.reduce((w, x) => (hits(x).length > hits(w).length ? x : w), pool[0]);
+  const wh = hits(wide);
+  if (!pool.some((x) => hits(x).length < wh.length)) return null;
+  return pool.every((x) => hits(x).every((h, k) => h === wh[k])) ? wide : null;
+}
+
+/**
  * The attacks one 'atk' plays of an ability (index v2 / v3, DESIGN §33.12, §33.17): the ability itself and, of a group,
  * the sub-abilities that fire. Index v3's `select` says how: `parallel` (and a `sequence`'s steps) — every one, its
  * `main` first (its projectile is the attack's); `random` — a seeded pick (unit id × attack count: the same in a
@@ -225,6 +262,14 @@ function abilityFits(a, kind, depth = 0) {
  * @param {number} nth the unit's attack count
  * @param {Map<any, { i: number, nth: number }>|null} mem the unit's last random picks by group, with their attack count
  */
+/**
+ * (fork) Sub-abilities that fire only on a kit fx, never on the sim's 'atk' (pickAttacks): by their projectile. 蕾缪安 S2's
+ * mode is an AbilityFirstSucceedGroup of her aimed shot (projectile_chr_lemuen_s2: lemuen_skill_02_start_02 by facing,
+ * _start_01) and her normal shot; the aimed shot is the kit's 'crit' (SkillFx `shot` binding), her 'atk's are the normal
+ * ones — before 2026-11-11 every 'atk' in S2 played the aimed shot's look and the aimed shots drew no muzzle flash.
+ */
+export const KIT_SHOTS = new Set(['projectile_chr_lemuen_s2']);
+
 export function pickAttacks(a, kind, seed = 0, depth = 0, nth = 0, mem = null) {
   if (!a) return [];
   const subs = Array.isArray(a.abilities) ? a.abilities.filter(Boolean) : [];
@@ -237,7 +282,11 @@ export function pickAttacks(a, kind, seed = 0, depth = 0, nth = 0, mem = null) {
     return [a, ...(main ? [main, ...subs.filter((x) => x !== main)] : subs).flatMap(next)];
   }
   const burst = Number.isInteger(sel?.burst) ? subs[sel.burst] : null;
-  const cand = burst && subs.length > 1 ? subs.filter((x) => x !== burst) : subs;
+  const cand0 = burst && subs.length > 1 ? subs.filter((x) => x !== burst) : subs;
+  // (fork) KIT_SHOTS: `kind.only` asks for that shot; any other attack leaves the kit's shots out (both: when there are others)
+  const only = kind.only ? cand0.filter((x) => x.projectileKey === kind.only) : [];
+  const rest = cand0.filter((x) => !KIT_SHOTS.has(x.projectileKey));
+  const cand = only.length ? only : rest.length ? rest : cand0;
   const fit = cand.filter((x) => abilityFits(x, kind));
   const held = fit.filter((x) => BLOCKED_NODE.test(x.node || ''));
   const free = fit.filter((x) => !BLOCKED_NODE.test(x.node || ''));
@@ -245,6 +294,9 @@ export function pickAttacks(a, kind, seed = 0, depth = 0, nth = 0, mem = null) {
   const pool = pick.length ? pick : cand;
   let i = 0;
   if (method === 'random') {
+    // (fork) a roll the sim's damage count shows (hitSuperset: 薇薇安娜 S2's Attack_Once / Attack_Twice): the widest
+    const wide = hitSuperset(pool);
+    if (wide) return [a, ...next(wide)];
     i = seed % pool.length;
     if (sel?.diffFromLast && mem && pool.length > 1) {
       // (fork) one attack is one pick: its wind-up and its strike both ask, with the same count
@@ -300,6 +352,8 @@ export class FxWiring {
    */
   constructor(ofx, opts = {}) {
     this.ofx = ofx;
+    // (fork) chained effects (OnPlayEmitter / OnFinishEmitter) of an effect on a unit play that unit's outfit twins
+    if (ofx && typeof ofx === 'object') ofx.remap = (k, owner) => this.skinKey(k, owner);
     this.opts = opts;
     this.idx = null;
     this.flights = new Set();     // projectile flights in the air
@@ -401,11 +455,28 @@ export class FxWiring {
 
   /** (fork) Effect key k as the outfit of view `by` plays it: its `<k>_<outfit>#N` twin when extracted, else k. */
   skinKey(k, by) {
-    const map = this.idx?.skinFx;
-    if (!k || !map || !by) return k;
-    const suf = this.outfitOf(by);
-    const alt = suf ? map[suf]?.[k] : null;
+    if (!k || !by || !this.idx?.skinFx) return k;
+    const alt = this._twin(k, by);
     return alt && this.ofx.lib.has(lc(alt)) ? lc(alt) : k;
+  }
+
+  /**
+   * (fork) The outfit twin of effect key k for view v, or null: its outfit's own skinpack replacement (index.json
+   * `skinPairs`, by outfit id — 薇薇安娜's 还愿礼 replaces common_char_birth_01, 号角's 初晓 of the same suffix does not),
+   * else the name rule's twin (`skinFx` by suffix). An index without `skinPairs` keeps `skinFx` whole (pairs included).
+   */
+  _twin(k, v) {
+    const suf = this.outfitOf(v);
+    if (!suf) return null;
+    const pairs = this.idx.skinPairs;
+    if (pairs) {
+      const m = v?.info?.model;
+      const own = typeof m === 'string' && m.includes('@') ? pairs[m.toLowerCase()]?.[k] : null;
+      if (own) return own;
+    }
+    const alt = this.idx.skinFx[suf]?.[k];
+    // with skinPairs, the by-suffix map gives the name rule's twins only (`<k>` with `_<suffix>` in it)
+    return alt && (!pairs || alt.replace(`_${suf}`, '') === k) ? alt : null;
   }
 
   /**
@@ -431,6 +502,8 @@ export class FxWiring {
       for (const k of Object.values(g.die || {})) if (k) keys.add(k);
       for (const k of Object.values(g.birth || {})) if (k) keys.add(k);
       for (const k of Object.values(g.status || {})) if (k) keys.add(k);
+      for (const k of Object.values(g.burst || {})) if (k) keys.add(k);
+      for (const k of Object.values(g.fx || {})) if (k) keys.add(k);
     }
     // an attack's rows and projectiles, its sub-abilities' too (index v2: a group's, a funnel attack's)
     const walk = (a, depth = 0) => {
@@ -466,11 +539,10 @@ export class FxWiring {
     for (const k of this.talents.keys(views)) keys.add(k);
     for (const k of this.funnels.keys(views)) keys.add(k);   // the 驭械术士's floating units (render/vfx/funnelfx.js)
     // (fork) the worn outfits' twins of those keys (skinKey)
-    const map = this.idx?.skinFx;
-    if (map) {
-      const sufs = new Set();
-      for (const v of views) { const s = this.outfitOf(v); if (s && map[s]) sufs.add(s); }
-      for (const s of sufs) for (const k of [...keys]) { const alt = map[s][lc(k)]; if (alt) keys.add(alt); }
+    if (this.idx?.skinFx) {
+      const worn = new Map();   // one view per outfit (_twin reads its model)
+      for (const v of views) { const m = this.outfitOf(v) ? v.info.model : null; if (m && !worn.has(m)) worn.set(m, v); }
+      for (const v of worn.values()) for (const k of [...keys]) { const alt = this._twin(lc(k), v); if (alt) keys.add(alt); }
     }
     return [...keys].map(lc).filter((k) => k && this.ofx.lib.has(k));
   }
@@ -638,7 +710,7 @@ export class FxWiring {
     const place = { pos, groundZ: -ground, yaw: 0, mirror: false, flipY: false, mountRot: null, rootRot: null };
     this._rotate(P, place, skin, pose);
     this._orient(def, place, pose, o, v);
-    const opts = { track: o.track || null, data: o.data ?? null, loop: !!o.loop, important: !!o.important, skip: o.skip > 0 ? o.skip : 0, owner: v };
+    const opts = { track: o.track || null, data: o.data ?? null, loop: !!o.loop, important: !!o.important, skip: o.skip > 0 ? o.skip : 0, lead: o.lead > 0 ? o.lead : 0, speed: o.speed > 0 ? o.speed : 1, owner: v };
     // the owner each frame: FollowMountPoint keeps the effect on the unit's point (and its rotation), a held effect
     // moves with the unit (`keep`), FollowDirection turns it with the unit, PauseEffectIf hides it while the unit shows
     // a condition; a prefab with chained effects (OnPlayEmitter: system.js FxHandle._start hands them this track) has
@@ -827,16 +899,18 @@ export class FxWiring {
         const first = e.startEvent == null || CAST_START_EVENTS.has(e.startEvent);
         if ((phase === 'start' && !first) || (phase === 'strike' && first) || (onTarget && !tgt)) continue;
         const skip = phase === 'start' ? info.skip : 0;
+        const lead = phase === 'all' && first ? info.lead : 0;   // (fork) an attack not wound up (attack)
+        const speed = info.speed;                                // (fork) the attack's playback speed (abilitySpeed)
         for (const k of this._rowKeys(e, src, nth)) {
           // the rows of the strike sit where its attack clip poses the unit's points at the strike frame
           const h = onTarget
-            ? this.playOn(k, tgt, { toward: beyond(src, tgt), flipFrom: src, skip })
-            : this.playOn(k, src, { toward: tgt, fourFace: !!e.useFourDirectionalFace, skip, strike: phase !== 'start' });
+            ? this.playOn(k, tgt, { toward: beyond(src, tgt), flipFrom: src, skip, lead, speed })
+            : this.playOn(k, src, { toward: tgt, fourFace: !!e.useFourDirectionalFace, skip, lead, speed, strike: phase !== 'start' });
           // a looping row stops at its end event (the cast's end); so does a looping prefab on a one-shot row, which
           // would otherwise never end (known once loaded: decided when the time comes)
           if (h) {
             const loopRow = !e.oneshot;
-            setTimeout0(this.ofx, { stop: () => { if (loopRow || this.ofx.lib.def(h.key)?.isLoop) h.stop(); } }, phase === 'start' && info.left > 0 ? Math.min(3, info.left) : CAST_LOOP_S, true);
+            setTimeout0(this.ofx, { stop: () => { if (loopRow || this.ofx.lib.def(h.key)?.isLoop) h.stop({ cast: true }); } }, phase === 'start' && info.left > 0 ? Math.min(3, info.left) : CAST_LOOP_S, true);
           }
         }
       }
@@ -854,7 +928,7 @@ export class FxWiring {
    * through unchanged.
    * @returns {{ cast: any[], castTarget: any[], inputTarget: any[], hit: any[], groups: any[][]|null, hitOpts: any, projectileKey: string|null, shot: any, shotClass: string|null }|null}
    */
-  _attackSet(u, m, src, tgt, kind, nth) {
+  _attackSet(u, m, src, tgt, kind, nth, only = null) {
     if (!m) return null;
     let a = m.attack || null;
     if (m.combat && (!a || (kind === 'none' && ((src.flags | 0) & UF.BLOCKED)))) a = m.combat;
@@ -863,7 +937,7 @@ export class FxWiring {
     const id = src.id ?? src.info?.id;
     let mem = this.picks.get(id);
     if (!mem) { mem = new Map(); this.picks.set(id, mem); }
-    const list = pickAttacks(a, { heal, ranged: !!kind && kind !== 'none', blocked: !!((src.flags | 0) & UF.BLOCKED) }, seedOf(id, nth), 0, nth, mem);
+    const list = pickAttacks(a, { heal, ranged: !!kind && kind !== 'none', blocked: !!((src.flags | 0) & UF.BLOCKED), only }, seedOf(id, nth), 0, nth, mem);
     const set = { cast: [], castTarget: [], inputTarget: [], hit: [], groups: null, hitOpts: null, projectileKey: null, shot: null, shotClass: null };
     const modeIdx = (u?.modes || []).indexOf(m);
     for (const x of list) {
@@ -926,9 +1000,24 @@ export class FxWiring {
     // a funnel shot's casts on its floating unit (耶拉's token) start with the owner's wind-up
     const fun = this.funnels.castStart(src, tgt, kind, info);
     if (!set && !sk) return fun;
+    info = { ...info, speed: this.abilitySpeed(src) };
     if (set) this._casts(set, src, tgt, 'start', info);
     if (sk) this.skills.casts(sk, src, tgt, 'start', info);
     return true;
+  }
+
+  /**
+   * (fork) The playback speed an attack of `src` gives its effects (the client: the ability's playbackSpeed, handed to
+   * each effect its emitters create — Effect.setPlayback caps it per prefab): its attack clip's own speed at its attack
+   * interval and its ability's `_maxAnimScale` (its data record's attackAnim.maxScale; SpineActor.abilitySpeed); 1 without
+   * a Spine actor or an interval.
+   */
+  abilitySpeed(src) {
+    if (!src?.actor?.abilitySpeed) return 1;
+    let rec;
+    try { rec = src.info ? this.opts?.record?.(src.info) : null; } catch { rec = null; }
+    const s = src.actor.abilitySpeed(Number(src.atkInterval), rec?.attackAnim?.maxScale);
+    return Number.isFinite(s) && s > 0 ? s : 1;
   }
 
   /**
@@ -986,7 +1075,7 @@ export class FxWiring {
    * official rows alone when it has any (R4). Returns true when the unit's official attack was drawn (the procedural
    * shot is skipped).
    */
-  attack(src, tgt, kind, time, wound = false) {
+  attack(src, tgt, kind, time, wound = false, o = {}) {
     if (!this.ofx.active || !src || !this.idx) return false;
     kind = this._combatKind(src, tgt, kind);
     const u = this.unitOf(src);
@@ -996,7 +1085,7 @@ export class FxWiring {
     // on each target), and it counts as one attack [ASSUMED: the same frame = the same attack]
     const again = this.castFrame.get(id) === this.skills.frame;
     const nth = Math.max(0, (this.attackN.get(id) || 0) - (again ? 1 : 0));
-    const set = this._attackSet(u, this.mode(u, src), src, tgt, kind, nth);
+    const set = this._attackSet(u, this.mode(u, src), src, tgt, kind, nth, o.only || null);
     const a = sk?.replace ? null : set;
     if (tgt) this.lastTargets.set(id, tgt);
     // the 驭械术士's floating units (render/vfx/funnelfx.js): they leave home and hit with the attack, or fly the funnel
@@ -1005,9 +1094,16 @@ export class FxWiring {
     if (!a && !sk) return !!fun;
     this.castFrame.set(id, this.skills.frame);
     const phase = wound ? 'strike' : 'all';
-    if (a) this._casts(a, src, tgt, phase, { owner: !again });
+    // (fork) not wound up: the clip shows its strike now, its cast began `lead` s earlier (SpineActor.attack strikeLead) —
+    // the cast rows' FxDelay counts from there, so 莫斯提马's S3 wave (FxDelay 0.8 s) lands with the blow, not after it. No
+    // attack clip to tell (her S3 swings are her skill's animation): the delayed parts show at the strike (UNWOUND_LEAD)
+    const sl = src.actor?.strikeLead;
+    const iv = Number(src.atkInterval);
+    const lead = phase === 'all' ? (Number.isFinite(sl) ? Math.max(0, sl) : Math.min(UNWOUND_LEAD, iv > 0 ? iv : UNWOUND_LEAD)) : 0;
+    const speed = this.abilitySpeed(src);
+    if (a) this._casts(a, src, tgt, phase, { owner: !again, lead, speed });
     if (sk) {
-      this.skills.casts(sk, src, tgt, phase, { owner: !again });
+      this.skills.casts(sk, src, tgt, phase, { owner: !again, lead, speed });
       if (!again) { this.skills.attacked(sk); this.skills.attackLine(sk.U, src, tgt); }
     }
     if (!again) this.attackN.set(id, nth + 1);
@@ -1016,7 +1112,8 @@ export class FxWiring {
     if (kind === 'note') return true;
     // the hit rows wait for the damage (each target hit: HitEffectOptions); useOwnerToTargetDirection turns the hit
     // along the blow
-    const keysOf = (rows) => rows.flatMap((e) => this._rowKeys(e, src, nth).map((k) => ({ k, along: !!e.useOwnerToTargetDirection })));
+    // (fork) at the attack's playback speed (abilitySpeed): the client's hit effects come from the attack's emitter
+    const keysOf = (rows) => rows.flatMap((e) => this._rowKeys(e, src, nth).map((k) => ({ k, along: !!e.useOwnerToTargetDirection, speed })));
     const hits = keysOf(a?.hit || []);
     // the projectile: a ranged skill attack's own, else the mode's (a sub-ability's)
     const pk = sk?.projectile || set?.projectileKey || null;
@@ -1047,6 +1144,11 @@ export class FxWiring {
       if (!again) this._followUps(shot, pk, src, tgt, kind, time, mount);
       this.skills.released(src, tgt, kind, time);
       if (grouped) { rec.hits = []; rec.window = (fo.dur || this._flightTime(src, tgt, kind)) + ARRIVAL_WINDOW; this.melee.set(tid, rec); }
+      // (fork) a skill whose hits mark the ground (skills.js FX_HIT_TILES, 烛煌 S2): its damage places the tile effect
+      else if (tid != null) {
+        const tileU = this.skills.tileOwner(src);
+        if (tileU) this.melee.set(tid, { hits: [], src, t: time, n: 0, hitT: null, seed: rec.seed, tileU, window: (fo.dur || this._flightTime(src, tgt, kind)) + ARRIVAL_WINDOW });
+      }
       // a chain lightning's shot: its bounces (the sim's 'chain' / 'chainHeal' events) draw its line from here (chain())
       const line = projectileParts(proj).chain;
       if (line && tid != null) this.chains.set(tid, { proj, rows: fo.hits, src, line, at: this.ofx.time + hitAt, until: this.ofx.time + hitAt + CHAIN_WINDOW });
@@ -1435,7 +1537,7 @@ export class FxWiring {
         for (const k of proj.onHit || []) this.playOn(k, tgt, { by: src || undefined });
         if (rows) {
           const own = new Set((proj.onHit || []).map(lc));
-          for (const h of rows) if (!own.has(lc(h.k))) this.playOn(h.k, tgt, { flipFrom: src || undefined, toward: h.along && src ? beyond(src, tgt) : undefined });
+          for (const h of rows) if (!own.has(lc(h.k))) this.playOn(h.k, tgt, { flipFrom: src || undefined, toward: h.along && src ? beyond(src, tgt) : undefined, speed: h.speed });
         }
         const id = tgt.id ?? tgt.info?.id;
         this.arrived.set(id, now);
@@ -1543,8 +1645,10 @@ export class FxWiring {
     const k = m.hitT === time ? m.n : 0;
     m.hitT = time;
     m.n = k + 1;
+    // (fork) only the ground mark of a shot whose own hit plays with its projectile (attack(): FX_HIT_TILES)
+    if (m.tileU) return k === 0 && !!this.skills.hitTile(m.tileU, v);
     let drawn = false;
-    const play = (list) => { for (const h of list) if (this.playOn(h.k, v, { flipFrom: m.src, toward: h.along && m.src ? beyond(m.src, v) : undefined })) drawn = true; };
+    const play = (list) => { for (const h of list) if (this.playOn(h.k, v, { flipFrom: m.src, toward: h.along && m.src ? beyond(m.src, v) : undefined, speed: h.speed })) drawn = true; };
     play(m.hits);
     if (m.modeGroups) play(pickGroup(m.modeGroups, k, m.modeOpts, m.seed));
     if (m.groups && this.skills.landed(m, v, k)) drawn = true;
@@ -1587,8 +1691,15 @@ export class FxWiring {
    */
   chain(prev, next, kind, time) {
     if (!this.ofx.active || !prev || !next || prev === next || !this.idx || !CHAIN.has(kind)) return false;
-    const c = this.chains.get(prev.id ?? prev.info?.id);
+    let c = this.chains.get(prev.id ?? prev.info?.id);
     if (!c || this.ofx.time > c.until) return false;
+    // (fork) a hop that leaves a relay unit flies another projectile's line and hit (skills.js CHAIN_RELAYS)
+    const relay = CHAIN_RELAYS[this.skills.of(c.src)?.skillId];
+    if (relay && this.unitKeyOf(prev) === relay.via) {
+      const p = this.idx.projectiles?.[relay.projectile];
+      const line = p ? projectileParts(p).chain : null;
+      if (line) c = { ...c, proj: p, line, rows: [] };
+    }
     const nid = next.id ?? next.info?.id;
     if (nid != null) this.chains.set(nid, c);
     const delay = Math.max(0, c.at - this.ofx.time);
@@ -1631,12 +1742,53 @@ export class FxWiring {
     if (!on) { if (prev) { prev.stop(); this.loops.delete(slot); } return !!prev; }
     if (!this.ofx.active) return false;
     if (prev && prev.alive) return true;
-    const key = this.idx.generic?.status?.[name];
+    const key = this.idx.generic?.status?.[name] || this._burstLoop(v, name);
     if (!key) return false;
     this.skills.status(v, lc(key));
     const h = this.playOn(key, v, { follow: true, loop: true, important: true });
     if (h) this.loops.set(slot, h);
     return !!h;
+  }
+
+  /**
+   * (fork) The official loop of an element burst's status (generic.burst): the `<element>Burst` lock (爆发冷却, server/sim/
+   * attack/element.js) loops the burst's `loop` effect of the unit's side (an operator's 灼燃: buff_burn), erosion's
+   * permanent DEF cut (`erosionDown`) its `down` effect. Null when the index names none.
+   */
+  _burstLoop(v, name) {
+    const b = this.idx.generic?.burst;
+    if (!b || typeof name !== 'string') return null;
+    if (name === 'erosionDown') return b[`erosion.${burstSide(v)}.down`] || null;
+    return name.endsWith('Burst') ? b[`${name.slice(0, -5)}.${burstSide(v)}.loop`] || null : null;
+  }
+
+  /**
+   * (fork) b.ev ['fx', 'burst', x, y, { id, element }] (server/sim/attack/element.js): the element's official burst
+   * (generic.burst) — its `hit` once on the unit. True when the official layer stands for the burst (a hit played, or
+   * the element has a lock loop for that side, which the burst's status draws), so the procedural flash is skipped; the legacy
+   * necrosis (no official burst) keeps it.
+   */
+  burst(extra) {
+    const b = this.idx?.generic?.burst;
+    const el = extra?.element;
+    if (!b || typeof el !== 'string' || !this.ofx.active) return false;
+    const v = this.view(extra.id);
+    if (!v) return false;
+    const side = burstSide(v);
+    const hit = b[`${el}.${side}.hit`], loop = b[`${el}.${side}.loop`];
+    const drew = !!(hit && this.playOn(hit, v, {}));
+    return drew || !!(loop && this.ofx.lib.has(loop));
+  }
+
+  /**
+   * (fork) A sim fx kind the client shows with a generic one-shot (index generic.fx: 'palsy' → common_061_numb_hit_01,
+   * a 麻痹 stack interrupting an attack) on the unit `extra.id`. True when it played (the procedural fx is skipped).
+   */
+  genericFx(kind, extra) {
+    const key = this.idx?.generic?.fx?.[kind];
+    if (!key || !this.ofx.active) return false;
+    const v = this.view(extra?.id);
+    return !!(v && this.playOn(key, v, {}));
   }
 
   /** Stop every loop of a unit (it died / left): its status loops, its skill / charge loops, the skills' loops on it. */
@@ -1682,7 +1834,9 @@ export class FxWiring {
     const t = this.talents.fx(kind, extra, x, y);
     // the floating units stand for the kit's 'drone' / 'drones' / 'droneLock' / 'overload' (render/vfx/funnelfx.js)
     const f = this.funnels.simFx(kind, x, y, extra);
-    return this.skills.simFx(kind, x, y, extra) || t || f;
+    const burst = kind === 'burst' && this.burst(extra);
+    const once = this.genericFx(kind, extra);
+    return this.skills.simFx(kind, x, y, extra) || t || f || burst || once;
   }
 
   /** b.ev 'die': the unit's own death effect or the generic one. */
@@ -1707,13 +1861,29 @@ export class FxWiring {
     if (!v || !this.idx) return false;
     this.skills.deployed(v);   // a passive's loops and start one-shots (it is drawn whatever the deploy effect is)
     this.talents.deployed(v);  // the deploy talents' one-shots (耀骑士临光's birth), once per life
+    return this.birth(v);
+  }
+
+  /**
+   * (fork) The unit's official deploy effect alone (its skill's birth row, else its mode's / unit's start effect, else the
+   * generic birth), the outfit's twin through playOn — `deploy` without the passive loops and deploy talents: a piece put
+   * on the board in prep (render/app.js) plays it as the client's deploy does (`cache: false`: no battle record). True
+   * when drawn.
+   */
+  birth(v, o = {}) {
+    if (!v || !this.idx) return false;
     if (!this.ofx.active || v.isEnemy) return false;
-    const b = this.skills.birthOf(v);
-    if (b && b.drawn) return b.own || b.empty ? true : !!this.playOn(b.key, v, {});
+    const b = this.skills.birthOf(v, o);
+    // a passive's birth row is its start one-shot (SkillFx.deployed plays it on a battle deploy); a prep piece
+    // (`cache: false`) has no deploy, so it plays here
+    // a prep piece's birth is never dropped by the crowd budget (a whole bond added at once: the client plays each)
+    const po = o.cache === false ? { important: true } : {};
+    if (b && b.drawn) return b.empty || (b.own && o.cache !== false) ? true : !!this.playOn(b.key, v, po);
     const u = this.unitOf(v);
-    const m = u ? this.mode(u, v) : null;
+    // a prep piece has no skill on: its default mode (mode() would ask SkillFx.state, which keeps a record)
+    const m = !u ? null : o.cache === false ? (u.modes || []).find((x) => x?.name === 'Default') || (u.modes || [])[0] || null : this.mode(u, v);
     const key = lc(m?.overrideStartEffect) || lc(u?.startEffect) || this.idx.generic?.birth?.char;
-    return !!(key && this.playOn(key, v, {}));
+    return !!(key && this.playOn(key, v, po));
   }
 
   /**

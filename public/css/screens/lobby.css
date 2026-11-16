@@ -495,6 +495,11 @@
 .tips__head > .icon { width: .2rem; height: .2rem; color: var(--mint-500); }
 /* the count and its arrows move to a line of their own, together, when the head is too narrow for them (§35.18 review) */
 .tips__pager { display: inline-flex; align-items: center; gap: .1rem; margin-left: auto; }
+/* (fork) the TACTICAL TIPS label gives way first: when it doesn't fit beside the title and the pager, it wraps onto a
+   hidden second line of its own box, so the pager keeps the title's row (no empty row for the count and its arrows) */
+.tips__sub { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; height: .3rem; overflow: hidden; }
+.tips__sub::before { content: ''; height: 100%; }
+.tips__sub > .micro { white-space: nowrap; }
 .tips__idx { font-size: calc(.16 * var(--t)); color: var(--text-md); }
 .tips__nav {
   display: grid;
@@ -511,6 +516,12 @@
 .tips__nav .icon { width: .18rem; height: .18rem; }
 .tips__text { margin-top: .1rem; font-size: calc(.17 * var(--t)); color: var(--text-lo); line-height: 1.6; animation: tip-in var(--t-slow) var(--ease-out); }
 @keyframes tip-in { from { opacity: 0; transform: translateX(.1rem); } }
+/* (fork) every tip sits in the same cell, the others hidden, so the box is always as tall as the longest tip: a rotating
+   tip never changes the height of the column, and the update announcement above it stays put */
+/* (and the tip shown sits in the middle of that height, so a short tip leaves even space above and below) */
+.tips__stack { display: grid; margin-top: .1rem; }
+.tips__stack > .tips__text { grid-area: 1 / 1; align-self: center; margin-top: 0; }
+.tips__text.is-ghost { visibility: hidden; animation: none; }
 
 /* ---- the two full-screen dialogs (Modal .proto / .ally) --------------------------------------------- */
 .modal.proto-veil { padding: 0; background: #0b0c0c; -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -672,6 +683,11 @@
 }
 .proto-list > :first-child { margin-top: auto; }
 .proto-list > :last-child { margin-bottom: auto; }
+/* (fork) only the last level scrolls (screens/lobby.js ProtoFit): 'full' and 'brief' are chosen only when they fit, give or
+   take the 1 px of rounding the fit allows, so they never show a scrollbar for that pixel. A scrollbar there narrowed the
+   list, the narrower list measured differently, and the cards flipped between two levels every few frames (a player's
+   report, 2026-11-12: 'full' with a scrollbar ↔ 'brief'). The pixel falls in the list's bottom padding. */
+.proto__body:not([data-fit="names"]) .proto-list { overflow-y: hidden; }
 .pcard {
   position: relative;
   flex: none;
@@ -745,6 +761,13 @@
 }
 .create-box__test input { width: .2rem; height: .2rem; margin: 0; flex: none; accent-color: #e8b84a; }
 .create-box__test em { flex-basis: 100%; font-style: normal; }
+/* (fork) 单人匹配: the versions to be matched for and the Grand Alliance opt-in, with its One for All sub-opt-in */
+.create-box__sub { padding-left: .3rem; }
+.create-box__sub.is-off { opacity: .5; }
+.create-box__strategy { margin-top: .04rem; }
+.create-box__queue { display: flex; flex-direction: column; gap: .06rem; }
+.create-box__versions { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: .04rem .16rem; }
+.create-box__legend { flex-basis: 100%; color: rgba(255, 255, 255, .72); font-size: calc(.14 * var(--t)); }
 @media (max-width: 720px) {
   .create-box__test { font-size: 16px; }
   .create-box__test input { width: 32px; height: 32px; }
@@ -1246,6 +1269,8 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 }
 .search-news__body:focus-visible { outline: 1px solid var(--mint-500); outline-offset: 2px; }
 .search-news__highlight { margin: 0 0 .07rem; padding-bottom: .07rem; font-size: calc(.16 * var(--t)); font-weight: 800; color: var(--mint-400); border-bottom: 1px solid var(--line); }
+.search-news__highlight > p { margin: 0; }
+.search-news__highlight > p + p { margin-top: .04rem; }
 .search-news__list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: .04rem; }
 .search-news__list li::marker { color: var(--mint-500); }
 
@@ -1350,7 +1375,21 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .rbr-card__lock { flex: none; display: inline-flex; align-items: center; gap: .04rem; padding: .01rem .08rem; font-size: calc(.13 * var(--t));
   color: #ffc45c; border: 1px solid rgba(255, 196, 92, .5); }
 .rbr-card__lock .icon { width: 1em; height: 1em; }
-.rbr-card__diff { display: inline-flex; align-items: center; gap: .06rem; font-size: calc(.15 * var(--t)); color: #b9c2bf; }
+/* (fork) One for All (ui/largeRooms.js OneForAllTag): the card's tag beside the lock, the room browser's note */
+.rbr-card__tags { flex: none; display: inline-flex; align-items: center; gap: .06rem; }
+.rbr-card.is-ofa { border-color: rgba(242, 193, 78, .4); }
+.rbr__intro--ofa { color: #f2c14e; font-weight: 600; }
+.rbr-card__diff { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: calc(.15 * var(--t)); color: #b9c2bf; }
+/* (fork) the server a room is on and its ping (ui/largeRooms.js RegionTag); the page's own server in the accent colour */
+.rbr-card__region { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: .05rem; padding: .01rem .07rem;
+  font-size: calc(.13 * var(--t)); color: #c9d2cf; border: 1px solid rgba(255, 255, 255, .18); white-space: nowrap; }
+.rbr-card__region.is-here { color: #4fe8c0; border-color: rgba(79, 232, 192, .45); }
+.rbr-card__region .icon { width: 1em; height: 1em; }
+.rbr-card__region-ms { color: #8b9692; }
+.rbr-card__region-ms small { font-size: calc(.104 * var(--t)); margin-left: .01em; }
+.rbr-card__region-ms.ping--low { color: #4fe8c0; }
+.rbr-card__region-ms.ping--medium { color: #ffc45c; }
+.rbr-card__region-ms.ping--high { color: #ff7a6b; }
 .rbr-card__squads { display: flex; flex-direction: column; gap: .05rem; }
 .rbr-squad { display: flex; align-items: center; gap: .08rem; }
 .rbr-squad__k { width: 1.6em; font-size: calc(.14 * var(--t)); font-weight: 700; text-align: center; color: #0b1520; background: #cfd8d4; }
@@ -1364,14 +1403,28 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .rbr-card__seats small { font-size: calc(.15 * var(--t)); color: #7f8a86; }
 .rbr-card__code { flex: 1 1 auto; font-size: calc(.14 * var(--t)); letter-spacing: .1em; color: #6f7a76; }
 
-/* (fork) the profile chip (screens/lobby.js ProfileChip): one's profile icon and Doctor name, opens the icon picker */
+/* (fork) the profile chip (screens/lobby.js ProfileChip): one's profile icon and Doctor name, opens the icon picker.
+   As tall as the version chip beside it (components.css .verchip, its touch height on touch screens); the icon fills it
+   and the edit pen keeps a readable floor (it was 10 px on a phone, where 1rem is clamped at 40 px). */
 .lobby-me {
-  display: inline-flex; align-items: center; gap: .08rem; min-width: 0; max-width: 2.6rem; height: .4rem;
+  display: inline-flex; align-items: center; gap: .08rem; min-width: 0; max-width: 2.6rem; height: max(.42rem, 28px);
   padding: 0 .1rem 0 .04rem; border: 1px solid var(--line-2); background: rgba(0, 0, 0, .35);
 }
 .lobby-me:hover:not(:disabled), .lobby-me:focus-visible { border-color: var(--mint-500); }
 .lobby-me:disabled { cursor: default; }
 .lobby-me__face { position: relative; flex: none; display: block; }
-.lobby-me__face .avatar { --av: .32rem; }
+.lobby-me__face .avatar { --av: max(.34rem, 22px); }
+.lobby-me .avedit__pen { width: max(.17rem, 14px); height: max(.17rem, 14px); }
+.sp-coarse .lobby-me { height: max(32px, calc(40px * var(--sp-ui, 1))); padding-left: 3px; }
+.sp-coarse .lobby-me__face .avatar { --av: max(26px, calc(34px * var(--sp-ui, 1))); }
+.sp-coarse .lobby-me .avedit__pen { width: max(14px, calc(16px * var(--sp-ui, 1))); height: max(14px, calc(16px * var(--sp-ui, 1))); }
+/* English at 大 / 特大 on a 640–667 px phone: 返回's word, the version chip and the chip leave no room in the top bar (the chip
+   lay over the Discord square, more so while the ping reads three digits). 返回 keeps its chevron there and the online
+   pill its icon and number; their titles (返回标题, 在线博士 {n}) still name them. Every other language and size fits as it
+   is. */
+@media (max-width: 700px) {
+  :root:is([data-text="lg"], [data-text="xl"]):lang(en) .lobby-screen .topbar__left > .btn--ghost:first-child .btn__label,
+  :root:is([data-text="lg"], [data-text="xl"]):lang(en) .lobby-screen .topbar__left .online-pill .ping__unit { display: none; }
+}
 .lobby-me__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: calc(.15 * var(--t)); font-weight: 700; color: var(--text-hi); }
 @media (max-width: 900px) { .lobby-me__name { display: none; } .lobby-me { padding-right: .04rem; } }

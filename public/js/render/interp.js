@@ -39,6 +39,9 @@
 //     and two the official effects read (render/vfx/talentfx.js, skillfx.js), the same way:
 //       `layers`  [[id, n]] (the hit-negating 护盾 layers, n ≥ 1)                → sample().layers  number (0: none)
 //       `charges` [[id, stored, maximum]] (a charge skill's stored charges)   → sample().charges [stored, maximum] | null
+//       `fxs`     [[id, buff, src, look]] (fork: the official buffs a unit shows the lasting effects of — sim fxStateView;
+//                 the server sends them as changes, net.js puts the whole set back: shared/fxsDiff.js)
+//                                                                        → sample().fxs [[buff, src, look]…] | null
 //     An entry that is malformed, or names a unit the snapshot does not list, is dropped; a snapshot without the list
 //     clears the readout (render/units.js: the segmented ammo bar, the wolf pips, the red bar of 斩业星熊's 我执).
 //   * `stand` [[id, until]] — the game time an enemy's attack recovery ends (sim atkStandUntil, PR #381): the position
@@ -80,7 +83,7 @@ function movementStart(a, b, id) {
 }
 
 /** Cosmetic event kinds that may be dropped when far behind (never state-changing). */
-export const COSMETIC_EVENTS = new Set(['atk', 'dmg', 'heal', 'fx', 'layer', 'bounty', 'cast', 'resource']);
+export const COSMETIC_EVENTS = new Set(['atk', 'dmg', 'heal', 'fx', 'layer', 'bounty', 'cast', 'resource', 'atkCast', 'atkCancel']);
 /**
  * Whether an event may be dropped when stale or shed from a full queue. An 'fx' that carries an enemy's model `form`
  * (shared/protocol.js fxForm) is state: dropping it left the view on the old model after a long main-thread stall, on a
@@ -214,6 +217,16 @@ export function normalizeSnapshot(snap) {
       (fever || (fever = new Map())).set(e[0], [clamp(e[1], 0, 1), e[2] ? 1 : 0]);
     }
   }
+  let fxs = null;
+  if (Array.isArray(snap.fxs)) {
+    for (const e of snap.fxs) {
+      if (!Array.isArray(e) || !units.has(e[0]) || typeof e[1] !== 'string' || !e[1]) continue;
+      const m = fxs || (fxs = new Map());
+      const list = m.get(e[0]) || [];
+      list.push([e[1], e[2] ?? null, e[3] ?? null]);
+      m.set(e[0], list);
+    }
+  }
   let face = null;
   if (Array.isArray(snap.face)) {
     for (const e of snap.face) {
@@ -221,7 +234,7 @@ export function normalizeSnapshot(snap) {
       (face || (face = new Map())).set(e[0], e[1]);
     }
   }
-  return { t, units, down, ammo, wolves, coins, energy, charges, layers, neg, motes, st, sh, stand, standCut, notes, fever, face, raw: snap };
+  return { t, units, down, ammo, wolves, coins, energy, charges, layers, fxs, neg, motes, st, sh, stand, standCut, notes, fever, face, raw: snap };
 }
 
 /**
@@ -537,6 +550,7 @@ export class SnapshotBuffer {
       o.energy = A.energy?.get(id) ?? null;
       o.charges = A.charges?.get(id) ?? null;
       o.layers = A.layers?.get(id) ?? 0;
+      o.fxs = A.fxs?.get(id) ?? null;
       o.neg = A.neg ? A.neg.get(id) || 0 : 0;
       o.st = A.st?.get(id) ?? null;
       o.sh = A.sh?.get(id) ?? 0;

@@ -111,8 +111,8 @@
         "enemy_1006_shield": [1,0,1,0,880]
       },
       "hooks": [1,93,5700,317,317,577,568,25,32,87,8,8,0,11729,19,14,68,55,1,32,3,0,33],
-      "events": {"atk":319,"cast":1,"deploy":25,"die":32,"dmg":568,"engage":11,"fx":93,"heal":25,"layer":3,"leak":55,"rate":63,"skill":16,"spawn":80,"status":37},
-      "fx": {"aoe":8,"displace":5,"dodge":33,"dp":4,"explode":34,"garrison":3,"garrisonGrant":1,"spGain":4,"zone":1},
+      "events": {"atk":319,"cast":1,"deploy":25,"die":32,"dmg":568,"engage":11,"fx":114,"heal":25,"layer":3,"leak":55,"rate":63,"skill":16,"spawn":80,"status":37},
+      "fx": {"aoe":8,"displace":5,"dodge":33,"dp":4,"explode":34,"garrison":3,"garrisonGrant":1,"spGain":4,"tick":21,"zone":1},
       "snaps": "bcb9498d 10250c1f ff52cf2d 7ec30af2 6d30f7c4 a4f946b8 273436d2 dd56091c 9e214c09 fe579142 4116baae 6a4b0a68 ec95c366 1fbcef56 e172a131 26dfddd9 8c7e28d1 4fe8c0d6 642ae482"
     },
     "standin-03": {
@@ -339,7 +339,7 @@
       "hooks": [1,135,5541,416,416,466,464,71,56,133,26,26,0,5081,3,43,98,72,1,56,4,0,2],
       "events": {"atk":431,"bounty":2,"deploy":37,"die":61,"dmg":464,"engage":11,"fx":57,"heal":48,"layer":4,"leak":72,"rate":44,"skill":52,"spawn":110,"status":46},
       "fx": {"blink":5,"camouflage":2,"displace":23,"dodge":2,"dp":6,"explode":1,"garrison":4,"slash":14},
-      "snaps": "e1e57198 4c21a4a9 1ee45812 0408a301 5d67db61 6e1c4b35 86780675 dfe0ab05 95a75434 aee35efc e6ed2793 6c8e1ea4 b8ad713a e0431bba de0900ae 036786c1 5414e2d1 ccb47376 65a8915c"
+      "snaps": "e1e57198 4c21a4a9 1ee45812 0408a301 5d67db61 6e1c4b35 86780675 dfe0ab05 15352125 31df3f99 2921fbc6 5777fe3d 565c89bf 02329223 78ba38ff c3bb6878 efd68f3c bfd82757 1840ea9d"
     },
     "standin-07": {
       "about": "elite band 6 as stand-ins: chess_char_4_18_b→char_602_cdfend chess_char_5_05_b→char_602_cdfend chess_char_5_08_b→char_610_acfend chess_char_4_19_b→char_608_acpion chess_char_5_01_b→char_600_cpione chess_char_5_06_b→char_609_acguad chess_char_5_07_b→char_601_cguard chess_char_4_20_b→char_603_csnipe chess_char_5_02_b→char_604_ccast chess_char_5_03_b→char_612_accast chess_char_5_10_b→char_606_csuppo chess_char_5_11_b→char_613_acmedc",
@@ -392,8 +392,8 @@
         "enemy_1071_dftman": [1,0,1,0,0]
       },
       "hooks": [1,111,6715,325,325,655,652,291,35,106,15,14,0,7351,23,22,80,71,1,35,3,0,3],
-      "events": {"atk":361,"bounty":1,"cast":5,"deploy":29,"die":35,"dmg":652,"engage":11,"fx":37,"heal":27,"layer":3,"leak":71,"rate":52,"skill":29,"spawn":94,"status":136},
-      "fx": {"aoe":4,"displace":8,"dodge":3,"dp":5,"garrison":3,"garrisonGrant":1,"palsy":1,"revive":3,"spGain":9},
+      "events": {"atk":361,"bounty":1,"cast":5,"deploy":29,"die":35,"dmg":652,"engage":11,"fx":42,"heal":27,"layer":3,"leak":71,"rate":52,"skill":29,"spawn":94,"status":136},
+      "fx": {"aoe":4,"displace":8,"dodge":3,"dp":5,"garrison":3,"garrisonGrant":1,"palsy":1,"revive":3,"spGain":9,"tick":5},
       "snaps": "3c7fc442 d512da53 d7dba93c aeb405a4 f5ef4dc8 fc391639 46629ccd 085099c4 ba329dc1 53c6ec83 f9f9276f 1fea4443 9ba894fa 97d67b4a 403d756c 20331bf1 c74560b4 bd5975b6 0da54f70 cbb45cb6 9e8498c3 b7fdf582 4dae655d"
     },
     "standin-08": {
@@ -445,8 +445,8 @@
         "enemy_1121_lifbos": [1,0,1,0,680]
       },
       "hooks": [1,129,6436,691,691,1176,1260,0,46,121,22,28,0,12291,9183,37,95,75,1,50,0,0,1],
-      "events": {"atk":793,"bounty":1,"deploy":31,"die":46,"dmg":1231,"engage":12,"fx":166,"leak":75,"rate":81,"skill":58,"spawn":110,"status":824},
-      "fx": {"aoe":11,"displace":34,"dodge":11,"dp":10,"explode":26,"ignite":31,"slash":43},
+      "events": {"atk":793,"bounty":1,"deploy":31,"die":46,"dmg":1231,"engage":12,"fx":208,"leak":75,"rate":81,"skill":58,"spawn":110,"status":824},
+      "fx": {"aoe":11,"displace":34,"dodge":11,"dp":10,"explode":26,"ignite":31,"slash":43,"tick":42},
       "snaps": "67547b52 e4ce20a3 ec1f52e3 f7e65cdf e72d01a5 6e8e4a4b 09bfca50 36f5b643 1d478e7f 5c825671 7622ff59 ad8ddf75 737bb6ca 0a2767bb 8e8d30fe 3d8034df 5f23b92e c5f7cd0f 68fbc5bb 903fba3f 91d5a882 0019f5ad"
     },
     "standin-09": {

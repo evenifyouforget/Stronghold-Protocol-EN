@@ -137,6 +137,31 @@ const PRISONER_GREY_3 = Object.freeze({
 const UTAGE_S1 = Object.freeze({ begin: 'Skill_Start', loop: 'Skill_Loop', end: 'Skill_End', index: 0, idle: null });
 const UTAGE_S2 = Object.freeze({ ...clipOf('Attack', 'attack'), index: 1, idle: null });
 /**
+ * (fork) 莫斯提马 (char_213_mostma, every outfit): read from the CN client 2026-11-10. S2 (skchr_mostma_2, [uc]skills.ab) is a
+ * ChannelingMeleeAttack whose animator plays Skill_Begin / Skill_Loop / Skill_End. S3 (skchr_mostma_3) plays no begin anim
+ * and switches her to mode S2 (charpack Modes/S2): its attack's _animKey Skill_2_Loop (OnAttack 0.733 s), _endAnimKey
+ * Skill_2_Idle, and its AnimatorHooker _replaceAnimPairs Idle → Skill_2_Idle; the skins' _mixSettings (default, epoque#5,
+ * ambienceSynesthesia#6) play Skill_2_Begin from Idle and Skill_2_End back to it. S1 (skcom_atk_up) plays no clip and
+ * keeps her attack. The resolver (by name) gave S2 the Skill_2 set and S1 / S3 the unnumbered one, so S3 held the channel
+ * pose and swung no attack (the user's report of 2026-11-10, Ethereal Harmony).
+ */
+const MOSTIMA_S1 = Object.freeze({ ...clipOf('Attack', 'attack'), index: 0, idle: null });
+const MOSTIMA_S2 = Object.freeze({ begin: 'Skill_Begin', loop: 'Skill_Loop', end: 'Skill_End', index: 1, idle: null });
+const MOSTIMA_S3 = Object.freeze({ begin: 'Skill_2_Begin', loop: 'Skill_2_Loop', end: 'Skill_2_End', index: 2, idle: 'Skill_2_Idle' });
+/**
+ * (fork) 水月 (char_437_mizuki, every outfit): read from the CN client 2026-11-11. S1 (skchr_mizuki_1, [uc]skills.ab) is a
+ * ReplacementSkill whose MeleeAttack `_animKey` is Attack: a charge is the normal swing it replaces (`keepAttack`: it plays
+ * out). S2 (skchr_mizuki_2) plays no begin anim and switches her to mode S1 (charpack Modes/S1): its attack's `_animKey`
+ * Skill_1, `_endAnimKey` Idle, no AnimatorHooker — she attacks with Skill_1 and rests in her normal Idle (`idle: 'Idle'`
+ * keeps render/spine.js setSkill from playing Skill_1 once as a cast clip). S3 (skchr_mizuki_3) has `_playSkillBeginAnim`
+ * with `_beginAnim` Skill_2_Start and switches to mode S2: attack Skill_2_Loop, AnimatorHooker Idle → Skill_2_Idle; the
+ * skins' _mixSettings (default, sale#7, game#6) play Skill_2_End from Skill_2_Idle / Skill_2_Loop back to Idle. The
+ * resolver (by name) gave S1 Skill_1, S2 the Skill_2 set and S3 the plain attack.
+ */
+const MIZUKI_S1 = Object.freeze({ ...clipOf('Attack', 'attack'), index: 0, idle: null, keepAttack: true });
+const MIZUKI_S2 = Object.freeze({ begin: null, loop: 'Skill_1', end: null, index: 1, idle: 'Idle' });
+const MIZUKI_S3 = Object.freeze({ begin: 'Skill_2_Start', loop: 'Skill_2_Loop', end: 'Skill_2_End', index: 2, idle: 'Skill_2_Idle' });
+/**
  * An enemy's skill slots (`anims.skills`: the slot = the skill's index in data/enemies.json `skills[]`, what a sim
  * ['cast', id, slot] event names) → the clip of that skill's official ability: the prefab's EnemySkill ability
  * `_animKey` (fx/index.json `units.<key>.skills.<prefabKey>.abilities[].animKey`, read from the same battle prefab). The
@@ -191,6 +216,8 @@ export const PREFAB_SPINE_ROLES = Object.freeze({
   enemy_9020_actrpc: { skills: slotMap([slotClip(0, 'Skill_c', { strike: true })]) },
   // operators by character id: both the front and the back model
   char_337_utage: { skill: UTAGE_S2, skills: { 0: UTAGE_S1, 1: UTAGE_S2 } },
+  char_213_mostma: { skill: MOSTIMA_S3, skills: { 0: MOSTIMA_S1, 1: MOSTIMA_S2, 2: MOSTIMA_S3 } },
+  char_437_mizuki: { skill: MIZUKI_S2, skills: { 0: MIZUKI_S1, 1: MIZUKI_S2, 2: MIZUKI_S3 } },
 });
 
 /**

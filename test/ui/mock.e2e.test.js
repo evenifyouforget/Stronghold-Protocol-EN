@@ -1231,6 +1231,47 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     await page.close();
   });
 
+  test('result: a Grand Alliance team page scrolls its 8 cards and opens on my own card', async () => {
+    // `then`: the screen resized after the page opened (a window resized; a phone going fullscreen or turning)
+    for (const size of [{ w: 1546, h: 905, then: { width: 1920, height: 1080 } },
+      { w: 844, h: 390, touch: true, then: { width: 780, height: 360, isMobile: true, hasTouch: true } }]) {
+      const { page, problems } = await open('phase=RESULT&variant=ga', size);
+      await page.waitForSelector('.settle__next', { visible: true, timeout: 10000 });
+      await page.click('.settle__next');
+      await page.waitForSelector('[data-testid="settle-team"] .hscroll.is-over', { timeout: 5000 });
+      const state = () => page.evaluate(() => {
+        const view = document.querySelector('.steam__view');
+        const self = document.querySelector('.tcard.is-self').getBoundingClientRect(), box = view.getBoundingClientRect();
+        return { cards: document.querySelectorAll('.tcard').length, left: view.scrollLeft, max: view.scrollWidth - view.clientWidth,
+          selfShown: self.left >= box.left && self.right <= box.right, selfAt: (self.left + self.width / 2 - box.left) / box.width, arrows: document.querySelectorAll('.hscroll__arrow:not([disabled])').length,
+          scrollbar: view.offsetHeight - view.clientHeight };
+      });
+      const open1 = await state();
+      assert.equal(open1.cards, 8, `${size.w}: eight cards`);
+      assert.ok(open1.max > 0 && open1.left > 0 && open1.left < open1.max, `${size.w}: opens mid-row: ${JSON.stringify(open1)}`);
+      assert.ok(open1.selfShown, `${size.w}: my own (6th) card is in view on open`);
+      assert.ok(Math.abs(open1.selfAt - 0.5) < 0.02, `${size.w}: my own card in the middle: ${open1.selfAt}`);
+      // a resize before the player touches the row keeps my card in the middle
+      await page.setViewport(size.then);
+      await page.waitForFunction(() => {
+        const v = document.querySelector('.steam__view').getBoundingClientRect(), c = document.querySelector('.tcard.is-self').getBoundingClientRect();
+        return Math.abs((c.left + c.width / 2 - v.left) / v.width - 0.5) < 0.02;
+      }, { timeout: 3000 }).catch(async () => assert.fail(`${size.w} → ${size.then.width}: my card left the middle: ${JSON.stringify(await state())}`));
+      open1.left = (await state()).left;
+      assert.equal(open1.arrows, 2, `${size.w}: both arrows while both ends hide cards`);
+      assert.equal(open1.scrollbar, 0, `${size.w}: no native scrollbar`);
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction((l) => document.querySelector('.steam__view').scrollLeft > l, { timeout: 3000 }, open1.left);
+      await page.click('.hscroll__arrow--prev');
+      await page.click('.hscroll__arrow--prev');
+      await page.waitForFunction(() => document.querySelector('.steam__view').scrollLeft === 0, { timeout: 3000 });
+      await sleep(200);
+      assert.equal((await state()).arrows, 1, `${size.w}: the left arrow hides at the start`);
+      assert.deepEqual(problems, []);
+      await page.close();
+    }
+  });
+
   test('result: the settlement flow — intro, my report with the level strip, the team page, back', async () => {
     const { page, problems } = await open('phase=RESULT');
     await page.waitForSelector('[data-testid="settle-self"]', { timeout: 10000 });
@@ -1253,6 +1294,7 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     await page.waitForSelector('[data-testid="settle-team"]', { timeout: 5000 });
     assert.equal(await page.$$eval('.tcard', (els) => els.length), 4, 'one card per seat');
     assert.ok(await page.$('.tcard.is-self'), 'my own card is marked');
+    assert.equal(await page.$$eval('.hscroll__arrow', (els) => els.length), 0, '4 cards fit: no scroller arrows (ui/hScroll.js)');
     assert.equal(await page.$$eval('[data-ui-slot="result.tab"]', (els) => els.length), 1, 'the 结算 tab plugin slot');
     assert.equal(await page.$('[data-testid="unofficial-mark"]'), null, 'the original game: no 非官方 mark');
     assert.deepEqual(problems, []);

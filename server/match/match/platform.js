@@ -6,7 +6,6 @@
 
 import { C2S } from '../../../shared/protocol.js';
 import { PHASE, ERR } from '../../../shared/constants.js';
-import { syntheticResult } from '../fields.js';
 import { FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 import { msg, playerParam } from '../../../shared/i18n.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
@@ -27,6 +26,7 @@ export class MatchPlatform {
       }
       this.enterInfoCheck();
       this._botWarm(); // (fork) match/botTasks.js
+      this._rehearsalWarm(); // (fork) match/rehearsal.js
     });
   }
 
@@ -58,7 +58,7 @@ export class MatchPlatform {
     if (this.disposed || this.ended) {
       // A report that crossed the match end (the last b.progress of a field, a delegated rehearsal's answer) is stale:
       // ignored, never an error (DESIGN §14 — an error frame without a rid would surface as a toast in the browser).
-      if (msg && (msg.t === 'b.rehearsalResult' || msg.t === 'b.botBattleResult' || msg.t === 'b.botReceived' || msg.t === 'b.botMoves' || msg.t === 'b.botHidden')) return OK;
+      if (msg && (msg.t === 'b.rehearsalResult' || msg.t === 'b.botBattleResult' || msg.t === 'b.botReceived' || msg.t === 'b.botLoaded' || msg.t === 'b.botMoves' || msg.t === 'b.botHidden')) return OK;
       return this.clientCombat && msg && (msg.t === 'b.progress' || msg.t === 'b.result') ? OK : fail(ERR.WRONG_PHASE);
     }
     if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string' || !GAME_TYPES.has(msg.t)) return fail(ERR.BAD_MSG);
@@ -163,6 +163,12 @@ export class MatchPlatform {
       ps.connected = true;
       this._largeReconnect(ps); // (fork) match/largeRoom.js: the board back from the AI
       this._resync(ps);
+      // (fork review) a reloaded or reconnected page lost its Workers (the page drops them when the socket goes down): the
+      // host's rehearsal Worker and the first bot executor's Worker warm again, as at the briefing
+      if (!this.ended) {
+        if (playerId === this.hostId) this._rehearsalWarm();
+        if (this._botExecutorFor() === playerId) this._botWarm();
+      }
       if (!was) this.markPublic();
     });
   }
@@ -214,8 +220,9 @@ export class MatchPlatform {
         this.finish({ victory: false, reason: 'abandoned' });
         return;
       }
-      // (fork) a large room: a departed player's board stays in the match under the AI (match/largeRoom.js) [ASSUMED]
-      if (this.largeRoom && ps.alive) { this.kickBot(ps); return; }
+      // (fork) every room type, Grand Alliance included: leaving eliminates (user, 2026-11-11). A running battle plays out
+      // in a browser (_authorityLost above); from the next round on no AI board, no prep, no battles. The rejoin window
+      // before this (onDisconnect) keeps the AI on a Grand Alliance board.
       this._quit(ps);
     });
   }
@@ -231,17 +238,9 @@ export class MatchPlatform {
     if (!ps.alive) return;
     const phase = this.phase;
     const passedRound = phase === PHASE.SETTLE ? this.round + 1 : Math.max(1, this.round);
-    // its own normal battle has nobody left to fight for
-    for (const f of this.fields) {
-      if (f.live && f.kind === 'normal' && f.players.length === 1 && f.players[0] === ps.playerId) {
-        if (this.clientCombat && f.cc) {
-          if (!f.result) f.result = syntheticResult(f.players);
-          this._fieldDone(f);
-          continue;
-        }
-        try { f.battle.forceEnd('left'); } catch (e) { this.reportError('quit forceEnd', e); }
-      }
-    }
+    // (fork) a battle the player was fighting plays out to its natural end (user, 2026-11-11): _authorityLost handed it to
+    // a browser (or the boss partner) like a disconnect's, so nobody waits on a silent field; from the next round on the
+    // seat has no field at all (not alive)
     ps.lp = 0;
     ps.eliminate(passedRound);
     this.offersChanged();
@@ -266,6 +265,7 @@ export class MatchPlatform {
     // drafts for it (botControlled → scheduleBandBot; botPickBand's departedWeight: Touch while nobody else holds it,
     // never 歌利亚) and it keeps the 0 LP it left with (_applyBand; §37.65)
     else if (phase === PHASE.BAND_DRAFT && this.draft && this.draftTurn(ps.playerId) === ps.playerId) this.startDraftTurn(ps.playerId);
+    else if (phase === PHASE.BAND_DRAFT && this.draft?.vote) this._voteLeave(ps); // (fork) One for All: the leaver's vote is dropped
     else if (phase === PHASE.PREP) this.maybeEndPrep();
   }
 

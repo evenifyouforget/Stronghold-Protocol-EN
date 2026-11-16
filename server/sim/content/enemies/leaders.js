@@ -532,7 +532,7 @@ function kitMace(ab) {
   const cs = { ratio: T(ab, 'ClearSp.hp_ratio') ?? 0, dur: T(ab, 'ClearSp.duration') ?? 0, r: T(ab, 'ClearSp.range_radius') ?? 0 };
   // SPA-CC ccDelegation United 3 (spawn: the battle's rules): 【瞬息杀机】 every CC.delegation.gateRatio of max HP, and a
   // hard HP gate at each step — no HP lost past it until the cast (CC.delegation.castSeconds) ends with the burst
-  const P = { form2: false, next: 1, gate: false, casting: false };
+  const P = { form2: false, next: 1, gate: false, casting: false, token: 0 };
   const penOn = (c, e) => (c.target === e.blockedBy ? (P.form2 ? pen2 : pen1) : 0);
   // its blocker is hit (PRTS 技能 "对之前阻挡自身的单位造成…"); the others on the way are an area selection (areaSelectable)
   const blink = (s) => (b, e) => {
@@ -565,6 +565,18 @@ function kitMace(ab) {
       if (!tagHas(b.flags?.rules, 'ccDelegation', 'united3')) return;
       P.gate = true;
       cs.ratio = CC.delegation.gateRatio;
+      // the linked gate (risk.js installDegenLink): her finished steps, and another field's finished cast opening hers
+      // (no burst here: that cast was on the other field)
+      const done = () => (P.form2 && cs.ratio > 0 ? Math.round((1 - P.next) / cs.ratio) : 0);
+      e.degenGate = {
+        done,
+        open(k) {
+          if (!P.form2 || !(cs.ratio > 0)) return;
+          let guard = 0;
+          while (done() < k && P.next - cs.ratio > 1e-9 && guard++ < 1000) P.next -= cs.ratio; // loop-cap: 1/gateRatio steps
+          if (P.casting) { P.casting = false; P.token++; }
+        },
+      };
       b.on('hpDamage', (c) => {                                  // the hard gate (second form)
         if (c.target !== e || !P.form2 || !e.alive) return;
         if (P.casting) { c.amount = 0; return; }
@@ -580,8 +592,10 @@ function kitMace(ab) {
       while (e.alive && e.hpRatio <= P.next - cs.ratio + 1e-9 && P.next - cs.ratio > 1e-9 && guard++ < ratioCap) { // loop-cap: burstLimit hp_ratio
         if (P.gate) {                                            // United 3: the cast, then the burst and the next step
           P.casting = true;
+          const token = ++P.token;
           b.fx('telegraph', { x: e.x, y: e.y, r: cs.r, dur: CC.delegation.castSeconds, kind: 'clearSp', id: e.id });
           b.after(CC.delegation.castSeconds, () => {
+            if (token !== P.token) return; // another field's cast opened the gate first
             P.casting = false;
             P.next -= cs.ratio;
             if (e.alive) burst(b, e);

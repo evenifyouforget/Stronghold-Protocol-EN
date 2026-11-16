@@ -1,7 +1,7 @@
 // Real-server browser E2E (DESIGN §16): scouting a teammate's board in prep (前往查看) shows THAT player's operator
 // loadout in the detail card — not the viewer's, not the defaults. The guest picks S1 骑枪刺击 + 不装备 for 野鬃 in the
 // room's 干员调配 and places the elite; the host (no loadout: default S2 + the default module) opens the guest's board
-// and right-clicks the unit: the card must read S1 (已调配) and 未装备模组, with the no-module ATK.
+// and right-clicks the unit: the card must read S1 (已调配) and 未装备模组, with the no-module ATK at the default 练度.
 // Unit/integration counterpart: test/match/teammate-loadout.test.js.
 //
 //   SP_E2E=1 node --test test/ui/teammate-loadout.e2e.test.js
@@ -51,19 +51,20 @@ describe('DESIGN §16 — a teammate\'s unit shows its owner\'s loadout (real se
 
       // the guest's 干员调配 (room screen): 野鬃 → S1 + 不装备, synced
       await guest.click('[data-testid="loadout-open"]');
-      await guest.page.waitForSelector('.lo .lo-card', { visible: true, timeout: 15000 });
-      await guest.click('.lo-search input');
-      await guest.page.keyboard.type('野鬃');
-      await guest.page.waitForFunction(() => document.querySelectorAll('.lo-card').length === 1, { timeout: 5000 });
-      await guest.click('.lo-card__pick');
-      // the row's quick choices (0.2.2: the roster is one list, a row per operator with its skills and the elite's
-      // modules; the detail's own module cards sit below the fold) — the row and the detail agree on S1 + 不装备
-      await guest.click('.lo-card .lo-q--skill[data-skill="0"]');
-      await guest.click('.lo-card .lo-q--mod[data-module="none"]');
-      await guest.page.waitForFunction(() => document.querySelector('.lo-card .lo-q--skill[data-skill="0"]')?.getAttribute('aria-pressed') === 'true'
-        && document.querySelector('.lo-card .lo-q--mod[data-module="none"]')?.getAttribute('aria-pressed') === 'true'
-        && document.querySelector('.lo-detail .lo-skill.is-on[data-skill="0"]') && document.querySelector('.lo-detail .lo-mod.is-on[data-module="none"]'), { timeout: 3000 });
+      // (fork) the card view (the only view since 2026-11-08): 搜索 → the one card → its own column's S1 + 不装备, then its
+      // detail (the drawer lies over the deck's left, where the one card is: the choices first); the card and the
+      // drawer's detail agree
+      const yak = await guest.loadoutFind('野鬃', { pick: false });
+      await guest.click(`${yak} .lo-op__skills .lo-q--skill[data-skill="0"]`);
+      await guest.click(`${yak} .lo-op__mlist .lo-q--mod[data-module="none"]`);
+      await guest.click(`${yak} .lo-op__pick`);
+      await guest.page.waitForSelector('[data-testid="loadout-drawer"]', { visible: true, timeout: 5000 });
+      await guest.page.waitForFunction((sel) => document.querySelector(`${sel} .lo-q--skill[data-skill="0"]`)?.getAttribute('aria-pressed') === 'true'
+        && document.querySelector(`${sel} .lo-op__mlist .lo-q--mod[data-module="none"]`)?.getAttribute('aria-pressed') === 'true'
+        && document.querySelector('.lo-detail .lo-skill.is-on[data-skill="0"]') && document.querySelector('.lo-detail .lo-mod.is-on[data-module="none"]'), { timeout: 3000 }, yak);
       await guest.page.waitForFunction(() => /已同步/.test(document.querySelector('.lo-sync')?.textContent || ''), { timeout: 8000 });
+      await guest.page.keyboard.press('Escape'); // the drawer
+      await guest.page.waitForSelector('[data-testid="loadout-drawer"]', { hidden: true, timeout: 3000 });
       await guest.page.keyboard.press('Escape');
       await guest.page.waitForFunction(() => !document.querySelector('.lo'), { timeout: 3000 });
 
@@ -146,7 +147,10 @@ describe('DESIGN §16 — a teammate\'s unit shows its owner\'s loadout (real se
       assert.ok(card.skill.includes(s1.name) && card.tag, `teammate card: ${s1.name} 已调配 (${JSON.stringify(card)})`);
       assert.ok(!card.skill.includes(sDef.name), 'not the default skill');
       assert.ok(card.none && card.module.includes('未装备模组'), `teammate card: 未装备模组 (${JSON.stringify(card)})`);
-      assert.equal(card.stats['攻击'], String(rec.statsBase.atk), `teammate card ATK without the module (${JSON.stringify(card.stats)})`);
+      // the card's base reads the operator's own numbers with its 练度 (the guest's default 精英2 Lv.60, aceffect_char_4 ×1.1;
+      // shared/protocol.js unitStatsEntry, DESIGN §27.60), as loadout-battle's detail card
+      const t4 = JSON.parse(readFileSync(path.join(ROOT, 'data/effects.json'), 'utf8')).aceffect_char_4.buffs.find((b) => b.key === 'char_attribute_mul').bb;
+      assert.equal(card.stats['攻击'], String(Math.round(rec.statsBase.atk * t4.atk)), `teammate card ATK without the module, at the default 练度 (${JSON.stringify(card.stats)})`);
       assert.deepEqual(problemsOf([host, guest]), []);
     } finally {
       for (const c of [host, guest]) if (c.problems.length) console.log(c.label, c.problems.slice(0, 20).join('\n'));

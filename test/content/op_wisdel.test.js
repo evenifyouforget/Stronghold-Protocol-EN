@@ -5,10 +5,11 @@
 // back from data/backups.json (the form of that slot status); the fidelity checklist of kits/README.md.
 // Run: node --test test/content/op_wisdel.test.js
 
+import { allyCastWindup } from '../../server/sim/ai.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { makeBattle, enemyRec, checkInvariants, throughBegin } from '../helpers/battleHarness.js';
 import { KITTED_CHARS, OPERATOR_KITS, KITS } from '../../server/sim/content/kits/index.js';
 import { diyPool, validateDiyPicks } from '../../shared/diy.js';
 
@@ -72,7 +73,9 @@ test('维什戴尔 in every 自选 form: her kit (all three skills authored), th
       done(h);
     }
   }
-  assert.deepEqual(formOf(6, true).skills.map((s) => [s.skillType, s.trigger.rule, s.trigger.rawRule]), [['AUTO', 'DEFAULT', 'DEFAULT'], ['MANUAL', 'DEFAULT', 'DEFAULT'], ['MANUAL', 'SP_FULL', 'ALWAYS']]);
+  assert.deepEqual(formOf(6, true).skills.map((s) => [s.skillType, s.trigger.rule, s.trigger.rawRule]), [['AUTO', 'DEFAULT', 'DEFAULT'], ['MANUAL', 'SEARCH', 'ATTACK_RANGE_ENEMY'], ['MANUAL', 'SP_FULL', 'ALWAYS']]);
+  // S2: the official SNIPER row [ATTACK_RANGE_ENEMY, SKILL_RANGE_ENEMY] (no rangeGrid: one SEARCH rule); S3: [ALWAYS]
+  assert.deepEqual(formOf(6, true).skills.map((s) => s.trigger.official), [undefined, ['ATTACK_RANGE_ENEMY', 'SKILL_RANGE_ENEMY'], ['ALWAYS']]);
   assert.deepEqual([FORMS['2/1/4/0'].stats.maxHp, FORMS['2/1/4/0'].stats.atk, FORMS['2/60/7/1'].stats.maxHp, FORMS['2/60/7/1'].stats.atk], [1434, 615, 1735, 684]);
   assert.deepEqual([modOf(5, BOM).attr, modOf(6, BOM).attr], [{ atk: 45, aspd: 5 }, { atk: 65, aspd: 7 }]);
   const data = { chess: CHESS, backups: BACKUPS };
@@ -118,6 +121,8 @@ test('T1 好礼: each aftershock on a marked enemy goes off 15 % of the time —
     const [tier, elite, mod] = f;
     const t0 = t0Of(tier, elite, mod);
     const { h, u } = field({ tier, elite, mod, skill: 1, seed: 33 });
+    // the talent alone: with the official SEARCH trigger S2 would cast within 20 s (3 targets, 过载) and mix its own hits into the counts
+    h.b.addBuff(u, { key: 'test:noSp', flags: { noSp: true } });
     const main = h.spawn('enemy_dummy', { pos: [10, 8] });
     const fly = h.spawn('enemy_fly', { pos: [10, 9] });   // 1.0 from the main target: only the explosion reaches it
     h.run(400);
@@ -264,7 +269,7 @@ test('S1 定点清算 (AUTO, attack SP 4 / 3, data DEFAULT): the next attack spl
     const sp = h.spawn('enemy_dummy', { pos: [10, 9.05] });   // 1.05: only the 1.1 splash
     u.skill.gainSp(999);
     assert.ok(h.runUntil(() => u.skill.activations === 1, 4), `${label(f)}: cast on her next attack`);
-    h.run(2);
+    h.run(2 + allyCastWindup(u)); // the hit (and its aftershocks) start one wind-up after the cast (official cast → hit, ai.js allyCastWindup)
     const atk = u.s.atk;
     const hits = from(h, u).filter((c) => !tag(c, 'wisdel:bomb') && c.dmg.isSkill);
     const n = (elite && mod ? 2 : 1) + 2;
@@ -277,13 +282,13 @@ test('S1 定点清算 (AUTO, attack SP 4 / 3, data DEFAULT): the next attack spl
   }
 });
 
-test('S2 饱和复仇 (MANUAL, 32 / 29 SP from 15, 25 s, data DEFAULT): ATK +16 % / +25 %, interval −0.5 / −0.7 s, 3 targets; 过载 the second half: every attack 4 rounds of 65 % / 70 % on random enemies of her range', () => {
+test('S2 饱和复仇 (MANUAL, 32 / 29 SP from 15, 25 s, data SEARCH = official SNIPER row): ATK +16 % / +25 %, interval −0.5 / −0.7 s, 3 targets; 过载 the second half: every attack 4 rounds of 65 % / 70 % on random enemies of her range', () => {
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S2);
     assert.deepEqual([sk.spCost, sk.initSp, sk.duration, sk.bb.atk, sk.bb.base_attack_time, sk.bb['attack@atk_scale_ol']], elite ? [29, 15, 25, 0.25, -0.7, 0.7] : [32, 15, 25, 0.16, -0.5, 0.65], `T${tier}`);
     const { h, u } = field({ tier, elite, skill: 1, seed: 8 });
     h.b.addBuff(shadowsOf(h, u)[0], { key: 'test:silence', flags: { silence: true } });
-    assert.deepEqual([u.skill.kind, u.skill.rule], ['duration', 'DEFAULT'], `T${tier}`);
+    assert.deepEqual([u.skill.kind, u.skill.rule], ['duration', 'SEARCH'], `T${tier}`);
     for (const p of [[10, 6], [11, 6], [9, 6], [12, 5]]) h.spawn('enemy_dummy', { pos: p });
     u.skill.gainSp(999);
     assert.ok(h.runUntil(() => u.skill.active, 4), `T${tier}: cast`);
@@ -321,6 +326,7 @@ test('S3 爆裂黎明 (MANUAL, data SP_FULL: at once, no enemy needed): 1 / 2 sh
     for (const t of shadowsOf(h, u)) h.b.addBuff(t, { key: 'test:silence', flags: { silence: true } });
     u.skill.gainSp(999);
     h.step();
+    throughBegin(h, u);
     assert.ok(u.skill.active, `T${tier}: cast at once, no enemy on the field`);
     const sh = shadowsOf(h, u);
     assert.equal(sh.length, 1 + sk.bb.max_cnt, `T${tier}: the talent's + ${sk.bb.max_cnt}`);
