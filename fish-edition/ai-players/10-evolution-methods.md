@@ -116,8 +116,7 @@ stopped by hand during iteration 19.
   against legacy on 2,000 paired fresh seeds (7001–9000, includes the 400 above), solo Ultimate, 0 errors: **875 wins vs
   815 (43.8 % ± 1.1 vs 40.8 % ± 1.1, 1σ)**, 332 seeds gained, 272 lost, sign test p = 0.016 (two-sided). With the 240
   held-back seeds: 367 gained, 298 lost, **p = 0.008**. **Evobot is proven better than legacy, by about +3 points.**
-  (The holdout row is the weekend's final best; evobot is the same two tactics with `maxTier: 2`, `set: both` spelled
-  out.)
+  (The holdout row is the weekend's final best, `evo-99f84d0e339c`: the same profile as evobot.)
 
 ## For Fish's PC
 
