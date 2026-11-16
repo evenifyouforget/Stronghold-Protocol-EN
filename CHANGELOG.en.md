@@ -9,6 +9,7 @@
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
 - AI profiles: an AI seat's ⓘ in the room opens a list of every AI profile, how each one plays and, for a tactic profile, its tactics. In a match, an AI player's "AI" badge names its profile. Each profile shows its strength, the win rate (%) in Ultimate solo: Basic AI 38, Level Curve 38, Tier 6 First 25, Adaptive Placement 20, Ioleta Opening 1, Ioleta + Adaptive 0; and, as a second number, the win rate of 4 of them as a team: 65, 65, 33, 28, 60, 23 (#151, issue #124).
+- Settings: "Name in match records" (off by default). Turn it on and enter a public name, and the records of your next matches carry it, so a clear can be credited to you. Other players' records stay anonymous (#154).
 - Under SPA-CC Strategy 2, Ioleta's, Du Yaoye's and Amiya's Strategy texts now say what it changes for them (highlighted), as Strategy 1 already shows its later rounds (#147, leftover of issue #88).
 - Release zips carry the server's version information, so the title screen's version line, "What's new" and "About this server" work on a release install too (#147, leftover of issues #98–#100).
 - The Chinese player guide links Fish Edition's repository and issues instead of the upstream ones (#147).
