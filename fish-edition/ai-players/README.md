@@ -22,3 +22,17 @@ out of the former `fish-edition/ai-players.md` (2026-11-07), keeping its order. 
 1. Get everything out of the measurements first: predictive models and carry rank.
 2. Then invent DYYBot tactics from human play.
 3. Then tune DYYBot with an evolutionary algorithm.
+
+## Seeds (Fish, 2026-11-17)
+
+Research may use seeded bot games, and collaborators won't necessarily coordinate on the seeds they use. Avoid reusing
+seeds, except for an explicit replication or a paired (fair) comparison, where both sides play the same seeds on
+purpose. So:
+
+- **Start each research inquiry at a random seed**, not the next number after the last one (for example
+  `node -e "console.log(1e5 + Math.floor(Math.random() * 9e8))"`), and count up from there.
+- **Write down the seeds used** in the note that reports the result: the range, which runs were paired, and which were
+  held back.
+
+Earlier notes used small consecutive ranges (101–148, 5001–5300, 7001–9000 …). They stay valid as recorded (each seed is
+hashed through `deriveSeed`, so a range is only bookkeeping), but new work shouldn't pick seeds near them.
