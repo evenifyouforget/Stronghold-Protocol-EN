@@ -9,6 +9,7 @@
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
 - AI profiles: an AI seat's ⓘ in the room opens a list of every AI profile, how each one plays and, for a tactic profile, its tactics. In a match, an AI player's "AI" badge names its profile. Each profile shows its strength, the win rate (%) in Ultimate solo: Basic AI 38, Level Curve 38, Tier 6 First 25, Adaptive Placement 20, Ioleta Opening 1, Ioleta + Adaptive 0; and, as a second number, the win rate of 4 of them as a team: 65, 65, 33, 28, 60, 23 (#151, issue #124).
+- Custom Lobby Modifications: a room you create starts with the rules you last used (remembered in this browser), and the rules dialog has a "Clear all" button (#148, issue #143).
 - Match records (for the server owner's analysis) now also log the shop a refresh leaves after its own effects, such as Du Yaoye's Yan offer; before, they held only the roll before those effects (#146, issue #90).
 - Fixed the LP loss shown during a battle (top bar, team list) and in the round's result box leaving out Last Line of Defense's extra 2 LP: a round with 10 or more leaks now shows −12, as the settlement charges. The LP tooltip names the extra LP (#145, issue #123).
 - Shared deck: the shop's new Deck button shows how many copies of each operator are left in the deck all players share (left / total), by class. It updates every round (#152).
