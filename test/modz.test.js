@@ -173,3 +173,163 @@ test('Fiammetta Z: S2 fires one shell per ammo and ends; S3 shells spend ammo (t
     else assert.ok(used >= 2 && u.skill.ammoLeft === ammo - used, `S3: ${used} used, ${u.skill.ammoLeft} left`);
   }
 });
+
+// ---- behaviour of each module (2026-11-17, before main: "any mod Zs that Claude can't confirm to be working as
+// intended should be disabled") ---------------------------------------------------------------------------------------
+
+const WALKERS = { enemies: { enemy_walk: enemyRec({ key: 'enemy_walk', hp: 9000, atk: 300, def: 200, res: 20, speed: 0.4 }),
+  enemy_weak: enemyRec({ key: 'enemy_weak', hp: 600, atk: 0, def: 0, res: 0, speed: 0.3 }),
+  enemy_tank: enemyRec({ key: 'enemy_tank', hp: 900000, atk: 0, def: 0, res: 0, speed: 0.4 }) } };
+const op = (charId, uniEquipId, skillIndex = 2, row = 9, col = 4) => ({ diy: { slot: 6, charId, skillIndex, uniEquipId }, elite: true, row, col, dir: 'RIGHT' });
+/** A battle with `units`, `enemies`, and recorders of element damage, damage, statuses and SP gains. */
+function rig(units, enemies = [], timeLimit = 90) {
+  const h = makeBattle({ seed: 3, defs: WALKERS, autoFinish: false, timeLimit, hooks: [], units, enemies });
+  const rec = { element: [], damage: [], status: [], sp: [] };
+  const b = h.b;
+  // recorders pass every argument on (the engine's calls have more than the first)
+  const de = b.dealElementDamage.bind(b); b.dealElementDamage = (o, ...a) => { rec.element.push(o); return de(o, ...a); };
+  const dd = b.dealDamage.bind(b); b.dealDamage = (o, ...a) => { rec.damage.push(o); return dd(o, ...a); };
+  const as = b.applyStatus.bind(b); b.applyStatus = (t, s, o, ...a) => { rec.status.push({ t, s, o }); return as(t, s, o, ...a); };
+  b.on('spGain', (c) => rec.sp.push({ unit: c.unit, reason: c.reason, amount: c.amount }));
+  h.step();
+  return { h, b, rec, ops: b.allyUnits.filter((a) => a.kind === 'op') };
+}
+const noErrors = (b) => assert.deepEqual(b.errors.map((e) => `${e.label}: ${e.message}`), []);
+
+test('Rosa Z: kills of marked enemies during her skill refund 17 SP each when it ends', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_197_poca', 'uniequip_fishz_poca')], [{ key: 'enemy_weak', time: 1, count: 30, interval: 1 }]);
+  h.run(90);
+  const refunds = rec.sp.filter((s) => s.unit === u && s.reason === 'module');
+  assert.ok(refunds.length > 0, 'at least one refund');
+  for (const r of refunds) assert.equal(r.amount % 17, 0, `${r.amount} is a multiple of 17`);
+  noErrors(b);
+});
+
+test('Eunectes Z: 3×3 range, DEF follows her ATK gain, S2 / S3 lure but S1 does not', () => {
+  for (const [skillIndex, lures] of [[0, false], [1, true], [2, true]]) {   // her S1 is passive: it never starts
+    const { h, b, rec, ops: [u] } = rig([op('char_416_zumama', 'uniequip_fishz_zumama', skillIndex)], [{ key: 'enemy_walk', time: 0.5, count: 12, interval: 1 }]);
+    assert.equal(u.rangeGrid.length, 9);
+    h.b.addBuff(u, { key: 'test:atk', mods: { atkFlat: 400 } });
+    h.run(1);
+    assert.equal(u.findBuff('fishModZ:zumama')?.mods?.defFlat, Math.round(u.s.atk - u.base.atk));
+    let started = false;
+    b.on('skillStart', (c) => { if (c.unit === u) started = true; });
+    if (skillIndex === 0) h.run(60); else { h.runUntil(() => started, 80); h.step(); assert.ok(started, `S${skillIndex + 1} started`); }
+    assert.equal(rec.status.some((x) => x.s === 'attract' && x.o?.source === u), lures, `S${skillIndex + 1} lure`);
+    noErrors(b);
+  }
+});
+
+test('Hellagur Z: per attack HP +50 (80 at most), per deployment one Waxing, Corrosion of 1 % ATK per Waxing', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_188_helage', 'uniequip_fishz_helage', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  h.run(30);
+  const p = u.persist.fishModZ;
+  assert.ok(p.stacks > 0 && p.stacks <= 80, `stacks ${p.stacks}`);
+  assert.equal(p.wax, 1, 'the first deployment counts');
+  assert.equal(u.findBuff('fishModZ:helage').mods.hpFlat, 50 * p.stacks);
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'erosion'), 'Corrosion with one Waxing');
+  noErrors(b);
+});
+
+test('Phantom Z: Raid and Indomitable on the elite, and Raid treats his skill as ready', () => {
+  const m = modZOf('uniequip_fishz_phatom');
+  assert.deepEqual([...m.bonds], ['raidShip', 'indomShip']);
+  const { ops: [u] } = rig([op('char_250_phatom', 'uniequip_fishz_phatom', 0)]);
+  assert.equal(u.fishRaidReady, true);
+});
+
+test('Shining Z: her heal grants Immortal (8 s), which stops a lethal hit once and adds 5 s to her cooldown', () => {
+  const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
+  t.hp = t.s.maxHp * 0.3;
+  h.runUntil(() => !!t.findBuff('fishModZ:immortal'), 20);
+  const im = t.findBuff('fishModZ:immortal');
+  assert.ok(im, 'Immortal granted by her heal');
+  b.dealDamage({ source: null, target: t, amount: t.hp * 50, type: 'true', calculation: 'precomputed' });
+  assert.ok(t.alive && t.hp >= 1, `alive at ${t.hp}`);
+  noErrors(b);
+});
+
+test('Siege Z: DP she earns ×2; DP above 90 is drained into SP for her player\'s operators', () => {
+  const { h, b, rec, ops: [s, t] } = rig([op('char_112_siege', 'uniequip_fishz_siege', 0), op('char_293_thorns', null, 0, 9, 5)]);
+  assert.equal(s.fishDpMul, 2);
+  b.addDp(s.ownerId, 99 - b.getPlayer(s.ownerId).dp);
+  if (t.skill) t.skill.sp = 0;
+  h.run(1);
+  assert.ok(b.getPlayer(s.ownerId).dp < 91, `DP ${b.getPlayer(s.ownerId).dp}`);   // whole DP are drained
+  assert.ok(rec.sp.some((x) => x.unit === t && x.reason === 'module' && x.amount >= 8), 'Thorns got the drained DP as SP');
+  noErrors(b);
+});
+
+test('Thorns Z: range +1 (+1 more in his skill), poison 3× as often, 20 % ATK Arts and 5 % ATK Nervous per hit', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_293_thorns', 'uniequip_fishz_thorns', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  assert.equal(u.fishPoisonTickMul, 3);
+  assert.equal(u.findBuff('fishModZ:thorns').mods.rangeExtend, 1);
+  h.run(20);
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'neural'), 'Nervous Impairment');
+  assert.ok(rec.damage.some((x) => x.source === u && x.type === 'arts'), 'the Arts addition');
+  noErrors(b);
+});
+
+test('Weedy Z: enemies weigh 2 less while she is on the field; her damage becomes Corrosion outside a burst', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_400_weedy', 'uniequip_fishz_weedy', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  h.run(40);
+  const e = b.aliveEnemies()[0];
+  assert.equal(e.findBuff('fishModZ:weedyMass')?.mods?.massFlat, -2);
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'erosion'), 'Corrosion');
+  noErrors(b);
+});
+
+test('Viviana Z: Glimmering Touch explodes 7 s after it marks an enemy in a Kazimierz operator\'s range', () => {
+  const { h, b, rec, ops: [v] } = rig([op('char_4098_vvana', 'uniequip_fishz_vvana', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  assert.ok(diyRecord(6, { charId: 'char_4098_vvana', skillIndex: 0, uniEquipId: 'uniequip_fishz_vvana' }, { elite: true, data })?.bonds?.includes('kazimierzShip') ?? true);
+  h.run(30);
+  const hits = rec.damage.filter((x) => x.source === v && x.tags?.includes('fishVvana'));
+  assert.ok(hits.length > 0, 'an explosion');
+  assert.ok(rec.element.some((x) => x.source === v && x.element === 'burn' && x.tags?.includes('fishVvana')));
+  noErrors(b);
+});
+
+test('Zuo Le Z: SP from other sources ×2; each hit adds 5 % ATK Corrosion (Burn + Arts at 0 DEF)', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_4121_zuole', 'uniequip_fishz_zuole', 0)], [{ key: 'enemy_walk', time: 0, count: 1 }]);
+  u.skill.sp = 0; u.skill.charges = 0;
+  const before = u.skill.spTotal;
+  u.skill.gainSp(1, 'test');
+  assert.equal(u.skill.spTotal - before, 2, 'doubled');
+  h.run(40);   // melee: the walker reaches him at ~25 s
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'erosion'), 'Corrosion on a 200-DEF enemy');
+  noErrors(b);
+  const z = rig([op('char_4121_zuole', 'uniequip_fishz_zuole', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  z.h.run(40);
+  const zu = z.ops[0];
+  assert.ok(z.rec.element.some((x) => x.source === zu && x.element === 'burn'), 'Burn on a 0-DEF enemy');
+  assert.ok(!z.rec.element.some((x) => x.source === zu && x.element === 'erosion'), 'no Corrosion there');
+  assert.ok(z.rec.damage.some((x) => x.source === zu && x.tags?.includes('fishZuole') && x.type === 'arts'), 'the Arts rider');
+  noErrors(z.b);
+});
+
+test('Typhon W: hits inflict Cold; a hit on a Frozen enemy shatters those within 1 tile (Freeze off, Stun 4 s, +40 % physical taken)', () => {
+  const { h, b, rec, ops: [u] } = rig([op('char_2012_typhon', 'uniequip_fishw_typhon', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  h.runUntil(() => rec.status.some((x) => x.s === 'cold' && x.o?.source === u), 40);
+  const cold = rec.status.find((x) => x.s === 'cold' && x.o?.source === u);
+  assert.ok(cold && cold.o.duration === 3, 'Cold for 3 s');
+  const e = cold.t;
+  b.applyStatus(e, 'freeze', { duration: 10, source: null });
+  assert.ok(e.findBuff('freeze'), 'frozen');
+  h.runUntil(() => !!e.findBuff('fishModZ:shatter'), 20);
+  assert.ok(!e.findBuff('freeze'), 'Freeze removed');
+  assert.equal(e.findBuff('fishModZ:shatter').mods.physTakenMul, 1.4);
+  assert.ok(rec.status.some((x) => x.t === e && x.s === 'stun' && x.o?.duration === 4), 'Stun 4 s');
+  noErrors(b);
+});
+
+test('Siege Z and Saileach Z: the DP they generate counts twice (addDp with them as the source)', () => {
+  for (const [charId, mod] of [['char_112_siege', 'uniequip_fishz_siege'], ['char_479_sleach', 'uniequip_fishz_sleach']]) {
+    const { b, ops: [u] } = rig([op(charId, mod, 0)]);
+    const pid = u.ownerId;
+    b.addDp(pid, -b.getPlayer(pid).dp);
+    b.addDp(pid, 5, u);
+    assert.equal(b.getPlayer(pid).dp, 10, charId);
+    b.addDp(pid, 5);
+    assert.equal(b.getPlayer(pid).dp, 15, `${charId}: other DP is not doubled`);
+  }
+});

@@ -116,15 +116,15 @@ const INSTALL = {
     }, { owner: u });
   },
 
-  // 3×3 range; SP +1/s while an enemy is in range; skill start lures every enemy in range to her until it ends;
-  // DEF + the ATK she gains (at most +5000)
+  // 3×3 range; SP +1/s while an enemy is in range; the start of S2 / S3 (not S1) lures every enemy in range to her
+  // until the skill ends; DEF + the ATK she gains (at most +5000)
   uniequip_fishz_zumama(battle, u) {
     u.rangeGrid = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 0], [0, 1], [1, -1], [1, 0], [1, 1]];
     if (u.deployed) battle._refreshRange(u);
     spTime(battle, u, () => (up(u) && !skillBusy(u) && enemyInRange(battle, u) ? 1 : 0));
     let lured = [];
     battle.on('skillStart', (c) => {
-      if (c.unit !== u) return;
+      if (c.unit !== u || skillIndex(u) === 0) return;
       lured = battle.enemiesInKeys(u.rangeKeys, u, { canHitFly: true });
       for (const e of lured) battle.applyStatus(e, 'attract', { duration: 60, source: u, point: { x: u.x, y: u.y } });
     }, { owner: u });

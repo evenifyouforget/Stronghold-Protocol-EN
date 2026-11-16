@@ -33,7 +33,7 @@ export const MODZ = Object.freeze([
   { charId: 'char_197_poca', code: 'poca', kind: 'Z', type: 'SIE-Z', attr: { atk: 700 },
     name: N_('早露的Z型调整'), desc: N_('标记受到自身伤害的敌人；技能结束时，技能期间每有1名被标记的敌人倒下，回复17点技力') },
   { charId: 'char_416_zumama', code: 'zumama', kind: 'Z', type: 'HES-Z', attr: { atk: 150, def: 150 },
-    name: N_('森蚺的Z型调整'), desc: N_('攻击范围变为自身周围3×3；攻击范围内有敌人时技力自然回复+1/秒；技能开启时，诱导攻击范围内的所有敌人至自身位置，直到技能结束；攻击力每+1，防御力也+1（最多+5000）') },
+    name: N_('森蚺的Z型调整'), desc: N_('攻击范围变为自身周围3×3；攻击范围内有敌人时技力自然回复+1/秒；二技能或三技能开启时，诱导攻击范围内的所有敌人至自身位置，直到技能结束；攻击力每+1，防御力也+1（最多+5000）') },
   { charId: 'char_300_phenxi', code: 'phenxi', kind: 'Z', type: 'ART-Z', attr: { atk: 100, res: 30 },
     name: N_('菲亚梅塔的Z型调整'), desc: N_('所有技能改为弹药类技能（一技能18发，二技能3发，三技能100发）；技能期间攻击速度+50，生命上限+100%') },
   { charId: 'char_188_helage', code: 'helage', kind: 'Z', type: 'SBL-Z', attr: { atk: 150 }, bonds: ['raidShip'],
