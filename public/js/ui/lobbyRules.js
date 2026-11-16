@@ -17,7 +17,6 @@ import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalize
 import { loadPref, savePref } from '../store.js';
 import { VIRTUOSA, BLAZE, CC, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
-import { loadPref, savePref } from '../store.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 const chessName = (id, fallback) => data.lookup('chess', id)?.name || fallback;
