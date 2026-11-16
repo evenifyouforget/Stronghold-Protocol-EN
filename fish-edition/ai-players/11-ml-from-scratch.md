@@ -248,3 +248,27 @@ operator (the per-decision question), and whether it can rank layouts, which the
 **Next.** Pair each mutant with its parent and measure the ranking; add tile and range features; then step 3 (rank
 layouts with the surrogate, rehearse the top 3, compare with legacy's rehearsal on paired seeds). Mutant generation runs
 at about 200 ms a battle here while the bench uses 9 cores; on Fish's PC it is about 36 ms.
+
+### Second measurement: does it rank a board against itself minus an Operator? (2026-11-17)
+
+All 30,000 mutants (15 chunks) are done. Each is now paired with its recorded parent (`extract.mjs pairs` replays a
+chunk's random draws without re-simulating and matches features in order; 30,000 of 30,000 paired). `pairs.py` trains on
+the training seeds (recorded boards plus mutants) and tests on the 5,896 held-out pairs.
+
+| Question (held-out pairs) | Trivial guess | Surrogate |
+|---|---|---|
+| Which of the pair leaked less (3,438 pairs where leaks differ)? | "the parent": 91.7 % | 90.5 % |
+| Which kept a clean wave (1,571 pairs where it differs)? | "the parent": 96.6 % | 96.7 % |
+| How much does this removal cost? (predicted vs real leak change) | – | correlation 0.52 |
+| Does this removal cost any leaks? (54 % of pairs) | – | AUC 0.80 |
+
+**Reading.** The surrogate already knows that fewer Operators is worse, so it can't beat "the parent is better" on direction. That
+question is too easy to be useful. The useful signal is the size: it tells a harmless removal from a costly one
+(AUC 0.80). That is the decision a bot faces when it sells, benches or swaps an Operator. In 8 % of the pairs the board
+with fewer Operators leaked less. Some of that is real (deploy order, DP), and some is the approximation (Alliance counts
+not recomputed).
+
+**Next.** Step 3 as planned, with one change: the first test is selling and benching, not layout, since these features
+see Operators and not tiles. Rank "which Operator to sell" by the predicted leak change and compare it with
+`sell-singles` on paired seeds. Tile and range features come before any layout ranking.
+
