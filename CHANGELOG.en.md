@@ -8,6 +8,7 @@
 
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
+- New bot profile, Evobot: the best version of the basic bot that last weekend's evolution search found. From round 9 it sells the single tier 1 and tier 2 Operators in its hand; from round 5 until the Final Assault it buys stack items (Identification Device, Simple Communicator, Dispatch Module) and funds items (Money-Grubbing Doll, Knightly Savings, Budget-Savvy Doll) when the shop shows them, keeping 9 funds. The host can pick it for an AI seat (#PR).
 - Shared deck: the shop's new Deck button shows how many copies of each operator are left in the deck all players share (left / total), by class. It updates every round (#152).
 - Fixed the skill chosen for Catherine not reaching Blaze when the Blaze rule is on: the match rejected the whole Operator Loadout because Catherine's Module isn't one of Blaze's, so every operator fought with its default skill. Blaze now takes Catherine's skill, and her own X Module in place of Catherine's (#144, issue #116).
 - SPA-CC balance update (November 2026): every tag level it changes shows "α" after its name in the room's rules, so you can see what changed. The tag texts in all four languages follow the new numbers (#138).
