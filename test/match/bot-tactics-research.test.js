@@ -523,3 +523,11 @@ test('diy-picks: a Mod Z pick keeps its module only in a room whose modZ rule li
     } finally { h.m.dispose(); }
   }
 });
+
+test('field-picks: registered; it swaps nothing for a bot without custom picks', async () => {
+  const { FIELD_PICKS, fieldPicks } = await import('../../server/match/botTacticsResearch.js');
+  assert.equal(TACTICS['field-picks'], FIELD_PICKS);
+  assert.deepEqual(resolveParams(FIELD_PICKS), { fromRound: 6, max: 2 });
+  const h = soloBot({ botStrategy: 'legacy', seed: 7 });
+  try { h.start(); h.toPrep(3); assert.equal(fieldPicks(h.m, h.m.order[0]), 0); } finally { h.m.dispose(); }
+});

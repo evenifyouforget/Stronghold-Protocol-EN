@@ -9,7 +9,7 @@
 // so a profile of them plays the same in the browser.
 import { defineTactic, PASS } from './botTactics.js';
 import { bountyKillChance, gainCountLayers, acquireLayers, carryAndFocus, itemSlotFree } from './bot.js';
-import { freeSlot, parseKey, tileKey, inField, pieceDir } from './board.js';
+import { freeSlot, parseKey, tileKey, inField, pieceDir, basePositionClass } from './board.js';
 
 const ok = (fn) => { try { const r = fn(); return !!(r && r.ok); } catch { return false; } };
 const gdOf = (m, ps) => ps.gd || m.gd;
@@ -1110,6 +1110,51 @@ export const PLACE_AMMO = defineTactic({
     },
   },
 });
+/**
+ * (2026-11-17, #128) diy-picks buys the custom pieces, but legacy's lineup seldom fields them: they have no Alliance, and
+ * the lineup is scored on Alliances (smoke: 4 Ultimate matches, a custom piece on the board in 1 round of ~50). After
+ * the rehearsed layout this puts each owned custom piece that is off the board onto the tile of the weakest ordinary
+ * Operator it can legally take (PlayerState.move swaps the two): never another custom piece, an elite (merged) one, or
+ * the board's only blocker or healer.
+ */
+export const FIELD_PICKS = defineTactic({
+  id: 'field-picks',
+  describe: 'after the rehearsed layout, swaps owned custom (自选) pieces onto the board in place of the weakest operators',
+  params: { fromRound: int(1, 14, 6), max: int(1, 4, 2) },
+  at: {
+    finishLayout(ctx) {
+      const { match: m, player: ps, params: p } = ctx;
+      if (ps.isBot && !ps.autoplay && m.round >= p.fromRound && ps.diy) fieldPicks(m, ps, p.max);
+      return ctx.next();
+    },
+  },
+});
+const isHealerRec = (c) => !!c && (c.dmgType === 'heal' || c.attackKind === 'heal');
+const isBlockerRec = (c) => !!c && basePositionClass(c) === 'melee' && (c.stats?.blockCnt ?? 1) > 0 && c.attackKind !== 'none';
+export function fieldPicks(m, ps, max = 2) {
+  const gd = gdOf(m, ps);
+  const slots = new Set(Object.keys(ps.diy || {}));
+  const isPick = (q) => q?.kind === 'chess' && slots.has(gd.baseIdOf(q.id));
+  const onBoard = new Set([...ps.board.values()].filter(isPick).map((q) => q.uid));
+  const off = [...ps.hand, ...(ps.temp || [])].filter((q) => isPick(q) && !onBoard.has(q.uid));
+  let moved = 0;
+  for (const q of off) {
+    if (moved >= max) break;
+    const board = [...ps.board.entries()].filter(([, o]) => o?.kind === 'chess');
+    const recs = new Map(board.map(([k, o]) => [k, gd.chess(o.id)]));
+    const blockers = board.filter(([k]) => isBlockerRec(recs.get(k))).length, healers = board.filter(([k]) => isHealerRec(recs.get(k))).length;
+    const qRec = gd.chess(q.id);
+    const cands = board.filter(([k, o]) => !isPick(o) && !gd.isGolden(o.id)
+      && !(isBlockerRec(recs.get(k)) && blockers <= 1 && !isBlockerRec(qRec)) && !(isHealerRec(recs.get(k)) && healers <= 1 && !isHealerRec(qRec)))
+      .sort((x, y) => (recs.get(x[0])?.tier || 0) - (recs.get(y[0])?.tier || 0) || (x[0] < y[0] ? -1 : 1));
+    for (const [k, o] of cands) {
+      const [r, c] = parseKey(k);
+      if (ok(() => ps.move(q.uid, { area: 'board', row: r, col: c }, pieceDir(o)))) { moved++; break; }
+    }
+  }
+  return moved;
+}
+
 const usesAmmo = (gd, id) => gd.chess(id)?.skill?.durationType === 'AMMO';
 const countsAmmo = (gd, id) => (gd.chess(id)?.garrisonIds || []).some((gid) => {
   const g = gd.garrison(gid);
@@ -1246,4 +1291,4 @@ export const PLACE_FARTOOTH = defineTactic({
 export const RESEARCH_TACTICS_LATE = Object.freeze([PLACE_CIVILIGHT, PLACE_FARTOOTH]);
 
 export const RESEARCH_TACTICS = Object.freeze([SIMPLE_LEVEL, SIMPLE_SPEND, SIMPLE_FREEZE, BOUNTY_OPTIMISM, BOUNTY_GATE,
-  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST, PLACE_AMMO]);
+  LP_HOLD_LEVEL, MERGE_FIRST, SELL_SINGLES, EARLY_ROLL, PLAN_BOND, PLAN_ENGINES, PLAN_ITEMS, PLAN_ISO, PLAN_COMBOS, PLAN_COMMIT, PLAN_KEEPERS, DIY_PICKS, CYCLE_ECON, PLACE_COPIERS, CARRY_ISO, BUY_MINIMALIST, PLACE_AMMO, FIELD_PICKS]);
