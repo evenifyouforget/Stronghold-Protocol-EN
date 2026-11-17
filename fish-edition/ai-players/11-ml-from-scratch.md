@@ -272,3 +272,30 @@ not recomputed).
 see Operators and not tiles. Rank "which Operator to sell" by the predicted leak change and compare it with
 `sell-singles` on paired seeds. Tile and range features come before any layout ranking.
 
+
+### Third measurement: which Operator to take off? (2026-11-18)
+
+The bench / swap decision, checked against the simulator. For each of the 1,905 held-out boards (groups not used in
+training, at least 3 Operators), every single-Operator removal was re-simulated (16,486 battles, `extract.mjs drop1`,
+`drop1.sh`; same simulator checkout as the training data). Each chooser picks one removal; the cost is its leaks
+minus the full board's.
+
+| Chooser | Mean leak cost of its pick | Picks a removal that costs nothing |
+|---|---|---|
+| Best possible | −0.27 | 88.8 % |
+| Surrogate (fewest predicted leaks) | 1.09 | 64.3 % |
+| Surrogate (most likely clean) | 1.16 | 65.3 % |
+| Lowest tier first (elites last, then fewest items) | 1.10 | 65.2 % |
+| Random | 1.76 | 56.9 % |
+| Worst possible | 4.83 | – |
+
+On average 57 % of a board's removals cost nothing, so "free" picks are common.
+
+**Reading.** The surrogate ties the trivial rule: it learned "low tier = expendable" and little more. Both are far from
+the best pick (1.1 vs −0.3 leaks), so there is real room, but these features (sums over the board, no tiles, no
+Alliance recount) can't see what makes one low-tier Operator matter, such as its tile, its range or the Alliance it
+completes. As it stands, the surrogate would not improve a bot's bench decision.
+
+**Next, if this line continues:** per-Operator features (its tile, its Alliance's count with and without it, its range
+over the route), trained directly on these drop-one rows (a ranking target, not leaks); the 16,486 rows are a ready
+held-out set. Without new features, this line stops here.
