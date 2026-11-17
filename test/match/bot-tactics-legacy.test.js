@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LEGACY_TUNABLES, LAYOUT_PARAMS, withLegacyTunables } from '../../server/match/bot.js';
 import { BOT_STRATEGIES, TACTICS, profileFromData } from '../../server/match/botStrategies.js';
-import { PASS, defineTactic, defineProfile, profileOf } from '../../server/match/botTactics.js';
+import { PASS, defineTactic, defineProfile, profileOf, resolveParams } from '../../server/match/botTactics.js';
 import { LEGACY_TACTICS, LEGACY_ARRANGE, LEGACY_LEVEL, levelTarget } from '../../server/match/botTacticsLegacy.js';
 import { ROOM_BOTS } from '../../shared/botProfiles.js';
 import { makeMatch, checkInvariants } from './harness.js';
@@ -33,6 +33,8 @@ test('legacy-layered: one tactic per decision point, registered for benches but 
   assert.deepEqual(p.tunables, LEGACY_TUNABLES);
   assert.deepEqual(levelTarget([3, 5, 7, 9]), LEGACY_TUNABLES.LEVEL_TARGET);
   assert.deepEqual(levelTarget([9, 3, 7, 5]), LEGACY_TUNABLES.LEVEL_TARGET, 'out-of-order rounds are sorted');
+  assert.deepEqual(levelTarget([3, 5, 7, 9, 16]), LEGACY_TUNABLES.LEVEL_TARGET, '(fork research) level6From 16: never');
+  assert.equal(levelTarget([3, 5, 7, 9, 11])[11], 6, '(fork research) level6From 11: level 6 from round 11');
   for (const t of LEGACY_TACTICS) assert.equal(TACTICS[t.id], t);
 });
 
@@ -90,4 +92,15 @@ test('profileFromData: tactics by id with checked parameters; legacy implied bel
   assert.throws(() => profileFromData({ tactics: [{ tactic: 'legacy-buy', params: { nope: 1 } }] }), /unknown param nope/);
   assert.throws(() => profileFromData({ tactics: [{ tactic: 'legacy-level', params: { maxLevel: 9 } }] }), /within 2\.\.6/);
   assert.throws(() => profileFromData({}), /tactics/);
+});
+
+test('legacy-rules: every named rule on by default (legacy itself); a switch turns one off', async () => {
+  const { LEGACY_RULES } = await import('../../server/match/botTacticsLegacy.js');
+  const { LEGACY_TUNABLES, LEGACY_RULE_NAMES } = await import('../../server/match/bot.js');
+  assert.ok(LEGACY_RULE_NAMES.length >= 12);
+  assert.deepEqual(LEGACY_RULES.tunables(resolveParams(LEGACY_RULES)).RULES, LEGACY_TUNABLES.RULES);
+  const off = LEGACY_RULES.tunables(resolveParams(LEGACY_RULES, { trade: false, shopItemsMergeOnly: false })).RULES;
+  assert.equal(off.trade, false);
+  assert.equal(off.shopItemsMergeOnly, false);
+  assert.equal(off.coreStep, true);
 });

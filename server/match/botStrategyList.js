@@ -7,8 +7,9 @@ import { IOLETA_BOT } from './botIoleta.js';
 import { FISH_PROFILES } from './botTacticsBasic.js';
 import { LEGACY_LAYERED } from './botTacticsLegacy.js';
 import { EVO_PROFILES } from './botTacticsEvo.js'; // (fork) evobot, the weekend evolution race's winner
+import { DYY_PROFILES } from './botTacticsDyy.js'; // Fish's Du Yaoye tactics
 
-export const BUILTIN_BOTS = Object.freeze([IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, ...EVO_PROFILES, LEGACY_LAYERED]);
+export const BUILTIN_BOTS = Object.freeze([IOLETA_BOT, ADAPTIVE_BOT, IOLETA_ADAPTIVE_BOT, ...FISH_PROFILES, ...DYY_PROFILES, ...EVO_PROFILES, LEGACY_LAYERED]);
 
 const BUILTIN_REGISTRY = createBotRegistry([...BUILTIN_BOTS]);
 
