@@ -8,6 +8,7 @@
 
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
+- AI profiles: an AI seat's ⓘ in the room opens a list of every AI profile, how each one plays and, for a tactic profile, its tactics. In a match, an AI player's "AI" badge names its profile. Each profile shows its strength, the win rate (%) in Ultimate solo: Basic AI 38, Level Curve 38, Tier 6 First 25, Adaptive Placement 20, Ioleta Opening 1, Ioleta + Adaptive 0; and, as a second number, the win rate of 4 of them as a team: 65, 65, 33, 28, 60, 23 (#151, issue #124).
 - Custom Lobby Modifications: the room's rules button glows until you open it for the first time, so new players find the cheats, Alliance changes and Risk tags (#149, part of issue #139).
 - Improv: "View Fields" pulls the Improv overlay away to check your Field, the Alliances and teammates' Fields (tap a teammate); the tab at the top, with the countdown, brings it back (#153).
 - New cheat, Damazti Isomorph+ (#150): worn with the Isomorph, more items that sound like an Alliance's make the holder its member: Tianshi's Cauldron (Yan), Steam Heart (Victoria), Kjeragandr's Tears (Kjerag), Desert Compass (Sargon), Trench Test Subject (Aegir), Chivalric Commandments, Pegasian Helm and Pegasian Lance (Kazimierz), Famiglia Insignia (Siracusa), Gun-Knight's Might (Laterano) and Laser Sighter (Arcane). Isomorph++ also pairs the Miniature Accelerator with Agile. The items are still no Alliance items of their own.
