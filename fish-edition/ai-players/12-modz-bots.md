@@ -45,5 +45,18 @@ Paired (seeds won by the second, lost by it; exact sign test):
   (`operator-mod-z/*.md`, team-bench).
 - To make it useful, a bot would have to plan its lineup around the custom piece (count it toward the Alliances it
   holds, or keep its slot), which is new tactic work and falls under the EOS freeze. Not planned.
-- The evolution race with `diy-picks`, `field-picks`, `sell-singles` and `plan-items` (Mod Z rule on) is
-  running to check whether some tuned setting does better; its result goes here.
+
+## Evolution race (2026-11-18)
+
+`evolve.mjs --race --budget 2400 --pool diy-picks,field-picks,sell-singles,plan-items --rules modZ=ALL --seed 17`,
+training seeds from 62065712, 5 iterations, 1,860 matches. Results in `untracked/modz-bots/race/`.
+
+- No profile with `diy-picks` survived. In iteration 0, `diy-picks()` alone scored +0.041 per match against legacy
+  (16 of 40), below the item and sell tactics.
+- `field-picks` led early only in profiles without `diy-picks`, where it never fires (nothing custom is owned), so it
+  was noise. The search dropped it by iteration 2.
+- Best: `plan-items(fromRound=7)`, +0.094 per match against legacy (71 of 160). The next three are `plan-items`
+  variants, the same tactic evobot already uses.
+
+The race agrees with the bench: no tuning of the current pick tactics helps a bot. Closed until a lineup tactic that
+counts the custom piece exists.
