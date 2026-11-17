@@ -47,7 +47,9 @@ test('positional traits are read from the garrison data: front / behind, rows, g
     assert.deepEqual(kinds('白面鸮'), ['copy:SERVER_PREP_START']);
     assert.deepEqual(kinds('塞雷娅'), ['copy:SERVER_PREP_FIN']);
     assert.deepEqual(kinds('惊蛰'), [], '获得时 only');
-    assert.deepEqual(kinds('莫斯提马'), ['around'], '(fork research) 自身周围4格的干员每消耗6发弹药');
+    // (fork research) 自身周围4格的干员每消耗6发弹药: only when a tactic values it (AROUND_VALUE); legacy places 莫斯提马 as before
+    assert.deepEqual(kinds('莫斯提马'), [], 'legacy: no around trait');
+    assert.deepEqual(withLegacyTunables({ AROUND_VALUE: 1 }, () => kinds('莫斯提马')), ['around'], 'around, when valued');
     assert.equal(positionTraitsOf(m, ps, m.gd.chess(idOf(m, '凛御银灰')))[0].need, 'kjeragShip', 'a 谢拉格 in front only');
   } finally { h.dispose?.(); }
 });
