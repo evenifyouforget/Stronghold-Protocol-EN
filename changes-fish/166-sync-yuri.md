@@ -1,0 +1,1 @@
+- 合入英文翻译版 2026-11-13 至 2026-11-15 的改动（[YuriRestia/Stronghold-Protocol-EN-translation](https://github.com/YuriRestia/Stronghold-Protocol-EN-translation)；全部见 [FORK-CHANGELOG.md](https://github.com/evenifyouforget/Stronghold-Protocol-EN/blob/main/FORK-CHANGELOG.md)）：敌人的官方音效与特效；联防阶段不会再卡住；AI 队友恢复行动；“一策同心”的赠送不再占用商店库存；予愿安洁莉娜按官方表现；新增“简化单位动画”设置；干员调配中自选编队栏位置于最前（#166）。

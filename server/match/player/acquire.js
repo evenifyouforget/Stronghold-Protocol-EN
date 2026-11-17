@@ -225,10 +225,12 @@ export class PlayerAcquire {
    * 'item' under its `label` (the effect's name; player report #6 after 0.1.0). `anyStock`: list the items whatever the
    * shared stock has left (the itemBoosterPack cheat; a displayed reward survives it, pickReward).
    */
-  pushItemOffer(ids, { source = 'effect', tier = null, label = null, anyStock = false } = {}) {
-    const list = [...new Set(Array.isArray(ids) ? ids : [])].filter((id) => this.gd.item(id) && (anyStock || this.m.itemPool.canGain(id))).slice(0, MAX_OFFER_SLOTS);
+  pushItemOffer(ids, { source = 'effect', tier = null, label = null, anyStock = false, offStock = false } = {}) {
+    const list = [...new Set(Array.isArray(ids) ? ids : [])].filter((id) => this.gd.item(id) && (anyStock || offStock || this.m.itemPool.canGain(id))).slice(0, MAX_OFFER_SLOTS);
     if (!list.length) return null;
     const offer = { tier: Number.isInteger(tier) ? tier : null, source, label: typeof label === 'string' && label ? label : null, slots: list.map((id) => ({ kind: 'item', id, price: 0, sold: false })) };
+    // (fork) One for All: a strategy's offer is apart from the stock (pool.js offStock); its pick never takes a copy
+    if (offStock) offer.offStock = true;
     this.offers.push(offer);
     this.dirty();
     return offer;
@@ -270,7 +272,7 @@ export class PlayerAcquire {
    * is actually kept, record the copies that did not fit (`need` minus `left` before the gain). A failed stow or
    * merge records nothing. Fixed gift families stay unlimited without a debt entry. Every other grant still refuses.
    */
-  acquireItem(itemId, { source = 'grant', toTemp = false, silent = false, deferMerge = false, requirePool = true, displayed = false } = {}) {
+  acquireItem(itemId, { source = 'grant', toTemp = false, silent = false, deferMerge = false, requirePool = true, displayed = false, offStock = false } = {}) {
     const rec = this.gd.item(itemId);
     if (!rec) return null;
     // Only the fixed operator-gift families can overdraw. Several unrelated strategy grants also pass
@@ -279,11 +281,13 @@ export class PlayerAcquire {
     const pool = this.m.itemPool;
     const leftBefore = pool.left(itemId);
     const need = pool.need(itemId);
-    if (!unlimitedGift && !displayed && !pool.canGain(itemId)) {
+    // (fork) `offStock`: One for All's strategy / garrison-effect grant (pool.js): never refused, takes no copy, owes nothing
+    if (!offStock && !unlimitedGift && !displayed && !pool.canGain(itemId)) {
       this.m.toast(this, 'warn', '装备库存不足，未获得该装备');
       return null;
     }
     let piece = this.newPiece('item', itemId);
+    if (offStock) piece.offStock = pool.need(itemId);
     // A prep-end grant may sit beside an identical copy until the next prep. The invariant counts only copies
     // without this mark, so the fight that is about to start is not reported as a missed merge.
     if (deferMerge) piece.deferMerge = true;
@@ -293,7 +297,7 @@ export class PlayerAcquire {
     } else {
       this.stow(piece, { allowTemp: true, toTemp });
     }
-    if (displayed && !unlimitedGift) {
+    if (displayed && !unlimitedGift && !offStock) {
       const shortfall = leftBefore === Infinity ? 0 : Math.max(0, need - leftBefore);
       if (shortfall > 0) pool.owe(itemId, shortfall);
     }
@@ -311,6 +315,9 @@ export class PlayerAcquire {
     if (consumed.length < need) return null;
     for (const l of consumed) if (l.area !== 'new') this._detach(l);
     const golden = this.newPiece('item', rec.upgradeChessId || rec.goldenId);
+    // (fork) One for All (pool.js offStock): the advanced piece keeps the off-stock copies it is made of
+    const off = consumed.reduce((n, l) => n + Math.max(0, Math.trunc(Number(l.piece.offStock) || 0)), 0);
+    if (off > 0) golden.offStock = Math.min(this.m.itemPool.need(golden.id), off);
     this.stow(golden, { allowTemp: true });
     this.stats.itemMerges++;
     this.m.dispatch(this, 'onMerge', { kind: 'item', piece: golden, itemId, consumed: consumed.map((l) => l.piece.uid) });
