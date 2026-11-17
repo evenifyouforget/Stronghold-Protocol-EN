@@ -220,7 +220,7 @@ const PLAN_BONDS = Object.freeze(['investShip', 'yanShip', 'sargonShip', 'victor
   'miraShip', 'raidShip', 'indomShip', 'soloShip', 'suntShip']);
 export const PLAN_BOND = defineTactic({
   id: 'plan-bond',
-  describe: "writes legacy's plan: adds a bond (default 投资人) to the seat's plan bonds from a round on; legacy's buying, lineup and sales follow it",
+  describe: "writes legacy's plan: adds a bond (default Investor) to the seat's plan bonds from a round on; legacy's buying, lineup and sales follow it",
   params: {
     bond: { type: 'choice', choices: PLAN_BONDS, default: 'investShip' },
     priority: int(1, 5, 3),
@@ -274,7 +274,7 @@ function stackerBases(m, kinds) {
 }
 export const PLAN_ENGINES = defineTactic({
   id: 'plan-engines',
-  describe: "writes legacy's plan: the position stack operators (空弦, 断崖 …) into its buy and keep lists from a round on",
+  describe: "writes legacy's plan: the position stack operators (Archetto, Ayerscarpe …) into its buy and keep lists from a round on",
   params: {
     kinds: { type: 'choice', choices: ENGINE_KINDS, default: 'pos' },
     fromRound: int(1, 14, 4),
@@ -350,7 +350,7 @@ function comboRoles(m) {
 const COMBO_KINDS = Object.freeze(['start', 'fin', 'gain']);
 export const PLAN_COMBOS = defineTactic({
   id: 'plan-combos',
-  describe: "writes legacy's plan: buys and keeps both halves of a trait combo (白面鸮 behind 空弦, 塞雷娅 behind 断崖 …) and 圣约送葬人 on Laterano boards",
+  describe: "writes legacy's plan: buys and keeps both halves of a trait combo (Ptilopsis behind Archetto, Saria behind Ayerscarpe …) and Executor the Ex Foedere on Laterano boards",
   params: {
     fromRound: int(1, 14, 4),
     toRound: int(1, 14, 12),
@@ -434,7 +434,7 @@ const ISOMORPH = 'chess_item_6_09_e_a';
 const MUELSYSE = 'chess_char_6_11_a';
 export const PLAN_ISO = defineTactic({
   id: 'plan-iso',
-  describe: "writes legacy's plan: 缪尔赛思, 变形同构体 and the bond items one Isomorph completes, from a shop level on",
+  describe: "writes legacy's plan: Muelsyse, Damazti Isomorph and the bond items one Isomorph completes, from a shop level on",
   params: {
     fromLevel: int(1, 6, 6),
     maxIso: int(1, 8, 6),
@@ -521,7 +521,7 @@ const OP = Object.freeze({ GLADIIA: 'chess_char_4_12_a', MOSTIMA: 'chess_char_4_
  */
 export const PLAN_COMMIT = defineTactic({
   id: 'plan-commit',
-  describe: "writes legacy's plan: commits to an Alliance once its key operator is owned (歌蕾蒂娅 → Ægir, 莫斯提马 / 圣约送葬人 → Laterano, 夕 → Yan / Arcane, 凛御银灰 + 3 → Kjerag)",
+  describe: "writes legacy's plan: commits to an Alliance once its key operator is owned (Gladiia → Ægir, Mostima / Executor the Ex Foedere → Laterano, Dusk → Yan / Arcane, SilverAsh the Reignfrost + 3 → Kjerag)",
   params: {
     priority: int(1, 5, 4),
     fromRound: int(1, 14, 3),
@@ -561,7 +561,7 @@ export const PLAN_COMMIT = defineTactic({
  */
 export const PLAN_KEEPERS = defineTactic({
   id: 'plan-keepers',
-  describe: "writes legacy's plan: takes and keeps 余, keeps 琳琅诗怀雅 until the boss round, prefers 圣约送葬人 to 伊内丝 under Foresight",
+  describe: "writes legacy's plan: takes and keeps Yu, keeps Swire the Elegant Wit until the boss round, prefers Executor the Ex Foedere to Ines under Foresight",
   params: {
     yu: { type: 'bool', default: true },
     swire: { type: 'bool', default: true },
@@ -628,7 +628,7 @@ export const DIY_CHOICES = Object.freeze({
 const DIY_OPTIONS = ['none', ...Object.keys(DIY_CHOICES)];
 export const DIY_PICKS = defineTactic({
   id: 'diy-picks',
-  describe: 'fills the custom operator (自选) slots at match setup: two picks per tier 5 and 6',
+  describe: 'fills the custom operator (Custom Squad) slots at match setup: two picks per tier 5 and 6',
   params: {
     t5a: { type: 'choice', choices: DIY_OPTIONS, default: 'chen' },
     t5b: { type: 'choice', choices: DIY_OPTIONS, default: 'shu' },

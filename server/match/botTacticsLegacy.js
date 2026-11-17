@@ -121,7 +121,7 @@ export const LEGACY_FREEZE = defineTactic({ id: 'legacy-freeze', describe: "lega
 
 export const LEGACY_EQUIP = defineTactic({
   id: 'legacy-equip',
-  describe: "legacy's items: the weight of a wanted item, the tier an elite item waits for, and whether 缪尔赛思 may take an Isomorph",
+  describe: "legacy's items: the weight of a wanted item, the tier an elite item waits for, and whether Muelsyse may take an Isomorph",
   params: { wantedItem: num(0, 100, L.WANTED_ITEM), eliteItemTier: int(1, 6, L.ELITE_ITEM_TIER),
     morphOnMuelsyse: { type: 'bool', default: L.MORPH_ON_MUELSYSE } },
   at: pass('equipItems'),
@@ -165,7 +165,7 @@ export const LEGACY_ARRANGE = defineTactic({
  */
 export const LEGACY_RULES = defineTactic({
   id: 'legacy-rules',
-  describe: "legacy's named rules, each switchable: trade, layer refresh, the pager seat, the 自选 level step, focus steps, the full-board gate, shop items, the Isomorph rules, the Final Assault item hunt",
+  describe: "legacy's named rules, each switchable: trade, layer refresh, the pager seat, the Custom Squad level step, focus steps, the full-board gate, shop items, the Isomorph rules, the Final Assault item hunt",
   params: Object.fromEntries(LEGACY_RULE_NAMES.map((k) => [k, { type: 'bool', default: true }])),
   at: pass('sellJunk'),
   tunables: (p) => ({ RULES: Object.freeze(Object.fromEntries(LEGACY_RULE_NAMES.map((k) => [k, p[k]]))) }),

@@ -312,7 +312,7 @@ function* packagingCycle(m, ps, p) {
 
 export const DYY_MUELSYSE = defineTactic({
   id: 'dyy-muelsyse',
-  describe: 'Du Yaoye: keep 缪尔赛思 and clone her (画卷, 拟态物质, the same-Alliance printers) for more Isomorphs; level 6 for her; then legacy',
+  describe: 'Du Yaoye: keep Muelsyse and clone her (Dusk’s Scroll, Mimic Matter, the same-Alliance printers) for more Isomorphs; level 6 for her; then legacy',
   params: {
     maxIso: { type: 'int', min: 1, max: 8, default: 6 },
     keep: { type: 'choice', choices: ['clone', 'always'], default: 'clone' },
@@ -379,7 +379,7 @@ function stackerOnBoard(gd, ps, fits) {
 }
 export const CARRY_HOLOGRAM = defineTactic({
   id: 'carry-hologram',
-  describe: '博士投影 on the planned carry (a promoted operator ignores the damage cap); then legacy',
+  describe: 'Doctor Hologram on the planned carry (a promoted operator ignores the damage cap); then legacy',
   params: {
     fromRound: { type: 'int', min: 1, max: 14, default: 4 },
     target: { type: 'choice', choices: ['carry', 'stacker', 'stacker-first'], default: 'carry' },
@@ -421,7 +421,7 @@ export const CARRY_HOLOGRAM = defineTactic({
  */
 export const ISO_NOT_MUELSYSE = defineTactic({
   id: 'iso-not-muelsyse',
-  describe: "no Isomorph on 缪尔赛思: legacy's conversion of her off (it goes on other operators)",
+  describe: "no Isomorph on Muelsyse: legacy's conversion of her off (it goes on other operators)",
   params: { morphHer: { type: 'bool', default: false } },
   at: { sellJunk: (ctx) => ctx.next() },
   tunables: (p) => ({ MORPH_ON_MUELSYSE: p.morphHer }),
