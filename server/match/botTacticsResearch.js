@@ -784,7 +784,7 @@ export const CYCLE_ECON = defineTactic({
     },
     spendDown(ctx) {
       const it = cycleSteps(ctx);
-      while (!it.next().done);
+      while (!it.next().done); // loop-cap: cycleSteps runs at most 12 rounds of its guard
       return ctx.next();
     },
   },
