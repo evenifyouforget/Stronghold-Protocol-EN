@@ -1,8 +1,9 @@
 # Working together on Fish Edition
 
-For everyone who works on this repository besides Fish: other people, and other AI agents (for example a Claude Code on
-Fish's PC). Fish leads. The Claude Code on Fish's laptop ("the laptop agent") is Fish's second in command, because it
-is online most consistently. Everyone else is a collaborator.
+For everyone who works on this repository besides Fish: other people, and other AI agents. Fish leads. Fish's own
+agents go by codenames, so nothing public says which machine is which: **orca** is Fish's second in command (online most
+consistently, keeps the board below), **shark** has more raw power and works when Fish is at it. Everyone else is a
+collaborator.
 
 You can't see anyone else's session. **GitHub is how we talk:** issues, PR comments and committed files. Anything
 that isn't committed or written on GitHub doesn't exist for you, and anything you only keep in your own session doesn't
@@ -11,15 +12,15 @@ exist for anyone else.
 ## Signing
 
 Fish's agents act through Fish's GitHub account (`evenifyouforget`), so every comment, issue and PR description an
-agent writes ends with a signature line naming the agent, e.g. `— Claude (laptop)` or `— Claude (PC)`. Text without
-one is Fish's. Commits by an agent use the agent's name as the author (`git -c user.name="Claude (PC)" …`).
+agent writes ends with a signature line naming the agent, e.g. `— Claude (orca)` or `— Claude (shark)`. Text without
+one is Fish's. Commits by an agent use the agent's name as the author (`git -c user.name="Claude (shark)" …`).
 
 ## The work board
 
 **The live list of who is doing what is a pinned issue titled "Work board"**, not this file (a file only changes when a
 PR merges). The issue lists each line of work with:
 
-- **Who** has it (Fish, the laptop agent, the PC agent, a person).
+- **Who** has it (Fish, orca, shark, a person).
 - **Open to:** `anyone` (pick an item, say so in a comment first), `compute` (help by running jobs, below), or
   `keep out` (with the reason: data that isn't in git, context that isn't written down, or work in progress that would
   conflict).
@@ -36,7 +37,7 @@ of calendar time, always goes on the board.
 | Code, tests, player docs | `main`, `mini/*` (PRs target the current `mini/*` branch) | yes |
 | PR descriptions, changelog fragments | the PR, `changes-fish/` (#158) | yes |
 | Research notes on the bots (`fish-edition/ai-players/`) | branch `wip/loop-notes-2026-11-11` until they're merged | yes, on that branch |
-| Raw research data (match records, bench outputs, ML datasets: `fish-edition/untracked/`) | the laptop only | **no**: too big for git, or contains players' records |
+| Raw research data (match records, bench outputs, ML datasets: `fish-edition/untracked/`) | orca only | **no**: too big for git, or contains players' records |
 | Fish's own drafts (for example `fish-edition/operator-mod-z/*.md`) | Fish's machines, not committed | **no** |
 
 If you need something from the last two rows, ask on the issue. Don't recreate it from guesses.
