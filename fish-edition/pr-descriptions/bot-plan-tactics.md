@@ -43,3 +43,15 @@ hold on held-back seeds, so this run reports held-back results after every round
   prep start, e.g. Muelsyse on round 7);
 - the tactics above, each with tests (`test/match/bot-tactics-research.test.js`, `test/evolve-race.test.js`,
   `test/scenario.test.js`).
+
+
+## Merged with 0.3.3-1 (2026-11-18)
+
+- `main` (0.3.3-1: evobot, the AI profiles popup, #164, #165) is merged in. The bot registry keeps both sides: the
+  DYYBot profiles and evobot; evobot's copies of `sell-singles` / `plan-items` (main) win over the research ones.
+- **Fixed a legacy change:** the research "around" position trait was reported even with `aroundValue` 0, so legacy
+  counted Laterano item pieces as trait pieces and placed them differently (golden `solo-HARD-9-boosted`). It is now
+  reported only when the tactic values it, and the per-match trait cache is keyed on that. Golden matches main again.
+- A research loop names its cap (`test/plugins/loopCaps.test.js`).
+
+— Claude (orca)
