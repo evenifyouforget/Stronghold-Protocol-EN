@@ -2964,7 +2964,6 @@
   "左乐的Z型调整": "Zuo Le's Z Adjustment",
   "从增益获得的攻击力翻倍；从自然回复以外的途径获得的技力翻倍；所有技能可多储存1次；造成伤害时额外造成攻击力5%的侵蚀损伤；若敌人防御力已为0，改为造成攻击力5%的灼燃损伤和10%的法术伤害": "ATK gained from buffs is doubled; SP gained from anything but natural recovery is doubled; every skill stores 1 more charge; dealing damage also deals Corrosion equal to 5% of ATK; on an enemy already at 0 DEF, Burn equal to 5% of ATK and Arts damage equal to 10% of ATK instead",
   "中毒伤害的触发频率变为3倍；攻击范围+1；技能期间攻击范围再+1，攻击目标数+1，并获得隐匿；攻击额外造成攻击力20%的法术伤害和5%的神经损伤": "Poison ticks 3 times as often; attack range +1; during his skill, range +1 more, +1 target, and Invisible; attacks also deal Arts damage equal to 20% of ATK and Nervous Impairment equal to 5% of ATK",
-  "一策同心": "One for All",
   "{left} / {cap} 张": "{left} / {cap} copies",
   "共享牌库": "Shared deck",
   "所有博士共用一副牌库：每位干员还剩几张（剩余 / 总数）。每回合更新；队友本回合的购买与出售在下次打开时显示。": "All Doctors buy from one deck: the copies of each operator left (left / total). Updated every round; a teammate's buys and sales this round show the next time you open it.",
@@ -2979,10 +2978,6 @@
   "AI 方案说明": "About the AI profiles",
   "战术（从上到下优先，之后由基础 AI 决定）": "Tactics (top first; then the Basic bot decides)",
   "创建者可以为每个 AI 队友选择方案。": "The room creator picks a profile for each AI teammate.",
-  "强度：单人终极难度的胜率（%），80 局测试": "Strength: the win rate (%) in Ultimate solo, over 80 test games",
-  "名称后的数字是强度：单人终极难度的胜率（%）。": "The number after a name is its strength: the win rate (%) in Ultimate solo.",
-  "4 名此 AI 组队时终极难度的胜率（%），40 局测试": "The win rate (%) of 4 of this AI as a team in Ultimate, over 40 test games",
-  "第二个数字：4 名此 AI 组队时的胜率（%）。": "The second number: the win rate (%) of 4 of this AI as a team.",
   "选择一个主盟约，围绕它购买、合成并升级干员，按回合推进调度中心等级": "Picks one main Alliance and buys, merges and upgrades operators around it; levels the Dispatch Center up round by round",
   "避免购买队友正在收集的盟约干员（高星干员更是如此），不与队友争抢": "Avoids buying operators of Alliances its teammates are collecting (high-tier ones even more), so it doesn't compete with them",
   "也会买入能与已有干员合成的干员": "Also buys operators that merge with ones it already has",
@@ -2997,5 +2992,8 @@
   "核心盟约被关闭时改为收集奥术或迅捷；其他策略的回合同基础 AI": "If its core Alliances are switched off it collects Arcane or Swift instead; with any other Strategy it plays like the Basic bot",
   "采购同基础 AI": "Buys like the Basic bot",
   "布阵时按当前地图的路线、可部署格和攻击范围搜索，最多比较 8 种布阵（包括正面接敌的方案），试演后选最好的一种": "Searches layouts by the map's routes, deployable tiles and attack ranges, compares up to 8 (including ones that meet the enemies head-on) and picks the best after rehearsing them",
-  "伊奥莱塔开局（同「伊奥莱塔开局」），布阵同「自适应布阵」": "Opens like “Ioleta opening” and places like “Adaptive placement”"
+  "伊奥莱塔开局（同「伊奥莱塔开局」），布阵同「自适应布阵」": "Opens like “Ioleta opening” and places like “Adaptive placement”",
+  "强度：单人与 4 人组队终极难度胜率（%）之和，0–200；± 为 1 个标准差": "Strength: the Ultimate win rates (%) solo and as a team of 4, added up, 0–200; ± is 1 standard deviation",
+  "单人 {solo}%（{soloN} 局）· 4 人组队 {team}%（{teamN} 局）": "Solo {solo}% ({soloN} matches) · team of 4 {team}% ({teamN} matches)",
+  "名称后的数字是强度：单人与 4 人组队终极难度的胜率（%）之和（0–200），± 为 1 个标准差。": "The number after a name is its strength: its Ultimate win rates (%) solo and as a team of 4 added up (0–200); ± is 1 standard deviation."
 }
