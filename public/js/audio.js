@@ -2766,8 +2766,8 @@ export class AudioManager {
             const uid = ex.id ?? ex.from;
             const u = uid != null ? this.units.get(ex.from ?? uid) : null;
             const url = u ? this.getManifest?.()?.audio?.sfx?.units?.[u.def]?.events?.[evName] : null;
-            if (url) this._playUnitUrl(url, `${ex.from ?? uid}:${evName}`, 0.8);
-            continue;
+            // only a planned event sound replaces the rest (Yuri's moments still play for an enemy without one)
+            if (url) { this._playUnitUrl(url, `${ex.from ?? uid}:${evName}`, 0.8); continue; }
           }
           if (ex && typeof ex === 'object' && ex.id != null) this._fxSound(e[1], ex);
           // a summon used up by its own effect (香槟炸弹 exploding: `consumed`): its impact sound now, no death sound
