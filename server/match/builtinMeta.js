@@ -135,7 +135,7 @@ function transmitterPlusGifts(ctx, uid, original, bonds, tier) {
   const random = (list, n) => {
     const pool = list.slice();
     const out = [];
-    while (pool.length && out.length < n) out.push(pool.splice(ctx.rng.int(pool.length), 1)[0]);
+    while (pool.length && out.length < n) out.push(pool.splice(ctx.rng.int(pool.length), 1)[0]); // loop-cap: n picks from a shrinking pool
     return out;
   };
   if (!big) {
