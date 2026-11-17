@@ -3277,7 +3277,8 @@ const numOr = (v, d = 0) => (Number.isFinite(Number(v)) && v !== '' && v != null
 export function positionTraitsOf(m, ps, c) {
   if (!c) return [];
   const cache = m._botPosTraits || (m._botPosTraits = new Map());
-  if (cache.has(c.chessId)) return cache.get(c.chessId);
+  const ck = AROUND_VALUE > 0 ? `${c.chessId}|around` : c.chessId; // (fork research) the around trait only when it's valued
+  if (cache.has(ck)) return cache.get(ck);
   const gd = ps?.gd || m.gd;
   const out = [];
   for (const gid of c.garrisonIds || []) {
@@ -3297,13 +3298,13 @@ export function positionTraitsOf(m, ps, c) {
         out.push(desc.includes('同一行最右边') ? { kind: 'mostRight', g2 } : { kind: 'grant', g2, need: bs.check_bond_id || null });
       }
     } else if (g.effectKey === 'act1autochess_gar_event_addition_cnt') out.push({ kind: 'extra', n: numOr(bb.extra_cnt, 1) });
-    else if (g.effectKey === 'act1autochess_gar_event_consume_ammo' && bs.range_id === 'x-5') out.push({ kind: 'around', bond: bs.bond_id, n: numOr(bb.bond_add_count, 1) });
+    else if (AROUND_VALUE > 0 && g.effectKey === 'act1autochess_gar_event_consume_ammo' && bs.range_id === 'x-5') out.push({ kind: 'around', bond: bs.bond_id, n: numOr(bb.bond_add_count, 1) });
     else if (g.effectKey === 'SERVER_TRIGGER_ANOTHER' && bs.scope === 'front' && bs.event === 'SERVER_GAIN') out.push({ kind: 'trigger' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_START') out.push({ kind: 'copy', event: 'SERVER_PREP_START' });
     else if (g.effectKey === 'SERVER_FRONT_SAME_EFFECT_PREP_FIN') out.push({ kind: 'copy', event: 'SERVER_PREP_FIN' });
     for (let i = before; i < out.length; i++) out[i].on = g.eventType;
   }
-  cache.set(c.chessId, out);
+  cache.set(ck, out);
   return out;
 }
 
