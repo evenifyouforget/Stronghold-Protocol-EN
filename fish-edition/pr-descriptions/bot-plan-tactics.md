@@ -1,9 +1,9 @@
-Draft: the bot plan tactics and the weekend evolution run on Fish's PC. **Not for merging yet**: the tactics are
+Draft: the bot plan tactics and the weekend evolution run on shark. **Not for merging yet**: the tactics are
 drafts, and this run is what tells them apart.
 
 Base: `main`. Branch: `feature/bot-plan-tactics`, built on `feature/bot-tactics-research` (#135).
 
-## Run on Fish's PC (the weekend, 2026-11-13)
+## Run on shark (the weekend, 2026-11-13)
 
 One command, from the repo folder (Windows, Node 22 or newer, as package.json asks):
 

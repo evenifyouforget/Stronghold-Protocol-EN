@@ -41,7 +41,7 @@ That's 480 matches, about an hour. It answers whether the draft beats legacy as 
 The early levelling works as designed but costs the board: fewer merges and more leaks in rounds 2–8. Fewer games
 reach the boss. Those that do win about as often. The details are in 05 ("Baseline").
 
-**For Fish's PC, later: the DYYBot evolution run** (05 "Process", step 5). It waits for the step 3 tactics: the
+**For shark, later: the DYYBot evolution run** (05 "Process", step 5). It waits for the step 3 tactics: the
 Isomorph plan, the levelling, Yan-focused buying and freezing. Then this PR gets one command that runs everything and
 writes one zip to send back.
 

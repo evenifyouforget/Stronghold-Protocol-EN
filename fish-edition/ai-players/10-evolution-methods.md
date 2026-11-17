@@ -4,7 +4,7 @@ Fish: "please research the literature and let's use already known good technique
 
 Our problem in the literature's terms: **automatic algorithm configuration** under noise. A configuration is a profile
 (tactics, their order, their parameters: categorical, integer and real). An evaluation is a match on one seed, with
-a noisy, mostly binary outcome. Matches are expensive: about 1,000 solo matches an hour on Fish's PC.
+a noisy, mostly binary outcome. Matches are expensive: about 1,000 solo matches an hour on shark.
 
 ## What the literature offers
 
@@ -18,7 +18,7 @@ a noisy, mostly binary outcome. Matches are expensive: about 1,000 solo matches 
 | Survey (Jin & Branke 2005) | Noise: resampling, larger populations, or models. | Background. |
 
 **Choice: irace's iterated racing**, written into our bench (`tools/evolve.mjs --race`, `tools/race.mjs`). The R
-package itself would need R on Fish's PC and a wrapper around botbench, and its sampling model doesn't know our
+package itself would need R on shark and a wrapper around botbench, and its sampling model doesn't know our
 tactic lists. So we keep our mutations (add, remove or move a tactic, change a parameter) as the sampling step, and
 take the rest from irace:
 - **Instances = seeds**, in one stream of 10-seed blocks. Every candidate of a race plays the same blocks (paired).
@@ -92,7 +92,7 @@ What it means:
   far more matches than 2,000; that's the PC run's job.
 - Next race here: the same pool plus the new tactics (queues 13–17), once they're measured.
 
-## The weekend race (2026-11-14 → 16, Fish's PC)
+## The weekend race (2026-11-14 → 16, shark)
 
 `untracked/race-weekend/` (summary.md, holdout.md, gen-*.md, best.json). 19 iterations, 122,380 matches, solo Ultimate;
 stopped by hand during iteration 19.
@@ -111,14 +111,14 @@ stopped by hand during iteration 19.
   (44.5 % vs 40.8 %), 67 seeds gained, 52 lost, p ≈ 0.20. With the 240 held-back seeds (independent of these): 102
   gained, 78 lost, p ≈ 0.09. So: about +4 points, consistent in both sets, still not significant at 5 %. The race's
   answer is "a small economy gain, probably real, not proven". Whether it goes into the bot selector as a profile
-  (e.g. 「经济」) is Fish's call; 1,000 more paired seeds would settle it (Fish's PC, ~3 h).
+  (e.g. 「经济」) is Fish's call; 1,000 more paired seeds would settle it (shark, ~3 h).
 - **Final confirmation (2026-11-17, plan fixed before results in `untracked/race-confirm/PLAN.txt`):** evobot (#159)
   against legacy on 2,000 paired fresh seeds (7001–9000, includes the 400 above), solo Ultimate, 0 errors: **875 wins vs
   815 (43.8 % ± 1.1 vs 40.8 % ± 1.1, 1σ)**, 332 seeds gained, 272 lost, sign test p = 0.016 (two-sided). With the 240
   held-back seeds: 367 gained, 298 lost, **p = 0.008**. **Evobot is proven better than legacy, by about +3 points.**
   (The holdout row is the weekend's final best, `evo-99f84d0e339c`: the same profile as evobot.)
 
-## For Fish's PC
+## For shark (Fish's other agent)
 
 Fish (2026-11-12): "I ctrl+c to stop it whenever is convenient, wait hopefully not longer than a minute for it to clean
 up, and then I have a zip file I can send back. that way whether I have 10 hours or 100 hours it still is maximally

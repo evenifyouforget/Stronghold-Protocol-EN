@@ -19,7 +19,7 @@ spawns, routes, seed) and its result (`out`: killed, total, leaks). I fed the sp
 - **762 normal battles from 30 records: 761 give the same leak / no-leak result as the record.** This holds even though
   the records come from app 0.3.1 and the engine has changed since.
 - **36 ms per normal battle** on one thread (73 game seconds each). That is about 28 battles a second per thread. On
-  your PC's 24 threads, that is roughly 2 million battles an hour. The race plays about 1,350 whole matches an hour.
+  shark's 24 threads, that is roughly 2 million battles an hour. The race plays about 1,350 whole matches an hour.
 - The 182 records hold 3,242 normal seat-battles (873 with leaks, 27 %), 360 unite, 131 boss, 77 hidden.
 
 So the slow part is the **whole match**, not the battle. Most of a match's time is the bot's own rehearsal (about 194
@@ -247,7 +247,7 @@ operator (the per-decision question), and whether it can rank layouts, which the
 
 **Next.** Pair each mutant with its parent and measure the ranking; add tile and range features; then step 3 (rank
 layouts with the surrogate, rehearse the top 3, compare with legacy's rehearsal on paired seeds). Mutant generation runs
-at about 200 ms a battle here while the bench uses 9 cores; on Fish's PC it is about 36 ms.
+at about 200 ms a battle here while the bench uses 9 cores; on shark it is about 36 ms.
 
 ### Second measurement: does it rank a board against itself minus an Operator? (2026-11-17)
 
