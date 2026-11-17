@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ROOM_BOTS, BOT_INFO } from '../../shared/botProfiles.js';
+import { ROOM_BOTS, BOT_INFO, botScore } from '../../shared/botProfiles.js';
 import { TACTICS } from '../../server/match/botStrategies.js';
 import { makeMatch } from '../match/harness.js';
 
@@ -44,5 +44,16 @@ test('every room bot has a strength (GitHub #124: Ultimate solo win rate × 100)
     assert.ok(Number.isInteger(s) && s >= 0 && s <= 100, `${b.id}: ${s}`);
     const team = BOT_INFO[b.id]?.team;
     assert.ok(Number.isInteger(team) && team >= 0 && team <= 100, `${b.id} team: ${team}`);
+  }
+});
+
+test('the strength score (Fish on #151): solo + team of 4, 0–200, ± 1 standard deviation of the two win rates', () => {
+  assert.deepEqual(botScore({ strength: 44, team: 78 }), { score: 122, sd: 9 });
+  assert.deepEqual(botScore({ strength: 38, team: 65 }), { score: 103, sd: 9 });
+  assert.deepEqual(botScore({ strength: 0, team: 23 }), { score: 23, sd: 7 });
+  assert.equal(botScore({ strength: 44 }), null, 'no team number: no score');
+  for (const b of ROOM_BOTS) {
+    const sc = botScore(BOT_INFO[b.id]);
+    assert.ok(sc && sc.score >= 0 && sc.score <= 200 && sc.sd >= 0, b.id);
   }
 });

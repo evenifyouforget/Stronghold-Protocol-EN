@@ -28,6 +28,22 @@ export const DEFAULT_ROOM_BOT = ROOM_BOTS[0].id;
 // `strength` (GitHub #124, level 1): the win rate in Ultimate solo × 100 — botbench solo:ABYSS, seeds 1–80, 2026-11-14
 // (the numbers: PR #151). `team` (level 2): the win rate of 4 such bots in Ultimate, coop4:ABYSS seeds 1–40. The
 // SPA-CC level: not yet (the issue's grinder).
+/** The matches each number is measured on (botbench seeds 1–80 solo, 1–40 for the team of 4). */
+export const STRENGTH_MATCHES = Object.freeze({ solo: 80, team: 40 });
+
+/**
+ * (fork, Fish on GitHub #151, 2026-11-16) One strength score: the solo and team-of-4 Ultimate win rates (%) added up,
+ * 0–200, with ± 1 standard deviation (the two binomial errors combined). Null when a number is missing.
+ * @param {{ strength?: number, team?: number } | null | undefined} info
+ * @returns {{ score: number, sd: number } | null}
+ */
+export function botScore(info) {
+  const s = info?.strength, tm = info?.team;
+  if (!Number.isFinite(s) || !Number.isFinite(tm)) return null;
+  const v = (p, n) => (p / 100) * (1 - p / 100) / n;
+  return { score: s + tm, sd: Math.round(100 * Math.sqrt(v(s, STRENGTH_MATCHES.solo) + v(tm, STRENGTH_MATCHES.team))) };
+}
+
 export const BOT_INFO = Object.freeze({
   legacy: {
     strength: 38, team: 65,
