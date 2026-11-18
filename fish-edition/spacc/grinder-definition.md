@@ -3,16 +3,45 @@
 Today's rubric (#168): 100 × solo Ultimate win rate + 100 × 4-man Ultimate win rate (4 clones), 0–200. Level 3 adds
 entries of the form "100 × solo Ultimate win rate with these tags on".
 
-## What the data is
+## The data
 
-- **Humans:** the match records aren't on hand here (Needs Fish: reshare), so the human side is #121's summary: 81
-  matches on 0.3.1, 12 clean wins, and the per-tag clears and tries. That's enough for the record sets, not for a
-  co-occurrence study. With the records back, "which tags humans take together" can be counted properly.
-- **Bots (new, 2026-11-18):** each of the 41 tag versions alone, evobot, solo Ultimate, 40 paired seeds from 762481
-  (random start), on `mini/0.3.3-2` after #166. Raw: `untracked/spacc-grinder-2026-11/tagcost/`. The bot doesn't know
-  the tags (botbench `--rules`), so this is what a tag costs a tag-unaware player.
+- **Humans:** Fish's records of 2026-11-18 (`logs/records-4.tar.xz`, 271 matches, 2026-10-27 to 11-17, all with a human
+  seat). 146 have Risk tags; 127 of those are on Ultimate, 61 of them with no cheat on (11 won). Analysis:
+  `untracked/spacc-grinder-2026-11/human-tags.mjs` → `human-tags.md`.
+- **Bots:** botbench, solo Ultimate, paired seeds from 762481 (random start), on `mini/0.3.3-2` after #166. The bot
+  doesn't know the tags (`--rules`), so this is what a tag costs a tag-unaware player. Raw:
+  `untracked/spacc-grinder-2026-11/` (`tagcost/`, `sets/`, `big/`).
 
-## 1. What each tag costs a bot (evobot, solo Ultimate; no tags: 15 of 40)
+## 1. What humans take
+
+**Picks** (Ultimate, no cheat, 61 matches): Activation 54, Swift 52, Strategy 47, Foresight 46, Barge 46, Deep
+Infiltration 43, Low Efficiency 43, Junk 41, Lockout 41, Vengeance 39, Last Line 35, Elements 34, Suffocation 33, Intern
+33, OZ Physical 30, Investor 28, OZ Arts 26, Patriot 24, Delegation 20, **Famiglia 9**.
+
+**Humans play one kit and add to it.** The common pairs are all inside the same group: Swift, Strategy, Foresight,
+Barge, Deep Infiltration, Low Efficiency, Junk, Last Line (Deep Infiltration + Low Efficiency are the tightest pair, lift
+1.42). On top, players add the combat and boss tags at their lowest level: Activation 1, Lockout 1, Suffocation 1,
+Vengeance 1, OZ Arts. Famiglia, Delegation and Patriot are the least picked.
+
+**The clean clears** (no cheat, Ultimate):
+
+| Date | Seats | Risk | Seeded | Tags |
+|---|---|---|---|---|
+| 2026-11-05 | 1 human | **26** | yes | Investor 2, Swift, Foresight, Strategy 2, Intern, Barge 2, Suffocation 3, Activation 3, Elements 1, Deep Infiltration, Low Efficiency, Last Line, Junk 2, OZ Arts, OZ Physical, Patriot 1, Delegation 1, Vengeance 1 |
+| 2026-11-04 | 1 human | 22 | yes | Investor 2, Swift, Foresight, Strategy 2, Barge 2, Suffocation 2, Activation 3, Deep Infiltration, Low Efficiency, Junk 2, OZ Arts, OZ Physical, Patriot 1, Delegation 1, Vengeance 1 |
+| 2026-11-04 | 1 human | **18** | | Swift, Foresight, Strategy 2, Intern, Barge 2, Suffocation 1, Activation 1, Elements 1, Deep Infiltration, Low Efficiency, Last Line, Junk 2, Lockout 1, Famiglia Cleaner 1, Vengeance 1 |
+| 2026-11-04 | 1 human | 15 | yes | Investor 2, Swift, Foresight, Strategy 2, Intern, Elements 2, Deep Infiltration, Low Efficiency, Lockout 3, Famiglia Cleaner 1 |
+| 2026-11-05 | 1 human | 15 (×3) | | Swift, Foresight, Strategy 2, Barge 1, Suffocation 1, Activation 1, Deep Infiltration, Low Efficiency, Last Line, Junk 2, OZ Arts, Lockout 1, Vengeance 1 |
+| 2026-11-08 | 4 humans | 15 | yes | Swift, Foresight, Intern, Barge 2, Suffocation 1, Activation 1, Elements 1, Junk 2, OZ Arts, OZ Physical, Lockout 1, Famiglia Cleaner 1, Vengeance 1 |
+| 2026-11-04 | 3 humans | 10 | | Swift, Foresight, Strategy 2, Intern, Barge 1, Suffocation 1, Activation 1, Junk 1, Patriot 1 |
+
+The Risk 15 set of 2026-11-05 was played 3 times and won 3 times: it's the community's standard kit. With cheats on,
+people go to Risk 39 (every tag at its top); the full list is in `human-tags.md`.
+
+Note: #121 (last updated 2026-11-05 from the older records) lists Risk 15 as the solo record; these records add the
+Risk 18, 22 and 26 clears. #121 is due a refresh.
+
+## 2. What each tag costs a bot (evobot, one tag at a time, 40 seeds; no tags: 15 of 40)
 
 | Tag version | Risk | Wins of 40 | |
 |---|---|---|---|
@@ -26,96 +55,87 @@ entries of the form "100 × solo Ultimate win rate with these tags on".
 | Low Efficiency · OZ Arts · Swift · Intern | 1 | 14 | ~free |
 | Deep Infiltration · Investor 1, 2 · Barge 1, 2 | 1–2 | 15–17 | free (noise) |
 
-(Exact counts per version: `tagcost/*.json`; ±1 SD on 40 matches is about ±3 wins, so only the walls and the free tags
-are firm.)
+(±1 SD on 40 matches is about ±3 wins, so only the walls and the free tags are firm.)
 
-**Reading.** Two kinds of tag:
-- **Economy and tempo tags are nearly free for a bot** (Investor, Barge, Deep Infiltration, Swift, Intern, OZ Arts,
-  Low Efficiency): it either doesn't meet them or they barely bite. These are the "efficient for high Risk" tags,
-  for bots at least. Several match #125's auto-award list, which fits: a tag that rarely matters is both cheap and
-  often awardable.
-- **Final-boss tags are walls**: anything that makes the boss tankier or invulnerable stops evobot completely. Humans
-  clear some of them (the solo record has Lockout 3 and Elements 2), so the bot's weakness is boss damage, not
-  "SPA-CC" as such.
+**Humans and bots agree on what's cheap.** The human kit is the bot's free and light tags. Where they part is the
+boss: humans add Activation 1 and Lockout 1 and win, while any boss tag stops the bot. **The bots' weakness is boss
+damage**, not SPA-CC as such.
 
-So a rubric entry with a wall in it scores 0 for every current bot. It's headroom (fine to keep: it's where a better
-bot shows), but it doesn't separate today's bots.
+## 3. Sets, and how bots score on them (solo Ultimate)
 
-## 2. Proposed tag sets
+| Set | Risk | What it is | Evobot | Legacy |
+|---|---|---|---|---|
+| No tags | 0 | | 78 / 200 | 75 / 200 |
+| **H5** | 5 | human kit, small: Swift, Foresight, Deep Infiltration, Low Efficiency, Strategy 1 | 13 / 40 | 15 / 40 |
+| **H10** | 10 | human kit: Swift, Foresight, Strategy 2, Barge 1, Deep Infiltration, Low Efficiency, Junk 2, Last Line | 5 / 40 | 8 / 40 |
+| **F9** | 9 | the other cheap tags: Investor 2, Barge 2, Deep Infiltration, Swift, Intern, OZ Arts, Low Efficiency | 38 / 200 | 41 / 200 |
+| **C3** | 3 | light combat: Suffocation 1, Vengeance 1, OZ Physical | 32 / 200 | 31 / 200 |
+| S1 | 5 | Investor 1, Swift, Strategy 1, Barge 1, Junk 1 | 55 / 200 | 54 / 200 |
+| S2 | 5 | Suffocation 1, Vengeance 1, Delegation 1, OZ Arts, Last Line | 9 / 200 | 6 / 200 |
+| S3 | 10 | Investor 2, Strategy 2, Barge 2, Junk 2, Intern, Foresight | 35 / 200 | 24 / 200 |
+| S4 | 11 | Suffocation 2, Vengeance 2, Delegation 2, Deep Infiltration, Low Efficiency, OZ Physical, Famiglia Unending 2 (no wall) | 0 / 40 | 0 / 40 |
+| **H15** | 15 | the human standard kit (won 3 of 3) | 0 / 40 | 0 / 40 |
+| **H18** | 18 | the solo unseeded record | 0 / 40 | 0 / 40 |
+| **S5** | 15 | the solo seeded record of 2026-11-04 (run unseeded) | 0 / 40 | 0 / 40 |
+| **S6** | 15 | bosses, low levels: Activation 1, Elements 1, Lockout 1, Patriot 1, Famiglia Seasonal 2, Suffocation 3, Vengeance 3, Delegation 3 | 0 / 40 | 0 / 40 |
+| S7, S8 | 21, 25 | bosses at higher levels | 0 / 40 | 0 / 40 |
 
-Eight sets, solo Ultimate, covering all 41 tag versions (each at least once) over Risk 5–25. S5 is the human solo
-record of 2026-11-04 (Risk 15, seeded in the real clear; unseeded here).
-
-| Set | Risk | Tags | Idea |
-|---|---|---|---|
-| S1 | 5 | Investor 1, Swift, Strategy 1, Barge 1, Junk 1 | light economy |
-| S2 | 5 | Suffocation 1, Vengeance 1, Delegation 1, OZ Arts, Last Line | light combat |
-| S3 | 10 | Investor 2, Strategy 2, Barge 2, Junk 2, Intern, Foresight | full economy |
-| S4 | 11 | Suffocation 2, Vengeance 2, Delegation 2, Deep Infiltration, Low Efficiency, OZ Physical, Famiglia Unending 2 | field |
-| S5 | 15 | Investor 2, Swift, Foresight, Strategy 2, Intern, Elements 2, Deep Infiltration, Low Efficiency, Lockout 3, Famiglia Cleaner 1 | the human solo record |
-| S6 | 15 | Activation 1, Elements 1, Lockout 1, Patriot 1, Famiglia Seasonal 2, Suffocation 3, Vengeance 3, Delegation 3 | bosses, low levels |
-| S7 | 21 | Activation 2, Lockout 2, Patriot 2, Famiglia Unending 3, Investor 2, Strategy 2, Barge 2, Junk 2, Swift, Foresight, Deep Infiltration, Low Efficiency | bosses + economy |
-| S8 | 25 | Activation 3, Patriot 3, Famiglia Seasonal 3, Elements 2, Lockout 3, Suffocation 3, Delegation 3, Vengeance 3, OZ Arts, OZ Physical | everything at the top |
-
-(As `--rules` strings: `untracked/spacc-grinder-2026-11/sets.txt`; F9 and C3 in `sets-extra.txt`.)
-
-### How the sets score today (solo Ultimate, 40 paired seeds from 762481)
-
-| Set | Risk | Evobot | Legacy |
-|---|---|---|---|
-| No tags | 0 | 15 | 16 |
-| S1 light economy | 5 | 10 | 12 |
-| S2 light combat | 5 | 3 | 1 |
-| C3 (extra) Suffocation 1, Vengeance 1, OZ Physical | 3 | 7 | 5 |
-| S3 full economy | 10 | 5 | 7 |
-| F9 (extra) the near-free tags: Investor 2, Barge 2, Deep Infiltration, Swift, Intern, OZ Arts, Low Efficiency | 9 | 6 | 10 |
-| S4 field (no wall in it) | 11 | 0 | 0 |
-| S5 human record · S6 · S7 · S8 | 15–25 | 0 | 0 |
+(Sets as `--rules` strings: `sets.txt`, `sets-extra.txt`, `sets-human.txt` in `untracked/spacc-grinder-2026-11/`.)
 
 **Reading.**
-- **Tags compound.** S4 has no wall, and each of its tags alone costs evobot 6–9 wins of 15, yet together they leave
-  0. Even the near-free tags add up: F9's seven tags each cost evobot 0–1 wins alone, together 9.
-- **Only Risk ≲ 10 separates today's bots**, and combat tags hurt far more per Risk than economy tags (S2 at Risk 5
-  is harder than F9 at 9).
-- 40 matches can't separate evobot from legacy here (legacy is ahead in 4 of 5 scoring sets, by 2–4 wins: within the
-  noise, but worth a bigger run before the grinder ranks them).
+- **Tags compound.** S4 has no wall and its tags cost evobot 6–9 wins each, yet together it's 0. Even the cheap tags
+  add up (F9: seven nearly free tags, 38 of 200).
+- **Only Risk ≲ 10 separates today's bots**, and combat tags cost far more per Risk than economy tags (S2 at Risk 5 is
+  harder than F9 at 9).
+- **Evobot and legacy can't be told apart here.** On 200 paired seeds no set separates them (p ≥ 0.1; without tags 78
+  vs 75). Evobot's edge is real but small (3 points, proven on 2,000 seeds), so a grinder that ranks bots this close
+  needs several hundred matches per set.
 
-**So, revised proposal:** score on the sets bots can sometimes clear, and keep the rest as headroom.
+## 4. Proposal
 
-- **Scored now (100 each):** S1, S2, S3, F9 (and C3 if a fifth is wanted). Together they still cover every economy
-  tag, the light combat tags and OZ, at Risk 3–10.
-- **Headroom (100 each, scoring 0 today):** S5 (the human record) plus one boss set (S6). They cover the walls, and
-  they're where a bot that solves boss damage shows up.
-- **Dropped:** S4, S7, S8. They duplicate the headroom sets' coverage at higher Risk and score 0. They can come back
-  if a bot ever clears S6.
-- Coverage with S1, S2, S3, F9, S5, S6 together: every tag version except Famiglia Unending 2 and 3 and Seasonal 3,
-  Activation 2 and 3, Patriot 2 and 3, Lockout 2, Suffocation 2, Delegation 2, Vengeance 2, and OZ Physical (which
-  C3 covers, if it's in). A tag at a higher level is
-  harder than at a lower one, so the lower level in the rubric stands for it until a bot clears it; full coverage
-  costs three more sets that score 0.
+Score on human-shaped sets; keep the human records and one boss set as headroom.
 
-**Weights:** 100 each, like the two existing entries, so the maximum goes from 200 to 1,000. Alternatives: weight by
-Risk (S8 counts 2.5× S3), or 100 × Risk / 10 so harder sets pay more. With today's bots the boss sets score 0 either
-way, so the weights only matter once a bot clears one.
+| Entry | Weight | Why |
+|---|---|---|
+| Solo Ultimate (today) | 100 | |
+| 4-man Ultimate (today) | 100 | |
+| **H5** | 100 | the human kit at Risk 5: what a casual SPA-CC player takes |
+| **H10** | 100 | the full human kit, no boss tags |
+| **F9** | 100 | the cheap tags humans take less (Investor, Barge 2, Intern, OZ Arts) |
+| **C3** | 100 | the lightest combat tags |
+| **H15** | 100 | headroom: the community's standard kit (won 3 of 3 by humans; bots 0) |
+| **H18** | 100 | headroom: the solo record without seeding |
+| **S5** | 100 | headroom: the solo seeded record of 2026-11-04 (Elements 2, Lockout 3, Investor 2), run unseeded |
+| **S6** | 100 | headroom: the boss tags at low levels; the only set with Patriot and Delegation |
 
-## 3. The combinatorial alternative
+- Maximum 1,000. Evobot today: 44 (solo) + 78 (team) + about 33 + 13 + 19 + 16 (the four scored sets) + 0 × 4 ≈ 200.
+- **Coverage:** every tag at some level, 27 of the 41 versions (without S5 and S6: 20, and no Patriot or Delegation).
+  The rest are higher levels of Activation, Lockout, Patriot, Famiglia, Delegation, Suffocation and Vengeance: harder
+  versions of tags already in, on which every bot scores 0. S4, S7 and S8 would cover them all, for three more
+  zeros.
+- **Seeded:** humans' best clears were seeded (an RNG reducer on). The grinder runs unseeded, like the bench; the
+  seeded records (Risk 22, 26) could come in as headroom with their seeding rules if Fish wants them.
+- **Matches:** 200 seeds per set would separate bots about 10 points apart; evobot vs legacy (3 points) would need
+  about 2,000 per set. At ~20 CPU-seconds a match, 8 sets × 200 seeds is under 2 hours here.
 
-Instead of fixed sets: each match draws its tags at random (each tag version on with some probability, chosen to give
-a target Risk spread), and the score is the win rate weighted by each match's Risk.
+## 5. The combinatorial alternative
 
-- **For:** covers combinations no fixed list would, and can't be "overfitted" by tuning a bot to eight sets.
-- **Against:** far noisier for the same number of matches (every match is a different problem), and the walls make it
-  worse: walls sit in 5 of the 20 tags (Activation, Elements, Lockout, Famiglia, Patriot), so a draw above Risk 5
-  likely contains one, and most draws would score 0 for today's bots
-  until the boss problem is solved. A fixed set is also explainable on the AI profiles popup; a distribution isn't.
-- **Verdict:** fixed sets now. Revisit once a bot clears a boss wall; the per-tag table above gives the probabilities
-  (e.g. draw walls rarely) if it's ever wanted.
+Each match draws its tags at random (each version on with some probability), and the score is the Risk-weighted win
+rate.
+
+- **For:** covers combinations no fixed list does, and a bot can't be tuned to a known list.
+- **Against:** much noisier for the same matches, and walls make it worse: walls sit in 5 of the 20 tags (Activation,
+  Elements, Lockout, Famiglia, Patriot), so a draw above Risk 5 likely contains one and scores 0 for every bot today.
+  Fixed sets can also be shown on the AI profiles popup; a distribution can't.
+- **Verdict:** fixed sets now. If wanted later, draw from the human pick rates (section 1), so the draws look like real
+  games.
 
 ## Questions for Fish
 
-- The eight sets, or fewer? (S6–S8 score 0 for every bot today: keep as headroom, or drop until a bot needs them?)
-- Weights: 100 each, by Risk, or something else?
-- Seeded: S5 was a seeded clear for the human. Run the grinder unseeded (as here), or seeded like the record?
-- Co-op: add one 4-man set (e.g. S3 with 4 clones), or keep level 3 solo only?
+- These eight sets (H5, H10, F9, C3 scored; H15, H18, S5, S6 headroom)? Or full version coverage (add S4, S7, S8)?
+- Weights: 100 each, or more for higher Risk?
+- Add the seeded records (Risk 22, 26) as headroom with their seeding rules?
+- Co-op: a 4-man version of one set (e.g. H10 with 4 clones), or keep level 3 solo only?
+- Refresh #121 from these records? (Its solo record is Risk 15; the records show 18 unseeded and 26 seeded.)
 
 — Claude (orca)
