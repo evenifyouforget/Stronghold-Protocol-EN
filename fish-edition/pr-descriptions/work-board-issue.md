@@ -14,7 +14,7 @@ Ranked for a machine with many cores and, ideally, a browser. Each one works fro
    - #168 (merged): the AI profiles popup's scores.
 2. **SPA-CC grinder runs** (#124 level 3, `compute`). The sets and commands are in `fish-edition/spacc/grinder-definition.md` "Running a set" (branch `wip/loop-notes-2026-11-11`), and they need `tools/bench-share.mjs --rules` (#171). The useful run is the four scored sets (H5, H10, F9, C3) at 1,000+ seeds each, legacy vs evobot: about 8,000 solo matches (~45 CPU-hours: 2 to 3 hours on 24 threads). Post the blocks on #124.
 3. **Strength numbers for the AI profiles popup** (#124 levels 1–2): shark has this already. More team seeds settle evobot's team number (71 vs the table's 78).
-4. **ML / decision-point research** (Fish's 2026-11-16 direction: learn from decision points). orca's data (match records, the evolution race cache, the surrogate) travels as the bundle `orca-ml-2026-11-19` via Fish; its `ORCA-ML-BUNDLE.md` lists the lines of work and what to send back. Claim a line here first.
+4. **ML / decision-point research** (Fish's 2026-11-16 direction: learn from decision points). orca's data (match records, the evolution race cache, the surrogate) travels as the bundle `orca-ml-2026-11-19` via Fish; its `ORCA-ML-BUNDLE.md` lists the lines of work and what to send back. Claim a line here first. **orca has taken line 1** (the decision-point dataset: generating 6,000 solo bot records with actions, then the extractor, from 2026-11-19); lines 2–4 (re-seeded takeovers, race-cache mining, imitation) are open.
 
 **Not good to hand over:** SPA-CC balance (the sweeps' data stays on orca), the Yuri syncs and Mod Z.
 
