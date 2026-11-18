@@ -133,7 +133,7 @@ export function AwardNotesButton({ notes }) {
     ${open ? html`<${Modal} open=${true} class="rules-why" micro="AUTO-AWARD" title=${t('未自动授予的标签')} width="min(34rem, 96vw)" onClose=${() => setOpen(false)}>
       <p class="rules-why__intro">${t('风险标签只有在不可能改变本局时才会自动授予。下面这些标签本可以改变本局，所以只有房间选了它们才计入风险。')}</p>
       <ul class="rules-why__list">${groupNotes(notes).map((n) => html`<li key=${`${n.key}:${n.level}`} class="rules-why__tag">
-        <b>${n.levels.map((l) => riskText(n.key, l).short).join(' · ')}</b>
+        <b>${n.levels.map((l) => `${riskText(n.key, l).short} (${t('风险 {n}', { n: ruleRisk(n.key, l) })})`).join(' · ')}</b>
         <ul>${n.broken.map(awardNoteLine)}${n.ai ? html`<li key="ai">${t('房间里有AI队友或托管：这个标签只在没有AI的房间里自动授予')}</li>` : null}</ul>
       </li>`)}</ul>
     <//>` : null}`;
