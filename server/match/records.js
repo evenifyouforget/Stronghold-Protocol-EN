@@ -237,6 +237,7 @@ export function finishRecord(m, summary) {
     lobbyRules: m.lobbyRules ?? {},
     rules: m.rules ?? null,
     ...(m.awarded ? { awarded: { ...m.awarded } } : {}),
+    ...(m.awardNotes ? { awardNotes: structuredClone(m.awardNotes) } : {}),
     cs: m.cs ?? null,
     seed: m.seed >>> 0,
     bossRound: m.gd.bossRound, hiddenRound: m.gd.hiddenRound ?? null,

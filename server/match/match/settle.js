@@ -155,7 +155,7 @@ export class MatchSettle {
     for (const f of this.fields) f.live = false;
     this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason };
     // (GitHub #125) the Risk tags the autoAward rule adds (null: none)
-    try { this.awarded = finishAwards(this); } catch (e) { this.reportError('autoAward', e); this.awarded = null; }
+    try { this.awarded = finishAwards(this); } catch (e) { this.reportError('autoAward', e); this.awarded = null; this.awardNotes = null; }
     let result;
     try {
       result = buildResult(this, this.outcome);
@@ -164,6 +164,7 @@ export class MatchSettle {
       result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
     }
     if (this.awarded) result.awarded = { ...this.awarded };
+    if (this.awardNotes) result.awardNotes = structuredClone(this.awardNotes);
     if (this.test) {
       result.test = true;
       result.testActions = this.testActions;

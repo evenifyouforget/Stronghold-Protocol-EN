@@ -18,14 +18,20 @@
 
 import { CC, strategyLateBandIds } from '../../shared/ruleData.js';
 import { countFree } from './board.js';
-import { awardedTags, STRATEGY2_BANDS } from '../../shared/autoAward.js';
+import { awardedTags, awardNotes, STRATEGY2_BANDS } from '../../shared/autoAward.js';
 
 const on = (m) => m?.lobbyRules?.autoAward === true;
 const broken = (m) => (m._awardBroken ||= new Set());
 
-/** Mark condition `id` broken (no-op while the rule is off). */
-export function breakAward(m, id) {
-  if (on(m)) broken(m).add(id);
+/**
+ * Mark condition `id` broken (no-op while the rule is off). The first break of each condition is kept for the end
+ * screen's "why not" panel: the round, and `info.id` (the operator or Strategy involved) when there is one.
+ */
+export function breakAward(m, id, info = null) {
+  if (!on(m)) return;
+  broken(m).add(id);
+  const why = (m._awardWhy ||= {});
+  if (!why[id]) why[id] = { r: Number.isInteger(m.round) ? m.round : null, ...(info?.id ? { id: info.id } : {}) };
 }
 
 /** After a player's live bond recompute: 投资人 active breaks `investor`. */
@@ -38,7 +44,7 @@ const INVESTOR_OPS = new Set(CC.investorSold.ops);
 export function noteGained(m, ps, chessId) {
   if (!on(m) || typeof chessId !== 'string') return;
   const base = ps?.gd?.baseIdOf ? ps.gd.baseIdOf(chessId) : chessId;
-  if (INVESTOR_OPS.has(base) || INVESTOR_OPS.has(chessId)) breakAward(m, 'investorOps');
+  if (INVESTOR_OPS.has(base) || INVESTOR_OPS.has(chessId)) breakAward(m, 'investorOps', { id: base });
 }
 
 /**
@@ -52,14 +58,14 @@ export function noteBattle(m, opts) {
     if (pl?.bonds?.swiftShip?.active) breakAward(m, 'swift');
     for (const u of Array.isArray(pl?.units) ? pl.units : []) {
       const c = m.gd?.chess ? m.gd.chess(u?.chessId) : null;
-      if (c && Array.isArray(c.bonds) && c.bonds.includes('visiShip')) breakAward(m, 'foresight');
+      if (c && Array.isArray(c.bonds) && c.bonds.includes('visiShip')) breakAward(m, 'foresight', { id: u.chessId });
     }
   }
 }
 
 /** A purchase of `chessId`: a tier-1 operator from round CC.tier1FromRound on breaks `intern`. */
 export function noteBuy(m, ps, chessId) {
-  if (on(m) && m.round >= CC.tier1FromRound && ps?.gd?.tierOf?.(chessId) === 1) breakAward(m, 'intern');
+  if (on(m) && m.round >= CC.tier1FromRound && ps?.gd?.tierOf?.(chessId) === 1) breakAward(m, 'intern', { id: chessId });
 }
 
 /** After a level-up: a Dispatch Center at level 5 or more breaks `barge`. */
@@ -100,11 +106,15 @@ export function finishAwards(m) {
   const b = new Set(broken(m));
   const late = new Set(strategyLateBandIds(m.gd?.raw?.bands ?? m.gd?.bands ?? {}));
   const players = [...(m.players?.values?.() ?? [])];
+  const why = { ...(m._awardWhy || {}) };
   for (const ps of players) {
-    if (late.has(ps.bandId)) b.add('strategy1');
-    if (STRATEGY2_BANDS.includes(ps.bandId)) b.add('strategy2');
+    if (late.has(ps.bandId)) { b.add('strategy1'); why.strategy1 ||= { r: null, id: ps.bandId }; }
+    if (STRATEGY2_BANDS.includes(ps.bandId)) { b.add('strategy2'); why.strategy2 ||= { r: null, id: ps.bandId }; }
   }
   const aiSeats = !!m._awardAiSeat || players.some((ps) => ps.isBot || ps.autoplay);
   const out = awardedTags(m.lobbyRules, b, { aiSeats });
+  // the end screen's "why not" panel (closed by default): every awardable version the room didn't take and didn't get
+  const notes = awardNotes(m.lobbyRules, out, why, { aiSeats });
+  m.awardNotes = notes.length ? notes : null;
   return Object.keys(out).length ? out : null;
 }

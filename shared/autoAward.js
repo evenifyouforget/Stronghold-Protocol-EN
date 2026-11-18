@@ -51,6 +51,27 @@ export const STRATEGY2_BANDS = Object.freeze(['band_ioleta', 'band_duyaoy', 'ban
 export const isAwardable = (key, level) => AWARDABLE.some((a) => a.key === key && a.level === level);
 
 /**
+ * Why each awardable version the room didn't take wasn't awarded (the end screen's panel): its broken conditions with
+ * the first break's round (null: at the end, e.g. a Strategy) and operator / Strategy id, and `ai` when it needs a
+ * lobby without AI seats. A version below an awarded level of the same tag is left out.
+ * @param {Record<string, any>} rules @param {Record<string, number>} awarded
+ * @param {Record<string, { r: number|null, id?: string }>} why condition id → its first break
+ * @param {{ aiSeats: boolean }} opts
+ * @returns {Array<{ key: string, level: number, ai: boolean, broken: Array<{ c: string, r: number|null, id?: string }> }>}
+ */
+export function awardNotes(rules, awarded, why, { aiSeats }) {
+  const out = [];
+  if (rules?.autoAward !== true) return out;
+  for (const a of AWARDABLE) {
+    if ((Number(rules[a.key]) || 0) > 0 || (awarded[a.key] || 0) >= a.level) continue;
+    const brokenList = a.needs.filter((c) => why[c]).map((c) => ({ c, ...why[c] }));
+    const ai = !a.aiOk && aiSeats;
+    if (brokenList.length || ai) out.push({ key: a.key, level: a.level, ai, broken: brokenList });
+  }
+  return out;
+}
+
+/**
  * The tags to award: for each tag the room did not take, the highest awardable level whose conditions all held.
  * @param {Record<string, any>} rules the lobby rules (autoAward must be on)
  * @param {Set<string>} broken the condition ids some event broke

@@ -1395,3 +1395,17 @@
 .rseat__bubble > .ebubble { flex: none; }
 .rseat__plate { position: relative; }
 .rseat__mute { position: absolute; right: .06rem; top: 50%; transform: translateY(-50%); z-index: 2; }
+
+/* (GitHub #125) the end screen's "why weren't other tags awarded" button and its panel (closed by default) */
+.rules-why__open {
+  display: inline-flex; align-items: center; gap: .05rem; margin-top: .06rem; padding: .02rem .08rem;
+  font: inherit; font-size: calc(.12 * var(--t)); color: #9fa6a3; background: transparent;
+  border: 1px solid rgba(255, 255, 255, .16); cursor: pointer;
+}
+.rules-why__open:hover, .rules-why__open:focus-visible { color: #5df0c6; border-color: #5df0c6; outline: none; }
+.rules-why__open .icon { width: 1.1em; height: 1.1em; }
+.rules-why__intro { margin: 0 0 .1rem; font-size: calc(.14 * var(--t)); color: #b9bfbc; }
+.rules-why__list { margin: 0; padding: 0; list-style: none; }
+.rules-why__tag { padding: .08rem .12rem; margin-top: .06rem; border-left: 2px solid rgba(255, 255, 255, .12); background: rgba(255, 255, 255, .03); }
+.rules-why__tag ul { margin: .03rem 0 0; padding-left: 1.1em; font-size: calc(.13 * var(--t)); color: #c9cecb; }
+.rules-why__at { color: #9fa6a3; }

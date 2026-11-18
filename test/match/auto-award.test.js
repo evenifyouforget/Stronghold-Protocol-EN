@@ -120,3 +120,19 @@ test('an idle solo game without AI seats also earns Intern, Barge 2 and Junk 1 (
   assert.equal(on.awarded.ccUpgrade, 2);
   assert.equal(on.awarded.ccJunk, 1);
 });
+
+test('the "why not" notes: each untaken, unawarded version with its first break (round, operator) or the AI-seat reason', async () => {
+  const { awardNotes } = await import('../../shared/autoAward.js');
+  const why = { swift: { r: 6 }, investorOps: { r: 4, id: 'chess_char_6_11_a' }, strategy1: { r: null, id: 'band_mlyss' } };
+  const notes = awardNotes({ ...ON, ccJunk: 1 }, { ccInvestorBench: 1, ccForesight: 1 }, why, { aiSeats: true });
+  const by = Object.fromEntries(notes.map((n) => [`${n.key}${n.level}`, n]));
+  assert.deepEqual(by.ccInvestorBench2.broken, [{ c: 'investorOps', r: 4, id: 'chess_char_6_11_a' }], 'Investor 1 awarded: only level 2 explained');
+  assert.ok(!by.ccInvestorBench1 && !by.ccForesight1, 'awarded versions are not listed');
+  assert.deepEqual(by.ccSwift1.broken, [{ c: 'swift', r: 6 }]);
+  assert.deepEqual(by.ccStrategyLate2.broken, [{ c: 'strategy1', r: null, id: 'band_mlyss' }]);
+  assert.ok(by.ccTier1Price1.ai && by.ccTier1Price1.broken.length === 0, 'AI seats: the reason is the seats');
+  assert.ok(!by.ccJunk1, 'a taken tag is not listed');
+  assert.deepEqual(awardNotes({}, {}, why, { aiSeats: false }), [], 'rule off: nothing');
+  const idle = idleMatch(ON);
+  assert.deepEqual(idle.pub.awardNotes ?? null, idle.result.awardNotes ?? null, 'the result and the public view carry the same notes');
+});
