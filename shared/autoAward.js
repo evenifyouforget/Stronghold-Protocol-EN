@@ -24,7 +24,7 @@ export const AWARD_CONDITIONS = Object.freeze({
 
 /**
  * The awardable tag versions, in RULES order. `needs`: condition ids (all must hold); `aiOk`: also with AI seats.
- * @type {ReadonlyArray<{ key: string, level: number, needs: string[], aiOk: boolean }>}
+ * @type {ReadonlyArray<Readonly<{ key: string, level: number, needs: readonly string[], aiOk: boolean }>>}
  */
 export const AWARDABLE = Object.freeze([
   { key: 'ccInvestorBench', level: 1, needs: ['investor'], aiOk: true },
@@ -49,6 +49,7 @@ export const isAwardable = (key, level) => AWARDABLE.some((a) => a.key === key &
  * @returns {Record<string, number>} tag key → level; empty when none (or the rule is off)
  */
 export function awardedTags(rules, broken, { aiSeats }) {
+  /** @type {Record<string, number>} */
   const out = {};
   if (rules?.autoAward !== true) return out;
   for (const a of AWARDABLE) {
