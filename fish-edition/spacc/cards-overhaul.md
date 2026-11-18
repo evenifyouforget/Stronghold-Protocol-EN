@@ -13,8 +13,21 @@ style Fish described, with one rule: **the kind keeps its colour; how the card g
 
 ## 1. The SPA look, as I'd describe it
 
-Written from the CSS and the components, not from seeing the site: I can't open a browser here. A few screenshots
-(room, end screen, a Risk grid) would let me check this against what players see.
+First written from the CSS, then checked against Fish's screen recording of 2026-11-17 (a Perilous solo game, the
+room, the Custom Lobby Modifications dialog, both end screens, the Operator files and settings).
+
+**What I see in the recording.** It looks like a field computer more than a website: the room sits on a near-black
+sheet of faint mint graph paper, and everything on it is a thin-lined rectangle. The colour is almost all in two
+places: the **mint** of things that are yours or ready (your seat card glows mint at the edges, "Start Simulation" is a
+solid mint slab with a block of diagonal hatching at its right end, the round number "14" on the end screen glows) and
+the **orange-red** of danger (the difficulty name, the selected Risk tiles, the enemy leader's halo on the end-screen
+map). Panels are marked by small mint corner brackets rather than full borders (the briefing, the dialogs), and the
+Custom Lobby Modifications dialog has a dashed mint top edge, like a tape label. The end screen's first page is the
+most "hologram": a dark relief map with scanlines, glowing mint headline type, thin white vector lines from the target
+to the operators. The second page goes calm and tabular: grey hairline tables, small mint bar charts. Text is white or
+light grey, in a plain sans; the big numbers are a heavier display face.
+
+The details from the CSS, which the recording confirms:
 
 - **A dark terminal, not a dark website.** Near-black green-grey surfaces (`#0c0f0e` to `#2d3632`), never pure black,
   with hairline borders a step lighter. Panels are flat rectangles: no rounded corners, no drop shadows to speak of.
@@ -23,7 +36,7 @@ Written from the CSS and the components, not from seeing the site: I can't open 
   sparingly, so a coloured outline already reads as a status.
 - **CRT texture, kept faint.** Panels carry 1 px horizontal lines every 3 px at 1.6–2.5 % white: you feel them more than
   see them. Diagonal hatching (−55°, mint at 6 %) marks busy or locked areas.
-- **Hologram behaviour.** Things arrive by *wiping* in (clip-path left to right) with a bright *sweep* line passing over
+- **Hologram behaviour (from the CSS).** Things arrive by *wiping* in (clip-path left to right) with a bright *sweep* line passing over
   them, or by scaling from a squashed state; digital segments *flicker* in steps (not fades); a scan line drifts
   slowly down some figures (`ps-scan`, 7 s). Motion is linear or stepped, like a display refreshing, not springy.
 - **Type.** Light text on dark, small uppercase English micro-labels ("ALLIANCE REPORT", "AI PROFILES") as a second
@@ -44,7 +57,7 @@ difference visible in a static screenshot? The end screen is what people screens
 | Bracket corners only, instead of a full outline | **strong** | trivial | **yes** | The site's own frame idiom; an instant "different kind of the same thing". |
 | Dashed / segmented outline (like `.seg`) | good | trivial | **yes** | Reads as "not fully committed" — could suit awarded tags, but might read as "disabled". |
 | Double outline (outer hairline 2 px out) | good | trivial | **yes** | Reads as "certified", "confirmed". |
-| Hatch fill (−55° stripes in the card's colour) | **strong** | trivial | **yes** | Already used for locked / busy states, so it may read as "locked". |
+| Hatch fill (−55° stripes in the card's colour) | **strong** | trivial | **yes** | The recording shows it as the main action buttons' mark (Start Simulation, Back, Next), so on a card it would read as "press me". |
 | Inset glow in the card's colour | good | trivial | yes | Subtle; fine as a second signal, too faint alone. |
 | Cut corner (one corner clipped by `clip-path`) | good | trivial | **yes** | Very legible at chip size; a classic sci-fi UI shape. |
 | Micro-label inside the chip ("AUTO", "+" or a glyph) | **strong** | trivial | **yes** | The site's second voice. Needs translation only if it's a word. |
@@ -85,6 +98,5 @@ menus already have their own established states, and a new style there would dil
 - Does the split read right: colour = kind, frame = selected vs awarded?
 - "AUTO", a glyph, or nothing for the label? (A word needs four translations; a glyph doesn't.)
 - Selected tags: keep as today, or add the double outline?
-- Screenshots of the room, the end screen and the Risk grid, to check section 1 against the real thing.
 
 — Claude (orca)
