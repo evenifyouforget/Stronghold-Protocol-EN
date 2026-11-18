@@ -130,12 +130,40 @@ rate.
 - **Verdict:** fixed sets now. If wanted later, draw from the human pick rates (section 1), so the draws look like real
   games.
 
+## Running a set (anyone, from git alone)
+
+Fish's answers (2026-11-18): the eight sets below, 100 each; no fuller coverage for now. With #171,
+`tools/bench-share.mjs` takes `--rules`, so each set is a shareable compute job (`fish-edition/COLLABORATION.md`):
+
+```
+node tools/bench-share.mjs run --a legacy --b evobot --config solo:ABYSS --seeds 200 --rules <the set's string>
+```
+
+| Set | `--rules` |
+|---|---|
+| H5 | `ccSwift=1,ccForesight=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccStrategyLate=1` |
+| H10 | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccUpgrade=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccJunk=2,ccLastLine=1` |
+| F9 | `ccInvestorBench=2,ccUpgrade=2,ccDeepInfiltration=1,ccSwift=1,ccTier1Price=1,ccOzArts=1,ccLowEfficiency=1` |
+| C3 | `ccSpRecovery=1,ccVengeance=1,ccOzPhys=1` |
+| H15 | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccUpgrade=1,ccSpRecovery=1,ccBoss=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccLastLine=1,ccJunk=2,ccOzArts=1,ccLockout=1,ccVengeance=1` |
+| H18 | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccTier1Price=1,ccUpgrade=2,ccSpRecovery=1,ccBoss=1,ccLeaderDr=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccLastLine=1,ccJunk=2,ccLockout=1,ccFamiglia=1,ccVengeance=1` |
+| S5 | `ccInvestorBench=2,ccSwift=1,ccForesight=1,ccStrategyLate=2,ccTier1Price=1,ccLeaderDr=2,ccDeepInfiltration=1,ccLowEfficiency=1,ccLockout=3,ccFamiglia=1` |
+| S6 | `ccBoss=1,ccLeaderDr=1,ccLockout=1,ccPatriot=1,ccFamiglia=4,ccSpRecovery=3,ccVengeance=3,ccDelegation=3` |
+
+**What's worth running:** the four scored sets (H5, H10, F9, C3) at 1,000+ seeds each would put a real number on the
+evobot-vs-legacy gap under tags (today it's within noise at 200). The headroom sets score 0 for both bots: 40 seeds is
+enough to confirm a new bot still scores 0, more is wasted.
+
 ## Questions for Fish
 
 - These eight sets (H5, H10, F9, C3 scored; H15, H18, S5, S6 headroom)? Or full version coverage (add S4, S7, S8)?
 - Weights: 100 each, or more for higher Risk?
 - Add the seeded records (Risk 22, 26) as headroom with their seeding rules?
 - Co-op: a 4-man version of one set (e.g. H10 with 4 clones), or keep level 3 solo only?
-- Refresh #121 from these records? (Its solo record is Risk 15; the records show 18 unseeded and 26 seeded.)
+- Refresh #121 from these records? (Its solo record is Risk 15; the records show 18 unseeded and 26 seeded.) - yes.
 
 — Claude (orca)
+
+I generally like the 8 proposed sets with 100 weight each. I considered extending up for fuller coverage, but the bots would score 0 on those categories right now, and extreme high risk may require extremely specific strategies and good RNG, which is not that great of a use of our bot research time. If our bots get much much better to where they can already play Ultimate+15, then we can revisit the question.
+
+Solo vs 4-clone... I suppose there can be separate Solo and 4-clone entries. It would be simplest to split each entry as 50 weight solo and 50 weight 4-clone, but based on the human records, this might not actually be appropriate, as certain tags may be easier in coop? Try drafting a version that doesn't use the same tag sets for solo and 4-clone, and then comment on if you would recommend that vs just a 50/50 split.
