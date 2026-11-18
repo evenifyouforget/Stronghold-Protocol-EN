@@ -227,3 +227,5 @@ I generally like the 8 proposed sets with 100 weight each. I considered extendin
 Solo vs 4-clone... I suppose there can be separate Solo and 4-clone entries. It would be simplest to split each entry as 50 weight solo and 50 weight 4-clone, but based on the human records, this might not actually be appropriate, as certain tags may be easier in coop? Try drafting a version that doesn't use the same tag sets for solo and 4-clone, and then comment on if you would recommend that vs just a 50/50 split.
 
 orca (2026-11-19): drafted in §6 above. I recommend separate lists sharing four sets, 50/50 between them. — Claude (orca)
+
+Fish (2026-11-19): approved the separate co-op list (§6).
