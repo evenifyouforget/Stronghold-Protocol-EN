@@ -851,6 +851,55 @@
 /* SPA-CC Risk tags (ui/lobbyRules.js RiskGrid): a column per tag, its levels top to bottom */
 .rules-badge--risk { background: rgba(231, 90, 26, .9); color: #fff; }
 .rules-chip--risk { border-color: rgba(231, 90, 26, .7); color: #ffb48a; }
+/* (GitHub #125, spacc/cards-overhaul.md) an awarded tag: still orange (a Risk tag), but framed by corner brackets
+   instead of an outline, over a faint triangular lattice, with an AUTO label: in a screenshot it reads as "counted, not
+   committed to beforehand". The brackets are the site's panel idiom (the briefing, the dialogs). */
+.rules-chip--auto {
+  --bk: rgba(255, 140, 70, .85);
+  border-color: transparent;
+  background:
+    linear-gradient(var(--bk), var(--bk)) top left / 5px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top left / 1px 5px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 5px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) top right / 1px 5px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 5px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom left / 1px 5px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 5px 1px no-repeat,
+    linear-gradient(var(--bk), var(--bk)) bottom right / 1px 5px no-repeat,
+    repeating-linear-gradient(60deg, rgba(255, 140, 70, .08) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(-60deg, rgba(255, 140, 70, .08) 0 1px, transparent 1px 7px),
+    repeating-linear-gradient(0deg, rgba(255, 140, 70, .06) 0 1px, transparent 1px 6px),
+    rgba(0, 0, 0, .3);
+  position: relative;
+  overflow: hidden;
+}
+.rules-chip__auto {
+  margin-right: .05rem;
+  padding: 0 .03rem;
+  background: rgba(255, 140, 70, .2);
+  color: #ffd2b8;
+  font-size: calc(.1 * var(--t));
+  font-weight: 800;
+  letter-spacing: .04em;
+  vertical-align: .01rem;
+}
+/* the motion half: a scan line creeps up the card every few seconds (the site's ps-scan idiom); off with reduced motion */
+.rules-chip--auto::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 1px; bottom: -2px;
+  background: rgba(255, 180, 130, .55);
+  animation: chip-auto-scan 4.5s linear infinite;
+  pointer-events: none;
+}
+@keyframes chip-auto-scan { 0%, 60% { transform: translateY(0); opacity: 0; } 62% { opacity: 1; } 100% { transform: translateY(-2.4em); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .rules-chip--auto::after { animation: none; display: none; } }
+/* the Risk grid while the rule is on: the versions it can award, bracket corners and no fill (not taken) */
+.risk__tile.is-awardable {
+  border-style: dashed;
+  border-color: rgba(231, 90, 26, .35);
+}
+.rules-auto__list { margin: .02rem 0 .04rem; padding-left: .2rem; color: var(--text-lo); font-size: calc(.13 * var(--t)); line-height: 1.45; }
+.rules-auto__list b { color: #ffb48a; font-weight: 600; }
+.rules-auto__warn { margin: 0 0 .06rem; color: var(--amber); font-size: calc(.13 * var(--t)); }
 .risk { display: flex; flex-direction: column; gap: .08rem; }
 .risk__total { display: flex; align-items: baseline; gap: .12rem; font-size: calc(.18 * var(--t)); }
 .risk__total b { color: #ffb48a; }

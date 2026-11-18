@@ -2995,5 +2995,18 @@
   "伊奥莱塔开局（同「伊奥莱塔开局」），布阵同「自适应布阵」": "Opens like “Ioleta opening” and places like “Adaptive placement”",
   "强度：单人与 4 人组队终极难度胜率（%）之和，0–200；± 为 1 个标准差": "Strength: the Ultimate win rates (%) solo and as a team of 4, added up, 0–200; ± is 1 standard deviation",
   "单人 {solo}%（{soloN} 局）· 4 人组队 {team}%（{teamN} 局）": "Solo {solo}% ({soloN} matches) · team of 4 {team}% ({teamN} matches)",
-  "名称后的数字是强度：单人与 4 人组队终极难度的胜率（%）之和（0–200），± 为 1 个标准差。": "The number after a name is its strength: its Ultimate win rates (%) solo and as a team of 4 added up (0–200); ± is 1 standard deviation."
+  "名称后的数字是强度：单人与 4 人组队终极难度的胜率（%）之和（0–200），± 为 1 个标准差。": "The number after a name is its strength: its Ultimate win rates (%) solo and as a team of 4 added up (0–200); ± is 1 standard deviation.",
+  "；": "; ",
+  "；且没有AI队友或托管": "; and no AI teammate or autopilot",
+  "也没有博士选择伊奥莱塔·罗素、杜遥夜或阿米娅": "nor did any Doctor pick Ioleta Russell, Du Yaoye or Amiya",
+  "没有博士的【投资人】生效过（候补区计入，任何时刻）": "no Doctor's Investor was ever active (the bench counts, at any moment)",
+  "没有博士的【迅捷】在任何作战中生效过": "no Doctor's Swift was active in any battle",
+  "没有博士获得过缪尔赛思、耶拉或焰尾（含精锐）": "no Doctor ever obtained Muelsyse, Kjera or Flametail (Elite included)",
+  "没有博士选择受影响的策略（策略在第N回合生效的那些）": "no Doctor picked an affected Strategy (those that take effect in a named round)",
+  "没有【远见】干员参加过任何作战": "no Foresight Operator fought in any battle",
+  "结算时，房间未选择、且本局证明不会产生任何影响的风险标签会自动加入风险（标记为AUTO），不算作弊": "At the end, Risk tags the room didn't take, and that this match shows would have changed nothing, are added to the Risk (marked AUTO). Not a cheat",
+  "自动授予": "Auto-awarded",
+  "自动授予无影响的风险标签": "Auto-award free Risk tags",
+  "自动授予：本局中此标签不会产生任何影响": "Auto-awarded: this tag would have changed nothing in this match",
+  "这些条件只覆盖部分情况：即使本局没有满足条件，选上这个标签也可能照样获胜。想确保拿到风险，仍建议手动选择这些标签。": "These conditions cover only some cases: a match that misses one might still have been won with the tag on. To be sure of the Risk, take these tags by hand."
 }

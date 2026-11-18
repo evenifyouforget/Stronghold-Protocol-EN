@@ -236,6 +236,7 @@ export function finishRecord(m, summary) {
     mode: m.mode, difficulty: m.difficulty, modeId: m.modeId,
     lobbyRules: m.lobbyRules ?? {},
     rules: m.rules ?? null,
+    ...(m.awarded ? { awarded: { ...m.awarded } } : {}),
     cs: m.cs ?? null,
     seed: m.seed >>> 0,
     bossRound: m.gd.bossRound, hiddenRound: m.gd.hiddenRound ?? null,

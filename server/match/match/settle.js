@@ -12,6 +12,7 @@ import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { finishRecord } from '../records.js';
 import { settleChatWallet } from '../chatWallet.js';
+import { finishAwards } from '../autoAward.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
@@ -152,6 +153,8 @@ export class MatchSettle {
     this.deadline = 0;
     for (const f of this.fields) f.live = false;
     this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason };
+    // (GitHub #125) the Risk tags the autoAward rule adds (null: none)
+    try { this.awarded = finishAwards(this); } catch (e) { this.reportError('autoAward', e); this.awarded = null; }
     let result;
     try {
       result = buildResult(this, this.outcome);
@@ -159,6 +162,7 @@ export class MatchSettle {
       this.reportError('buildResult', e);
       result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
     }
+    if (this.awarded) result.awarded = { ...this.awarded };
     if (this.test) {
       result.test = true;
       result.testActions = this.testActions;

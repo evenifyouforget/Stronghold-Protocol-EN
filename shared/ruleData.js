@@ -312,6 +312,22 @@ function shiftRounds(text, rounds, mark) {
  * Strategy 1: the Strategy records whose named rounds come one round later (CC.strategyLate), their texts with the
  * new rounds, highlighted in `descRaw`. A record whose text names none of them is left out.
  */
+/**
+ * (fork, GitHub #125) The Strategies Strategy 1 (ccStrategyLate) affects: a named-round buff (CC.strategyLate.keys with
+ * bb.round), not one of the periodic ones. The same test as strategyLateBands, without the text check.
+ * @param {Record<string, any>} bands the bands data
+ * @returns {string[]}
+ */
+export function strategyLateBandIds(bands) {
+  const out = [];
+  if (!bands || typeof bands !== 'object') return out;
+  for (const [id, b] of Object.entries(bands)) {
+    if (!b || CC.strategyLate.periodic.includes(id) || !Array.isArray(b.buffs)) continue;
+    if (b.buffs.some((x) => x && CC.strategyLate.keys.includes(x.key) && Number.isInteger(x.bb?.round))) out.push(id);
+  }
+  return out;
+}
+
 function strategyLateBands(bands) {
   const out = {};
   if (!bands || typeof bands !== 'object') return out;

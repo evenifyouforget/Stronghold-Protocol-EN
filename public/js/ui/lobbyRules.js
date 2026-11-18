@@ -17,6 +17,7 @@ import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalize
 import { loadPref, savePref } from '../store.js';
 import { VIRTUOSA, BLAZE, CC, ISO_PLUS, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
+import { AWARDABLE, AWARD_CONDITIONS, isAwardable } from '../../../shared/autoAward.js';
 import { MODZ } from '../../../shared/modZ.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -67,6 +68,7 @@ export function ruleLabel(key, rules) {
     case 'lateranoMod': return t('{bond}模组 {m}', { bond: bondName('lateranoShip'), m: v });
     case 'victoriaMod': return t('{bond}模组 {m}', { bond: bondName('victoriaShip'), m: v });
     case 'virtuosaBonds': return t('{name}加入{a}与{b}', { name: chessName(VIRTUOSA.ids[0], VIRTUOSA.ids[0]), a: bondName('swiftShip'), b: bondName('deputShip') });
+    case 'autoAward': return t('自动授予无影响的风险标签');
     case 'blaze': return t('{name}代替{old}', { name: data.get('backups')?.units?.[BLAZE.charId]?.name || BLAZE.charId, old: (data.lookupBase('chess', BLAZE.slot.a)?.name || BLAZE.slot.a) });
     case 'stage': return t('指定战场：{name}', { name: data.lookup('stages', v)?.name || v });
     case 'bans': return t('指定禁用盟约：{list}', { list: (v || []).map(bondName).join(t('、')) });
@@ -79,17 +81,19 @@ export function ruleLabel(key, rules) {
  * tag's chip carries its effects (every level in force) as its tooltip.
  * @param {{ rules: any }} props
  */
-export function RulesChips({ rules }) {
+export function RulesChips({ rules, awarded = null }) {
+  const auto = awarded && typeof awarded === 'object' ? Object.entries(awarded).filter(([k, v]) => ruleOf(k) && v > 0) : [];
   return html`<ul class="rules-chips">${rulesInForce(rules).map((k) => {
     const r = ruleOf(k);
     const tip = r.type === 'level' ? levelsInForce(r, rules[k]).map((l) => riskText(k, l).full).join('\n') : undefined;
     return html`<li key=${k} class=${`rules-chip rules-chip--${r.category}`} title=${tip}>${ruleLabel(k, rules)}</li>`;
-  })}</ul>`;
+  })}${auto.map(([k, v]) => html`<li key=${`auto:${k}`} class="rules-chip rules-chip--risk rules-chip--auto"
+      title=${`${t('自动授予：本局中此标签不会产生任何影响')}\n${riskText(k, v).full}`}><span class="rules-chip__auto" aria-label=${t('自动授予')}>AUTO</span>${riskText(k, v).short}</li>`)}</ul>`;
 }
 
-/** The result-title suffix and watermark of `rules`: `{ seeded, cheats, risk }` (null / 0 when not labelled). */
-export function ruleBadges(rules) {
-  const l = ruleLabels(rules);
+/** The result-title suffix and watermark of `rules` (and the tags `awarded` by #125): `{ seeded, cheats, risk }`. */
+export function ruleBadges(rules, awarded = null) {
+  const l = ruleLabels(rules, awarded);
   return { seeded: l.seeded ? 'seeded' : null, cheats: l.cheats ? 'WITH CHEATS' : null, risk: l.risk };
 }
 
@@ -264,7 +268,7 @@ function RiskGrid({ rules, editable, onSet }) {
       ${cells.map(({ r, level, row, col: c, span, inForce }) => {
         const active = rules[r.key] === level;
         return html`<${Tooltip} key=${`${r.key}:${level}`} text=${riskText(r.key, level).full} style=${`grid-row:${row};grid-column:${c} / span ${span}`}>
-          <button type="button" class=${cx('risk__tile', active && 'is-active', !active && inForce && 'is-included')} aria-pressed=${active ? 'true' : 'false'}
+          <button type="button" class=${cx('risk__tile', active && 'is-active', !active && inForce && 'is-included', rules.autoAward === true && !(rules[r.key] > 0) && isAwardable(r.key, level) && 'is-awardable')} aria-pressed=${active ? 'true' : 'false'}
             data-risk=${r.key} data-level=${level} disabled=${!editable} onClick=${() => onSet({ [r.key]: active ? 0 : level })}>
             <span class="risk__lv num">${ruleRisk(r.key, level)}</span><span>${riskText(r.key, level).short}</span>
           </button>
@@ -529,6 +533,21 @@ function ModZPicker({ rules, editable, onSet }) {
     </div>`;
 }
 
+/**
+ * (GitHub #125) The autoAward rule: the toggle, and while it's on, every tag version it can award with its conditions,
+ * and the warning that a tag taken by hand is the safe way (Fish, 2026-11-18).
+ */
+function AutoAwardToggle({ rules, editable, onSet }) {
+  const on = rules.autoAward === true;
+  return html`<div class="rules-auto">
+    <${Toggle} k="autoAward" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('autoAward', rules)}
+      desc=${t('结算时，房间未选择、且本局证明不会产生任何影响的风险标签会自动加入风险（标记为AUTO），不算作弊')} />
+    ${on ? html`<ul class="rules-auto__list">${AWARDABLE.map((a) => html`<li key=${`${a.key}:${a.level}`}>
+        <b>${riskText(a.key, a.level).short}</b>：${a.needs.map((c) => t(AWARD_CONDITIONS[c])).join(t('；'))}${a.aiOk ? '' : t('；且没有AI队友或托管')}</li>`)}</ul>
+      <p class="rules-auto__warn">${t('这些条件只覆盖部分情况：即使本局没有满足条件，选上这个标签也可能照样获胜。想确保拿到风险，仍建议手动选择这些标签。')}</p>` : null}
+  </div>`;
+}
+
 /** The dialog's tabs and the rule keys each one holds (its badge counts the ones in force). */
 const RULE_TABS = Object.freeze([
   { id: 'cheat', keys: ['extraDeploy', 'extraFunds', 'doubleLp', 'tierStart', 'boosterPack', 'itemBoosterPack', 'untimed'] },
@@ -543,7 +562,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   const [tab, setTab] = useState('cheat');
   const inForce = new Set(rulesInForce(rules));
   const badge = (tb) => {
-    const keys = tb.keys ?? RULES.filter((r) => r.category === 'risk').map((r) => r.key);
+    const keys = tb.keys ?? [...RULES.filter((r) => r.category === 'risk').map((r) => r.key), 'autoAward'];
     const n = tb.id === 'modZ' ? (rules.modZ || []).length : keys.filter((k) => inForce.has(k)).length;
     return n > 0 ? n : null;
   };
@@ -594,6 +613,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Seeded} room=${room} rules=${rules} editable=${editable} onSet=${onSet} />
     <//>` : null}
     ${tab === 'risk' ? html`<${Section} title=${t('风险')} note=${t('结算标题将带有「+风险」')}>
+      <${AutoAwardToggle} rules=${rules} editable=${editable} onSet=${onSet} />
       <${RiskGrid} rules=${rules} editable=${editable} onSet=${onSet} />
     <//>` : null}
   <//>`;

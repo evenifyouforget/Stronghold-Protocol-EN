@@ -12,6 +12,7 @@ import { FLOW_TICKER_PRIORITY, DELAYS } from './common.js';
 import { msg, playerParam } from '../../../shared/i18n.js';
 import { onStartUnite } from '../botEmotes.js';
 import { noteChatKills } from '../chatWallet.js';
+import { noteBattle } from '../autoAward.js';
 
 /** (fork) The watchdog's second stage: how long after the field closed `_afterUnite` gets to move the phase on. */
 const UNITE_SETTLE_GRACE_MS = 10_000;
@@ -23,7 +24,9 @@ export class MatchUnite {
     this.phase = PHASE.UNITE;
     this.unitePlan = plan;
     const limit = this.wave ? this.wave.timeLimit : 60;
-    const battle = this.newBattle(this._uniteOpts(plan, limit));
+    const uo = this._uniteOpts(plan, limit);
+    noteBattle(this, uo); // (GitHub #125) a real field
+    const battle = this.newBattle(uo);
     this.fields = [{ fieldId: 'u', kind: 'unite', players: plan.helpers.map((p) => p.playerId), battle, live: true }];
     this.deadline = this.sched.instant ? 0 : this.sched.now() + Math.round((limit / this.gameSpeed) * 1000);
     this._defaultWatch();
