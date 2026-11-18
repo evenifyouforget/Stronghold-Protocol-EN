@@ -12,7 +12,7 @@ import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { finishRecord } from '../records.js';
 import { settleChatWallet } from '../chatWallet.js';
-import { finishAwards } from '../autoAward.js';
+import { finishAwards, noteSettle } from '../autoAward.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
@@ -48,6 +48,7 @@ export class MatchSettle {
       const loss = this.riskLoss(r.leaked, leaker ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted), !leaker);
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
+      noteSettle(this, ps, counted > 0); // (GitHub #125) Last Line
       ps.stats.lpLost += loss;
       ps.stats.leaks += counted;
       ps.stats.kills += Number(r.killed) || 0;

@@ -14,13 +14,17 @@ const ON = { autoAward: true };
 test('awardedTags: only with the rule on; untaken tags; the highest level whose conditions all held', () => {
   const none = new Set();
   assert.deepEqual(awardedTags({}, none, { aiSeats: false }), {}, 'rule off: nothing');
+  const PHASE1 = { ccInvestorBench: 2, ccSwift: 1, ccForesight: 1, ccStrategyLate: 2 };
   assert.deepEqual(awardedTags(ON, none, { aiSeats: false }),
-    { ccInvestorBench: 2, ccSwift: 1, ccForesight: 1, ccStrategyLate: 2 }, 'nothing broken: every awardable tag, top level');
-  assert.deepEqual(awardedTags({ ...ON, ccSwift: 1, ccStrategyLate: 1 }, none, { aiSeats: false }),
+    { ...PHASE1, ccTier1Price: 1, ccUpgrade: 2, ccLastLine: 1, ccJunk: 1 }, 'nothing broken, no AI seats: every awardable tag, top level');
+  assert.deepEqual(awardedTags(ON, none, { aiSeats: true }), PHASE1, 'AI seats: only the versions marked aiOk');
+  assert.deepEqual(awardedTags(ON, new Set(['barge', 'junk']), { aiSeats: false }),
+    { ...PHASE1, ccTier1Price: 1, ccLastLine: 1 }, 'Barge 1 and 2 share one condition; Junk 2 is never awarded');
+  assert.deepEqual(awardedTags({ ...ON, ccSwift: 1, ccStrategyLate: 1 }, none, { aiSeats: true }),
     { ccInvestorBench: 2, ccForesight: 1 }, 'a taken tag (any level) is not awarded or raised');
-  assert.deepEqual(awardedTags(ON, new Set(['investorOps', 'strategy2', 'foresight']), { aiSeats: false }),
+  assert.deepEqual(awardedTags(ON, new Set(['investorOps', 'strategy2', 'foresight']), { aiSeats: true }),
     { ccInvestorBench: 1, ccSwift: 1, ccStrategyLate: 1 }, 'a level drops to the one whose conditions held');
-  assert.deepEqual(awardedTags(ON, new Set(['investor', 'strategy1', 'swift', 'foresight']), { aiSeats: false }), {},
+  assert.deepEqual(awardedTags(ON, new Set(['investor', 'strategy1', 'swift', 'foresight']), { aiSeats: true }), {},
     'a stacking tag needs its lower levels: no Investor 2 without Investor 1');
 });
 
@@ -75,4 +79,44 @@ test('a real field with a Foresight operator and an active Swift breaks both', a
   assert.equal(a.ccForesight, undefined);
   assert.equal(a.ccSwift, undefined);
   h.m.dispose();
+});
+
+test('phase 2 watchers: a late tier-1 buy, a level-5 Dispatch Center, a full hand, Last Line\'s extra LP', async () => {
+  const { noteBuy, noteLevel, noteHand, noteSettle, noteTeamLp } = await import('../../server/match/autoAward.js');
+  const h = makeMatch({ mode: 'solo', seed: 5, lobbyRules: ON }).start();
+  h.toPrep(1);
+  const m = h.m; const ps = [...m.players.values()][0];
+  const tier = (t) => Object.keys(m.gd.raw.chess).find((id) => m.gd.tierOf(id) === t);
+  const broken = () => new Set(m._awardBroken || []);
+  noteBuy(m, ps, tier(1));
+  assert.ok(!broken().has('intern'), 'round 1: tier-1 buys cost the same');
+  m.round = 3; noteBuy(m, ps, tier(2));
+  assert.ok(!broken().has('intern'), 'round 3: a tier-2 buy is not affected');
+  noteBuy(m, ps, tier(1));
+  assert.ok(broken().has('intern'), 'round 3: a tier-1 buy breaks Intern');
+  ps.shop.level = 4; noteLevel(m, ps); assert.ok(!broken().has('barge'));
+  ps.shop.level = 5; noteLevel(m, ps); assert.ok(broken().has('barge'), 'level 5 breaks Barge');
+  const hand = ps.hand; ps.hand = hand.map(() => null); ps.hand[0] = { kind: 'item', id: 'x' };
+  noteHand(m, ps); assert.ok(!broken().has('junk'), 'a free slot left');
+  ps.hand = ps.hand.map(() => ({ kind: 'item', id: 'x' })); noteHand(m, ps);
+  assert.ok(broken().has('junk'), 'a full hand breaks Junk 1');
+  ps.hand = hand;
+  const lp = ps.lp;
+  ps.lp = 10; noteSettle(m, ps, true); noteSettle(m, ps, false); noteSettle(m, ps, true);
+  assert.ok(!broken().has('lastLine'), '10 LP less 4 extra: still alive');
+  ps.lp = 4; noteSettle(m, ps, false);
+  assert.ok(broken().has('lastLine'), '4 LP less 4 extra: eliminated');
+  m._awardBroken.delete('lastLine'); m.teamLp = 5; noteTeamLp(m);
+  assert.ok(!broken().has('lastLine'), 'team LP 5 less 4: the boss fight goes on');
+  m.teamLp = 4; noteTeamLp(m);
+  assert.ok(broken().has('lastLine'), 'team LP 4 less 4: it would have ended');
+  ps.lp = lp;
+  h.m.dispose();
+});
+
+test('an idle solo game without AI seats also earns Intern, Barge 2 and Junk 1 (nothing bought, levelled or held)', () => {
+  const on = idleMatch(ON);
+  assert.equal(on.awarded.ccTier1Price, 1);
+  assert.equal(on.awarded.ccUpgrade, 2);
+  assert.equal(on.awarded.ccJunk, 1);
 });

@@ -7,10 +7,17 @@
 //   swift        a real field's battle (Match: normal, boss, unite): a player's 迅捷 (swiftShip) active in its spec
 //   foresight    the same battles: a deployed operator of 远见 (visiShip)
 //   strategy1/2  at the end: a player's Strategy is on the tag's list
+//   intern       PlayerEconomy.buy: a tier-1 operator bought from round CC.tier1FromRound on (the price Intern raises)
+//   barge        PlayerEconomy.levelUp: a Dispatch Center reaches level 5 (Barge 1 prices 4→5; Barge 2 also 5→6)
+//   lastLine     settle: a player's LP minus Last Line's extra so far (CC.lastLineLp per round its own battle leaked)
+//                would be 0; the boss rounds: the team LP minus the alive players' extra would be 0
+//   junk         every write into a hand (PlayerPieces.stow, the temp refill, placement, items): the hand is left with
+//                no free slot, or a piece overflowed into the temp hand (the hammer would have taken that slot)
 //
 // AI seats (bots, 托管 at any time) are noted for the versions that need a lobby without them.
 
 import { CC, strategyLateBandIds } from '../../shared/ruleData.js';
+import { countFree } from './board.js';
 import { awardedTags, STRATEGY2_BANDS } from '../../shared/autoAward.js';
 
 const on = (m) => m?.lobbyRules?.autoAward === true;
@@ -48,6 +55,38 @@ export function noteBattle(m, opts) {
       if (c && Array.isArray(c.bonds) && c.bonds.includes('visiShip')) breakAward(m, 'foresight');
     }
   }
+}
+
+/** A purchase of `chessId`: a tier-1 operator from round CC.tier1FromRound on breaks `intern`. */
+export function noteBuy(m, ps, chessId) {
+  if (on(m) && m.round >= CC.tier1FromRound && ps?.gd?.tierOf?.(chessId) === 1) breakAward(m, 'intern');
+}
+
+/** After a level-up: a Dispatch Center at level 5 or more breaks `barge`. */
+export function noteLevel(m, ps) {
+  if (on(m) && (ps?.shop?.level ?? 0) >= 5) breakAward(m, 'barge');
+}
+
+/** After a write into `ps`'s hand: no free slot left breaks `junk` (`overflow`: a piece went to the temp hand instead). */
+export function noteHand(m, ps, overflow = false) {
+  if (on(m) && (overflow || (Array.isArray(ps?.hand) && countFree(ps.hand) === 0))) breakAward(m, 'junk');
+}
+
+const lastLineExtra = (m) => (m._awardLastLine ||= new Map());
+/** After a player's settle (`leaked`: its own battle leaked): would Last Line's extra so far have eliminated it? */
+export function noteSettle(m, ps, leaked) {
+  if (!on(m) || !ps) return;
+  const ex = (lastLineExtra(m).get(ps.playerId) || 0) + (leaked ? CC.lastLineLp : 0);
+  lastLineExtra(m).set(ps.playerId, ex);
+  if (ps.lp > 0 && ps.lp - ex <= 0) breakAward(m, 'lastLine');
+}
+
+/** After a team LP loss in the boss rounds: would the team LP, less the alive players' extra, be gone? */
+export function noteTeamLp(m) {
+  if (!on(m) || !(m.teamLp > 0)) return;
+  let ex = 0;
+  for (const ps of m.alivePlayers?.() ?? []) ex += lastLineExtra(m).get(ps.playerId) || 0;
+  if (m.teamLp - ex <= 0) breakAward(m, 'lastLine');
 }
 
 /** A seat was played by the AI at some point (a bot, or 托管). */
