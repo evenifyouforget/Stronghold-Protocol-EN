@@ -40,6 +40,8 @@ For each open PR on our repo:
 - red CI: find the cause and fix it, or say why it's unrelated (a known flake, an environment failure);
 - merge conflicts: merge the base branch in;
 - keep the description and labels current. Labels always include `drafted-by-ai`, never `playtested`;
+- a PR that adds or rewords text players see gets a blind read before it's ready (`PLAYER_TEXT.md`: the style rule, the
+  prompt, the log), with the result in its description;
 - close it if a recent change made it irrelevant, with a comment saying which change.
 
 PRs on Yuri's repo: report what needs doing and ask before pushing to their branches.
