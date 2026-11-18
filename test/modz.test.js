@@ -231,6 +231,21 @@ test('Hellagur Z: per attack HP +50 (80 at most), per deployment one Waxing, Cor
   noErrors(b);
 });
 
+test('Hellagur Z: Waxing\'s ASPD is Tenacity: none at full HP, in full at 70 % HP lost; with his talent the highest counts', () => {
+  const { h, b, ops: [u] } = rig([op('char_188_helage', 'uniequip_fishz_helage', 0)]);
+  h.run(0.5);
+  assert.equal(u.persist.fishModZ.wax, 1);
+  assert.ok(!u.findBuff('fishModZ:helage:tenacity'), 'full HP: no Tenacity');
+  u.hp = u.s.maxHp * 0.3; h.run(0.2);
+  const talent = u.findBuff('talent:helage:berserk')?.data?.v ?? 0;
+  assert.ok(talent > 20, `his talent's Tenacity ${talent}`);
+  assert.ok(!u.findBuff('fishModZ:helage:tenacity'), 'one Waxing (+20) is below his talent: the highest counts, nothing added');
+  u.persist.fishModZ.wax = 10; h.run(0.2);
+  const add = u.findBuff('fishModZ:helage:tenacity').mods.aspd, t2 = u.findBuff('talent:helage:berserk').data.v;
+  assert.ok(Math.abs(add + t2 - 2 * t2) < 0.5, `10 Waxing: twice his talent's +100 in all, i.e. +200 at 70 % lost (talent ${t2} + ${add})`);
+  noErrors(b);
+});
+
 test('Phantom Z: Raid and Indomitable on the elite, and Raid treats his skill as ready', () => {
   const m = modZOf('uniequip_fishz_phatom');
   assert.deepEqual([...m.bonds], ['raidShip', 'indomShip']);
