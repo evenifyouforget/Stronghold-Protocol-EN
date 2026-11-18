@@ -17,7 +17,7 @@ import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalize
 import { loadPref, savePref } from '../store.js';
 import { VIRTUOSA, BLAZE, CC, ISO_PLUS, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
 import { t } from '../../../shared/i18n.js';
-import { AWARDABLE, AWARD_CONDITIONS, isAwardable } from '../../../shared/autoAward.js';
+import { AWARDABLE, AWARD_CONDITIONS, AWARD_EVENTS, isAwardable } from '../../../shared/autoAward.js';
 import { MODZ } from '../../../shared/modZ.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -91,12 +91,18 @@ export function RulesChips({ rules, awarded = null }) {
       title=${`${t('自动授予：本局中此标签不会产生任何影响')}\n${riskText(k, v).full}`}><span class="rules-chip__auto" aria-label=${t('自动授予')}>AUTO</span>${riskText(k, v).short}</li>`)}</ul>`;
 }
 
-/** One broken condition's line in the "why not" panel: the condition, then when it first failed and what broke it. */
+/** The Alliance each event names. */
+const EVENT_BOND = { investor: 'investShip', swift: 'swiftShip', foresight: 'visiShip' };
+/** One broken condition's line in the "why not" panel: what happened (its round first), as AWARD_EVENTS says it. */
 function awardNoteLine(b) {
-  const what = b.id ? (b.id.startsWith('band_') ? bandName(b.id) : chessName(b.id, b.id)) : null;
-  const when = Number.isInteger(b.r) && b.r > 0 ? t('第{r}回合', { r: b.r }) : null;
-  const detail = [when, what].filter(Boolean).join(t('、'));
-  return html`<li key=${b.c}>${AWARD_CONDITIONS[b.c] ? t(AWARD_CONDITIONS[b.c]) : b.c}${detail ? html` <span class="rules-why__at">${t('（未满足：{detail}）', { detail })}</span>` : null}</li>`;
+  const name = b.id ? (b.id.startsWith('band_') ? bandName(b.id) : chessName(b.id, b.id)) : '';
+  const when = Number.isInteger(b.r) && b.r > 0 ? t('第{r}回合：', { r: b.r }) : '';
+  const text = AWARD_EVENTS[b.c]
+    ? t(AWARD_EVENTS[b.c], { name, bond: EVENT_BOND[b.c] ? bondName(EVENT_BOND[b.c]) : '', item: t(TOXIC_WASTE_NAME) })
+    : AWARD_CONDITIONS[b.c] ? t(AWARD_CONDITIONS[b.c]) : b.c;
+  // no round in front: the sentence starts the line (English and Korean lines start in lowercase after "Round N: ")
+  const line = when ? text : text.charAt(0).toUpperCase() + text.slice(1);
+  return html`<li key=${b.c}>${when ? html`<span class="rules-why__at">${when}</span>` : null}${line}</li>`;
 }
 
 /**
@@ -104,15 +110,30 @@ function awardNoteLine(b) {
  * end screen; Fish 2026-11-19). `notes`: shared/autoAward.js awardNotes. Nothing when there are none.
  * @param {{ notes: Array<{ key: string, level: number, ai: boolean, broken: Array<{ c: string, r: number|null, id?: string }> }> | null }} props
  */
+/**
+ * The panel's rows: levels of one tag with the same reasons share a row ("Barge 1 · Barge 2"), so two identical lines
+ * don't read as two different reasons (the 2026-11-19 blind read asked what told them apart).
+ * @param {Array<{ key: string, level: number, ai?: boolean, broken: Array<{ c: string }> }>} notes
+ */
+export function groupNotes(notes) {
+  const out = [];
+  for (const n of notes) {
+    const prev = out.at(-1);
+    if (prev && prev.key === n.key && !!prev.ai === !!n.ai && JSON.stringify(prev.broken) === JSON.stringify(n.broken)) prev.levels.push(n.level);
+    else out.push({ ...n, levels: [n.level] });
+  }
+  return out;
+}
+
 export function AwardNotesButton({ notes }) {
   const [open, setOpen] = useState(false);
   if (!Array.isArray(notes) || !notes.length) return null;
   return html`<button type="button" class="rules-why__open" data-testid="award-notes-open" aria-haspopup="dialog" onClick=${() => setOpen(true)}>
       <${Icon} name="info" />${t('为什么没有自动授予其他标签？')}</button>
     ${open ? html`<${Modal} open=${true} class="rules-why" micro="AUTO-AWARD" title=${t('未自动授予的标签')} width="min(34rem, 96vw)" onClose=${() => setOpen(false)}>
-      <p class="rules-why__intro">${t('这些风险标签本可以自动授予，但本局中它们的条件没有全部满足。这只是说明，不影响结算。')}</p>
-      <ul class="rules-why__list">${notes.map((n) => html`<li key=${`${n.key}:${n.level}`} class="rules-why__tag">
-        <b>${riskText(n.key, n.level).short}</b>
+      <p class="rules-why__intro">${t('风险标签只有在不可能改变本局时才会自动授予。下面这些标签本可以改变本局，所以只有房间选了它们才计入风险。')}</p>
+      <ul class="rules-why__list">${groupNotes(notes).map((n) => html`<li key=${`${n.key}:${n.level}`} class="rules-why__tag">
+        <b>${n.levels.map((l) => riskText(n.key, l).short).join(' · ')}</b>
         <ul>${n.broken.map(awardNoteLine)}${n.ai ? html`<li key="ai">${t('房间里有AI队友或托管：这个标签只在没有AI的房间里自动授予')}</li>` : null}</ul>
       </li>`)}</ul>
     <//>` : null}`;
