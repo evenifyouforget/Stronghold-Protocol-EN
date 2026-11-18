@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ROOM_BOTS, BOT_INFO, botScore } from '../../shared/botProfiles.js';
+import { ROOM_BOTS, BOT_INFO, botScore, strengthMatches, STRENGTH_MATCHES } from '../../shared/botProfiles.js';
 import { TACTICS } from '../../server/match/botStrategies.js';
 import { makeMatch } from '../match/harness.js';
 
@@ -52,6 +52,8 @@ test('the strength score (Fish on #151): solo + team of 4, 0–200, ± 1 standar
   assert.deepEqual(botScore({ strength: 38, team: 65 }), { score: 103, sd: 9 });
   assert.deepEqual(botScore({ strength: 0, team: 23 }), { score: 23, sd: 7 });
   assert.equal(botScore({ strength: 44 }), null, 'no team number: no score');
+  assert.deepEqual(botScore({ strength: 42, team: 71, n: { solo: 380, team: 340 } }), { score: 113, sd: 4 }, 'a bot\'s own match counts narrow its ±');
+  assert.equal(strengthMatches({}), STRENGTH_MATCHES);
   for (const b of ROOM_BOTS) {
     const sc = botScore(BOT_INFO[b.id]);
     assert.ok(sc && sc.score >= 0 && sc.score <= 200 && sc.sd >= 0, b.id);
