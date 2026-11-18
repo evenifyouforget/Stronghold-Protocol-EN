@@ -14,21 +14,21 @@ Ranked for a machine with many cores and, ideally, a browser. Each one works fro
    - #168 (merged): the AI profiles popup's scores.
 2. **SPA-CC grinder runs** (#124 level 3, `compute`). The sets and commands are in `fish-edition/spacc/grinder-definition.md` "Running a set" (branch `wip/loop-notes-2026-11-11`), and they need `tools/bench-share.mjs --rules` (#171). The useful run is the four scored sets (H5, H10, F9, C3) at 1,000+ seeds each, legacy vs evobot: about 8,000 solo matches (~45 CPU-hours: 2 to 3 hours on 24 threads). Post the blocks on #124.
 3. **Strength numbers for the AI profiles popup** (#124 levels 1–2): shark has this already. More team seeds settle evobot's team number (71 vs the table's 78).
-4. **Auto-award phase 2** (#125, code; after #170 merges). Intern, Barge 1/2, Low Efficiency, Last Line and Junk 1, only in lobbies without AI seats. The conditions are in the analysis comment on #125, and the pattern is in `shared/autoAward.js` / `server/match/autoAward.js` (an `aiOk: false` entry plus a watcher each). Otherwise orca does it next.
+4. **ML / decision-point research** (Fish's 2026-11-16 direction: learn from decision points). orca's data (match records, the evolution race cache, the surrogate) travels as the bundle `orca-ml-2026-11-19` via Fish; its `ORCA-ML-BUNDLE.md` lists the lines of work and what to send back. Claim a line here first.
 
-**Not good to hand over:** the ML surrogate (its 250 MB of data is only on orca), studies of human games (the match records are only on orca unless Fish shares them too), SPA-CC balance, the Yuri syncs and Mod Z.
+**Not good to hand over:** SPA-CC balance (the sweeps' data stays on orca), the Yuri syncs and Mod Z.
 
 ## Lines of work
 
 | Line of work | Who | Open to | Where |
 | --- | --- | --- | --- |
-| Current mini release `mini/0.3.3-2` (opened 2026-11-18): syncs, bug fixes and small PRs; scope in `fish-edition/TODO.md` | Fish, orca | anyone (small PRs to `mini/0.3.3-2`, label `mini-0.3.3-2`) | merged: #166, #167, #168; open: #170, #171 |
-| Auto-award free Risk tags (#125) | orca | phase 1: review; phase 2: anyone (see above) | #170 |
+| Current mini release `mini/0.3.3-2` (opened 2026-11-18): syncs, bug fixes and small PRs; scope in `fish-edition/TODO.md` | Fish, orca | anyone (small PRs to `mini/0.3.3-2`, label `mini-0.3.3-2`) | merged: #166, #167, #168, #170, #171; open: #173 |
+| Auto-award free Risk tags (#125) | orca | phase 1 merged (#170); phase 2 in review (#173); Low Efficiency waits on Fish | #170, #173 |
 | SPA-CC grinder (#124 level 3): the rubric, its tag sets, bot runs | orca (rubric, co-op sets running now), anyone (runs) | compute | `fish-edition/spacc/grinder-definition.md`, #124, #171 |
-| Cards display overhaul (#125's look) | orca, Fish | keep out until #170 merges | `fish-edition/spacc/cards-overhaul.md` |
+| Cards display overhaul (#125's look) | orca, Fish | keep out (Fish's in-game feedback first) | `fish-edition/spacc/cards-overhaul.md` |
 | SPA-CC clears tracking | orca | anyone can share records with Fish | #121 (refreshed 2026-11-18 from 277 matches) |
 | Bot strength numbers (#124 levels 1–2) | shark | compute | #124, #168 |
-| Bot research: tactics, evolution, ML surrogate | orca | compute (strength runs); otherwise keep out: the datasets are only on orca | branch `wip/loop-notes-2026-11-11`, `fish-edition/ai-players/` |
+| Bot research: tactics, evolution, ML | orca, shark (via the bundle) | compute (strength runs); ML lines: claim one here (bundle `orca-ml-2026-11-19`) | branch `wip/loop-notes-2026-11-11`, `fish-edition/ai-players/` |
 | SPA-CC balance (last update before the end of service) | orca | keep out: the sweeps' data is only on orca | `fish-edition/spacc/`, TODO.md "SPA-CC" |
 | Mod Z / Mod W draft | orca | keep out: Fish's designs aren't committed | #142 (in 0.3.3-1) |
 | Collaboration setup: this board, `COLLABORATION.md`, compute jobs (`tools/bench-share.mjs`) | orca | anyone: comments on the doc welcome | #162 (merged), #171 |
