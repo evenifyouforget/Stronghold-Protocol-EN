@@ -9,6 +9,7 @@ import { hasTraitFor } from '../operatorTraits.js';
 import { pieceDir, parseDir, mergeTile } from '../board.js';
 import { MAX_OFFER_SLOTS } from './common.js';
 import { onMerge } from '../botEmotes.js';
+import { noteGained } from '../autoAward.js';
 
 export class PlayerAcquire {
   /** Normal copies of a base chess currently owned (board/hand/temp). */
@@ -45,6 +46,7 @@ export class PlayerAcquire {
     const need = rec.isGolden ? this.gd.goldenCopies : 1;
     // the shared pool, or this player's stock of a slotted 自选 piece (player/diy.js poolOf)
     const taken = fromPool ? this.poolOf(base).take(base, need, { overdraw: true }) : 0;
+    noteGained(this.m, this, chessId); // (GitHub #125) Investor 2's operators
     const piece = this.newPiece('chess', chessId, { poolCopies: taken });
     this.round.gainedChess++;
     let owned = piece;
@@ -159,6 +161,7 @@ export class PlayerAcquire {
   transformChess(piece, newId) {
     const loc = this.find(piece.uid);
     if (!loc || loc.piece.kind !== 'chess' || !this.gd.chess(newId)) return null;
+    noteGained(this.m, this, newId); // (GitHub #125)
     // Remove the original carrier, its summons, and its pool occupation.
     this._detach(loc);
     this.removeTokensOf(piece.uid);

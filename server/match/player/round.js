@@ -13,6 +13,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { equippedItemProgress } from '../itemProgress.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
+import { noteBonds } from '../autoAward.js';
 
 export class PlayerRound {
   /** The tierStart cheat's operators: per tier, a random base id the shared pool still has a copy of. */
@@ -117,6 +118,7 @@ export class PlayerRound {
     // the states the last recompute stored: the change since then is reported once (_reportActiveBonds)
     const before = this.bonds;
     this.bonds = computeBonds(this.gd, this);
+    noteBonds(this.m, this); // (GitHub #125) 投资人 active: Investor can't be awarded
     this.dirty();
     this._reportActiveBonds(before, this.bonds);
   }

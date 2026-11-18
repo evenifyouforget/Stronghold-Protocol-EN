@@ -27,6 +27,7 @@
       "victoriaMod": "A",
       "virtuosaBonds": false,
       "blaze": false,
+      "autoAward": false,
       "stage": null,
       "bans": [],
       "ccInvestorBench": 0,
