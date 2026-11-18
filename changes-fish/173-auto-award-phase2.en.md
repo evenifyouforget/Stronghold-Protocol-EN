@@ -1,0 +1,1 @@
+- "Auto-award free Risk tags" now also covers Intern, Barge 1 and 2, Last Line of Defense and Junk 1. These are awarded only in rooms without bots or autoplay, since bots read prices, free hand slots and LP (#173, issue #125).
