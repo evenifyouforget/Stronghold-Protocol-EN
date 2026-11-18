@@ -130,6 +130,58 @@ rate.
 - **Verdict:** fixed sets now. If wanted later, draw from the human pick rates (section 1), so the draws look like real
   games.
 
+## 6. Co-op: the same sets, or its own? (Fish's question; benched 2026-11-19)
+
+Team of 4 evobots (`coop4:ABYSS`, Ultimate), 40 seeds from 762481, beside the solo numbers above (±1 SD at 40 seeds is
+about ±3 wins, ±8 points):
+
+| Set | Solo | Team of 4 | |
+|---|---|---|---|
+| No tags | 39% | 73% | |
+| H5 | 33% | 63% | the economy tags cost about the same share in both modes |
+| H10 | 13% | 30% | |
+| F9 | 19% | 30% | |
+| C3 (light combat) | 16% | **55%** | combat tags cost far less in co-op |
+| Activation 1 alone | 13% | **45%** | so do boss tags: the whole team damages the boss |
+| Patriot 1 alone | 3% | **23%** | |
+| Lockout 1 alone | 0% | 0% | still a wall |
+| CB2: Activation 1 + Patriot 1 | — | 15% | |
+| H10B: H10 + Activation 1 | — | 15% | |
+| CO10: the 3-human co-op clear (Risk 10, 2026-11-04) | — | 5% | |
+| CO15: the 4-human co-op clear (Risk 15, seeded, 2026-11-08; run unseeded) | — | 0% | |
+| H15, H18, S5, S6 | 0% | 0% | |
+
+**Reading.** Your hunch holds for combat and boss tags: they're much easier in co-op, while the economy tags cost about
+the same in both modes. In co-op, the boss tags (the bots' main weakness) score above zero, so co-op is where a better
+boss bot would show first.
+
+**Draft: a co-op list of its own** (8 sets, 100 each, like solo):
+
+| Co-op set | Evobot | Why | Also in solo? |
+|---|---|---|---|
+| H5 | 63% | the casual kit | yes |
+| H10 | 30% | the full human kit | yes |
+| C3 | 55% | light combat | yes |
+| **CB2** | 15% | Activation 1 + Patriot 1: boss damage, measurable only in co-op | no (replaces F9: economy tags behave as in solo, so F9 adds little) |
+| **H10B** | 15% | the human kit plus Activation 1 | no |
+| **CO10** | 5% | headroom: what 3 humans cleared | no (replaces H18, the solo record) |
+| **CO15** | 0% | headroom: what 4 humans cleared | no (replaces S5, the solo seeded record) |
+| S6 | 0% | headroom: the boss tags at low levels | yes |
+
+Evobot would score about 183 on this list, against about 178 on the solo sets played as 4-clone.
+
+**Recommendation: separate lists, sharing four sets (H5, H10, C3, S6).** Split the level-3 weight 50/50 between the
+solo list and the co-op list.
+- It measures what is actually different about co-op. Under a plain 50/50 split on the same sets, the co-op half
+  measures the economy tags twice. It also puts 200 points on two solo records (H18, S5) that no co-op team, human or
+  bot, has been shown to reach, and has no boss-tag gradient.
+- Its headroom comes from real co-op clears (CO10, CO15) rather than solo records.
+- The four shared sets keep solo and co-op comparable set by set.
+- Cost: 12 distinct sets instead of 8, but the same number of matches. Every set is played once per mode either way.
+
+A plain 50/50 split on the same sets would be fine if simplicity matters more: the totals come out almost the same
+today (about 178 vs 183). They only drift apart once a bot gets better at bosses.
+
 ## Running a set (anyone, from git alone)
 
 Fish's answers (2026-11-18): the eight sets below, 100 each; no fuller coverage for now. With #171,
@@ -149,6 +201,12 @@ node tools/bench-share.mjs run --a legacy --b evobot --config solo:ABYSS --seeds
 | H18 | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccTier1Price=1,ccUpgrade=2,ccSpRecovery=1,ccBoss=1,ccLeaderDr=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccLastLine=1,ccJunk=2,ccLockout=1,ccFamiglia=1,ccVengeance=1` |
 | S5 | `ccInvestorBench=2,ccSwift=1,ccForesight=1,ccStrategyLate=2,ccTier1Price=1,ccLeaderDr=2,ccDeepInfiltration=1,ccLowEfficiency=1,ccLockout=3,ccFamiglia=1` |
 | S6 | `ccBoss=1,ccLeaderDr=1,ccLockout=1,ccPatriot=1,ccFamiglia=4,ccSpRecovery=3,ccVengeance=3,ccDelegation=3` |
+| CB2 (co-op draft) | `ccBoss=1,ccPatriot=1` |
+| H10B (co-op draft) | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccUpgrade=1,ccDeepInfiltration=1,ccLowEfficiency=1,ccJunk=2,ccLastLine=1,ccBoss=1` |
+| CO10 (co-op draft) | `ccSwift=1,ccForesight=1,ccStrategyLate=2,ccTier1Price=1,ccUpgrade=1,ccSpRecovery=1,ccBoss=1,ccJunk=1,ccPatriot=1` |
+| CO15 (co-op draft) | `ccSwift=1,ccForesight=1,ccTier1Price=1,ccUpgrade=2,ccSpRecovery=1,ccBoss=1,ccLeaderDr=1,ccJunk=2,ccOzArts=1,ccOzPhys=1,ccLockout=1,ccFamiglia=1,ccVengeance=1` |
+
+Co-op runs: the same command with `--config coop4:ABYSS`.
 
 **What's worth running:** the four scored sets (H5, H10, F9, C3) at 1,000+ seeds each would put a real number on the
 evobot-vs-legacy gap under tags (today it's within noise at 200). The headroom sets score 0 for both bots: 40 seeds is
@@ -167,3 +225,5 @@ enough to confirm a new bot still scores 0, more is wasted.
 I generally like the 8 proposed sets with 100 weight each. I considered extending up for fuller coverage, but the bots would score 0 on those categories right now, and extreme high risk may require extremely specific strategies and good RNG, which is not that great of a use of our bot research time. If our bots get much much better to where they can already play Ultimate+15, then we can revisit the question.
 
 Solo vs 4-clone... I suppose there can be separate Solo and 4-clone entries. It would be simplest to split each entry as 50 weight solo and 50 weight 4-clone, but based on the human records, this might not actually be appropriate, as certain tags may be easier in coop? Try drafting a version that doesn't use the same tag sets for solo and 4-clone, and then comment on if you would recommend that vs just a 50/50 split.
+
+orca (2026-11-19): drafted in §6 above. I recommend separate lists sharing four sets, 50/50 between them. — Claude (orca)
