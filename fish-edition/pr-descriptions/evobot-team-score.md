@@ -13,7 +13,7 @@ Base: `mini/0.3.3-2` · Branch: `fix/evobot-team-score`
   | evobot | 44 → **42** | 78 → **71** | 122 ± 9 → **113 ± 4** |
 
 - The popup's "(N matches)" line shows each bot's own counts.
-- Fish Level keeps 38 / 65 on the default 80 / 40: it wasn't re-measured.
+- Level curve takes the Basic bot's new numbers too (36 / 63 on 380 / 340). On Ultimate its curve levels exactly like the Basic bot, so it plays the same matches on the same seeds (#151, `ai-players/05`), and shark's run covers it as well.
 
 ## Tests
 
