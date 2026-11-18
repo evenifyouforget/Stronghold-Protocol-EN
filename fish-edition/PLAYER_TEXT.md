@@ -51,7 +51,12 @@ What a player of this game knows (the game's basics only):
 - Before a match, the room can turn on lobby modifications. Some are cheats (marked by the red "WITH CHEATS" banner).
   Others are "Risk tags": optional extra difficulties, each worth some Risk points; the total shows next to the
   difficulty in the title. Players chase high-Risk clears.
-- LP is the life points the Doctors are defending.
+- LP is the life points the Doctors are defending; enemies that get through ("leaks") cost LP. Each Doctor has a
+  "Field" (their board). The match ends with the Final Assault against a final Leader (the boss).
+- The shop also sells items (equipment), which Doctors equip on Operators. Modes differ in length.
+- Operators have stats (HP, ATK, DEF, RES, ASPD = attack speed), skills powered by SP, traits and talents, and can have
+  modules (upgrades from the original game). Status effects from the original game (Cold, Frozen, Stun, Fragile and so
+  on) work as there.
 
 <one sentence: what the player just did to see this>. Answer in plain words:
 1. What do you think this is telling you? Go through it as a whole and then line by line, in your own words.
@@ -63,9 +68,23 @@ Be honest about confusion; a guess labelled as a guess is more useful than a con
 500 words.
 ```
 
+### Building the material
+
+- **Render with the game's own code**, never retype: `fish-edition/untracked/player-text/` holds `render.mjs` (rule
+  texts, Mod Z, the AI popup) and `render-dialog.mjs` + `dom.mjs` (renders a real Preact dialog into a minimal fake DOM
+  and prints it as text, tab by tab): `node render-dialog.mjs <checkout> <out dir>`.
+- **Load every data file the screen uses.** The 2026-11-19 retro's first copies lacked the enemies file (raw
+  `enemy_…` ids) and the AI popup's intro and score line, and the readers duly flagged both: always compare the copy
+  with the real screen's parts before a read, and rerun with a fresh agent after fixing the material.
+- Findings that come from the copy (a line out of its screen, a missing tooltip) are noted as such, not fixed.
+
 ## Log
 
 | Date | Text | Reader confidence | Main findings |
 |---|---|---|---|
 | 2026-11-19 | #173 "why not" panel, as merged (control) | 65% | rule lines read backwards next to "failed"; "a named round"; identical lines for levels 1 and 2; Muelsyse as Strategy or Operator? |
 | 2026-11-19 | #179's rewrite (a text copy built from the en pack) | 70%; every line read right | "a Doctor" in solo: me?; Muelsyse also an Operator?; what each tag is worth (added to #179); the tag names and "Objective:" prefix (outside the panel) |
+| 2026-11-19 | Retro, Fish Edition's own texts (257 strings Yuri's pack doesn't have): small texts | 60% | deck "{left} / {cap}" vs "(left / total)"; "Updated every round" vs "next time you open it"; Patriot offer "joins" (which side?) / "no bounty" / "If nobody takes him"; "Mod Z available"; "Last Line of Defense costs {n} more"; "Bot profile" / "AI profiles" / "AI" |
+| 2026-11-19 | Retro: AI profiles popup (2nd read, corrected copy) | 65% | Level curve shows Basic's numbers (never measured); "Picks the Ioleta Russell Alliance" vs "Picks Ioleta's Strategy"; Evobot's developer talk ("weekend run", "evolution search", "paired test"); tactic ids as code names; why offer bots far below Basic? |
+| 2026-11-19 | Retro: Mod Z / W modules | 60% | many scope questions (stacking, what "instead" replaces, per target or global, lasting or timed): Phantom, Hellagur, Typhon Z, Viviana, Shining least clear. Fish's designs: questions to Fish before rewording |
+| 2026-11-19 | Retro: room rules dialog (2nd read, corrected copy) | 60% (Transmitter+ and Isomorph ~20%) | Swift "becomes 20% + 0.25% × stacks (was 0.35% × stacks)" omits the unchanged 20% base, so it reads as easier; Booster Pack reuse; Transmitter+ "teammates who have no use for the original"; Isomorph + vs ++; Mod Z "this custom Operator" / "0/13" vs 14 buttons; bans "any slots left open are still drawn at random" reads as picking, not banning; Risk digit glued to tile names; "α"; tier stacking; Last Line of Defense read as clear |
