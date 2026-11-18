@@ -64,7 +64,8 @@ export const BOT_INFO = Object.freeze({
     ],
   },
   'fish-level': {
-    strength: 38, team: 65,
+    // plays legacy's exact games on Ultimate (its curve is legacy's there: ai-players/05), so legacy's pooled numbers
+    strength: 36, team: 63, n: { solo: 380, team: 340 },
     about: [N_('按升级曲线提升调度中心等级，曲线按模式长度换算（较短的模式升级更早）'), N_('其余同基础 AI')],
     tactics: [{ id: 'level-curve', text: N_('升级曲线：每回合把调度中心升到曲线的等级，然后由基础 AI 继续升级') }],
   },
