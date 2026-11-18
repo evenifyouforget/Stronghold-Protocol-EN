@@ -12,7 +12,7 @@ import { onSettle, resetRoundCounters } from '../botEmotes.js';
 import { creditedKillsOf } from '../../sim/spec.js';
 import { finishRecord } from '../records.js';
 import { settleChatWallet } from '../chatWallet.js';
-import { finishAwards } from '../autoAward.js';
+import { finishAwards, noteSettle } from '../autoAward.js';
 
 export class MatchSettle {
   settle(plan, uniteResult) {
@@ -48,6 +48,7 @@ export class MatchSettle {
       const loss = this.riskLoss(r.leaked, leaker ? Math.min(cap, survivors.get(ps.playerId) || 0) : Math.min(cap, counted), !leaker);
       if (this.uniteResultView) this.uniteResultView.losses[ps.playerId] = loss;
       ps.lp -= loss;
+      noteSettle(this, ps, counted > 0); // (GitHub #125) Last Line
       ps.stats.lpLost += loss;
       ps.stats.leaks += counted;
       ps.stats.kills += Number(r.killed) || 0;
@@ -154,7 +155,7 @@ export class MatchSettle {
     for (const f of this.fields) f.live = false;
     this.outcome = { victory: !!victory, hiddenReached: this.hiddenReached, hiddenCleared: !!hiddenCleared, reason };
     // (GitHub #125) the Risk tags the autoAward rule adds (null: none)
-    try { this.awarded = finishAwards(this); } catch (e) { this.reportError('autoAward', e); this.awarded = null; }
+    try { this.awarded = finishAwards(this); } catch (e) { this.reportError('autoAward', e); this.awarded = null; this.awardNotes = null; }
     let result;
     try {
       result = buildResult(this, this.outcome);
@@ -163,6 +164,7 @@ export class MatchSettle {
       result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
     }
     if (this.awarded) result.awarded = { ...this.awarded };
+    if (this.awardNotes) result.awardNotes = structuredClone(this.awardNotes);
     if (this.test) {
       result.test = true;
       result.testActions = this.testActions;

@@ -15,7 +15,7 @@ import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_T
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
 import { bossRiskConfig } from '../../sim/bossRisk.js';
 import { CC } from '../../../shared/ruleData.js';
-import { noteBattle } from '../autoAward.js';
+import { noteBattle, noteTeamLp } from '../autoAward.js';
 
 /** b.pool broadcasts at most this often (ms). */
 const POOL_MIN_GAP_MS = 250;
@@ -480,6 +480,7 @@ export class MatchBoss {
     const n = Number(amount);
     if (this.teamLp == null || !Number.isFinite(n) || !(n > 0)) return;
     this.teamLp = Math.max(0, this.teamLp - n);
+    noteTeamLp(this); // (GitHub #125) Last Line
     if (this._bossLazyPublic()) { this._bossPublic(); return; }
     this._syncTeamLp();
     this.markPublic();

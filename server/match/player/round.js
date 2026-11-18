@@ -13,7 +13,7 @@ import { createRng, deriveSeed } from '../../sim/rng.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { equippedItemProgress } from '../itemProgress.js';
 import { computeBonds, bondSnapshot, activatedLayers, bondsWithGains } from '../bondsMeta.js';
-import { noteBonds } from '../autoAward.js';
+import { noteBonds, noteHand } from '../autoAward.js';
 
 export class PlayerRound {
   /** The tierStart cheat's operators: per tier, a random base id the shared pool still has a copy of. */
@@ -110,11 +110,13 @@ export class PlayerRound {
   }
 
   recompute() {
+    noteHand(this.m, this); // (GitHub #125) a placement or unequip that filled the hand: Junk 1 can't be awarded
     this.deployMap(); // a change of the deploy field (a boss round's prep) marks the legality stale
     if (this._legalityStale) this._evictIllegal();
     this._liftOutOfRange();
     // a free regular hand slot pulls a temp piece in (PRTS 卫戍协议/帮助 §手牌区 "常规手牌区出现空位时自动移入")
     this._fillHandFromTemp();
+    noteHand(this.m, this);
     // the states the last recompute stored: the change since then is reported once (_reportActiveBonds)
     const before = this.bonds;
     this.bonds = computeBonds(this.gd, this);

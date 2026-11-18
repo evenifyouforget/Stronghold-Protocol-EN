@@ -20,6 +20,10 @@ export const AWARD_CONDITIONS = Object.freeze({
   foresight: N_('没有【远见】干员参加过任何作战'),
   strategy1: N_('没有博士选择受影响的策略（策略在第N回合生效的那些）'),
   strategy2: N_('也没有博士选择伊奥莱塔·罗素、杜遥夜或阿米娅'),
+  intern: N_('没有博士在第3回合及之后购买过1阶干员'),
+  barge: N_('没有博士的调度中心升到过5级'),
+  lastLine: N_('每回合多扣2点目标生命值也不会淘汰任何博士，也不会让最终攻势提前失败'),
+  junk: N_('每位博士的手牌区始终至少有1个空位'),
 });
 
 /**
@@ -33,6 +37,11 @@ export const AWARDABLE = Object.freeze([
   { key: 'ccForesight', level: 1, needs: ['foresight'], aiOk: true },
   { key: 'ccStrategyLate', level: 1, needs: ['strategy1'], aiOk: true },
   { key: 'ccStrategyLate', level: 2, needs: ['strategy1', 'strategy2'], aiOk: true },
+  { key: 'ccTier1Price', level: 1, needs: ['intern'], aiOk: false },
+  { key: 'ccUpgrade', level: 1, needs: ['barge'], aiOk: false },
+  { key: 'ccUpgrade', level: 2, needs: ['barge'], aiOk: false },
+  { key: 'ccLastLine', level: 1, needs: ['lastLine'], aiOk: false },
+  { key: 'ccJunk', level: 1, needs: ['junk'], aiOk: false },
 ].map((a) => Object.freeze({ ...a, needs: Object.freeze(a.needs) })));
 
 /** The Strategies Strategy 2 adds to Strategy 1's (shared/ruleData.js CC.strategy2: their own changes). */
@@ -40,6 +49,27 @@ export const STRATEGY2_BANDS = Object.freeze(['band_ioleta', 'band_duyaoy', 'ban
 
 /** Whether a Risk tag version can be awarded at all (the room's Risk grid marks those). */
 export const isAwardable = (key, level) => AWARDABLE.some((a) => a.key === key && a.level === level);
+
+/**
+ * Why each awardable version the room didn't take wasn't awarded (the end screen's panel): its broken conditions with
+ * the first break's round (null: at the end, e.g. a Strategy) and operator / Strategy id, and `ai` when it needs a
+ * lobby without AI seats. A version below an awarded level of the same tag is left out.
+ * @param {Record<string, any>} rules @param {Record<string, number>} awarded
+ * @param {Record<string, { r: number|null, id?: string }>} why condition id → its first break
+ * @param {{ aiSeats: boolean }} opts
+ * @returns {Array<{ key: string, level: number, ai: boolean, broken: Array<{ c: string, r: number|null, id?: string }> }>}
+ */
+export function awardNotes(rules, awarded, why, { aiSeats }) {
+  const out = [];
+  if (rules?.autoAward !== true) return out;
+  for (const a of AWARDABLE) {
+    if ((Number(rules[a.key]) || 0) > 0 || (awarded[a.key] || 0) >= a.level) continue;
+    const brokenList = a.needs.filter((c) => why[c]).map((c) => ({ c, ...why[c] }));
+    const ai = !a.aiOk && aiSeats;
+    if (brokenList.length || ai) out.push({ key: a.key, level: a.level, ai, broken: brokenList });
+  }
+  return out;
+}
 
 /**
  * The tags to award: for each tag the room did not take, the highest awardable level whose conditions all held.

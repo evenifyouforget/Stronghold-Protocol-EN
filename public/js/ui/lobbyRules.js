@@ -91,6 +91,33 @@ export function RulesChips({ rules, awarded = null }) {
       title=${`${t('自动授予：本局中此标签不会产生任何影响')}\n${riskText(k, v).full}`}><span class="rules-chip__auto" aria-label=${t('自动授予')}>AUTO</span>${riskText(k, v).short}</li>`)}</ul>`;
 }
 
+/** One broken condition's line in the "why not" panel: the condition, then when it first failed and what broke it. */
+function awardNoteLine(b) {
+  const what = b.id ? (b.id.startsWith('band_') ? bandName(b.id) : chessName(b.id, b.id)) : null;
+  const when = Number.isInteger(b.r) && b.r > 0 ? t('第{r}回合', { r: b.r }) : null;
+  const detail = [when, what].filter(Boolean).join(t('、'));
+  return html`<li key=${b.c}>${AWARD_CONDITIONS[b.c] ? t(AWARD_CONDITIONS[b.c]) : b.c}${detail ? html` <span class="rules-why__at">${t('（未满足：{detail}）', { detail })}</span>` : null}</li>`;
+}
+
+/**
+ * (GitHub #125) Why the autoAward rule didn't award the other tags: a button that opens a panel, closed by default (the
+ * end screen; Fish 2026-11-19). `notes`: shared/autoAward.js awardNotes. Nothing when there are none.
+ * @param {{ notes: Array<{ key: string, level: number, ai: boolean, broken: Array<{ c: string, r: number|null, id?: string }> }> | null }} props
+ */
+export function AwardNotesButton({ notes }) {
+  const [open, setOpen] = useState(false);
+  if (!Array.isArray(notes) || !notes.length) return null;
+  return html`<button type="button" class="rules-why__open" data-testid="award-notes-open" aria-haspopup="dialog" onClick=${() => setOpen(true)}>
+      <${Icon} name="info" />${t('为什么没有自动授予其他标签？')}</button>
+    ${open ? html`<${Modal} open=${true} class="rules-why" micro="AUTO-AWARD" title=${t('未自动授予的标签')} width="min(34rem, 96vw)" onClose=${() => setOpen(false)}>
+      <p class="rules-why__intro">${t('这些风险标签本可以自动授予，但本局中它们的条件没有全部满足。这只是说明，不影响结算。')}</p>
+      <ul class="rules-why__list">${notes.map((n) => html`<li key=${`${n.key}:${n.level}`} class="rules-why__tag">
+        <b>${riskText(n.key, n.level).short}</b>
+        <ul>${n.broken.map(awardNoteLine)}${n.ai ? html`<li key="ai">${t('房间里有AI队友或托管：这个标签只在没有AI的房间里自动授予')}</li>` : null}</ul>
+      </li>`)}</ul>
+    <//>` : null}`;
+}
+
 /** The result-title suffix and watermark of `rules` (and the tags `awarded` by #125): `{ seeded, cheats, risk }`. */
 export function ruleBadges(rules, awarded = null) {
   const l = ruleLabels(rules, awarded);
