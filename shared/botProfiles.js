@@ -11,8 +11,8 @@ export const ROOM_BOTS = Object.freeze([
   { id: 'legacy', label: N_('基础 AI'), desc: N_('原版 AI，未选择时的默认') },
   { id: 'fish-level', label: N_('升级曲线'), desc: N_('按模式长度换算的升级曲线，其余同基础 AI') },
   { id: 'fish-tier6', label: N_('六星优先'), desc: N_('优先购买六星干员，升级到 6 级，其余同基础 AI') },
-  { id: 'evobot', label: N_('进化 AI'), desc: N_('进化搜索调出的基础 AI：后期卖掉低星单张干员，并购买叠层与资金道具') },
-  { id: 'ioleta', label: N_('伊奥莱塔开局'), desc: N_('开局优先选择伊奥莱塔盟约') },
+  { id: 'evobot', label: N_('进化 AI'), desc: N_('自动调参后的基础 AI：后期卖掉凑不成对的低星干员，并购买叠层与资金道具') },
+  { id: 'ioleta', label: N_('伊奥莱塔开局'), desc: N_('开局有伊奥莱塔策略时优先选择它') },
   { id: 'adaptive', label: N_('自适应布阵'), desc: N_('按地图搜索部署位置') },
   { id: 'ioleta-adaptive', label: N_('伊奥莱塔开局 + 自适应布阵'), desc: N_('伊奥莱塔开局，并按地图搜索部署位置') },
 ].map((b) => Object.freeze(b)));
@@ -56,7 +56,8 @@ export const BOT_INFO = Object.freeze({
   },
   'fish-level': {
     strength: 38, team: 65,
-    about: [N_('按升级曲线提升调度中心等级，曲线按模式长度换算（较短的模式升级更早）'), N_('其余同基础 AI')],
+    about: [N_('按升级曲线提升调度中心等级，曲线按模式长度换算（较短的模式升级更早）'), N_('其余同基础 AI'),
+      N_('终极难度下它的升级曲线与基础 AI 的升级相同，所以对局完全一样，强度数字也相同；区别只在较短的模式中')],
     tactics: [{ id: 'level-curve', text: N_('升级曲线：每回合把调度中心升到曲线的等级，然后由基础 AI 继续升级') }],
   },
   'fish-tier6': {
@@ -84,7 +85,7 @@ export const BOT_INFO = Object.freeze({
   evobot: {
     strength: 44, team: 78,
     about: [
-      N_('由进化搜索在基础 AI 之上调出（2026 年 11 月的周末测试），在 2000 局配对测试中胜过基础 AI'),
+      N_('在基础 AI 之上自动调参得到，在 2000 局对比测试中胜过基础 AI'),
       N_('从第 9 回合起，卖掉手牌中凑不成对的一、二星干员'),
       N_('从第 5 回合到最终攻势前，购买增加层数的道具和资金道具，并留下约 9 点资金'),
       N_('其余同基础 AI'),
