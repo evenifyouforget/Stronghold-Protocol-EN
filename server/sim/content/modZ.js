@@ -219,6 +219,9 @@ const INSTALL = {
   uniequip_fishz_shining(battle, u) {
     const key = `${KEY}:immortal`;
     let cd = 0, readyAt = 0;
+    // Fish's text: "Can heal allies that are already at max HP (just to apply Immortality)": a full-HP ally is a heal
+    // target while the grant is ready and the ally has no Immortal (battle/queries.js injuredAlliesInKeys; injured first)
+    u.fishHealFull = (a) => battle.time >= readyAt && !a.findBuff(key);
     battle.on('heal', (c) => {
       if (c.source !== u || !c.target || c.target.side === 'enemy' || battle.time < readyAt || c.target.findBuff(key)) return;
       battle.addBuff(c.target, { key, duration: 8, source: u, visible: true, tags: ['module'] });

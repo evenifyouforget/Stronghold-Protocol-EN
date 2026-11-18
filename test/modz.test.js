@@ -249,6 +249,14 @@ test('Shining Z: her heal grants Immortal (8 s), which stops a lethal hit once a
   noErrors(b);
 });
 
+test('Shining Z: she heals an ally at full HP too, to grant Immortal (Fish: "can heal allies that are already at max HP")', () => {
+  const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
+  assert.ok(t.hp >= t.s.maxHp - 1e-6, 'Thorns starts at full HP');
+  h.runUntil(() => !!t.findBuff('fishModZ:immortal'), 20);
+  assert.ok(t.findBuff('fishModZ:immortal'), 'Immortal granted to a full-HP ally');
+  noErrors(b);
+});
+
 test('Siege Z: DP she earns ×2; DP above 90 is drained into SP for her player\'s operators', () => {
   const { h, b, rec, ops: [s, t] } = rig([op('char_112_siege', 'uniequip_fishz_siege', 0), op('char_293_thorns', null, 0, 9, 5)]);
   assert.equal(s.fishDpMul, 2);

@@ -173,7 +173,8 @@ export class BattleQueries {
       if (!a.alive || !a.deployed || a.hidden || a.kind === 'device') continue;
       if (!set.has(a.tileR * COLS + a.tileC)) continue;
       if (a !== healer && ((a.s.flags.noHeal && !(through && through(healer, a))) || (a.profile && a.profile.noHeal))) continue;
-      const injured = a.hp < a.s.maxHp - 1e-6;
+      // (Fish Edition) Mod Z Shining heals an ally at full HP too, just to grant Immortality (content/modZ.js)
+      const injured = a.hp < a.s.maxHp - 1e-6 || !!(healer && healer.fishHealFull && healer.fishHealFull(a));
       const elem = includeElement && (a.elem.burn + a.elem.neural + a.elem.necrosis + a.elem.apoptosis + a.elem.erosion) > 0;
       if (injured || elem) out.push(a);
     }
