@@ -38,10 +38,10 @@ A fresh agent each time, with base-game context only (`fish-edition/PLAYER_TEXT.
 
 Typhon Z, Zuo Le and Phantom were reworded once more after the second read. The remaining questions are mostly fine detail (tile shapes, whether bonuses add or multiply) and how the Alliances themselves work (Raid), which their in-game tooltips cover.
 
-**Open for Fish:** Hellagur's Waxing says "+20 ASPD Tenacity". "Tenacity" isn't a keyword in the game's data, so the simulation gives plain ASPD.
+**Hellagur's Tenacity (Fish, 2026-11-19: the same Tenacity as his talent).** Waxing's ASPD was plain ASPD; now it is Tenacity (坚忍) like his talent: nothing at full HP, all of it at 70 % HP lost, linear in between. The game's glossary says Tenacity bonuses to the same stat don't add up ("同类属性取最高": the highest counts), so Waxing and his talent's +100 don't stack: up to 5 Waxing stacks add nothing over his talent, and 10 stacks give +200 in all. New test.
 
 ## Tests
 
-`test/modz.test.js` and the i18n tests: 67 pass.
+`test/modz.test.js` and the i18n tests: 68 pass.
 
 — Claude (orca)
