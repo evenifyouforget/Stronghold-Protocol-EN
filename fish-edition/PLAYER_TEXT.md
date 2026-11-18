@@ -6,6 +6,10 @@ language; nothing checked that a player can follow it. This is that check.
 
 ## The style rule
 
+- **Designed texts start from the designer's own words.** Before asking Fish what a text means, read Fish's design text
+  (`operator-mod-z/<op>.md`, issue bodies) and earlier answers: the in-game English was shortened via the Chinese
+  source and lost details Fish's English had (2026-11-19).
+
 - **Say what happened, not the rule behind it.** "Round 14: a Doctor got the Operator Muelsyse", not "no Doctor ever
   obtained Muelsyse (failed: round 14, Muelsyse)": next to "failed", a rule reads as the opposite of what happened.
 - **Then say why it matters to the player**, in the player's terms ("this tag delays it by 1 round"), not the code's
@@ -91,3 +95,5 @@ Be honest about confusion; a guess labelled as a guess is more useful than a con
 | 2026-11-19 | #181 (pass 1): room rules dialog | 60% (Booster Packs, bans, Swift, Isomorph fixed) | Transmitter+ still hard (tweaked after); α; how tag levels stack; Risk digit glued to tile names; Mod Z codes unexplained |
 | 2026-11-19 | #181 (pass 1): AI profiles popup | 70% | Ioleta, Evobot, Level curve fixed; what "solo" / "team of 4" measure; why weak profiles are offered |
 | 2026-11-19 | Mod Z / W | — | questions with the sim's answers in each `operator-mod-z/<op>.md` ("Claude's notes"), for Fish |
+| 2026-11-19 | #182: Mod Z / W, reworded from Fish's descriptions and answers | 65% (was 60%) | Phantom (Raid's mechanics), Weedy, Typhon Z (reworded again after), Fiammetta, Siege; tile shapes, add vs multiply |
+
