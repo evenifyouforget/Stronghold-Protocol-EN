@@ -94,6 +94,41 @@ from here.
 - **What transfers:** SPA's battle is a deterministic simulator we can call 2 million times an hour. A learned model
   is cheap to train here, and we can check it against the real simulator at any time.
 
+### Model size, overfitting and distillation (2026-11-19)
+
+Fish (2026-11-19): one piece of advice says "train a big NN and then distill it", another says "tune the dimensionality to
+prevent overfitting"; what does the literature say? From general knowledge of the ML literature, not re-read here
+(verify before quoting). **Both are right in different situations, and the amount of data decides which.**
+
+- **Big, then distill.** Buciluă et al. 2006 (model compression) and Hinton et al. 2015 (distillation): a small model
+  trained on a big one's outputs often beats the same small model trained directly, since the soft outputs carry more
+  than win / loss labels. Li et al. 2020 ("Train Large, Then Compress"): on a fixed compute budget, large models reach
+  a given accuracy sooner and compress well. Frankle & Carbin 2019 (lottery ticket): big nets train easily because
+  they hold many good small subnetworks. Applies when the end product must be small and fast.
+- **Tune the size.** The classic bias-variance view, and what happened in 04 (every feature, 150 seeds: overfit).
+  Corrected by double descent (Belkin et al. 2019; Nakkiran et al. 2019): test error peaks where the model can just
+  memorise its data, then falls again as it grows; good regularisation and early stopping mostly remove the peak
+  (Nakkiran et al. 2020). Scaling laws (Kaplan 2020; Hoffmann 2022 "Chinchilla"; Muennighoff 2023, data-limited): the
+  best model size grows with the data, and with scarce fixed data bigger stops helping. Applies when data is the limit.
+- **Tabular features favour trees.** Grinsztajn et al. (NeurIPS 2022), Shwartz-Ziv & Armon 2022: boosted trees
+  usually beat neural nets on hand-made tabular features at our data sizes. Our first measurement agrees (trees 0.91 AUC).
+- **Surrogates inside a search get exploited**: the search finds where the surrogate errs in its favour (Jin 2011).
+  Fixes: check the top picks on the real simulator (our "rehearse the top 3"); an ensemble's disagreement as
+  uncertainty (Lakshminarayanan et al. 2017, deep ensembles); generate new data where it is unsure.
+- **Order-free per-unit encodings.** Deep Sets (Zaheer et al. 2017), Set Transformer (Lee et al. 2019): one
+  representation per unit, pooled so unit order doesn't matter.
+
+**For our surrogate:**
+1. **Data is unlimited** (the simulator, ~2 M battles an hour on shark), so overfitting is mostly not the constraint:
+   if a model overfits, generate more rows rather than shrink it. What must stay strict is held-out seeds (whole seeds,
+   every variant folder with them).
+2. **Training on the simulator already is distillation**, with the simulator as teacher. A big net is worth it only
+   if the browser bots need a small fast model: train big on simulator data, distill to small, check the small one
+   against the simulator.
+3. **Our bottleneck is the inputs, not the capacity.** The third measurement (below) tied "lowest tier first" because
+   its features are board-wide sums: no tile, range or Alliance recount. Next: per-Operator features (Deep Sets style)
+   trained on the 16,486 drop-one rows, as an ensemble whose disagreement tells the bot when to rehearse instead.
+
 ### Learned evaluation plus shallow search
 
 - **TD-Gammon / AlphaZero lineage.** Learn V(state) and pick the action whose result has the best V. Gumbel
