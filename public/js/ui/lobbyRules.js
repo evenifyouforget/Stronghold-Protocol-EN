@@ -12,7 +12,7 @@ import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Modal, Icon, MicroLabel, Tooltip, Tabs } from './components.js';
 import { BondGlyph } from './gameComponents.js';
 import { data, useData } from '../data.js';
-import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, RULE_BIG_STACK_CAP, modeIdFor } from '../../../shared/constants.js';
+import { DEFAULT_RULES, RULE_EXTRA_DEPLOY, RULE_EXTRA_FUNDS, RULE_BIG_STACK_CAP, BOSS_HIT_LIMIT, modeIdFor } from '../../../shared/constants.js';
 import { rulesInForce, ruleLabels, ruleOf, RULES, ruleRisk, tagParent, normalizeRules, sameRuleValue } from '../../../shared/rules.js';
 import { loadPref, savePref } from '../store.js';
 import { VIRTUOSA, BLAZE, CC, ISO_PLUS, LATERANO_B_TEXT, LATERANO_B_LIST, VICTORIA_C_TEXT, TOXIC_WASTE_NAME } from '../../../shared/ruleData.js';
@@ -637,7 +637,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     ${tab === 'cheat' ? html`<${Section} title=${t('作弊')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
       <${Toggle} k="extraDeploy" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraDeploy', rules)} desc=${t('所有博士的部署上限 +{n}', { n: RULE_EXTRA_DEPLOY })} />
       <${Toggle} k="extraFunds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraFunds', rules)} desc=${t('每回合开始时额外获得 {n} 资金', { n: RULE_EXTRA_FUNDS })} />
-      <${Toggle} k="bigStacks" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('bigStacks', rules)} desc=${t('每个盟约的层数上限从 999 提高到 {n}，并取消对领袖的单次伤害上限（否则层数太高的一击会被取消）', { n: RULE_BIG_STACK_CAP })} />
+      <${Toggle} k="bigStacks" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('bigStacks', rules)} desc=${t('每个盟约的层数上限从 999 提高到 {n}。通常对领袖的单次伤害达到 {limit} 以上时，该次攻击会被取消、不造成伤害；这个限制也一并取消，因此层数再高也能打伤领袖', { n: RULE_BIG_STACK_CAP, limit: BOSS_HIT_LIMIT })} />
       <${Toggle} k="doubleLp" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('doubleLp', rules)} desc=${t('所有博士的初始目标生命翻倍')} />
       <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
       <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />

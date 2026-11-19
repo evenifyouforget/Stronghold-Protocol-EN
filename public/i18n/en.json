@@ -3029,5 +3029,5 @@
   "自动授予：本局中此标签不会产生任何影响": "Auto-awarded: this tag would have changed nothing in this match",
   "这些条件只覆盖部分情况：即使本局没有满足条件，选上这个标签也可能照样获胜。想确保拿到风险，仍建议手动选择这些标签。": "These conditions cover only some cases: a match that misses one might still have been won with the tag on. To be sure of the Risk, take these tags by hand.",
   "盟约层数上限 {n}": "Alliance Stack limit {n}",
-  "每个盟约的层数上限从 999 提高到 {n}，并取消对领袖的单次伤害上限（否则层数太高的一击会被取消）": "Every Alliance's Stack limit goes from 999 to {n}, and the limit on a single hit against a Leader is removed (otherwise a hit from that many Stacks would be cancelled)"
+  "每个盟约的层数上限从 999 提高到 {n}。通常对领袖的单次伤害达到 {limit} 以上时，该次攻击会被取消、不造成伤害；这个限制也一并取消，因此层数再高也能打伤领袖": "Every Alliance's Stack limit goes from 999 to {n}. Normally a single hit of {limit} or more on a Leader is cancelled and does no damage; that limit is removed too, so huge Stack counts can still hurt the boss"
 }
