@@ -96,4 +96,5 @@ Be honest about confusion; a guess labelled as a guess is more useful than a con
 | 2026-11-19 | #181 (pass 1): AI profiles popup | 70% | Ioleta, Evobot, Level curve fixed; what "solo" / "team of 4" measure; why weak profiles are offered |
 | 2026-11-19 | Mod Z / W | — | questions with the sim's answers in each `operator-mod-z/<op>.md` ("Claude's notes"), for Fish |
 | 2026-11-19 | #182: Mod Z / W, reworded from Fish's descriptions and answers | 65% (was 60%) | Phantom (Raid's mechanics), Weedy, Typhon Z (reworded again after), Fiammetta, Siege; tile shapes, add vs multiply |
+| 2026-11-20 | #186: the Cheats tab with the new "Alliance Stack limit 9999" toggle (first wording, then reworded) | 55% → 45% whole tab (the low scores are the old Transmitter+ and Isomorph lines); the new line: partly clear → read right | "I do not know that limit exists", "cancelled or dealt?" (fixed by naming the 300000 and saying the hit does no damage); how Stacks turn into damage is game knowledge |
 
