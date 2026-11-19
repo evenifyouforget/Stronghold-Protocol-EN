@@ -166,6 +166,56 @@ prevent overfitting"; what does the literature say? From general knowledge of th
 irace, SMAC, NTBEA, CMA-ES. Surrogate-assisted evolution (Jin, "Surrogate-assisted evolutionary computation", 2011)
 is the bridge: rank candidates on a cheap model, and play real games only for the survivors.
 
+### Placing the Final Assault board as a lattice search (2026-11-19)
+
+Fish (2026-11-19): placing the boss board is a tractable subproblem (the bot keeps only ~70 % of the human layout's
+damage on the human's own units, `04`); check the literature before any experiment, and save the result of every game
+run. Web search, **abstracts and snippets only, no paper opened** (verify before quoting). Nothing I found solves
+"units on a 2D lattice, scored by a simulator" exactly; these are the nearest.
+
+| Source | What it does | What we take from it |
+|---|---|---|
+| Barriga, Stanescu, Buro, "Building Placement Optimization in RTS Games" (AIIDE 2014, https://ojs.aaai.org/index.php/AIIDE/article/view/12735) | A GA whose fitness is a simulated battle of the candidate placement | The closest precedent for our rehearsal; our gap is the candidate set, not the idea |
+| Zhang, Fontaine, Hoover, Nikolaidis, "Deep Surrogate Assisted MAP-Elites for Hearthstone Deckbuilding" (GECCO 2022, https://arxiv.org/abs/2112.03534) | A deep surrogate trained online on game outcomes; MAP-Elites searches on it; the elites are checked in the real game and become training data | The best match for "surrogate + search + real simulator as judge". The diverse archive feeds the surrogate and counters the search exploiting its errors; beat an offline-trained surrogate |
+| Surrogate-assisted neighbourhood search for thermal layout (Complex & Intelligent Systems 2023, https://link.springer.com/article/10.1007/s40747-023-01276-0) | Layouts encoded as images, a deep net as surrogate, local search on swaps | Generic surrogates had large errors on discrete layouts; the image encoding fixed it. Supports a grid encoding with a local-search neighbourhood |
+| Loshchilov, Schoenauer, Sebag, ACM-ES (PPSN 2010, https://infoscience.epfl.ch/record/186020; arXiv 1206.0974) | A rank-SVM surrogate inside CMA-ES, tested on noisy functions too | Learn the ordering, not the value: invariant to monotone transforms, so heavy-tailed damage doesn't matter |
+| Oh et al., COMBO (NeurIPS 2019, https://arxiv.org/pdf/1902.00448) | Bayesian optimisation over categorical variables with a diffusion kernel on the combinatorial graph | An option for few-unit boards, but a GP scales poorly; not first choice |
+| Mirhoseini et al., chip placement with RL (2020, https://arxiv.org/abs/2004.10746) | Places blocks on a canvas with RL; an encoder pretrained to predict placement quality | The pretrained quality predictor is the reusable part; RL itself needs far more games than we have |
+| CIG 2013 paper 78 (https://www.cse.unr.edu/~simingl/papers/publish/CIG2013-Paper-78-eXpress-Ready.pdf) | Search over influence-map parameters for StarCraft group positioning | Search a handful of layout parameters instead of every unit's tile |
+| Bloons TD as a 2D knapsack (Tilburg, https://research.tilburguniversity.edu/en/publications/modeling-bloons-tower-defense-as-a-temporal-two-dimensional-knaps/) | Integer programming over a dotted board | The fixed-pieces-on-a-grid formulation, if we ever need an exact method |
+
+**Specialisations for a lattice (the first two are in the sources, the rest are my reasoning, to test):**
+1. **Search the small, structured space, not the raw one.** A layout generator with a few parameters (cluster
+   centre, spread, tile order for the dealers, which tiles the blockers take) cuts the dimensions from "every unit ×
+   every tile" to a handful. This is also the answer to the dimensionality question: shrink what you search, not the model.
+2. **A local-search neighbourhood on the lattice**: move one unit one step, swap two units, rotate a facing. Evaluating a
+   neighbour is one battle; a surrogate only pre-screens neighbours.
+3. **Encode tiles, not coordinates.** The route and the boss's approach break translation and mirror symmetry, so a
+   raw (row, column) input loses what a human sees. Give per-tile channels instead: distance to the route, how many
+   route tiles each unit's range covers from that tile and facing, ground or ranged tile, neighbours' range overlap.
+   A CNN or per-unit set encoding then works on those.
+4. **Canonicalise before storing or learning.** Units that are identical (same operator, elite, items, modules) are
+   interchangeable; sort them so one layout has one hash and one label.
+5. **Rank, don't regress.** Train on "layout A beats layout B for this board and boss" pairs (neighbours of one
+   parent give thousands cheaply). That is ACM-ES's reason and fits our pairing of parents with children in `11`'s drop-one test.
+6. **Archive with descriptors** (DSA-ME): e.g. the packed centre column, the spread, the share facing the approach.
+   The archive keeps diversity so the surrogate trains on the whole space, not only where it thinks it's good.
+7. **Re-score the top picks on the real simulator**, with the same seeds for all candidates (paired), as our rehearsal does.
+
+## Logging every game run (for analysis and training later)
+
+Every simulated battle in a placement experiment is saved, accepted or not, one JSON row each, written in chunks of a
+few thousand to `untracked/placement-2026-11/` with a PID lock so a restart resumes (the incremental-experiments rule).
+A row holds what is needed to replay it and to train on it:
+- **Identity:** run id, chunk, board id (the recorded match + seat + round), boss id, battle seed, simulator commit.
+- **Layout:** each unit as (id, elite, items, modules, tile, facing), the sorted canonical form and its hash.
+- **Provenance:** which generator or step produced it (search algorithm, iteration, parent layout hash, move type),
+  so parent / child pairs can be rebuilt; the surrogate's prediction when one chose it (to measure how much the search exploits it).
+- **Outcome:** the objective (damage at 120 s, time to kill, leak), the boss's HP sampled over time, each unit's damage
+  share, whether it won, and the battle's wall time.
+- **Rejected and invalid layouts too**, flagged, since "what fails" is training data.
+Held-out splits are by board (whole boards, with every layout of them), never by row.
+
 ## 3. Other ways to add order (instead of legacy's)
 
 Legacy hand-writes a score for every decision point (`buyScore`, `lineupScore`, `bondPlan` …) and tunes constants.
