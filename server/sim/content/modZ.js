@@ -312,7 +312,10 @@ const INSTALL = {
       if (!pick) return;
       readyAt = battle.time + 12;
       const tx = Math.round(pick.x), ty = Math.round(pick.y);
-      battle.fx('zone', { x: tx, y: ty, radius: 2, dur: 7, id: u.id, skill: 'fishVvana' });
+      // the warning is the 13 tiles of the diamond it will hit (a round 'zone' ring showed no diamond: GitHub #175)
+      const diamond = [];
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) diamond.push([ty + dr, tx + dc]);
+      battle.fx('telegraph', { x: tx, y: ty, r: 2.5, dur: 7, tiles: diamond, id: u.id, skill: 'fishVvana' });
       battle.after(7, () => {
         if (!u.alive) return;   // [DRAFT: the explosion needs her alive; her ATK at detonation]
         const n = kaz().length;
