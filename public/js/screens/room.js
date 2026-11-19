@@ -93,7 +93,7 @@ import { SearchBar, SearchButton, SearchStatus, useSearchNotice, useFindMates, c
 import { OnlinePill } from '../ui/presence.js';
 import { publicPath } from '../gen.js';
 import { t, tc, getLang, tName, botNameParts as splitBotName } from '../../../shared/i18n.js';
-import { ROOM_BOTS, FILL_PRESETS, roomBot } from '../../../shared/botProfiles.js';
+import { ROOM_BOTS, FILL_PRESETS, roomBot, botScoreSuffix } from '../../../shared/botProfiles.js';
 import { BotInfoModal } from '../ui/botInfo.js';
 import { RoomChat } from '../ui/chatLog.js';
 import { ChatMuteButton } from '../ui/chat.js';
@@ -414,8 +414,8 @@ function SeatCard({ seat, index, room, facts, myId, busy, onAddBot, onRemoveBot,
       ${prof && facts.isHost && onSetBot
         ? html`<select class="rseat__botpick" data-testid="seat-bot" value=${prof.id} disabled=${busy === `bot${index}`} title=${t(prof.desc)}
             aria-label=${t('AI 方案')} onChange=${(e) => onSetBot(index, e.currentTarget.value)}>
-            ${ROOM_BOTS.map((b) => html`<option key=${b.id} value=${b.id}>${t(b.label)}</option>`)}</select>`
-        : html`<small class="rseat__doc" title=${prof ? t(prof.desc) : undefined}>${prof ? (seat.bot ? t(prof.label) : 'AUTONOMOUS UNIT') : `DOCTOR #${doctorNo(seat.playerId)}`}</small>`}
+            ${ROOM_BOTS.map((b) => html`<option key=${b.id} value=${b.id}>${t(b.label)}${botScoreSuffix(b.id)}</option>`)}</select>`
+        : html`<small class="rseat__doc" title=${prof ? t(prof.desc) : undefined}>${prof ? (seat.bot ? t(prof.label) + botScoreSuffix(prof.id) : 'AUTONOMOUS UNIT') : `DOCTOR #${doctorNo(seat.playerId)}`}</small>`}
       ${prof && onBotInfo ? html`<button type="button" class="rseat__botinfo" data-testid="seat-bot-info" onClick=${() => onBotInfo(prof.id)}
           title=${t('AI 方案说明')} aria-label=${t('AI 方案说明')}><${Icon} name="info" /></button>` : null}
       ${chatOn && !isMe && !seat.isBot ? html`<${ChatMuteButton} player=${seat} muted=${muted} class="team__mute rseat__mute" />` : null}

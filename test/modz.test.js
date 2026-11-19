@@ -305,7 +305,12 @@ test('Weedy Z: enemies weigh 2 less while she is on the field; her damage become
 test('Viviana Z: Glimmering Touch explodes 7 s after it marks an enemy in a Kazimierz operator\'s range', () => {
   const { h, b, rec, ops: [v] } = rig([op('char_4098_vvana', 'uniequip_fishz_vvana', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
   assert.ok(diyRecord(6, { charId: 'char_4098_vvana', skillIndex: 0, uniEquipId: 'uniequip_fishz_vvana' }, { elite: true, data })?.bonds?.includes('kazimierzShip') ?? true);
+  const fxs = []; const fx0 = b.fx.bind(b); b.fx = (k, p, ...r) => { fxs.push({ k, p }); return fx0(k, p, ...r); };
   h.run(30);
+  const warn = fxs.find((e) => e.p?.skill === 'fishVvana' && e.p.tiles);
+  assert.ok(warn, 'the warning names its tiles (GitHub #175)');
+  assert.equal(warn.p.tiles.length, 13, 'a diamond of 13 tiles');
+  assert.ok(warn.p.tiles.every(([r, c]) => Math.abs(r - warn.p.y) + Math.abs(c - warn.p.x) <= 2), 'every tile within 2 of the centre');
   const hits = rec.damage.filter((x) => x.source === v && x.tags?.includes('fishVvana'));
   assert.ok(hits.length > 0, 'an explosion');
   assert.ok(rec.element.some((x) => x.source === v && x.element === 'burn' && x.tags?.includes('fishVvana')));

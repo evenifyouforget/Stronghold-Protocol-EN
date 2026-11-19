@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ROOM_BOTS, BOT_INFO, botScore, strengthMatches, STRENGTH_MATCHES } from '../../shared/botProfiles.js';
+import { ROOM_BOTS, BOT_INFO, botScore, botScoreSuffix, strengthMatches, STRENGTH_MATCHES } from '../../shared/botProfiles.js';
 import { TACTICS } from '../../server/match/botStrategies.js';
 import { makeMatch } from '../match/harness.js';
 
@@ -58,4 +58,15 @@ test('the strength score (Fish on #151): solo + team of 4, 0–200, ± 1 standar
     const sc = botScore(BOT_INFO[b.id]);
     assert.ok(sc && sc.score >= 0 && sc.score <= 200 && sc.sd >= 0, b.id);
   }
+});
+
+test('the room\'s bot selector shows each bot\'s strength score next to its name (GitHub #172)', () => {
+  for (const b of ROOM_BOTS) {
+    const sc = botScore(BOT_INFO[b.id]);
+    assert.equal(botScoreSuffix(b.id), sc ? ` (${sc.score})` : '', b.id);
+  }
+  assert.equal(botScoreSuffix('legacy'), ` (${botScore(BOT_INFO.legacy).score})`);
+  assert.equal(botScoreSuffix('no-such-bot'), '');
+  const room = readFileSync(new URL('../../public/js/screens/room.js', import.meta.url), 'utf8');
+  assert.match(room, /\$\{t\(b\.label\)\}\$\{botScoreSuffix\(b\.id\)\}/, 'the option carries the suffix');
 });
