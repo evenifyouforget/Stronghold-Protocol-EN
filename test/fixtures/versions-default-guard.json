@@ -15,6 +15,7 @@
     "rules": {
       "extraDeploy": false,
       "extraFunds": false,
+      "bigStacks": false,
       "untimed": false,
       "doubleLp": false,
       "tierStart": false,
