@@ -335,6 +335,44 @@ the human's tiles (`untracked/carry-rank/placement2.jsonl`).
   approach".** A cheap, fixed facing rule gives nearly all of the facing value, and needs no rehearsal: it suits bots
   that run in the player's browser.
 
+### Can a search reach the human layout? The ceiling test (2026-11-19)
+
+**Test.** `untracked/boss-board-2026-11/` (`search.mjs`, `analyze.mjs`, `shape.mjs`; run `run-1.sh`). Boards: the 53
+solo human boss records without summon tokens (60 of the 78 are won; 25 boards carry tokens and were left out, their
+tiles depend on their owner), simulator sp-170 at 81dda9e7f. Each board's own units, only tiles and facings change
+(legal tiles from the stage's deploy map; swaps, moves of one unit to a free tile, turns), scored by the real boss
+fight (wrap pool, damage at 120 s, `p120`) on the record's boss. Three starts × 400 fights per board: the human layout,
+the human tiles all facing RIGHT, and a random legal layout. A search sees one battle seed; every layout is then
+re-scored on 4 other seeds. **Base seed 30711621**, validation seeds derived from it. Every fight is a row in
+`out-1/rows/<board>.jsonl` (63,398 rows, 37 MB, with the layout, canonical hash, parent hash, move, per-unit damage).
+
+| Start | Start's own damage vs the human layout | Best found vs the human layout (unseen seeds) | Boards with best ≥ 0.95× human | > 1.2× |
+|---|---|---|---|---|
+| human layout | 1.00 | geomean **1.33**, median 1.14 | 50 / 53 | 25 |
+| human tiles, all RIGHT | 0.97 | 1.31, median 1.07 | 51 / 53 | 25 |
+| random legal layout | **0.17** | **1.26**, median 1.05 | 43 / 53 | 24 |
+
+- **A plain local search, 400 fights from a random layout, reaches the human layout** (≥ 0.95× on 43 of 53 boards, and
+  beats it by > 1.2× on 24). The problem is solvable and cheap; no board's best fell under 0.5×. So the bot's 70 % is
+  its candidate layouts, not an unreachable ceiling, and the human layouts aren't optimal either (1.33×).
+- **Lost boards:** 9 of the 53 were lost by the human. On 8 the sim says the human layout doesn't kill the pool in
+  120 s (`p120` < 100); the search's best does on 3 of them (68 → 105, 93 → 199, 55 → 192), a loss turned into a kill.
+  The ninth killed the pool in the sim anyway (the loss came from something this fight doesn't model).
+- **What the best layouts look like:** no clean rule in the marginals. Facing RIGHT is 73 % of the humans' units, but
+  only 41–55 % in the search's best layouts, and the columns match the humans' (5–8). Treat the facing numbers with
+  care: the search accepts equal scores, so a unit whose facing doesn't matter drifts to a random one. A rule has to
+  come from per-unit effects (what a move does to the damage), which the rows allow.
+
+**Caveats.** One boss, 120 s damage as the objective (not the win), a fixed set of 53 boards the search was also run on
+(its best layouts are searched per board, not a rule that carries to new boards). Not measured here: the bot's own
+layout on these 53 boards, and how much win rate the damage is worth (the human winning boards kill the pool in 7–45 s,
+so most of the 30 % is margin).
+
+**Next.** (1) The bot's layout (`arrange` final) on the same 53 boards with this fight, to put the 70 % on the same
+footing. (2) Per-unit effects from the rows (which move helped, by unit type and tile class) and a layout generator
+with a few parameters, scored on boards the search hasn't seen. (3) The win-rate check: put the better layout into bot
+matches that reach the Final Assault.
+
 ### What this says for DYYBot
 
 - **Placement is the first lever:** worth ~30 %, about as much as the difference between the best stand-in and the carry.
