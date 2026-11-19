@@ -1,0 +1,1 @@
+- New cheat "Alliance Stack limit 9999" (#174): every Alliance's Stack limit goes from 999 to 9999, and the limit on a single hit against a Leader is lifted too (otherwise a hit from that many Stacks would be cancelled).

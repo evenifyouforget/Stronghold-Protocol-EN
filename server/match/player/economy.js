@@ -4,7 +4,7 @@
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
-import { ERR, PHASE, layerGainRoom } from '../../../shared/constants.js';
+import { ERR, PHASE, layerGainRoom, layerCapOf } from '../../../shared/constants.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { freeSlot } from '../board.js';
 import { noteBuy, noteLevel } from '../autoAward.js';
@@ -47,7 +47,7 @@ export class PlayerEconomy {
     if (!this.gd.bond(bondId) || !Number.isFinite(n) || n <= 0) return 0;
     if (requireActive && !(this.bonds[bondId] && this.bonds[bondId].active)) return 0;
     const before = this.layers[bondId] || 0;
-    const add = layerGainRoom(before, Math.floor(n));
+    const add = layerGainRoom(before, Math.floor(n), layerCapOf(this.m.lobbyRules));
     if (add <= 0) return 0;
     this.layers[bondId] = before + add;
     this.recompute();
