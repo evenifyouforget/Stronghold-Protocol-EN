@@ -1,2 +1,2 @@
 - Fixed #175: Viviana's Mod Z warning (Glimmering Touch) now shows the 13-tile diamond it will hit, not a ring.
-- Fixed #172: the room's bot selector shows each bot's strength score next to its name (for example "Evobot (121)").
+- Fixed #172: the room's bot selector shows each bot's strength score next to its name (for example "Evobot (113)").
