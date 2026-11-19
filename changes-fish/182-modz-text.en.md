@@ -1,0 +1,1 @@
+- Mod Z: Shining heals allies at full HP too, to grant Immortal; the English module texts are reworded from Fish's descriptions (#182).

@@ -183,17 +183,28 @@ const INSTALL = {
   },
 
   // per attack: max HP +50 and 庇护 +1 % (80 stacks, kept through retreats); per deployment: one Waxing stack (10 at
-  // most): healing received +20 %, ASPD +20, and Corrosion of 1 % ATK on each hit, per stack
+  // most): healing received +20 %, ASPD +20 Tenacity (坚忍, as his talent: in full at 70 % HP lost, linear before; Tenacity doesn't stack, the
+  // highest counts, so this only adds what exceeds his talent's), and
+  // Corrosion of 1 % ATK on each hit, per stack
   uniequip_fishz_helage(battle, u) {
     const p = (u.persist[KEY] ??= { stacks: 0, wax: 0 });
     const apply = () => {
       battle.addBuff(u, {
         key: `${KEY}:helage`, persist: true, allowDead: true, tags: ['module'],
-        mods: { hpFlat: 50 * p.stacks, healingTakenMul: 1 + 0.2 * p.wax, aspd: 20 * p.wax },
+        mods: { hpFlat: 50 * p.stacks, healingTakenMul: 1 + 0.2 * p.wax },
       });
     };
     battle.on('attack', (c) => { if (c.attacker === u && p.stacks < 80) { p.stacks++; apply(); } }, { owner: u });
     battle.on('deploy', (c) => { if (c.unit === u && !c.move) { p.wax = Math.min(10, p.wax + 1); apply(); } }, { owner: u });
+    const tenKey = `${KEY}:helage:tenacity`;
+    battle.on('tick', () => {
+      const cur = u.findBuff(tenKey);
+      const talent = u.findBuff('talent:helage:berserk')?.data?.v ?? 0;
+      const v = up(u) ? Math.max(0, 20 * p.wax * Math.max(0, Math.min(1, (1 - u.hpRatio) / 0.7)) - talent) : 0;
+      if (cur && Math.abs((cur.data?.v ?? 0) - v) < 0.05) return;
+      if (v < 0.05) { if (cur) battle.removeBuff(u, tenKey); return; }
+      battle.addBuff(u, { key: tenKey, mods: { aspd: v }, data: { v }, tags: ['module'] });
+    }, { owner: u });
     battle.on('tick', () => { if (up(u) && p.stacks > 0) holdProtect(battle, u, p.stacks * 0.01, PROTECT_TICK_HOLD, u); }, { owner: u });
     battle.on('hit', (c) => {
       if (c.source !== u || c.target?.side !== 'enemy' || c.dmg.type === 'element' || !(p.wax > 0)) return;
@@ -219,6 +230,9 @@ const INSTALL = {
   uniequip_fishz_shining(battle, u) {
     const key = `${KEY}:immortal`;
     let cd = 0, readyAt = 0;
+    // Fish's text: "Can heal allies that are already at max HP (just to apply Immortality)": a full-HP ally is a heal
+    // target while the grant is ready and the ally has no Immortal (battle/queries.js injuredAlliesInKeys; injured first)
+    u.fishHealFull = (a) => battle.time >= readyAt && !a.findBuff(key);
     battle.on('heal', (c) => {
       if (c.source !== u || !c.target || c.target.side === 'enemy' || battle.time < readyAt || c.target.findBuff(key)) return;
       battle.addBuff(c.target, { key, duration: 8, source: u, visible: true, tags: ['module'] });
