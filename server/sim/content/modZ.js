@@ -250,9 +250,12 @@ const INSTALL = {
   // every 0.5 s; "持续消耗" names no rate]
   uniequip_fishz_siege(battle, u) {
     u.fishDpMul = 2;
+    // GitHub #176: while she is up, her player's DP cap is 999, so a gain between two drains is never wasted at the usual
+    // 99 (Fish's suggestion: "Siege Mod Z also raises DP cap to 999")
     battle.every(0.5, () => {
-      if (!up(u)) return;
       const ps = battle.getPlayer(u.ownerId);
+      if (ps) ps.fishDpMax = up(u) ? 999 : 0;
+      if (!up(u)) return;
       const extra = Math.floor((ps?.dp ?? 0) - 90);
       if (!(extra > 0)) return;
       battle.addDp(u.ownerId, -extra);

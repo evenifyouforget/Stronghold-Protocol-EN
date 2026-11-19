@@ -356,3 +356,15 @@ test('Siege Z and Saileach Z: the DP they generate counts twice (addDp with them
     assert.equal(b.getPlayer(pid).dp, 15, `${charId}: other DP is not doubled`);
   }
 });
+
+test('Siege Z: while she is up her player can hold more than 99 DP, so gains between drains are not wasted (#176)', () => {
+  const { h, b, ops: [s] } = rig([op('char_112_siege', 'uniequip_fishz_siege', 0)]);
+  const ps = b.getPlayer(s.ownerId);
+  h.run(0.6);
+  assert.equal(ps.fishDpMax, 999);
+  b.addDp(s.ownerId, 200 - ps.dp);
+  assert.ok(ps.dp > 120, `DP ${ps.dp} kept past 99 until the next drain`);
+  h.run(1);   // the next drain takes the excess over 90 (her own skill then earns some back from the SP: her DP gain is doubled)
+  assert.ok(ps.dp < 140, `drained from 200 to ${ps.dp}`);
+  noErrors(b);
+});
