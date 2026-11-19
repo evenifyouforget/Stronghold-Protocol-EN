@@ -368,8 +368,19 @@ re-scored on 4 other seeds. **Base seed 30711621**, validation seeds derived fro
 layout on these 53 boards, and how much win rate the damage is worth (the human winning boards kill the pool in 7–45 s,
 so most of the 30 % is margin).
 
-**Next.** (1) The bot's layout (`arrange` final) on the same 53 boards with this fight, to put the 70 % on the same
-footing. (2) Per-unit effects from the rows (which move helped, by unit type and tile class) and a layout generator
+### The bot's layout on the same boards (2026-11-19)
+
+`botlayout.mjs`: bot.js `arrange` final, on a replay of each match to its boss prep, then the same fight and the same
+four unseen seeds as the ceiling run (`out-bot/`). 51 of the 53 boards (2 failed to replay).
+
+- **The bot keeps a median 63 % of the human layout's damage** (the old 12-board figure was 70 %); on 9 of 51 boards it
+  reaches ≥ 0.95× and on 20 it keeps under half. The search's best layout is a median **1.9×** the bot's.
+- **Kills, not just damage:** on 5 boards the human layout kills the pool in 120 s and the bot's doesn't
+  (29b8: 163 → 65, 3af6: 169 → 65, 564c: 232 → 87, 725b: 948 → 88, a4c3: 149 → 84). One board the other way (7d5c,
+  55 → 123). So roughly one boss board in ten is a kill the bot's placement loses.
+- Where the human layout fails too (8 boards under 100), the bot is worse on 7 of them; the search kills on 3.
+
+**Next.** (2) Per-unit effects from the rows (which move helped, by unit type and tile class) and a layout generator
 with a few parameters, scored on boards the search hasn't seen. (3) The win-rate check: put the better layout into bot
 matches that reach the Final Assault.
 
