@@ -34,6 +34,7 @@
 //   syntheticResult(players, progress)     stand-in when a boss field's client never reported
 import { TICK, SNAPSHOT_EVERY } from '../sim/constants.js';
 import { layerGainRoom } from '../../shared/constants.js';
+import { modZOf } from '../../shared/modZ.js';
 import { uniteLeft } from '../sim/spec.js';
 import { diyTokenOwner, diyRecordOf } from '../../shared/diy.js';
 import { simMeter } from './simMeter.js';
@@ -627,7 +628,7 @@ function layerBondsOf(p, gd) {
  * only by the room under 999 (Infinity here): such boards legitimately gain hundreds of layers a battle.
  * @returns {Map<string, number>} bondId → extra allowance (Infinity: uncapped)
  */
-function layerAllowanceOf(p, gd) {
+export function layerAllowanceOf(p, gd) {
   const out = new Map();
   if (typeof gd.garrison !== 'function' || typeof gd.chess !== 'function' || typeof gd.bond !== 'function') return out;
   const units = (Array.isArray(p.units) ? p.units : []).filter((u) => u && u.kind !== 'token' && typeof u.chessId === 'string');
@@ -651,6 +652,13 @@ function layerAllowanceOf(p, gd) {
       const given = gd.garrison(g.bbStr?.give_garrison_id);
       if (given && given.eventType === 'IN_BATTLE') credit(given, units.length);
     }
+  }
+  // (Fish Edition) a Mod Z / W that adds stacks in battle (shared/modZ.js `layerAllow`: how many per Alliance per battle at most):
+  // `own` and `all` count the player's whole line-up (the module's own Alliances are in it), a bond id names that one
+  for (const u of units) {
+    const z = modZOf(u.diy?.uniEquipId);
+    if (!z || !z.layerAllow) continue;
+    for (const [k, n] of Object.entries(z.layerAllow)) for (const b of (k === 'own' || k === 'all' ? lineup : [k])) out.set(b, (out.get(b) || 0) + n);
   }
   if (extra) for (const b of out.keys()) out.set(b, Infinity);
   return out;

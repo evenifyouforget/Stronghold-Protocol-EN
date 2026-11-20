@@ -8,7 +8,7 @@ import { modZRulePicks, diyRecord, checkDiyPick, hasModZ } from '../shared/diy.j
 import { unitForm } from '../shared/standIn.js';
 import { getDefaultSource } from '../server/sim/simdata.js';
 import { RULES, isRuleValue, normalizeRules, ruleSet } from '../shared/rules.js';
-import { makeBattle, enemyRec } from './helpers/battleHarness.js';
+import { makeBattle, enemyRec, chessRec } from './helpers/battleHarness.js';
 
 const ds = getDefaultSource();
 const backups = ds.rawBackups();
@@ -150,8 +150,10 @@ test('Zuo Le Z: one more skill charge; Viviana Z: the RES shred stays after she 
   assert.ok(e, 'an enemy on the field');
   h.b.dealElementDamage({ source: v, target: e, element: 'burn', amount: 99999 });
   assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.resFlat, -2);
+  assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.defFlat, -200, 'and DEF -200 (v2)');
   h.b.retreat(v, { dying: true });
   assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.resFlat, -2, 'kept after she falls');
+  assert.equal(e.findBuff('fishModZ:vvanaRes')?.mods?.defFlat, -200);
   h.run(20);
   assert.deepEqual(h.b.errors.map((x) => `${x.label}: ${x.message}`), []);
 });
@@ -182,8 +184,8 @@ const WALKERS = { enemies: { enemy_walk: enemyRec({ key: 'enemy_walk', hp: 9000,
   enemy_tank: enemyRec({ key: 'enemy_tank', hp: 900000, atk: 0, def: 0, res: 0, speed: 0.4 }) } };
 const op = (charId, uniEquipId, skillIndex = 2, row = 9, col = 4) => ({ diy: { slot: 6, charId, skillIndex, uniEquipId }, elite: true, row, col, dir: 'RIGHT' });
 /** A battle with `units`, `enemies`, and recorders of element damage, damage, statuses and SP gains. */
-function rig(units, enemies = [], timeLimit = 90) {
-  const h = makeBattle({ seed: 3, defs: WALKERS, autoFinish: false, timeLimit, hooks: [], units, enemies });
+function rig(units, enemies = [], timeLimit = 90, extra = {}) {
+  const h = makeBattle({ seed: 3, defs: WALKERS, autoFinish: false, timeLimit, hooks: [], units, enemies, ...extra });
   const rec = { element: [], damage: [], status: [], sp: [] };
   const b = h.b;
   // recorders pass every argument on (the engine's calls have more than the first)
@@ -246,29 +248,43 @@ test('Hellagur Z: Waxing\'s ASPD is Tenacity: none at full HP, in full at 70 % H
   noErrors(b);
 });
 
-test('Phantom Z: Raid and Indomitable on the elite, and Raid treats his skill as ready', () => {
+test('Phantom Z (v2): Victoria, Raid and Resilient; Raid treats his skill as ready; +3 stacks to his active Alliances per deployment, 10 times', () => {
   const m = modZOf('uniequip_fishz_phatom');
-  assert.deepEqual([...m.bonds], ['raidShip', 'indomShip']);
-  const { ops: [u] } = rig([op('char_250_phatom', 'uniequip_fishz_phatom', 0)]);
+  assert.deepEqual([...m.bonds], ['victoriaShip', 'raidShip', 'indomShip']);
+  assert.equal(m.isoFree, true);
+  const al = (layers = 0) => ({ count: 3, active: true, tier: 1, layers });
+  const bonds = { victoriaShip: al(), raidShip: al(), indomShip: al(), kjeragShip: al() };
+  const { b, ops: [u] } = rig([op('char_250_phatom', 'uniequip_fishz_phatom', 0)], [], 20, { bonds, flags: { layerGainsEnabled: true } });
   assert.equal(u.fishRaidReady, true);
-});
-
-test('Shining Z: her heal grants Immortal (8 s), which stops a lethal hit once and adds 5 s to her cooldown', () => {
-  const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
-  t.hp = t.s.maxHp * 0.3;
-  h.runUntil(() => !!t.findBuff('fishModZ:immortal'), 20);
-  const im = t.findBuff('fishModZ:immortal');
-  assert.ok(im, 'Immortal granted by her heal');
-  b.dealDamage({ source: null, target: t, amount: t.hp * 50, type: 'true', calculation: 'precomputed' });
-  assert.ok(t.alive && t.hp >= 1, `alive at ${t.hp}`);
+  const L = () => b.getPlayer(u.ownerId).bonds;
+  assert.equal(L().raidShip.layers, 3, 'the first deployment counts');
+  assert.equal(L().kjeragShip.layers, 0, 'only his own Alliances');
+  for (let i = 0; i < 14; i++) b.emit('deploy', { unit: u });
+  assert.equal(L().raidShip.layers, 30, '10 deployments at most');
   noErrors(b);
 });
 
-test('Shining Z: she heals an ally at full HP too, to grant Immortal (Fish: "can heal allies that are already at max HP")', () => {
+test('Shining Z (v2): everyone starts Immortal (ready); a lethal hit makes it active for 8 s, and nothing grants a second one', () => {
   const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
-  assert.ok(t.hp >= t.s.maxHp - 1e-6, 'Thorns starts at full HP');
-  h.runUntil(() => !!t.findBuff('fishModZ:immortal'), 20);
-  assert.ok(t.findBuff('fishModZ:immortal'), 'Immortal granted to a full-HP ally');
+  assert.ok(t.findBuff('fishModZ:immortalReady'), 'granted at the start of the battle');
+  assert.ok(s.findBuff('fishModZ:immortalReady'), 'she too');
+  b.dealDamage({ source: null, target: t, amount: t.hp * 50, type: 'true', calculation: 'precomputed' });
+  assert.ok(t.alive && t.hp >= 1, `alive at ${t.hp}`);
+  assert.ok(t.findBuff('fishModZ:immortal'), 'active');
+  assert.ok(!t.findBuff('fishModZ:immortalReady'), 'ready is used up');
+  b.dealDamage({ source: null, target: t, amount: t.hp * 50, type: 'true', calculation: 'precomputed' });
+  assert.ok(t.alive, 'a second lethal hit during the 8 s is stopped too');
+  noErrors(b);
+});
+
+test('Shining Z (v2): she heals an ally at full HP to grant Immortal again, allies without it first', () => {
+  const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
+  b.removeBuff(t, 'fishModZ:immortalReady');
+  assert.ok(t.hp >= t.s.maxHp - 1e-6, 'Thorns is at full HP');
+  const order = b.injuredAlliesInKeys(s.rangeKeys, s).map((a) => a.id);
+  assert.equal(order[0], t.id, 'the ally without Immortality comes first');
+  h.runUntil(() => !!t.findBuff('fishModZ:immortalReady'), 20);
+  assert.ok(t.findBuff('fishModZ:immortalReady'), 'granted by a heal to a full-HP ally');
   noErrors(b);
 });
 
@@ -317,22 +333,18 @@ test('Viviana Z: Glimmering Touch explodes 7 s after it marks an enemy in a Kazi
   noErrors(b);
 });
 
-test('Zuo Le Z: SP from other sources ×2; each hit adds 5 % ATK Corrosion (Burn + Arts at 0 DEF)', () => {
+test('Zuo Le Z (v2): SP from other sources ×2; every hit adds 5 % ATK Burn and 10 % ATK Arts (no Corrosion, whatever the DEF)', () => {
   const { h, b, rec, ops: [u] } = rig([op('char_4121_zuole', 'uniequip_fishz_zuole', 0)], [{ key: 'enemy_walk', time: 0, count: 1 }]);
   u.skill.sp = 0; u.skill.charges = 0;
   const before = u.skill.spTotal;
   u.skill.gainSp(1, 'test');
   assert.equal(u.skill.spTotal - before, 2, 'doubled');
+  assert.deepEqual([...modZOf('uniequip_fishz_zuole').bonds], ['swiftShip']);
   h.run(40);   // melee: the walker reaches him at ~25 s
-  assert.ok(rec.element.some((x) => x.source === u && x.element === 'erosion'), 'Corrosion on a 200-DEF enemy');
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'burn'), 'Burn on a 200-DEF enemy');
+  assert.ok(!rec.element.some((x) => x.source === u && x.element === 'erosion'), 'no Corrosion any more');
+  assert.ok(rec.damage.some((x) => x.source === u && x.type === 'arts' && x.tags?.includes('fishZuole')), 'Arts too');
   noErrors(b);
-  const z = rig([op('char_4121_zuole', 'uniequip_fishz_zuole', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
-  z.h.run(40);
-  const zu = z.ops[0];
-  assert.ok(z.rec.element.some((x) => x.source === zu && x.element === 'burn'), 'Burn on a 0-DEF enemy');
-  assert.ok(!z.rec.element.some((x) => x.source === zu && x.element === 'erosion'), 'no Corrosion there');
-  assert.ok(z.rec.damage.some((x) => x.source === zu && x.tags?.includes('fishZuole') && x.type === 'arts'), 'the Arts rider');
-  noErrors(z.b);
 });
 
 test('Typhon W: hits inflict Cold; a hit on a Frozen enemy shatters those within 1 tile (Freeze off, Stun 4 s, +40 % physical taken)', () => {
@@ -372,4 +384,65 @@ test('Siege Z: while she is up her player can hold more than 99 DP, so gains bet
   h.run(1);   // the next drain takes the excess over 90 (her own skill then earns some back from the SP: her DP gain is doubled)
   assert.ok(ps.dp < 140, `drained from 200 to ${ps.dp}`);
   noErrors(b);
+});
+
+test('Typhon Z and Thorns Z (v2): the first time the skill ends in a battle they are at max SP at once; only that time', () => {
+  for (const [charId, id] of [['char_2012_typhon', 'uniequip_fishz_typhon'], ['char_293_thorns', 'uniequip_fishz_thorns']]) {
+    const { h, b, ops: [u] } = rig([op(charId, id, 1)], [{ key: 'enemy_weak', time: 1, count: 80, interval: 1 }], 200);
+    const ends = [];
+    b.on('skillEnd', (c) => { if (c.unit === u) ends.push({ sp: u.skill.sp, cost: u.skill.spCost }); }, { priority: -100 });
+    u.skill.sp = u.skill.spCost;
+    h.runUntil(() => ends.length >= 2, 160);
+    assert.ok(ends.length >= 1, `${charId}: the skill ended`);
+    assert.ok(ends[0].sp >= ends[0].cost - 1e-6, `${charId}: max SP right after the first end (${ends[0].sp} / ${ends[0].cost})`);
+    if (ends.length >= 2) assert.ok(ends[1].sp < ends[1].cost - 1e-6, `${charId}: not again at the second end`);
+    noErrors(b);
+  }
+});
+
+test('Eunectes Z (v2): each enemy that dies in her range gives +3 stacks to her active Alliances, 20 times at most', () => {
+  const al = () => ({ count: 3, active: true, tier: 1, layers: 0 });
+  const bonds = { steadShip: al(), kjeragShip: al() };
+  const { h, b, ops: [u] } = rig([op('char_416_zumama', 'uniequip_fishz_zumama', 0, 9, 5)], [{ key: 'enemy_weak', time: 1, count: 60, interval: 0.5 }], 80, { bonds, flags: { layerGainsEnabled: true } });
+  assert.deepEqual([...modZOf('uniequip_fishz_zumama').bonds], ['steadShip']);
+  h.run(70);
+  const L = b.getPlayer(u.ownerId).bonds;
+  assert.ok(L.steadShip.layers > 0 && L.steadShip.layers % 3 === 0, `Durable ${L.steadShip.layers}`);
+  assert.ok(L.steadShip.layers <= 60, 'at most 20 x 3');
+  assert.equal(L.kjeragShip.layers, 0, 'only her own Alliances');
+  noErrors(b);
+});
+
+test('Siege W: DP above 90 becomes Marvel stacks, 3 DP each, at most 50 a round; DP limit 999 while she is up', () => {
+  const bonds = { miraShip: { count: 3, active: true, tier: 1, layers: 0 } };
+  const { h, b, ops: [s] } = rig([op('char_112_siege', 'uniequip_fishw_siege', 0)], [], 30, { bonds, flags: { layerGainsEnabled: true } });
+  assert.equal(modZOf('uniequip_fishw_siege').kind, 'W');
+  const ps = b.getPlayer(s.ownerId);
+  h.run(0.6);
+  assert.equal(ps.fishDpMax, 999);
+  b.addDp(s.ownerId, 400 - ps.dp);
+  h.run(0.6);
+  assert.equal(ps.bonds.miraShip.layers, 50 - 50 + Math.min(50, ps.bonds.miraShip.layers), 'sanity');
+  assert.ok(ps.bonds.miraShip.layers > 0 && ps.bonds.miraShip.layers <= 50, `Marvel ${ps.bonds.miraShip.layers}`);
+  h.run(10);
+  assert.equal(ps.bonds.miraShip.layers, 50, 'the 50-stack cap per round');
+  noErrors(b);
+});
+
+test('Saileach W: after each cast, if [Aid] is active every active Alliance gains +2 stacks, +4 with 3 or more different [Aid] Operators', () => {
+  const al = () => ({ count: 3, active: true, tier: 1, layers: 0 });
+  const bonds = { deputShip: al(), kjeragShip: al(), yanShip: al() };
+  const { b, ops: [s] } = rig([op('char_479_sleach', 'uniequip_fishw_sleach', 0)], [], 20, { bonds, flags: { layerGainsEnabled: true } });
+  assert.deepEqual([...modZOf('uniequip_fishw_sleach').bonds], ['deputShip']);
+  const L = () => b.getPlayer(s.ownerId).bonds;
+  b.emit('skillStart', { unit: s, skill: s.skill });
+  assert.deepEqual([L().deputShip.layers, L().kjeragShip.layers, L().yanShip.layers], [2, 2, 2], 'one Aid Operator: +2');
+  noErrors(b);
+  // three different Aid Operators on the field: +4
+  const defs = { ...WALKERS, chess: { aid_a: chessRec({ id: 'aid_a', bonds: ['deputShip'] }), aid_b: chessRec({ id: 'aid_b', bonds: ['deputShip'] }) } };
+  const x = rig([op('char_479_sleach', 'uniequip_fishw_sleach', 0), { chessId: 'aid_a', row: 10, col: 5, dir: 'RIGHT' }, { chessId: 'aid_b', row: 11, col: 5, dir: 'RIGHT' }], [], 20, { defs, bonds: { ...bonds, deputShip: al() }, flags: { layerGainsEnabled: true } });
+  const s2 = x.ops.find((o) => o.def?.raw?.module?.id === 'uniequip_fishw_sleach');
+  x.b.emit('skillStart', { unit: s2, skill: s2.skill });
+  assert.equal(x.b.getPlayer(s2.ownerId).bonds.kjeragShip.layers, 4, 'three Aid Operators: +4');
+  noErrors(x.b);
 });
