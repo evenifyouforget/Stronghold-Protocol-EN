@@ -216,6 +216,17 @@ A row holds what is needed to replay it and to train on it:
 - **Rejected and invalid layouts too**, flagged, since "what fails" is training data.
 Held-out splits are by board (whole boards, with every layout of them), never by row.
 
+### Shark's return: the shop decision-point dataset (line 1; received 2026-11-20)
+
+Archive `logs/shark-ml-return-2026-11-19.tar.xz` (unpacked, untracked, in `untracked/shark-return-2026-11-19/`; its `RETURN.md` is shark's report). **Checked by orca:** the row counts per source match, `predictability.mjs` reproduces shark's table to the digit, and the human file count (231 in the rows) is 203 files with a round-2-or-later decision, as stated.
+
+- **The data:** `decision-points/shop.jsonl`, 102,839 rows of shop buy/skip decisions (human 25,972; bot-legacy 6,151; bot-other 36,202; legacy-clean 17,290; evobot-clean 17,224), with a start-of-round state (previous round's snapshot, so no leak), counters within the round, and cheat / Risk / seeded labels from `ruleLabels`. It holds human match data: **never commit it** (same as the human records).
+- **Results (shark, reproduced):** majority guess vs state-bucketed predictor. Bots: +7 to +8 points over per-round (legacy-clean 63.9 → 71.5 %, evobot-clean 62.2 → 70.8 %); no signature of overfitting. Clean humans (88 files): no lift (62.9 % majority, 61.3 % bucketed), which says the sample is thin and the features too coarse, not that humans are random. Cheat-economy humans skip 78 % of shops. **legacy vs evobot: no difference established** in how predictable their shop decisions are (relative lift 21.1 vs 22.1 %, CI [-0.4, 2.4] points).
+- **What it means for the imitation line (line 4):** shop buy/skip from round, shop screen and last round's level is learnable for bots but not yet for humans; a human-imitation model needs richer features (the offer's contents, owned units, Alliance fit) before any claim. Do not redo the extractor or the `bot: 1` tagging (RETURN.md "What orca shouldn't redo").
+- **Seeds:** the clean bot records use seeds **5001-5300, which are the evolution race's held-back seeds** (`ai-players/10`). Fine for placement or analysis; never for tuning or training anything that must see those seeds as unseen.
+- **New resource for the boss-board work:** the 600 bot records (`bot-records/`, legacy and evobot, solo ABYSS) hold **503 boss battles (452 without summon tokens)**: bot-built final boards, about 8 times the 53 human boards of the placement ceiling test. Use them to find and fit a placement rule, and test it on the human boards (as planned in `04`).
+- **Tool:** `make-bot-records.mjs` makes labelled bot records for any registered bot, seeds and config (needs to sit in `fish-edition/untracked/shark-ml/`).
+
 ## 3. Other ways to add order (instead of legacy's)
 
 Legacy hand-writes a score for every decision point (`buyScore`, `lineupScore`, `bondPlan` …) and tunes constants.
