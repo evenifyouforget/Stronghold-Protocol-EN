@@ -162,12 +162,14 @@ const INSTALL = {
     liveBuff(battle, u, `${KEY}:zumama`, () => true, () => ({ defFlat: Math.min(5000, Math.max(0, Math.round(u.s.atk - u.base.atk))) }));
   },
 
-  // every skill an ammo skill (18 / 3 / 100 attacks: S1 her normal attacks, S2 / S3 one shell per ammo); during it,
-  // ASPD +50 and max HP +100 %
+  // every skill an ammo skill (24 / 4 / 200 attacks: S1 her normal attacks, S2 / S3 one shell per ammo); during it,
+  // ASPD +100 and max HP +100 %; when a [Laterano] Operator on one of the 4 tiles around her finishes a skill while hers is
+  // active, she reloads to max ammo; every [Laterano] Operator gets x2 (x3 at 500+ stacks) of the Laterano ATK effect
+  // (bonds/core.js installLaterano reads `fishLateranoMul`)
   uniequip_fishz_phenxi(battle, u) {
     const sk = u.skill;
     const i = skillIndex(u);
-    const ammo = [18, 3, 100][i ?? -1];
+    const ammo = [24, 4, 200][i ?? -1];
     if (sk && !sk.noSkill && ammo && sk.kind !== 'passive') {
       const was = sk.kind;
       sk.kind = 'ammo';
@@ -205,7 +207,14 @@ const INSTALL = {
         } };
       }
     }
-    liveBuff(battle, u, `${KEY}:phenxi`, () => !!(u.skill && u.skill.active), () => ({ aspd: 50, hpMul: 2 }));
+    liveBuff(battle, u, `${KEY}:phenxi`, () => !!(u.skill && u.skill.active), () => ({ aspd: 100, hpMul: 2 }));
+    u.fishLateranoMul = true;
+    battle.on('skillEnd', (c) => {
+      const o = c.unit;
+      if (!o || o === u || o.side !== u.side || !up(u) || !sk || !sk.active || sk.kind !== 'ammo') return;
+      if (Math.abs(o.tileR - u.tileR) + Math.abs(o.tileC - u.tileC) !== 1 || !memberOf(battle, o, 'lateranoShip')) return;
+      sk.ammoLeft = sk.ammo;
+    }, { owner: u });
   },
 
   // per attack: max HP +50 and 庇护 +1 % (80 stacks, kept through retreats); per deployment: one Waxing stack (10 at

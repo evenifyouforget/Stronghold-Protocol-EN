@@ -159,7 +159,7 @@ test('Zuo Le Z: one more skill charge; Viviana Z: the RES shred stays after she 
 });
 
 test('Fiammetta Z: S2 fires one shell per ammo and ends; S3 shells spend ammo (the ammoUsed hook)', () => {
-  for (const [skillIndex, ammo] of [[1, 3], [2, 100]]) {
+  for (const [skillIndex, ammo] of [[1, 4], [2, 200]]) {
     const h = makeBattle({ seed: 5, autoFinish: false, timeLimit: 60, hooks: [],
       units: [{ diy: { slot: 6, charId: 'char_300_phenxi', skillIndex, uniEquipId: 'uniequip_fishz_phenxi' }, elite: true, row: 9, col: 4, dir: 'RIGHT' },
         { diy: { slot: 5, charId: 'char_416_zumama', skillIndex: 0, uniEquipId: null }, elite: false, row: 9, col: 5, dir: 'RIGHT' }],
@@ -445,4 +445,49 @@ test('Saileach W: after each cast, if [Aid] is active every active Alliance gain
   x.b.emit('skillStart', { unit: s2, skill: s2.skill });
   assert.equal(x.b.getPlayer(s2.ownerId).bonds.kjeragShip.layers, 4, 'three Aid Operators: +4');
   noErrors(x.b);
+});
+
+test('Fiammetta Z (v2): 24 / 4 / 200 ammo, ASPD +100 in a skill, a reload when an adjacent Laterano Operator finishes a skill', () => {
+  for (const [si, ammo] of [[0, 24], [1, 4], [2, 200]]) {
+    const { ops: [f] } = rig([op('char_300_phenxi', 'uniequip_fishz_phenxi', si)]);
+    assert.equal(f.skill.ammo, ammo, `S${si + 1}`);
+  }
+  const defs = { ...WALKERS, chess: { lat_n: chessRec({ id: 'lat_n', bonds: ['lateranoShip'] }) } };
+  const at = (col) => rig([op('char_300_phenxi', 'uniequip_fishz_phenxi', 0, 9, 4), { chessId: 'lat_n', row: 9, col, dir: 'RIGHT' }], [{ key: 'enemy_tank', time: 1, count: 1 }], 60, { defs });
+  const near = at(5);
+  const [f, n] = near.ops.sort((x, y) => (x.def?.id === 'lat_n') - (y.def?.id === 'lat_n'));
+  near.h.runUntil(() => f.skill.active, 40);
+  assert.ok(f.skill.active, 'her skill is active');
+  assert.ok(f.s.aspd >= f.base.aspd + 99, `ASPD +100 (${f.s.aspd} / ${f.base.aspd})`);
+  f.skill.ammoLeft = 3;
+  near.b.emit('skillEnd', { unit: n, skill: n.skill });
+  assert.equal(f.skill.ammoLeft, f.skill.ammo, 'adjacent (4 tiles) Laterano Operator: reloaded to max');
+  const far = at(6);
+  const [f2, n2] = far.ops.sort((x, y) => (x.def?.id === 'lat_n') - (y.def?.id === 'lat_n'));
+  far.h.runUntil(() => f2.skill.active, 40);
+  f2.skill.ammoLeft = 3;
+  far.b.emit('skillEnd', { unit: n2, skill: n2.skill });
+  assert.equal(f2.skill.ammoLeft, 3, 'two tiles away: no reload');
+  noErrors(near.b);
+});
+
+test('Fiammetta Z (v2): the Laterano ATK effect (+4 % per ammo, up to +200 %) is x2 for every member while she is on the field, x3 at 500+ stacks', () => {
+  const lat = (extra = {}) => chessRec({ id: 'lat', bonds: ['lateranoShip'], stats: { atk: 1000, maxHp: 99999 }, ...extra });
+  const defs = { ...WALKERS, chess: { lat_a: lat({ id: 'lat_a' }), lat_b: lat({ id: 'lat_b' }), lat_c: lat({ id: 'lat_c' }), lat_d: lat({ id: 'lat_d' }), lat_e: lat({ id: 'lat_e' }) } };
+  const run = (withFia, layers) => {
+    const units = [{ chessId: 'lat_a', row: 10, col: 4, dir: 'RIGHT' }, { chessId: 'lat_b', row: 11, col: 4, dir: 'RIGHT' }, { chessId: 'lat_c', row: 10, col: 6, dir: 'RIGHT' }, { chessId: 'lat_d', row: 11, col: 6, dir: 'RIGHT' }, { chessId: 'lat_e', row: 9, col: 6, dir: 'RIGHT' },
+      op('char_300_phenxi', withFia ? 'uniequip_fishz_phenxi' : null, 0, 9, 8)];
+    const x = rig(units, [], 20, { defs, bonds: { lateranoShip: { count: 6, active: true, tier: 2, layers } }, flags: { layerGainsEnabled: true } });
+    const a = x.ops.find((o) => o.defId === 'lat_a' || o.def?.id === 'lat_a');
+    const base = a.s.atk;
+    for (let i = 0; i < 20; i++) x.b.emit('ammoUsed', { unit: a, left: 1, skill: a.skill });
+    x.b.step?.();
+    x.h.run(0.2);
+    return { gain: a.s.atk / base - 1, x };
+  };
+  const plain = run(false, 0), fia = run(true, 0), big = run(true, 600);
+  assert.ok(plain.gain > 0.5, `the base effect works in this rig (+${(plain.gain * 100).toFixed(0)} %)`);
+  assert.ok(Math.abs(fia.gain / plain.gain - 2) < 0.05, `x2 with her: ${fia.gain} vs ${plain.gain}`);
+  assert.ok(Math.abs(big.gain / plain.gain - 3) < 0.05, `x3 at 500+ stacks: ${big.gain} vs ${plain.gain}`);
+  noErrors(fia.x.b);
 });
