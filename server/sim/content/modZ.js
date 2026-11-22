@@ -11,6 +11,7 @@ import { up, skillBusy, isMainHit, holdProtect, PROTECT_TICK_HOLD, enemyInRange 
 import { installLordArtsAddition } from './kits/shared/lord.js';
 import { memberOf } from './items/battle.js';
 import { ASPD_MAX, COLS } from '../constants.js';
+import { hypot } from '../detmath.js';
 import { gainLayers, unitBonds, bondActive as bondOn } from './support/index.js';
 
 const KEY = 'fishModZ';
@@ -408,7 +409,7 @@ const INSTALL = {
     battle.every(0.5, () => {
       for (const e of battle.aliveEnemies()) {
         const k = e.findBuff(SLIP)?.data?.k;
-        if (!k || !battle.routes.some((r) => r.start && Math.hypot(e.x - r.start[1], e.y - r.start[0]) <= 0.75)) continue;
+        if (!k || !battle.routes.some((r) => r.start && hypot(e.x - r.start[1], e.y - r.start[0]) <= 0.75)) continue;
         battle.dealDamage({ source: u, target: e, amount: 1000 * 2 ** (k - 1), type: 'true', attackType: 'ADDITION', applyWay: 'NONE',
           calculation: 'precomputed', tags: ['module', 'fishSlippery'] });
       }
