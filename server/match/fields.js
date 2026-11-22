@@ -692,6 +692,8 @@ export function specBounds(spec, gd = null) {
   const derived = new Set();
   for (const k of keyCounts.keys()) for (const d of derivedKeys(gd, k)) derived.add(d);
   const maxTotal = spawnCount * 4 + 100;
+  // (Fish Edition) a player with Mod W Typhon re-adds up to 30 fallen enemies (content/modZ.js): extra leaks of scheduled keys, uncounted
+  const reviveAllow = (spec.players || []).some((pl) => (pl.units || []).some((u) => u && u.diy && u.diy.uniEquipId === 'uniequip_fishw_typhon')) ? 30 : 0;
   // 联防: `${childKey}|${sourcePlayerId}` → how many content-spawned children the enemies that leaker sent in can leave
   // (offspringPerParent per parent; maxTotal when the data gives no bound) — a reported child must belong to a leaker
   // whose own enemies can have produced it, including a child marked `uniteRuntime` (which is not billed)
@@ -747,7 +749,7 @@ export function specBounds(spec, gd = null) {
   return {
     keyCounts, keySourceCounts, derivedSourceCounts, uncountedKeys, derived, spawnCount, bountyCoins, sources, players,
     // content spawns (splits, summons, boss minions) can add enemies beyond the schedule
-    maxTotal,
+    maxTotal, reviveAllow,
     layerCap: 60 + 4 * round,
     maxTime: spec && spec.timeLimit > 0 ? spec.timeLimit + 5 : HARD_CAP_SECONDS,
   };
@@ -855,11 +857,11 @@ export function validateClientResult(spec, raw, { gd = null, botField = false } 
           if (!B.keyCounts.has(key) && !B.derived.has(key)) return bad('leak key');
           const n = (leakCount.get(key) || 0) + 1;
           leakCount.set(key, n);
-          const bound = (B.keyCounts.get(key) || 0) + (B.derived.has(key) ? B.maxTotal : 0);
+          const bound = (B.keyCounts.get(key) || 0) + (B.derived.has(key) ? B.maxTotal : 0) + B.reviveAllow;
           if (n > bound) return bad('leak multiset');
           // a leak costs LP unless the enemy never counts (data notCountInTotal, countInTotal false, boss / part
           // entries); content-spawned keys (summons, splits) may carry their own flag
-          if (!counted && !B.uncountedKeys.has(key) && !B.derived.has(key)) return bad('uncounted leak');
+          if (!counted && !B.uncountedKeys.has(key) && !B.derived.has(key) && !B.reviveAllow) return bad('uncounted leak');
         }
         // mods / tag / source come from the spawn schedule (a leak re-enters 联防 with them). An enemy content spawned
         // (a split, a summon) carries its parent's mods — the round multipliers, a bounty id — so the leak's mods may

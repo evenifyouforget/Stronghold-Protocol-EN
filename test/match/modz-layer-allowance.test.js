@@ -17,3 +17,11 @@ test('Eunectes Z (+3 x 20), Phantom Z (+3 x 10), Siege W (50 Marvel) and Saileac
 test('a module without stack gains, an official module and no module add nothing', () => {
   for (const id of ['uniequip_fishz_typhon', 'uniequip_002_helage', null]) assert.equal(layerAllowanceOf(player(id), gd).size, 0, String(id));
 });
+
+import { specBounds } from '../../server/match/fields.js';
+test('Typhon W: the server allows up to 30 extra (uncounted) leaks of the wave\'s keys only for a player with the module', () => {
+  const spec = (id) => ({ spawns: [{ enemyKey: 'enemy_a', count: 5, time: 0, interval: 1 }], players: [{ playerId: 'p', units: [{ uid: 1, kind: 'chess', chessId: 'c', diy: { uniEquipId: id } }] }] });
+  assert.equal(specBounds(spec('uniequip_fishw_typhon')).reviveAllow, 30);
+  assert.equal(specBounds(spec('uniequip_fishz_typhon')).reviveAllow, 0);
+  assert.equal(specBounds({ spawns: [], players: [] }).reviveAllow, 0);
+});

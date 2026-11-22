@@ -29,7 +29,7 @@ export const MODZ = Object.freeze([
   { charId: 'char_2012_typhon', code: 'typhon', kind: 'Z', type: 'SIE-Z', attr: { maxHp: 300 }, bonds: ['preciShip'],
     name: N_('提丰的Z型调整'), desc: N_('获得【精准】盟约身份；自动平衡攻击力与攻击速度（攻击力+1%视为攻击速度+1；攻击速度最多+500，超出部分保留为攻击力）；部署10秒后攻击速度+100；每场战斗中第一次技能结束后，立即获得满额技力') },
   { charId: 'char_2012_typhon', code: 'typhon', kind: 'W', type: 'SIE-W', attr: { maxHp: 300, atk: 150, aspd: 10 },
-    name: N_('提丰的W型调整'), desc: N_('攻击使目标寒冷；若目标已冻结，改为使其周围1格内的所有敌人碎冰：解除冻结，晕眩4秒并使其受到的物理伤害+40%，持续4秒') },
+    name: N_('提丰的W型调整'), desc: N_('攻击使目标寒冷；若目标已冻结，改为使其周围1格内的所有敌人碎冰：解除冻结，晕眩4秒并使其受到的物理伤害+40%，持续4秒；非首领回合、非联防阶段：本回合最先倒下的30名敌人会重新加入敌潮，重新加入的敌人最大生命+100%、攻击力-70%，漏怪时不扣除生命值，不会传递到联防阶段，也不提供赏金') },
   { charId: 'char_197_poca', code: 'poca', kind: 'Z', type: 'SIE-Z', attr: { atk: 700 }, bonds: ['preciShip'],
     name: N_('早露的Z型调整'), desc: N_('获得【精准】盟约身份；标记受到自身伤害的敌人；技能结束时，技能期间每有1名被标记的敌人倒下，回复17点技力') },
   { charId: 'char_416_zumama', code: 'zumama', kind: 'Z', type: 'HES-Z', attr: { atk: 150, def: 150 }, layerAllow: { own: 60 }, bonds: ['steadShip'],

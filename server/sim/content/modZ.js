@@ -115,6 +115,20 @@ const INSTALL = {
         battle.addBuff(e, { key: `${KEY}:shatter`, duration: 4, mods: { physTakenMul: 1.4 }, source: u, tags: ['module'] });
       }
     }, { owner: u });
+    // v2: in a normal battle (no boss rounds, no unite phase) the first 30 enemies that die while she is on the field are added
+    // to the wave again on their own route: +100 % max HP, -70 % ATK, no LP when they leak, not passed on to the unite phase,
+    // no bounty. A revived enemy does not come back a second time. [DRAFT: only while she is on the field]
+    let revived = 0;
+    battle.on('death', (c) => {
+      const e = c.unit;
+      if (!e || e.side !== 'enemy' || revived >= 30 || !up(u) || battle.kind !== 'normal' || e.isBoss || e.tag || e.fishRevived || e.uniteRuntime) return;
+      const n = battle.spawnEnemy(e.defId, { routeIndex: e.routeIndex ?? 0, mods: { hpMul: 2, atkMul: 0.3 }, countInTotal: false, ownerPlayerId: e.ownerId, sourcePlayerId: e.sourcePlayerId ?? undefined });
+      if (!n) return;
+      revived++;
+      n.fishRevived = true;
+      n.uniteRuntime = true;
+      n.lpr = 0;
+    }, { owner: u });
   },
 
   // enemies she damages are marked; at the end of a skill, 17 SP per marked enemy that fell during it

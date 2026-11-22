@@ -512,3 +512,19 @@ test('Weedy W: SP requirement -30 %; each cast gives enemies on the field a Slip
   assert.equal(slip().length, n, 'no more true damage away from every red box');
   noErrors(b);
 });
+
+test('Typhon W (v2): the first 30 fallen enemies come back once on their own route: +100 % HP, -70 % ATK, no LP, not passed on, no bounty', () => {
+  const { h, b, ops: [u] } = rig([op('char_2012_typhon', 'uniequip_fishw_typhon', 0)], [{ key: 'enemy_weak', time: 1, count: 50, interval: 0.4 }], 80);
+  h.run(60);
+  const back = b.enemies.filter((e) => e.fishRevived);
+  assert.ok(back.length > 0 && back.length <= 30, `revived ${back.length}`);
+  const e = back[0];
+  assert.equal(e.base.maxHp, 2 * 600, '+100 % max HP');
+  assert.ok(Math.abs(e.base.atk - 0) < 1e-9, '-70 % of an ATK 0 enemy is 0');
+  assert.equal(e.counted, false, 'counts for nothing (no LP when it leaks)');
+  assert.equal(e.uniteRuntime, true, 'not passed on to the unite phase');
+  assert.equal(e.lpr, 0);
+  assert.equal(e.bounty ?? null, null, 'no bounty');
+  assert.equal(b.enemies.filter((x) => x.fishRevived && x.defId !== 'enemy_weak').length, 0, 'the same kind of enemy');
+  noErrors(b);
+});
