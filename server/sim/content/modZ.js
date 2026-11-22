@@ -370,6 +370,37 @@ const INSTALL = {
     u.fishCannonRedeployMul = 1;
     battle.on('tick', () => { if (up(u)) u.fishCannonRedeployMul = 1 - 0.01 * steps(); }, { owner: u });
   },
+  // Weedy W: skill SP requirement -30 % (added to similar effects, e.g. 绝技's); every skill activation gives every enemy on the
+  // field one Slippery stack (5 at most, for good): weight -1 per stack, and every 0.5 s an enemy touching a red box (an enemy
+  // route's start tile) takes 1000 / 2000 / 4000 / 8000 / 16000 true damage; and her Water Cannon's cooldown is set to 1 s
+  // when more than 1 s is left. [Slippery goes only on the enemies already on the field when the skill is activated]
+  uniequip_fishw_weedy(battle, u) {
+    const SLIP = `${KEY}:slippery`;
+    battle.on('battleStart', () => {
+      const sk = u.skill;
+      if (sk && !sk.noSkill && sk.kind !== 'passive') sk.spCostMul = Math.max(0, sk.spCostMul - 0.3);
+    }, { owner: u });
+    battle.on('skillStart', (c) => {
+      if (c.unit !== u) return;
+      for (const e of battle.aliveEnemies()) {
+        const k = Math.min(5, (e.findBuff(SLIP)?.data?.k ?? 0) + 1);
+        battle.addBuff(e, { key: SLIP, mods: { massFlat: -k }, data: { k }, source: u, tags: ['module'] });
+      }
+      for (const t of battle.allyUnits) {
+        const w = t.kind === 'token' && t.defId === 'token_10009_weedy_cannon' && t.ownerUnit === u ? t.fishCannonWait : null;
+        if (w && !t.alive && w.at - battle.time > 1) w.at = battle.time + 1;
+      }
+    }, { owner: u });
+    battle.every(0.5, () => {
+      for (const e of battle.aliveEnemies()) {
+        const k = e.findBuff(SLIP)?.data?.k;
+        if (!k || !battle.routes.some((r) => r.start && Math.hypot(e.x - r.start[1], e.y - r.start[0]) <= 0.75)) continue;
+        battle.dealDamage({ source: u, target: e, amount: 1000 * 2 ** (k - 1), type: 'true', attackType: 'ADDITION', applyWay: 'NONE',
+          calculation: 'precomputed', tags: ['module', 'fishSlippery'] });
+      }
+    }, { owner: u });
+  },
+
   // Glimmering Touch (cooldown 12 s, ready at once): an enemy in the range of any of her player's 卡西米尔 operators
   // (leaders first) is marked; 7 s later its tile explodes (5×5 diamond): 300 % ATK Burn and 300 % ATK Arts — the Arts
   // 600 % ATK × the living 卡西米尔 operators on an enemy already in a Burn burst. Any enemy's Burn burst: RES −2,

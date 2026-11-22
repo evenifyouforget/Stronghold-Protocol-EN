@@ -491,3 +491,24 @@ test('Fiammetta Z (v2): the Laterano ATK effect (+4 % per ammo, up to +200 %) is
   assert.ok(Math.abs(big.gain / plain.gain - 3) < 0.05, `x3 at 500+ stacks: ${big.gain} vs ${plain.gain}`);
   noErrors(fia.x.b);
 });
+
+test('Weedy W: SP requirement -30 %; each cast gives enemies on the field a Slippery stack (5 at most, weight -1 each); true damage only at a red box', () => {
+  const base = rig([op('char_400_weedy', null, 2)], [{ key: 'enemy_tank', time: 0, count: 1 }], 20);
+  const { h, b, rec, ops: [u] } = rig([op('char_400_weedy', 'uniequip_fishw_weedy', 2)], [{ key: 'enemy_tank', time: 0, count: 1 }], 60);
+  assert.deepEqual([...modZOf('uniequip_fishw_weedy').bonds], ['swiftShip']);
+  assert.equal(u.skill.spCost, Math.floor(base.ops[0].skill.baseSpCost * 0.7), 'SP requirement -30 %');
+  const e = b.aliveEnemies()[0];
+  assert.ok(e, 'an enemy on the field');
+  const start = b.routes[0].start;
+  const slip = () => rec.damage.filter((x) => Array.isArray(x.tags) && x.tags.includes('fishSlippery'));
+  for (let i = 0; i < 7; i++) b.emit('skillStart', { unit: u, skill: u.skill });
+  assert.equal(e.findBuff('fishModZ:slippery').data.k, 5, '5 stacks at most');
+  assert.equal(e.findBuff('fishModZ:slippery').mods.massFlat, -5, 'weight -1 per stack');
+  h.run(1);
+  assert.ok(slip().length >= 1 && slip().every((x) => x.type === 'true' && x.amount === 16000), `16000 true damage while it stands on its spawn (${slip().map((x) => x.amount)})`);
+  h.run(25);   // it has walked away from every red box (0.2 tiles per second here)
+  const n = slip().length;
+  h.run(3);
+  assert.equal(slip().length, n, 'no more true damage away from every red box');
+  noErrors(b);
+});

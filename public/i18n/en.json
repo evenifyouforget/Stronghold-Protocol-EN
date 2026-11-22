@@ -3031,5 +3031,7 @@
   "推进之王的W型调整": "Siege's W Adjustment",
   "获得【奇迹】盟约身份；在场时我方部署费用上限为999；自身获得的部署费用翻倍；每0.5秒消耗超过90点的部署费用，每消耗3点使【奇迹】层数+1（每回合最多+50层）": "Joins the [Marvel] Alliance. While she is on the field your DP limit is 999; DP she earns is doubled; every 0.5 seconds, DP above 90 is drained, each 3 DP giving 1 [Marvel] Stack (at most 50 Stacks per round)",
   "琴柳的W型调整": "Saileach's W Adjustment",
-  "获得【助力】盟约身份；释放技能后，若【助力】已激活，所有已激活的盟约层数+2；在场【助力】干员达到3名及以上时改为+4": "Joins the [Aid] Alliance. After she casts a skill, if [Aid] is active, all active Alliances gain +2 Stacks (+4 instead with 3 or more [Aid] Operators on the field)"
+  "获得【助力】盟约身份；释放技能后，若【助力】已激活，所有已激活的盟约层数+2；在场【助力】干员达到3名及以上时改为+4": "Joins the [Aid] Alliance. After she casts a skill, if [Aid] is active, all active Alliances gain +2 Stacks (+4 instead with 3 or more [Aid] Operators on the field)",
+  "温蒂的W型调整": "Weedy's W Adjustment",
+  "获得【迅捷】盟约身份；技能所需技力-30%（与同类效果相加）；开启技能时，使场上所有敌人获得【湿滑】，并在水炮的再部署冷却超过1秒时将其设为1秒；【湿滑】最多叠加5层，永久持续：每层重量-1，且每0.5秒若接触红框（敌人出生点），受到1000/2000/4000/8000/16000点真实伤害": "Joins the [Swift] Alliance. Skill SP requirement -30% (adds to similar effects). On skill activation, every enemy on the field gets Slippery, and the Water Cannon's cooldown is set to 1 second if more than 1 second is left. Slippery stacks up to 5 times and lasts forever: -1 Weight per stack, and every 0.5 seconds an enemy touching a red box (where enemies spawn) takes 1000 / 2000 / 4000 / 8000 / 16000 True damage"
 }
