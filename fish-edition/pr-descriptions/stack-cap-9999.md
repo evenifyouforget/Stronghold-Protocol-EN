@@ -2,6 +2,8 @@ Two new cheats into `mini/0.3.3-2`, as separate rules (Fish's comment on this PR
 
 Closes #174
 
+Base: `mini/0.3.3-2`. Branch: `feature/stack-cap-9999`.
+
 ## Alliance Stack limit 9999
 
 In the lobby's Cheats tab: every Alliance's Stack (layer) limit goes from 999 to 9999 for all Doctors. The 999 is the original game's cap; it now comes from `layerCapOf(rules)` in `shared/constants.js`, and every place that applies it uses that (prep gains, battle gains, the settle after a battle, the client-result check, the helper's stack count, the invariants check, the bond strip's live copy in the client). Off by default.

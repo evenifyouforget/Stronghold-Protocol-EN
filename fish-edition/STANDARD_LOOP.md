@@ -59,7 +59,7 @@ GitHub keeps the text.
 - Find the PR from the file's "Branch `…`" line: `gh pr list --repo <repo> --state all --head <branch>`.
 - Keep a file whose PR is still open, and a file that hasn't been made a PR yet.
 - Keep the newest merged file of each kind as the template for the next one: today `mini-0.3.3-1.md` (mini → main)
-  and `sync-yuri-2026-11-13.md` (Yuri → here). When a newer one of the same kind lands, it becomes the template and
+  and `sync-yuri-2026-11-18.md` (Yuri → here). When a newer one of the same kind lands, it becomes the template and
   the old one goes.
 - If a file has no "Branch" line, add one while you're there, or ask Fish if it's unclear what the file belongs to.
 
