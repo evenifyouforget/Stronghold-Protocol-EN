@@ -1,2 +1,0 @@
-- Fixed #183: HR File did nothing under the +2 deployment-limit cheat; it is still +1 over the limit (9 → 11).
-- Fixed #176: while Siege's Mod Z is on the field her player's DP cap is 999, so DP is no longer wasted at the usual 99.
