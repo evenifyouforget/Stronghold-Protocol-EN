@@ -2,7 +2,7 @@
 
 > English translation of [CHANGELOG.md](CHANGELOG.md). The Chinese original is the authoritative version.
 
-## 0.3.4 — Unreleased
+## 0.3.4-3 — 2026-11-24
 
 ### Fish Edition
 
