@@ -1,5 +1,5 @@
-// GitHub #174: the cheat 「叠层上限 9999」 (lobby rule `bigStacks`): every bond's layer cap is 9999 instead of 999, and the
-// boss-hit limit (限伤, 300000 per hit on a leader) is off, since a hit of that many layers would be cancelled.
+// GitHub #174: the cheat 「叠层上限 9999」 (lobby rule `bigStacks`): every bond's layer cap is 9999 instead of 999. A second,
+// separate cheat, `noHitLimit`, turns the boss-hit limit (限伤, 300000 per hit on a leader) off.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOND_LAYER_CAP, RULE_BIG_STACK_CAP, layerCapOf, layerGainRoom, DEFAULT_RULES, normalizeRules } from '../../shared/constants.js';
@@ -33,10 +33,12 @@ test('a player\'s layers stop at 999 normally and at 9999 with the rule', () => 
   assert.deepEqual(layersAfter({ bigStacks: true }), { added: 5000, layers: 5000 });
 });
 
-test('the boss-hit limit cancels a 500000 hit on a leader, unless the rule is on', () => {
+test('the boss-hit limit cancels a 500000 hit on a leader, unless the rule noHitLimit is on (bigStacks alone does not lift it)', () => {
   const target = { isBoss: true, x: 0, y: 0, id: 1 };
   const battle = (rules) => ({ kind: 'boss', flags: { rules }, fx() {} });
   assert.equal(leaderHitCancelled(battle({}), target, 500000), true);
-  assert.equal(leaderHitCancelled(battle({ bigStacks: true }), target, 500000), false);
+  assert.equal(leaderHitCancelled(battle({ bigStacks: true }), target, 500000), true, 'the stack cheat alone leaves the limit');
+  assert.equal(leaderHitCancelled(battle({ noHitLimit: true }), target, 500000), false);
+  assert.equal(DEFAULT_RULES.noHitLimit, false);
   assert.equal(leaderHitCancelled(battle({}), target, 299999), false, 'below the limit lands either way');
 });

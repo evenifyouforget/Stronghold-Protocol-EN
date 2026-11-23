@@ -58,6 +58,7 @@ export function ruleLabel(key, rules) {
     case 'extraDeploy': return t('部署上限 +{n}', { n: RULE_EXTRA_DEPLOY });
     case 'extraFunds': return t('每回合资金 +{n}', { n: RULE_EXTRA_FUNDS });
     case 'bigStacks': return t('盟约层数上限 {n}', { n: RULE_BIG_STACK_CAP });
+    case 'noHitLimit': return t('取消领袖单次伤害上限');
     case 'untimed': return t('行动阶段不限时');
     case 'doubleLp': return t('初始目标生命翻倍');
     case 'tierStart': return t('开局获得各阶干员');
@@ -599,7 +600,7 @@ function AutoAwardToggle({ rules, editable, onSet }) {
 
 /** The dialog's tabs and the rule keys each one holds (its badge counts the ones in force). */
 const RULE_TABS = Object.freeze([
-  { id: 'cheat', keys: ['extraDeploy', 'extraFunds', 'bigStacks', 'doubleLp', 'tierStart', 'boosterPack', 'itemBoosterPack', 'untimed'] },
+  { id: 'cheat', keys: ['extraDeploy', 'extraFunds', 'bigStacks', 'noHitLimit', 'doubleLp', 'tierStart', 'boosterPack', 'itemBoosterPack', 'untimed'] },
   { id: 'modZ', keys: ['modZ'] },
   { id: 'bonds', keys: ['lateranoMod', 'victoriaMod', 'virtuosaBonds', 'blaze'] },
   { id: 'seeded', keys: ['stage', 'bans'] },
@@ -637,7 +638,8 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
     ${tab === 'cheat' ? html`<${Section} title=${t('作弊')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>
       <${Toggle} k="extraDeploy" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraDeploy', rules)} desc=${t('所有博士的部署上限 +{n}', { n: RULE_EXTRA_DEPLOY })} />
       <${Toggle} k="extraFunds" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('extraFunds', rules)} desc=${t('每回合开始时额外获得 {n} 资金', { n: RULE_EXTRA_FUNDS })} />
-      <${Toggle} k="bigStacks" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('bigStacks', rules)} desc=${t('每个盟约的层数上限从 999 提高到 {n}。通常对领袖的单次伤害达到 {limit} 以上时，该次攻击会被取消、不造成伤害；这个限制也一并取消，因此层数再高也能打伤领袖', { n: RULE_BIG_STACK_CAP, limit: BOSS_HIT_LIMIT })} />
+      <${Toggle} k="bigStacks" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('bigStacks', rules)} desc=${t('每个盟约的层数上限从 999 提高到 {n}', { n: RULE_BIG_STACK_CAP })} />
+      <${Toggle} k="noHitLimit" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('noHitLimit', rules)} desc=${t('通常对领袖的单次伤害达到 {limit} 以上时，该次攻击会被取消、不造成伤害；开启后取消这个限制（适合与提高盟约层数上限的作弊搭配）', { limit: BOSS_HIT_LIMIT })} />
       <${Toggle} k="doubleLp" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('doubleLp', rules)} desc=${t('所有博士的初始目标生命翻倍')} />
       <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
       <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />

@@ -16,6 +16,7 @@
       "extraDeploy": false,
       "extraFunds": false,
       "bigStacks": false,
+      "noHitLimit": false,
       "untimed": false,
       "doubleLp": false,
       "tierStart": false,
