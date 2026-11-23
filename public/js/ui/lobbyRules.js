@@ -36,7 +36,7 @@ const isoPairs = (pairs) => Object.entries(pairs).map(([base, b]) => `${data.loo
 function IsoPlusChoice({ rules, editable, onSet }) {
   const v = rules.isoPlus;
   const labels = { off: t('关'), plus: `${isoName()}+`, plusplus: `${isoName()}++` };
-  const desc = v === 'off' ? t('{name}还能与更多听起来属于某个盟约的装备搭配', { name: isoName() })
+  const desc = v === 'off' ? t('选择+或++查看列表：与{name}一同装备时，更多名字像某个盟约的装备（如天师的鼎→炎）也会让携带者成为该盟约的成员；++比+多一件', { name: isoName() })
     : t('与{name}一同装备时，以下装备也使携带者视为对应盟约成员：{list}', { name: isoName(), list: isoPairs({ ...ISO_PLUS.plus, ...(v === 'plusplus' ? ISO_PLUS.plusplus : {}) }) });
   return html`<div class="rules-row">
     <div class="rules-mod">
@@ -187,7 +187,7 @@ function riskTextOf(key, level) {
     case 'ccInvestorBench': return level >= 2
       ? { short: t('目标：投资人 {n}', { n: level }), full: t('{list}的获得时效果改为售出时触发（因此不再受【{bond}】加倍）', { list: CC.investorSold.ops.map((id) => chessName(id, id)).join(t('、')), bond: bondName('investShip') }) }
       : { short: t('目标：投资人 {n}', { n: level }), full: t('整备区的干员不再计入【{bond}】', { bond: bondName('investShip') }) };
-    case 'ccSwift': return { short: t('目标：迅捷'), full: t('【{bond}】回复技力的概率改为20% + 0.25%×层数（原为0.35%×层数）', { bond: bondName('swiftShip') }) };
+    case 'ccSwift': return { short: t('目标：迅捷'), full: t('【{bond}】回复技力的概率中，每层增加的部分从0.35%降为0.25%（基础20%不变）', { bond: bondName('swiftShip') }) };
     case 'ccForesight': return { short: t('目标：远见'), full: t('【{bond}】干员攻击速度-{n}（无论盟约是否激活）', { bond: bondName('visiShip'), n: -CC.foresightAspd }) };
     case 'ccStrategyLate': return level >= 2
       ? { short: t('目标：策略 {n}', { n: level }), full: t('【{ioleta}】的攻击力与生命值加成最多+{cap}%；【{duyaoy}】每回合只有第{r}次主动刷新为特殊刷新；【{amiya}】每档需要多{n}种激活盟约', { ioleta: bandName('band_ioleta'), cap: pct(CC.strategy2.ioletaCap), duyaoy: bandName('band_duyaoy'), r: CC.strategy2.duyaoyRefreshes, amiya: bandName('band_amiya'), n: CC.strategy2.amiyaExtra }) }
@@ -462,7 +462,7 @@ function Seeded({ room, rules, editable, onSet }) {
     };
     return html`<div class="rules-bans">
       <div class="rules-bans__head"><b>${isCore ? t('禁用核心盟约') : t('禁用附加盟约')}</b>
-        <span class="t-dim">${t('已选 {n}/{max}，其余随机', { n, max })}</span></div>
+        <span class="t-dim">${t('已指定 {n}/{max} 个禁用，其余随机', { n, max })}</span></div>
       <div class="rules-bans__grid">
         ${list.map((b) => html`<${Tooltip} key=${b.bondId} text=${b.name}>
           <button type="button" class=${cx('rules-ban', picks.has(b.bondId) && 'is-active')} aria-pressed=${picks.has(b.bondId) ? 'true' : 'false'}
@@ -490,7 +490,7 @@ function Seeded({ room, rules, editable, onSet }) {
       </div>
       <${StagePreview} stageId=${rules.stage} />
     </div>
-    <p class="rules-row__desc">${t('选择要禁用的盟约；未选满的名额仍随机抽取')}</p>
+    <p class="rules-row__desc">${t('每局会随机禁用一些盟约。在这里指定要禁用哪些；没指定的名额仍随机禁用')}</p>
     ${counts.core > 0 ? group(true, counts.core) : null}
     ${counts.addon > 0 ? group(false, counts.addon) : null}`;
 }
@@ -566,9 +566,9 @@ function ModZPicker({ rules, editable, onSet }) {
     set(next);
   };
   const ops = new Set(MODZ.map((m) => m.charId)).size;
-  return html`<p class="rules-row__desc">${t('开启后，所有博士的该自选干员都装备这个模组（Fish Edition的自制模组，草案，未经平衡）；每名干员最多开启一个')}</p>
+  return html`<p class="rules-row__desc">${t('为一名干员开启一个模组后，所有博士自选的这名干员都会装备它（本服务器的自制模组：草案，未经平衡）。每名干员最多开启一个模组')}</p>
     <div class="rules-bans">
-      <div class="rules-bans__head"><b>${t('装备的模组')}</b><span class="t-dim">${t('已开启 {n}/{max}名干员', { n: on.size, max: ops })}</span>
+      <div class="rules-bans__head"><b>${t('装备的模组')}</b><span class="t-dim">${t('{max}名干员中{n}名已开启模组', { n: on.size, max: ops })}</span>
         <${Button} size="sm" variant="ghost" disabled=${!editable || on.size === ops} onClick=${() => set(new Set(MODZ.filter((m, i) => MODZ.findIndex((x) => x.charId === m.charId) === i).map((m) => m.id)))}>${t('全部Z型')}<//>
         <${Button} size="sm" variant="ghost" disabled=${!editable || on.size === 0} onClick=${() => set(new Set())}>${t('清空')}<//>
       </div>
@@ -642,9 +642,9 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
       <${Toggle} k="noHitLimit" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('noHitLimit', rules)} desc=${t('通常对领袖的单次伤害达到 {limit} 以上时，该次攻击会被取消、不造成伤害；开启后取消这个限制（适合与提高盟约层数上限的作弊搭配）', { limit: BOSS_HIT_LIMIT })} />
       <${Toggle} k="doubleLp" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('doubleLp', rules)} desc=${t('所有博士的初始目标生命翻倍')} />
       <${Toggle} k="tierStart" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('tierStart', rules)} desc=${t('开局时所有博士各获得每个阶级的随机干员1名（1~6阶）')} />
-      <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上即可免费选择同阶干员，每次6名，按固定顺序轮换；补充包留在手牌（AI不会使用）')} />
-      <${Toggle} k="itemBoosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('itemBoosterPack', rules)} desc=${t('开局时所有博士各获得1个装备补充包：装备到任意干员上即可免费选择一件装备，每次6件，按固定顺序轮换全部装备；装备补充包留在手牌（AI不会使用）')} />
-      <${Toggle} k="transmitterPlus" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('transmitterPlus', rules)} desc=${t('信标更好用：独自一人时，第一次装备给六星干员必出缪尔赛思，其他时候必出一名你层数最多的盟约的干员；有队友但没人需要原干员时，改为给2名随机队友各送1名其主盟约的同阶干员；5人及以上的房间多送1人')} />
+      <${Toggle} k="boosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('boosterPack', rules)} desc=${t('开局时所有博士各获得1个补充包：装备到干员上，从6名与它同阶的干员中免费选择1名（每次换下一批6名）。补充包不会消耗，可以反复使用（AI不会使用）')} />
+      <${Toggle} k="itemBoosterPack" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('itemBoosterPack', rules)} desc=${t('开局时所有博士各获得1个装备补充包：装备到任意干员上，从6件装备中免费选择1件（每次换下一批6件）。装备补充包不会消耗，可以反复使用（AI不会使用）')} />
+      <${Toggle} k="transmitterPlus" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('transmitterPlus', rules)} desc=${t('信标更好用。独自一人时：第一次给六星干员使用信标，候选中必定有缪尔赛思；其他时候，候选中必定有一名你层数最多的盟约的干员。有队友时：原版信标会把被换掉的干员送给收集它的盟约的队友；没有这样的队友时，改为给2名随机队友（5人及以上的房间为3名）各送1名同阶、属于其层数最多盟约的干员')} />
       <${IsoPlusChoice} rules=${rules} editable=${editable} onSet=${onSet} />
       ${room.mode === 'solo' ? null : html`<${Toggle} k="untimed" rules=${rules} editable=${editable} onSet=${onSet} label=${ruleLabel('untimed', rules)} desc=${t('选择策略、机变阶段与休整期不限时（作战仍有时间限制）')} />`}
     <//>` : null}

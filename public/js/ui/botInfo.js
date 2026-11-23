@@ -16,7 +16,7 @@ function BotBlock({ bot, current }) {
     ${sc ? html`<p class="botinfo__scores">${t('单人 {solo}%（{soloN} 局）· 4 人组队 {team}%（{teamN} 局）', { solo: info.strength, soloN: strengthMatches(info).solo, team: info.team, teamN: strengthMatches(info).team })}</p>` : null}
     <ul class="botinfo__about">${info.about.map((line) => html`<li key=${line}>${t(line)}</li>`)}</ul>
     ${info.tactics?.length ? html`<p class="botinfo__sub">${t('战术（从上到下优先，之后由基础 AI 决定）')}</p>
-      <ol class="botinfo__tactics">${info.tactics.map((x) => html`<li key=${x.id}><code>${x.id}</code> ${t(x.text)}</li>`)}</ol>` : null}
+      <ol class="botinfo__tactics">${info.tactics.map((x) => html`<li key=${x.id}>${t(x.text)}</li>`)}</ol>` : null}
   </section>`;
 }
 

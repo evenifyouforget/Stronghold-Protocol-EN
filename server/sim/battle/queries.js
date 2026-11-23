@@ -178,7 +178,8 @@ export class BattleQueries {
       const elem = includeElement && (a.elem.burn + a.elem.neural + a.elem.necrosis + a.elem.apoptosis + a.elem.erosion) > 0;
       if (injured || elem) out.push(a);
     }
-    out.sort((a, b) => a.hpRatio - b.hpRatio || a.deploySeq - b.deploySeq);
+    const pri = healer && healer.fishHealPriority;   // (Fish Edition) Mod Z Shining: allies without Immortality first while her grant is ready
+    out.sort((a, b) => (pri ? pri(a) - pri(b) : 0) || a.hpRatio - b.hpRatio || a.deploySeq - b.deploySeq);
     return out;
   }
 

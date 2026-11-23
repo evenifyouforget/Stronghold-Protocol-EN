@@ -385,10 +385,13 @@ function installLaterano(battle, pid, bb, members) {
   const per = num(bb.atk_per_consume, 0), cap = num(bb.max_atk_for_consume, Infinity);
   if (!(per > 0)) return;
   const st = { used: 0, bonus: 0 };
+  // (Fish Edition) Mod Z Fiammetta on the field: every member gets x2 of this effect (rate and limit), x3 at 500+ stacks
+  const fishMul = () => (members.some((m) => m.fishLateranoMul && m.alive && m.deployed) ? (S.bondLayers(battle, pid, 'lateranoShip') >= 500 ? 3 : 2) : 1);
   battle.on('ammoUsed', ({ unit }) => {
-    if (!memberSet.has(unit) || st.bonus >= cap) return;
+    const k = fishMul();
+    if (!memberSet.has(unit) || st.bonus >= cap * k) return;
     st.used++;
-    st.bonus = Math.min(cap, st.used * per);
+    st.bonus = Math.min(cap * k, st.used * per * k);
     for (const m of members) S.passiveBuff(battle, m, 'bond:laterano:ammo', S.directMods({ atk: st.bonus }));
   });
 }

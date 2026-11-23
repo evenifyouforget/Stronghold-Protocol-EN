@@ -1,0 +1,1 @@
+- Clearer player texts (from blind reads): Swift names its unchanged 20% base; Booster Packs say they're reusable and what you pick from; Transmitter+ explains the original; clearer Isomorph, Alliance bans, Mod Z tab and AI profile texts (Ioleta, Evobot, Level curve); enemy offers say they're enemies (#181).
