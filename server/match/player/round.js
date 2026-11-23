@@ -6,7 +6,7 @@
 // Installed on PlayerState.prototype by server/match/PlayerState.js (a method container: never instantiated; `this` is
 // the player state).
 
-import { RULE_EXTRA_FUNDS } from '../../../shared/constants.js';
+import { RULE_EXTRA_FUNDS, layerCapOf } from '../../../shared/constants.js';
 import { tagLevel } from '../../../shared/rules.js';
 import { CC, BOOSTER, ITEM_BOOSTER } from '../../../shared/ruleData.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
@@ -155,7 +155,7 @@ export class PlayerRound {
    * in-battle gains of this round's finished normal battle (bondsMeta.bondsWithGains). The 联防 field fights with them too
    * (battleInput `reached`); no other rule reads them.
    */
-  bondsView() { return bondsWithGains(this.bonds, this.pendingLayerGains); }
+  bondsView() { return bondsWithGains(this.bonds, this.pendingLayerGains, layerCapOf(this.m.lobbyRules)); }
 
   /**
    * `reached`: the bonds carry the layers this round's own combat reached (bondsView: the pending in-battle gains, capped

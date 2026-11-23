@@ -33,6 +33,8 @@ export const RULE_CATEGORIES = Object.freeze(['neutral', 'cheat', 'seeded', 'ris
 
 export const RULE_EXTRA_DEPLOY = 2;
 export const RULE_EXTRA_FUNDS = 2;
+/** The per-bond layer cap with the cheat 「叠层上限 9999」 on (the official one is BOND_LAYER_CAP, 999; shared/constants.js layerCapOf). */
+export const RULE_BIG_STACK_CAP = 9999;
 /** The most ban picks a rules object keeps (the difficulties draw at most 3 core + 4 add-on). */
 export const RULE_BANS_MAX = 12;
 
@@ -45,6 +47,8 @@ export const RULES = Object.freeze([
   // cheats
   { key: 'extraDeploy', type: 'bool', category: 'cheat' },      // +RULE_EXTRA_DEPLOY deployment limit for every player
   { key: 'extraFunds', type: 'bool', category: 'cheat' },       // +RULE_EXTRA_FUNDS Funds at every round start
+  { key: 'bigStacks', type: 'bool', category: 'cheat' },        // the per-bond layer cap is RULE_BIG_STACK_CAP
+  { key: 'noHitLimit', type: 'bool', category: 'cheat' },       // the boss-hit limit (限伤, BOSS_HIT_LIMIT) is off: a hit of 300000+ on a leader lands
   { key: 'untimed', type: 'bool', category: 'cheat' },          // no countdown on the screens players act on (battles keep theirs)
   { key: 'doubleLp', type: 'bool', category: 'cheat' },         // every player starts with twice its strategy's LP
   { key: 'tierStart', type: 'bool', category: 'cheat' },        // every player starts with one random operator of each tier

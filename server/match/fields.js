@@ -33,7 +33,7 @@
 //                                          (keySourceCounts only; settlement bills that same set)
 //   syntheticResult(players, progress)     stand-in when a boss field's client never reported
 import { TICK, SNAPSHOT_EVERY } from '../sim/constants.js';
-import { layerGainRoom } from '../../shared/constants.js';
+import { layerGainRoom, layerCapOf } from '../../shared/constants.js';
 import { modZOf } from '../../shared/modZ.js';
 import { uniteLeft } from '../sim/spec.js';
 import { diyTokenOwner, diyRecordOf } from '../../shared/diy.js';
@@ -905,7 +905,7 @@ export function validateClientResult(spec, raw, { gd = null, botField = false } 
       for (const [bondId, n] of Object.entries(p.layerGains || {})) {
         // ≤ 60 + 4·round + what the player's layer 特质 can add to the bond (layerAllowanceOf; uncapped ones: no flat
         // bound), and never past BOND_LAYER_CAP from the layers the bond started with (Battle.addLayers clamps)
-        const bound = Math.min(B.layerCap + (own.layerAllow.get(bondId) || 0), layerGainRoom(own.startLayers.get(bondId) || 0, Infinity));
+        const bound = Math.min(B.layerCap + (own.layerAllow.get(bondId) || 0), layerGainRoom(own.startLayers.get(bondId) || 0, Infinity, layerCapOf(spec.flags && spec.flags.rules)));
         if (!finiteIn(n, 0, bound)) return bad('layer bound');
         if (n > 0 && spec.flags && spec.flags.layerGainsEnabled === false) return bad('layers disabled');
         if (gd && typeof gd.bond === 'function' && !gd.bond(bondId)) return bad('bond');

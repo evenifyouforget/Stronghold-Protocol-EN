@@ -38,7 +38,7 @@
 // at birth (sim/battle/spawns.js) and neither uniteSurvivors nor the HUD's ×N reads it.
 
 import { buildUniteWave } from './waves.js';
-import { layerGainRoom } from '../../shared/constants.js';
+import { layerGainRoom, layerCapOf } from '../../shared/constants.js';
 
 /**
  * @param {import('./Match.js').Match} m
@@ -102,7 +102,7 @@ export function helperStats(m, ps, results) {
     active = true;
     const stored = Number(ps.layers && ps.layers[id]) || Number(b.layers) || 0;
     const gain = pending && Number(pending[id]);
-    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain)) : 0;
+    const add = Number.isFinite(gain) && gain > 0 ? layerGainRoom(stored, Math.floor(gain), layerCapOf(m.lobbyRules)) : 0;
     layers += stored + add;
   }
   const r = results && typeof results.get === 'function' ? results.get(ps.playerId) : null;
