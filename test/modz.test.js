@@ -305,7 +305,12 @@ test('Weedy Z: enemies weigh 2 less while she is on the field; her damage become
 test('Viviana Z: Glimmering Touch explodes 7 s after it marks an enemy in a Kazimierz operator\'s range', () => {
   const { h, b, rec, ops: [v] } = rig([op('char_4098_vvana', 'uniequip_fishz_vvana', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
   assert.ok(diyRecord(6, { charId: 'char_4098_vvana', skillIndex: 0, uniEquipId: 'uniequip_fishz_vvana' }, { elite: true, data })?.bonds?.includes('kazimierzShip') ?? true);
+  const fxs = []; const fx0 = b.fx.bind(b); b.fx = (k, p, ...r) => { fxs.push({ k, p }); return fx0(k, p, ...r); };
   h.run(30);
+  const warn = fxs.find((e) => e.p?.skill === 'fishVvana' && e.p.tiles);
+  assert.ok(warn, 'the warning names its tiles (GitHub #175)');
+  assert.equal(warn.p.tiles.length, 13, 'a diamond of 13 tiles');
+  assert.ok(warn.p.tiles.every(([r, c]) => Math.abs(r - warn.p.y) + Math.abs(c - warn.p.x) <= 2), 'every tile within 2 of the centre');
   const hits = rec.damage.filter((x) => x.source === v && x.tags?.includes('fishVvana'));
   assert.ok(hits.length > 0, 'an explosion');
   assert.ok(rec.element.some((x) => x.source === v && x.element === 'burn' && x.tags?.includes('fishVvana')));
@@ -355,4 +360,16 @@ test('Siege Z and Saileach Z: the DP they generate counts twice (addDp with them
     b.addDp(pid, 5);
     assert.equal(b.getPlayer(pid).dp, 15, `${charId}: other DP is not doubled`);
   }
+});
+
+test('Siege Z: while she is up her player can hold more than 99 DP, so gains between drains are not wasted (#176)', () => {
+  const { h, b, ops: [s] } = rig([op('char_112_siege', 'uniequip_fishz_siege', 0)]);
+  const ps = b.getPlayer(s.ownerId);
+  h.run(0.6);
+  assert.equal(ps.fishDpMax, 999);
+  b.addDp(s.ownerId, 200 - ps.dp);
+  assert.ok(ps.dp > 120, `DP ${ps.dp} kept past 99 until the next drain`);
+  h.run(1);   // the next drain takes the excess over 90 (her own skill then earns some back from the SP: her DP gain is doubled)
+  assert.ok(ps.dp < 140, `drained from 200 to ${ps.dp}`);
+  noErrors(b);
 });

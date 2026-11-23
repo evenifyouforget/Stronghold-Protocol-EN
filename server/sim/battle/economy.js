@@ -6,13 +6,15 @@ import { layerGainRoom, layerCapOf } from '../../../shared/constants.js';
 
 export class BattleEconomy {
   // Optional source is presentation attribution; the return value and DP arithmetic stay unchanged.
+  /** The most DP a player holds: the battle's `dpMax`, or more while their 围攻 Mod Z is on the field (content/modZ.js, GitHub #176). */
+  dpCapOf(ps) { return ps && ps.fishDpMax > this.flags.dpMax ? ps.fishDpMax : this.flags.dpMax; }
   addDp(playerId, n, source = null) {
     const ps = this.getPlayer(playerId);
     if (!ps || !Number.isFinite(n)) return 0;
     // (Fish Edition) Mod Z: an operator whose DP gain is doubled (content/modZ.js `fishDpMul`)
     if (n > 0 && source && Number.isFinite(source.fishDpMul)) n *= source.fishDpMul;
     const before = ps.dp;
-    ps.dp = Math.max(0, Math.min(this.flags.dpMax, ps.dp + n));
+    ps.dp = Math.max(0, Math.min(this.dpCapOf(ps), ps.dp + n));
     const reason = source?.def?.subProf;
     if ((n > 0 && ['agent', 'charger', 'pioneer'].includes(reason)) || (n < 0 && reason === 'merchant')) {
       this.resourceNumber(source, 'cost', ps.dp - before, reason);

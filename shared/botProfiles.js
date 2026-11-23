@@ -53,6 +53,12 @@ export function botScore(info) {
   return { score: s + tm, sd: Math.round(100 * Math.sqrt(v(s, n.solo) + v(tm, n.team))) };
 }
 
+/** " (113)": the bot's strength score for a drop-down option or a seat label, "" for a bot without measured numbers (GitHub #172). */
+export function botScoreSuffix(id) {
+  const sc = botScore(BOT_INFO[id]);
+  return sc ? ` (${sc.score})` : '';
+}
+
 export const BOT_INFO = Object.freeze({
   legacy: {
     strength: 36, team: 63, n: { solo: 380, team: 340 },

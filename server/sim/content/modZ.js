@@ -250,9 +250,12 @@ const INSTALL = {
   // every 0.5 s; "持续消耗" names no rate]
   uniequip_fishz_siege(battle, u) {
     u.fishDpMul = 2;
+    // GitHub #176: while she is up, her player's DP cap is 999, so a gain between two drains is never wasted at the usual
+    // 99 (Fish's suggestion: "Siege Mod Z also raises DP cap to 999")
     battle.every(0.5, () => {
-      if (!up(u)) return;
       const ps = battle.getPlayer(u.ownerId);
+      if (ps) ps.fishDpMax = up(u) ? 999 : 0;
+      if (!up(u)) return;
       const extra = Math.floor((ps?.dp ?? 0) - 90);
       if (!(extra > 0)) return;
       battle.addDp(u.ownerId, -extra);
@@ -312,7 +315,10 @@ const INSTALL = {
       if (!pick) return;
       readyAt = battle.time + 12;
       const tx = Math.round(pick.x), ty = Math.round(pick.y);
-      battle.fx('zone', { x: tx, y: ty, radius: 2, dur: 7, id: u.id, skill: 'fishVvana' });
+      // the warning is the 13 tiles of the diamond it will hit (a round 'zone' ring showed no diamond: GitHub #175)
+      const diamond = [];
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) diamond.push([ty + dr, tx + dc]);
+      battle.fx('telegraph', { x: tx, y: ty, r: 2.5, dur: 7, tiles: diamond, id: u.id, skill: 'fishVvana' });
       battle.after(7, () => {
         if (!u.alive) return;   // [DRAFT: the explosion needs her alive; her ATK at detonation]
         const n = kaz().length;
