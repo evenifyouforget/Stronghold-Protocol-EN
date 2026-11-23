@@ -228,7 +228,7 @@ export function morphBondOf(rec) {
  * free (Fish Edition: Mod Z Phantom): no canGiveBond item and no second item needed; every item's giveBondId grants.
  * @param {Array<string|{id?: string}>|null|undefined} items
  * @param {(id: string) => any} getItem
- * @param {{ mode?: string, bondOk?: (id: string) => boolean }} [opts]
+ * @param {{ mode?: string, bondOk?: (id: string) => boolean, free?: boolean }} [opts]
  * @returns {string[]}
  */
 export function grantedBondsByMorph(items, getItem, { mode = 'official', bondOk = () => true, free = false } = {}) {
