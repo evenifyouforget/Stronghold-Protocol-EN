@@ -23,6 +23,21 @@ out of the former `fish-edition/ai-players.md` (2026-11-07), keeping its order. 
 2. Then invent DYYBot tactics from human play.
 3. Then tune DYYBot with an evolutionary algorithm.
 
+## Literature first, for new ML work (Fish, 2026-11-19)
+
+Before committing compute to any new ML work (a new model, a new search method, a new kind of experiment, not a rerun
+of a measured one), **research the literature first** and write down what it says, in the same note that reports the
+result (or in `11-ml-from-scratch.md`). Fish's reason: the placement search turned up a closely matching method (a deep
+surrogate with MAP-Elites, checked in the real game) and several lattice-specific ideas only because we looked before
+running anything.
+
+- **What to write:** the nearest sources and what each does, what we take from it, what doesn't transfer, and how it
+  changes the plan. Keep a link list in `untracked/ml-2026-11/papers.md`.
+- **Say how it was read.** If only abstracts or search snippets were seen, say so and mark the claims "verify".
+- **Then log every run.** Experiments save every simulated game (accepted or not) as rows with enough to replay it, so
+  later analysis and training don't need a rerun. The schema for placement is in `11-ml-from-scratch.md`.
+- A quick rerun, a bug fix or a tuning pass of something already measured doesn't need this.
+
 ## Seeds (Fish, 2026-11-17)
 
 Research may use seeded bot games, and collaborators won't necessarily coordinate on the seeds they use. Avoid reusing
