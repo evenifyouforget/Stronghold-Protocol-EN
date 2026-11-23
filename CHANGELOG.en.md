@@ -8,6 +8,7 @@
 
 This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
 
+- Fixed: the shared deck popup and other dialogs without footer buttons could be hard to close (only Esc or a click outside, and in fullscreen Esc leaves fullscreen instead). They now have a close × in the top-right corner (#177, issue #169).
 - Mod Z / W v2: new Alliance memberships (Typhon Z, Rosa Z, Eunectes Z, Phantom Z, Shining Z, Siege Z/W, Weedy Z/W, Zuo Le Z, Saileach W); Typhon and Thorns: max SP the first time their skill ends; Eunectes: +3 Stacks when an enemy dies in her range; Phantom: +3 Stacks per deployment, and items give him Alliances without the Damazti Isomorph; Shining: every Operator starts with Immortal; Fiammetta: new ammo numbers, reloading, and the Laterano ATK effect doubled; Viviana: bursts also lower DEF; Zuo Le: Burn and Arts on every hit; Typhon W: the first 30 fallen enemies are added to the wave again; Weedy W, Siege W and Saileach W are new modules. (#187).
 - New cheat "Alliance Stack limit 9999" (#186, issue #174): every Alliance's Stack limit goes from 999 to 9999.
 - New cheat "No boss hit limit": a single hit of 300000 or more on a Leader is no longer cancelled (made for use with the stack cheat, but separate). (#186).
