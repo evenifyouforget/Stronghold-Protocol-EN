@@ -94,6 +94,41 @@ from here.
 - **What transfers:** SPA's battle is a deterministic simulator we can call 2 million times an hour. A learned model
   is cheap to train here, and we can check it against the real simulator at any time.
 
+### Model size, overfitting and distillation (2026-11-19)
+
+Fish (2026-11-19): one piece of advice says "train a big NN and then distill it", another says "tune the dimensionality to
+prevent overfitting"; what does the literature say? From general knowledge of the ML literature, not re-read here
+(verify before quoting). **Both are right in different situations, and the amount of data decides which.**
+
+- **Big, then distill.** Buciluă et al. 2006 (model compression) and Hinton et al. 2015 (distillation): a small model
+  trained on a big one's outputs often beats the same small model trained directly, since the soft outputs carry more
+  than win / loss labels. Li et al. 2020 ("Train Large, Then Compress"): on a fixed compute budget, large models reach
+  a given accuracy sooner and compress well. Frankle & Carbin 2019 (lottery ticket): big nets train easily because
+  they hold many good small subnetworks. Applies when the end product must be small and fast.
+- **Tune the size.** The classic bias-variance view, and what happened in 04 (every feature, 150 seeds: overfit).
+  Corrected by double descent (Belkin et al. 2019; Nakkiran et al. 2019): test error peaks where the model can just
+  memorise its data, then falls again as it grows; good regularisation and early stopping mostly remove the peak
+  (Nakkiran et al. 2020). Scaling laws (Kaplan 2020; Hoffmann 2022 "Chinchilla"; Muennighoff 2023, data-limited): the
+  best model size grows with the data, and with scarce fixed data bigger stops helping. Applies when data is the limit.
+- **Tabular features favour trees.** Grinsztajn et al. (NeurIPS 2022), Shwartz-Ziv & Armon 2022: boosted trees
+  usually beat neural nets on hand-made tabular features at our data sizes. Our first measurement agrees (trees 0.91 AUC).
+- **Surrogates inside a search get exploited**: the search finds where the surrogate errs in its favour (Jin 2011).
+  Fixes: check the top picks on the real simulator (our "rehearse the top 3"); an ensemble's disagreement as
+  uncertainty (Lakshminarayanan et al. 2017, deep ensembles); generate new data where it is unsure.
+- **Order-free per-unit encodings.** Deep Sets (Zaheer et al. 2017), Set Transformer (Lee et al. 2019): one
+  representation per unit, pooled so unit order doesn't matter.
+
+**For our surrogate:**
+1. **Data is unlimited** (the simulator, ~2 M battles an hour on shark), so overfitting is mostly not the constraint:
+   if a model overfits, generate more rows rather than shrink it. What must stay strict is held-out seeds (whole seeds,
+   every variant folder with them).
+2. **Training on the simulator already is distillation**, with the simulator as teacher. A big net is worth it only
+   if the browser bots need a small fast model: train big on simulator data, distill to small, check the small one
+   against the simulator.
+3. **Our bottleneck is the inputs, not the capacity.** The third measurement (below) tied "lowest tier first" because
+   its features are board-wide sums: no tile, range or Alliance recount. Next: per-Operator features (Deep Sets style)
+   trained on the 16,486 drop-one rows, as an ensemble whose disagreement tells the bot when to rehearse instead.
+
 ### Learned evaluation plus shallow search
 
 - **TD-Gammon / AlphaZero lineage.** Learn V(state) and pick the action whose result has the best V. Gumbel
@@ -130,6 +165,67 @@ from here.
 
 irace, SMAC, NTBEA, CMA-ES. Surrogate-assisted evolution (Jin, "Surrogate-assisted evolutionary computation", 2011)
 is the bridge: rank candidates on a cheap model, and play real games only for the survivors.
+
+### Placing the Final Assault board as a lattice search (2026-11-19)
+
+Fish (2026-11-19): placing the boss board is a tractable subproblem (the bot keeps only ~70 % of the human layout's
+damage on the human's own units, `04`); check the literature before any experiment, and save the result of every game
+run. Web search, **abstracts and snippets only, no paper opened** (verify before quoting). Nothing I found solves
+"units on a 2D lattice, scored by a simulator" exactly; these are the nearest.
+
+| Source | What it does | What we take from it |
+|---|---|---|
+| Barriga, Stanescu, Buro, "Building Placement Optimization in RTS Games" (AIIDE 2014, https://ojs.aaai.org/index.php/AIIDE/article/view/12735) | A GA whose fitness is a simulated battle of the candidate placement | The closest precedent for our rehearsal; our gap is the candidate set, not the idea |
+| Zhang, Fontaine, Hoover, Nikolaidis, "Deep Surrogate Assisted MAP-Elites for Hearthstone Deckbuilding" (GECCO 2022, https://arxiv.org/abs/2112.03534) | A deep surrogate trained online on game outcomes; MAP-Elites searches on it; the elites are checked in the real game and become training data | The best match for "surrogate + search + real simulator as judge". The diverse archive feeds the surrogate and counters the search exploiting its errors; beat an offline-trained surrogate |
+| Surrogate-assisted neighbourhood search for thermal layout (Complex & Intelligent Systems 2023, https://link.springer.com/article/10.1007/s40747-023-01276-0) | Layouts encoded as images, a deep net as surrogate, local search on swaps | Generic surrogates had large errors on discrete layouts; the image encoding fixed it. Supports a grid encoding with a local-search neighbourhood |
+| Loshchilov, Schoenauer, Sebag, ACM-ES (PPSN 2010, https://infoscience.epfl.ch/record/186020; arXiv 1206.0974) | A rank-SVM surrogate inside CMA-ES, tested on noisy functions too | Learn the ordering, not the value: invariant to monotone transforms, so heavy-tailed damage doesn't matter |
+| Oh et al., COMBO (NeurIPS 2019, https://arxiv.org/pdf/1902.00448) | Bayesian optimisation over categorical variables with a diffusion kernel on the combinatorial graph | An option for few-unit boards, but a GP scales poorly; not first choice |
+| Mirhoseini et al., chip placement with RL (2020, https://arxiv.org/abs/2004.10746) | Places blocks on a canvas with RL; an encoder pretrained to predict placement quality | The pretrained quality predictor is the reusable part; RL itself needs far more games than we have |
+| CIG 2013 paper 78 (https://www.cse.unr.edu/~simingl/papers/publish/CIG2013-Paper-78-eXpress-Ready.pdf) | Search over influence-map parameters for StarCraft group positioning | Search a handful of layout parameters instead of every unit's tile |
+| Bloons TD as a 2D knapsack (Tilburg, https://research.tilburguniversity.edu/en/publications/modeling-bloons-tower-defense-as-a-temporal-two-dimensional-knaps/) | Integer programming over a dotted board | The fixed-pieces-on-a-grid formulation, if we ever need an exact method |
+
+**Specialisations for a lattice (the first two are in the sources, the rest are my reasoning, to test):**
+1. **Search the small, structured space, not the raw one.** A layout generator with a few parameters (cluster
+   centre, spread, tile order for the dealers, which tiles the blockers take) cuts the dimensions from "every unit ×
+   every tile" to a handful. This is also the answer to the dimensionality question: shrink what you search, not the model.
+2. **A local-search neighbourhood on the lattice**: move one unit one step, swap two units, rotate a facing. Evaluating a
+   neighbour is one battle; a surrogate only pre-screens neighbours.
+3. **Encode tiles, not coordinates.** The route and the boss's approach break translation and mirror symmetry, so a
+   raw (row, column) input loses what a human sees. Give per-tile channels instead: distance to the route, how many
+   route tiles each unit's range covers from that tile and facing, ground or ranged tile, neighbours' range overlap.
+   A CNN or per-unit set encoding then works on those.
+4. **Canonicalise before storing or learning.** Units that are identical (same operator, elite, items, modules) are
+   interchangeable; sort them so one layout has one hash and one label.
+5. **Rank, don't regress.** Train on "layout A beats layout B for this board and boss" pairs (neighbours of one
+   parent give thousands cheaply). That is ACM-ES's reason and fits our pairing of parents with children in `11`'s drop-one test.
+6. **Archive with descriptors** (DSA-ME): e.g. the packed centre column, the spread, the share facing the approach.
+   The archive keeps diversity so the surrogate trains on the whole space, not only where it thinks it's good.
+7. **Re-score the top picks on the real simulator**, with the same seeds for all candidates (paired), as our rehearsal does.
+
+## Logging every game run (for analysis and training later)
+
+Every simulated battle in a placement experiment is saved, accepted or not, one JSON row each, written in chunks of a
+few thousand to `untracked/placement-2026-11/` with a PID lock so a restart resumes (the incremental-experiments rule).
+A row holds what is needed to replay it and to train on it:
+- **Identity:** run id, chunk, board id (the recorded match + seat + round), boss id, battle seed, simulator commit.
+- **Layout:** each unit as (id, elite, items, modules, tile, facing), the sorted canonical form and its hash.
+- **Provenance:** which generator or step produced it (search algorithm, iteration, parent layout hash, move type),
+  so parent / child pairs can be rebuilt; the surrogate's prediction when one chose it (to measure how much the search exploits it).
+- **Outcome:** the objective (damage at 120 s, time to kill, leak), the boss's HP sampled over time, each unit's damage
+  share, whether it won, and the battle's wall time.
+- **Rejected and invalid layouts too**, flagged, since "what fails" is training data.
+Held-out splits are by board (whole boards, with every layout of them), never by row.
+
+### Shark's return: the shop decision-point dataset (line 1; received 2026-11-20)
+
+Archive `logs/shark-ml-return-2026-11-19.tar.xz` (unpacked, untracked, in `untracked/shark-return-2026-11-19/`; its `RETURN.md` is shark's report). **Checked by orca:** the row counts per source match, `predictability.mjs` reproduces shark's table to the digit, and the human file count (231 in the rows) is 203 files with a round-2-or-later decision, as stated.
+
+- **The data:** `decision-points/shop.jsonl`, 102,839 rows of shop buy/skip decisions (human 25,972; bot-legacy 6,151; bot-other 36,202; legacy-clean 17,290; evobot-clean 17,224), with a start-of-round state (previous round's snapshot, so no leak), counters within the round, and cheat / Risk / seeded labels from `ruleLabels`. It holds human match data: **never commit it** (same as the human records).
+- **Results (shark, reproduced):** majority guess vs state-bucketed predictor. Bots: +7 to +8 points over per-round (legacy-clean 63.9 → 71.5 %, evobot-clean 62.2 → 70.8 %); no signature of overfitting. Clean humans (88 files): no lift (62.9 % majority, 61.3 % bucketed), which says the sample is thin and the features too coarse, not that humans are random. Cheat-economy humans skip 78 % of shops. **legacy vs evobot: no difference established** in how predictable their shop decisions are (relative lift 21.1 vs 22.1 %, CI [-0.4, 2.4] points).
+- **What it means for the imitation line (line 4):** shop buy/skip from round, shop screen and last round's level is learnable for bots but not yet for humans; a human-imitation model needs richer features (the offer's contents, owned units, Alliance fit) before any claim. Do not redo the extractor or the `bot: 1` tagging (RETURN.md "What orca shouldn't redo").
+- **Seeds:** the clean bot records use seeds **5001-5300, which are the evolution race's held-back seeds** (`ai-players/10`). Fine for placement or analysis; never for tuning or training anything that must see those seeds as unseen.
+- **New resource for the boss-board work:** the 600 bot records (`bot-records/`, legacy and evobot, solo ABYSS) hold **503 boss battles (452 without summon tokens)**: bot-built final boards, about 8 times the 53 human boards of the placement ceiling test. Use them to find and fit a placement rule, and test it on the human boards (as planned in `04`).
+- **Tool:** `make-bot-records.mjs` makes labelled bot records for any registered bot, seeds and config (needs to sit in `fish-edition/untracked/shark-ml/`).
 
 ## 3. Other ways to add order (instead of legacy's)
 
@@ -272,3 +368,30 @@ not recomputed).
 see Operators and not tiles. Rank "which Operator to sell" by the predicted leak change and compare it with
 `sell-singles` on paired seeds. Tile and range features come before any layout ranking.
 
+
+### Third measurement: which Operator to take off? (2026-11-18)
+
+The bench / swap decision, checked against the simulator. For each of the 1,905 held-out boards (groups not used in
+training, at least 3 Operators), every single-Operator removal was re-simulated (16,486 battles, `extract.mjs drop1`,
+`drop1.sh`; same simulator checkout as the training data). Each chooser picks one removal; the cost is its leaks
+minus the full board's.
+
+| Chooser | Mean leak cost of its pick | Picks a removal that costs nothing |
+|---|---|---|
+| Best possible | −0.27 | 88.8 % |
+| Surrogate (fewest predicted leaks) | 1.09 | 64.3 % |
+| Surrogate (most likely clean) | 1.16 | 65.3 % |
+| Lowest tier first (elites last, then fewest items) | 1.10 | 65.2 % |
+| Random | 1.76 | 56.9 % |
+| Worst possible | 4.83 | – |
+
+On average 57 % of a board's removals cost nothing, so "free" picks are common.
+
+**Reading.** The surrogate ties the trivial rule: it learned "low tier = expendable" and little more. Both are far from
+the best pick (1.1 vs −0.3 leaks), so there is real room, but these features (sums over the board, no tiles, no
+Alliance recount) can't see what makes one low-tier Operator matter, such as its tile, its range or the Alliance it
+completes. As it stands, the surrogate would not improve a bot's bench decision.
+
+**Next, if this line continues:** per-Operator features (its tile, its Alliance's count with and without it, its range
+over the route), trained directly on these drop-one rows (a ranking target, not leaks); the 16,486 rows are a ready
+held-out set. Without new features, this line stops here.

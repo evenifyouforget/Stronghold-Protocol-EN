@@ -23,6 +23,12 @@ For our repo and Yuri's, as far as our PRs and issues go:
 - issues on our repo: new ones, new comments, and ones that changed state;
 - comments on our PRs on Yuri's repo.
 
+Scope is by **milestone**, not label (Fish, 2026-11-24): "Release 0.3.4-3" (due 2026-11-30), "-4" (12-14), "-5" (12-31),
+about a two-week cadence. Every PR and every issue the release means to fix gets the milestone of the release it is
+aimed at (`gh pr create --milestone "Release 0.3.4-N"`, or `gh api -X PATCH repos/…/issues/N -F milestone=<number>`).
+Each loop, move what has slipped to the next milestone and adjust the scopes to what was realistically done; items that
+wait on Fish or aren't planned have no milestone.
+
 Bring TODO.md up to date: drop what is done, add new open work under its heading and in "What blocks what", and keep
 each fact in the one place TODO.md's table names. Findings go on the GitHub issue or in the file the item points to,
 not in TODO.md. If a comment on Yuri's repo needs an answer, draft it (in the scratchpad or `untracked/`) for Fish to
@@ -40,6 +46,8 @@ For each open PR on our repo:
 - red CI: find the cause and fix it, or say why it's unrelated (a known flake, an environment failure);
 - merge conflicts: merge the base branch in;
 - keep the description and labels current. Labels always include `drafted-by-ai`, never `playtested`;
+- a PR that adds or rewords text players see gets a blind read before it's ready (`PLAYER_TEXT.md`: the style rule, the
+  prompt, the log), with the result in its description;
 - close it if a recent change made it irrelevant, with a comment saying which change.
 
 PRs on Yuri's repo: report what needs doing and ask before pushing to their branches.
@@ -51,7 +59,7 @@ GitHub keeps the text.
 - Find the PR from the file's "Branch `…`" line: `gh pr list --repo <repo> --state all --head <branch>`.
 - Keep a file whose PR is still open, and a file that hasn't been made a PR yet.
 - Keep the newest merged file of each kind as the template for the next one: today `mini-0.3.3-1.md` (mini → main)
-  and `sync-yuri-2026-11-13.md` (Yuri → here). When a newer one of the same kind lands, it becomes the template and
+  and `sync-yuri-2026-11-18.md` (Yuri → here). When a newer one of the same kind lands, it becomes the template and
   the old one goes.
 - If a file has no "Branch" line, add one while you're there, or ask Fish if it's unclear what the file belongs to.
 

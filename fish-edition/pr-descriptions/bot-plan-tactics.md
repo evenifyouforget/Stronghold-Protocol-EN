@@ -53,5 +53,7 @@ hold on held-back seeds, so this run reports held-back results after every round
   counted Laterano item pieces as trait pieces and placed them differently (golden `solo-HARD-9-boosted`). It is now
   reported only when the tactic values it, and the per-match trait cache is keyed on that. Golden matches main again.
 - A research loop names its cap (`test/plugins/loopCaps.test.js`).
+- `sell-singles` and `plan-items` now have one definition, evobot's (`botTacticsEvo.js`); the research list reuses it.
+  The two copies were identical, but each side's tests wanted its own object in `TACTICS`.
 
 — Claude (orca)
