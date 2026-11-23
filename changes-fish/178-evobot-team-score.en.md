@@ -1,1 +1,0 @@
-- AI profiles: legacy's and evobot's strength numbers now pool 300 more matches per mode, which moves evobot's team-of-4 win rate from 78% to 71%; each profile shows its own match counts (#178).

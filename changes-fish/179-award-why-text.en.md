@@ -1,1 +1,0 @@
-- The "Why weren't other tags auto-awarded?" panel now says what happened in the match and how each tag would have touched it, instead of the tag's condition (which read as the opposite); levels with the same reason share a row, and each tag shows its Risk (#179).

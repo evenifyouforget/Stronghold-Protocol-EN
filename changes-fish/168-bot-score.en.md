@@ -1,1 +1,0 @@
-- AI profiles: one strength score after each name, the Ultimate win rates solo and as a team of 4 added up (0–200), with ± 1 standard deviation; both win rates are listed below it (#168, issue #124).
