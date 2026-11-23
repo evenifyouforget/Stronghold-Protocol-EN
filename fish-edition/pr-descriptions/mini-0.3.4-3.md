@@ -31,6 +31,7 @@ Base: `main`. Branch `mini/0.3.3-2` (working name; the real version is `0.3.4-3`
 - Siege's Mod Z no longer wastes DP at the 99 cap: her player's DP cap is 999 while she is on the field (#184, issue #176).
 
 ### Sync and tools
+- The release is named **0.3.4-3**: the version fields, the changelog heading and the folded changelog fragments (#190). Numbered updates (`x.y.z-N`) are now releases for the version test, the in-game release notes and the packager.
 - Yuri's English translation, 2026-11-13 to 11-15 (#166).
 - `tools/bench-share.mjs --rules` shares SPA-CC grinder sets as compute jobs (#171).
 
