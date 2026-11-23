@@ -1,6 +1,6 @@
 Who is working on what. Rules: `fish-edition/COLLABORATION.md`. Comment here (or on the item's issue / PR) before you start something, so two of us don't do the same work. Kept up to date by orca.
 
-**Scope labels:** `mini-0.3.3-1` / `-2` / `-3` say which mini update an issue or PR is meant for (not final; they can move).
+**Scope:** GitHub milestones (about a two-week cadence): [Release 0.3.4-3](https://github.com/evenifyouforget/Stronghold-Protocol-EN/milestone/1) (due 2026-11-30; the working name is `mini/0.3.3-2`), [0.3.4-4](https://github.com/evenifyouforget/Stronghold-Protocol-EN/milestone/2) (12-14), [0.3.4-5](https://github.com/evenifyouforget/Stronghold-Protocol-EN/milestone/3) (12-31). They replace the old `mini-…` labels; an item's milestone says which release it is meant for (not final; it moves).
 
 **Open to:** `anyone` = pick it up after saying so; `compute` = help by running jobs (`compute` label); `keep out` = needs files or context that aren't in git, or would conflict.
 
@@ -22,7 +22,7 @@ Ranked for a machine with many cores and, ideally, a browser. Each one works fro
 
 | Line of work | Who | Open to | Where |
 | --- | --- | --- | --- |
-| Current mini release `mini/0.3.3-2` (opened 2026-11-18): syncs, bug fixes and small PRs; scope in `fish-edition/TODO.md` | Fish, orca | anyone (small PRs to `mini/0.3.3-2`, label `mini-0.3.3-2`) | merged: #166, #167, #168, #170, #171, #173; open: #178 |
+| Current mini release `mini/0.3.3-2` (opened 2026-11-18): syncs, bug fixes and small PRs; scope in `fish-edition/TODO.md` | Fish, orca | anyone (small PRs to `mini/0.3.3-2`, milestone Release 0.3.4-3) | merged: #166, #167, #168, #170, #171, #173, #178, #179, #182; open: #181, #184, #185, #186, #187 |
 | Auto-award free Risk tags (#125) | orca | phases 1 and 2 merged (#170, #173); Low Efficiency waits on Fish | #170, #173 |
 | SPA-CC grinder (#124 level 3): the rubric, its tag sets, bot runs | orca (rubric, co-op sets running now), anyone (runs) | compute | `fish-edition/spacc/grinder-definition.md`, #124, #171 |
 | Cards display overhaul (#125's look) | orca, Fish | keep out (Fish's in-game feedback first) | `fish-edition/spacc/cards-overhaul.md` |

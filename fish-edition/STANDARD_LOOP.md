@@ -23,6 +23,12 @@ For our repo and Yuri's, as far as our PRs and issues go:
 - issues on our repo: new ones, new comments, and ones that changed state;
 - comments on our PRs on Yuri's repo.
 
+Scope is by **milestone**, not label (Fish, 2026-11-24): "Release 0.3.4-3" (due 2026-11-30), "-4" (12-14), "-5" (12-31),
+about a two-week cadence. Every PR and every issue the release means to fix gets the milestone of the release it is
+aimed at (`gh pr create --milestone "Release 0.3.4-N"`, or `gh api -X PATCH repos/…/issues/N -F milestone=<number>`).
+Each loop, move what has slipped to the next milestone and adjust the scopes to what was realistically done; items that
+wait on Fish or aren't planned have no milestone.
+
 Bring TODO.md up to date: drop what is done, add new open work under its heading and in "What blocks what", and keep
 each fact in the one place TODO.md's table names. Findings go on the GitHub issue or in the file the item points to,
 not in TODO.md. If a comment on Yuri's repo needs an answer, draft it (in the scratchpad or `untracked/`) for Fish to
