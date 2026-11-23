@@ -2,7 +2,7 @@
 // tactic profile, its tactics (shared/botProfiles.js ROOM_BOTS, BOT_INFO). Opened from a seat card's ⓘ (screens/room.js)
 // and from an AI player's row in the match (ui/teamPanel.js).
 import { html, Modal } from './components.js';
-import { ROOM_BOTS, BOT_INFO, DEFAULT_ROOM_BOT, botScore, STRENGTH_MATCHES } from '../../../shared/botProfiles.js';
+import { ROOM_BOTS, BOT_INFO, DEFAULT_ROOM_BOT, botScore, strengthMatches } from '../../../shared/botProfiles.js';
 import { t } from '../../../shared/i18n.js';
 
 /** One bot's block; `current`: the seat's own bot, marked. */
@@ -13,7 +13,7 @@ function BotBlock({ bot, current }) {
     <h3 class="botinfo__name">${t(bot.label)}${bot.id === DEFAULT_ROOM_BOT ? html` <small>${t('默认')}</small>` : null}
       ${current ? html` <small class="botinfo__here">${t('当前')}</small>` : null}
       ${sc ? html` <span class="botinfo__strength" title=${t('强度：单人与 4 人组队终极难度胜率（%）之和，0–200；± 为 1 个标准差')}>(${sc.score} ± ${sc.sd})</span>` : null}</h3>
-    ${sc ? html`<p class="botinfo__scores">${t('单人 {solo}%（{soloN} 局）· 4 人组队 {team}%（{teamN} 局）', { solo: info.strength, soloN: STRENGTH_MATCHES.solo, team: info.team, teamN: STRENGTH_MATCHES.team })}</p>` : null}
+    ${sc ? html`<p class="botinfo__scores">${t('单人 {solo}%（{soloN} 局）· 4 人组队 {team}%（{teamN} 局）', { solo: info.strength, soloN: strengthMatches(info).solo, team: info.team, teamN: strengthMatches(info).team })}</p>` : null}
     <ul class="botinfo__about">${info.about.map((line) => html`<li key=${line}>${t(line)}</li>`)}</ul>
     ${info.tactics?.length ? html`<p class="botinfo__sub">${t('战术（从上到下优先，之后由基础 AI 决定）')}</p>
       <ol class="botinfo__tactics">${info.tactics.map((x) => html`<li key=${x.id}>${t(x.text)}</li>`)}</ol>` : null}

@@ -183,17 +183,28 @@ const INSTALL = {
   },
 
   // per attack: max HP +50 and 庇护 +1 % (80 stacks, kept through retreats); per deployment: one Waxing stack (10 at
-  // most): healing received +20 %, ASPD +20, and Corrosion of 1 % ATK on each hit, per stack
+  // most): healing received +20 %, ASPD +20 Tenacity (坚忍, as his talent: in full at 70 % HP lost, linear before; Tenacity doesn't stack, the
+  // highest counts, so this only adds what exceeds his talent's), and
+  // Corrosion of 1 % ATK on each hit, per stack
   uniequip_fishz_helage(battle, u) {
     const p = (u.persist[KEY] ??= { stacks: 0, wax: 0 });
     const apply = () => {
       battle.addBuff(u, {
         key: `${KEY}:helage`, persist: true, allowDead: true, tags: ['module'],
-        mods: { hpFlat: 50 * p.stacks, healingTakenMul: 1 + 0.2 * p.wax, aspd: 20 * p.wax },
+        mods: { hpFlat: 50 * p.stacks, healingTakenMul: 1 + 0.2 * p.wax },
       });
     };
     battle.on('attack', (c) => { if (c.attacker === u && p.stacks < 80) { p.stacks++; apply(); } }, { owner: u });
     battle.on('deploy', (c) => { if (c.unit === u && !c.move) { p.wax = Math.min(10, p.wax + 1); apply(); } }, { owner: u });
+    const tenKey = `${KEY}:helage:tenacity`;
+    battle.on('tick', () => {
+      const cur = u.findBuff(tenKey);
+      const talent = u.findBuff('talent:helage:berserk')?.data?.v ?? 0;
+      const v = up(u) ? Math.max(0, 20 * p.wax * Math.max(0, Math.min(1, (1 - u.hpRatio) / 0.7)) - talent) : 0;
+      if (cur && Math.abs((cur.data?.v ?? 0) - v) < 0.05) return;
+      if (v < 0.05) { if (cur) battle.removeBuff(u, tenKey); return; }
+      battle.addBuff(u, { key: tenKey, mods: { aspd: v }, data: { v }, tags: ['module'] });
+    }, { owner: u });
     battle.on('tick', () => { if (up(u) && p.stacks > 0) holdProtect(battle, u, p.stacks * 0.01, PROTECT_TICK_HOLD, u); }, { owner: u });
     battle.on('hit', (c) => {
       if (c.source !== u || c.target?.side !== 'enemy' || c.dmg.type === 'element' || !(p.wax > 0)) return;
@@ -219,6 +230,9 @@ const INSTALL = {
   uniequip_fishz_shining(battle, u) {
     const key = `${KEY}:immortal`;
     let cd = 0, readyAt = 0;
+    // Fish's text: "Can heal allies that are already at max HP (just to apply Immortality)": a full-HP ally is a heal
+    // target while the grant is ready and the ally has no Immortal (battle/queries.js injuredAlliesInKeys; injured first)
+    u.fishHealFull = (a) => battle.time >= readyAt && !a.findBuff(key);
     battle.on('heal', (c) => {
       if (c.source !== u || !c.target || c.target.side === 'enemy' || battle.time < readyAt || c.target.findBuff(key)) return;
       battle.addBuff(c.target, { key, duration: 8, source: u, visible: true, tags: ['module'] });
@@ -236,9 +250,12 @@ const INSTALL = {
   // every 0.5 s; "持续消耗" names no rate]
   uniequip_fishz_siege(battle, u) {
     u.fishDpMul = 2;
+    // GitHub #176: while she is up, her player's DP cap is 999, so a gain between two drains is never wasted at the usual
+    // 99 (Fish's suggestion: "Siege Mod Z also raises DP cap to 999")
     battle.every(0.5, () => {
-      if (!up(u)) return;
       const ps = battle.getPlayer(u.ownerId);
+      if (ps) ps.fishDpMax = up(u) ? 999 : 0;
+      if (!up(u)) return;
       const extra = Math.floor((ps?.dp ?? 0) - 90);
       if (!(extra > 0)) return;
       battle.addDp(u.ownerId, -extra);
@@ -298,7 +315,10 @@ const INSTALL = {
       if (!pick) return;
       readyAt = battle.time + 12;
       const tx = Math.round(pick.x), ty = Math.round(pick.y);
-      battle.fx('zone', { x: tx, y: ty, radius: 2, dur: 7, id: u.id, skill: 'fishVvana' });
+      // the warning is the 13 tiles of the diamond it will hit (a round 'zone' ring showed no diamond: GitHub #175)
+      const diamond = [];
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) diamond.push([ty + dr, tx + dc]);
+      battle.fx('telegraph', { x: tx, y: ty, r: 2.5, dur: 7, tiles: diamond, id: u.id, skill: 'fishVvana' });
       battle.after(7, () => {
         if (!u.alive) return;   // [DRAFT: the explosion needs her alive; her ATK at detonation]
         const n = kaz().length;

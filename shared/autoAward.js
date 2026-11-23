@@ -12,6 +12,24 @@
 
 import { N_ } from './i18n.js';
 
+/**
+ * The end screen's "why not" panel: what broke each condition, said as what happened in the match and how the tag
+ * would have touched it (Fish, 2026-11-19: the condition texts read as rules, not as what happened). `{name}` is the
+ * Operator or Strategy involved, `{bond}` the Alliance, `{item}` Junk's item; the panel puts "Round N:" in front.
+ */
+export const AWARD_EVENTS = Object.freeze({
+  investor: N_('有博士的【{bond}】生效了（这个标签会让整备区的干员不再计入它）'),
+  investorOps: N_('有博士获得了干员{name}（这个标签会改变{name}获得时的效果）'),
+  swift: N_('有博士的【{bond}】在作战中生效了（这个标签会改变它回复技力的方式）'),
+  foresight: N_('【{bond}】干员{name}参加了作战（这个标签会降低它的攻击速度）'),
+  strategy1: N_('有博士选择了策略{name}，它在指定回合生效（这个标签会把它推迟1回合）'),
+  strategy2: N_('有博士选择了策略{name}（这个标签会削弱它）'),
+  intern: N_('有博士购买了I阶干员{name}（这个标签会让每回合第一名I阶干员更贵）'),
+  barge: N_('有博士的调度中心升到了5级（这个标签会让这次升级更贵）'),
+  lastLine: N_('如果每回合多扣2点目标生命值，会有博士被淘汰，或最终攻势提前失败'),
+  junk: N_('有博士的手牌区满了（这个标签的【{item}】会占用一个位置）'),
+});
+
 /** The conditions, by id: their text (msgid) for the room dialog's list. */
 export const AWARD_CONDITIONS = Object.freeze({
   investor: N_('没有博士的【投资人】生效过（候补区计入，任何时刻）'),

@@ -231,6 +231,21 @@ test('Hellagur Z: per attack HP +50 (80 at most), per deployment one Waxing, Cor
   noErrors(b);
 });
 
+test('Hellagur Z: Waxing\'s ASPD is Tenacity: none at full HP, in full at 70 % HP lost; with his talent the highest counts', () => {
+  const { h, b, ops: [u] } = rig([op('char_188_helage', 'uniequip_fishz_helage', 0)]);
+  h.run(0.5);
+  assert.equal(u.persist.fishModZ.wax, 1);
+  assert.ok(!u.findBuff('fishModZ:helage:tenacity'), 'full HP: no Tenacity');
+  u.hp = u.s.maxHp * 0.3; h.run(0.2);
+  const talent = u.findBuff('talent:helage:berserk')?.data?.v ?? 0;
+  assert.ok(talent > 20, `his talent's Tenacity ${talent}`);
+  assert.ok(!u.findBuff('fishModZ:helage:tenacity'), 'one Waxing (+20) is below his talent: the highest counts, nothing added');
+  u.persist.fishModZ.wax = 10; h.run(0.2);
+  const add = u.findBuff('fishModZ:helage:tenacity').mods.aspd, t2 = u.findBuff('talent:helage:berserk').data.v;
+  assert.ok(Math.abs(add + t2 - 2 * t2) < 0.5, `10 Waxing: twice his talent's +100 in all, i.e. +200 at 70 % lost (talent ${t2} + ${add})`);
+  noErrors(b);
+});
+
 test('Phantom Z: Raid and Indomitable on the elite, and Raid treats his skill as ready', () => {
   const m = modZOf('uniequip_fishz_phatom');
   assert.deepEqual([...m.bonds], ['raidShip', 'indomShip']);
@@ -246,6 +261,14 @@ test('Shining Z: her heal grants Immortal (8 s), which stops a lethal hit once a
   assert.ok(im, 'Immortal granted by her heal');
   b.dealDamage({ source: null, target: t, amount: t.hp * 50, type: 'true', calculation: 'precomputed' });
   assert.ok(t.alive && t.hp >= 1, `alive at ${t.hp}`);
+  noErrors(b);
+});
+
+test('Shining Z: she heals an ally at full HP too, to grant Immortal (Fish: "can heal allies that are already at max HP")', () => {
+  const { h, b, ops: [s, t] } = rig([op('char_147_shining', 'uniequip_fishz_shining', 0), op('char_293_thorns', null, 0, 9, 5)]);
+  assert.ok(t.hp >= t.s.maxHp - 1e-6, 'Thorns starts at full HP');
+  h.runUntil(() => !!t.findBuff('fishModZ:immortal'), 20);
+  assert.ok(t.findBuff('fishModZ:immortal'), 'Immortal granted to a full-HP ally');
   noErrors(b);
 });
 
@@ -282,7 +305,12 @@ test('Weedy Z: enemies weigh 2 less while she is on the field; her damage become
 test('Viviana Z: Glimmering Touch explodes 7 s after it marks an enemy in a Kazimierz operator\'s range', () => {
   const { h, b, rec, ops: [v] } = rig([op('char_4098_vvana', 'uniequip_fishz_vvana', 0)], [{ key: 'enemy_tank', time: 0, count: 1 }]);
   assert.ok(diyRecord(6, { charId: 'char_4098_vvana', skillIndex: 0, uniEquipId: 'uniequip_fishz_vvana' }, { elite: true, data })?.bonds?.includes('kazimierzShip') ?? true);
+  const fxs = []; const fx0 = b.fx.bind(b); b.fx = (k, p, ...r) => { fxs.push({ k, p }); return fx0(k, p, ...r); };
   h.run(30);
+  const warn = fxs.find((e) => e.p?.skill === 'fishVvana' && e.p.tiles);
+  assert.ok(warn, 'the warning names its tiles (GitHub #175)');
+  assert.equal(warn.p.tiles.length, 13, 'a diamond of 13 tiles');
+  assert.ok(warn.p.tiles.every(([r, c]) => Math.abs(r - warn.p.y) + Math.abs(c - warn.p.x) <= 2), 'every tile within 2 of the centre');
   const hits = rec.damage.filter((x) => x.source === v && x.tags?.includes('fishVvana'));
   assert.ok(hits.length > 0, 'an explosion');
   assert.ok(rec.element.some((x) => x.source === v && x.element === 'burn' && x.tags?.includes('fishVvana')));
@@ -332,4 +360,16 @@ test('Siege Z and Saileach Z: the DP they generate counts twice (addDp with them
     b.addDp(pid, 5);
     assert.equal(b.getPlayer(pid).dp, 15, `${charId}: other DP is not doubled`);
   }
+});
+
+test('Siege Z: while she is up her player can hold more than 99 DP, so gains between drains are not wasted (#176)', () => {
+  const { h, b, ops: [s] } = rig([op('char_112_siege', 'uniequip_fishz_siege', 0)]);
+  const ps = b.getPlayer(s.ownerId);
+  h.run(0.6);
+  assert.equal(ps.fishDpMax, 999);
+  b.addDp(s.ownerId, 200 - ps.dp);
+  assert.ok(ps.dp > 120, `DP ${ps.dp} kept past 99 until the next drain`);
+  h.run(1);   // the next drain takes the excess over 90 (her own skill then earns some back from the SP: her DP gain is doubled)
+  assert.ok(ps.dp < 140, `drained from 200 to ${ps.dp}`);
+  noErrors(b);
 });

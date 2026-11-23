@@ -210,7 +210,7 @@ const ITEM_HANDLERS = {
     onEquip(ctx, ev) { ctx.addPendingFunds(int(paramsOf(ctx, ev.item).count, 2)); },
   },
   equip_destory_deployment_cnt_change: {
-    onEquip(ctx, ev) { ctx.setDeployCapAtLeast(int(paramsOf(ctx, ev.item).count, 9)); },
+    onEquip(ctx, ev) { ctx.setDeployCapAtLeast(int(paramsOf(ctx, ev.item).count, 9), { withRule: true }); },
   },
   use_equip_upgrade_char: {
     onEquip(ctx, ev) {
