@@ -15,7 +15,7 @@ import { FieldRunner, HeadlessPacer, syntheticResult, BOSS_SILENCE_MS, CATCHUP_T
 import { FLOW_TICKER_PRIORITY, BOSS_CLOCK_MS, DELAYS } from './common.js';
 import { bossRiskConfig } from '../../sim/bossRisk.js';
 import { CC } from '../../../shared/ruleData.js';
-import { noteBattle, noteTeamLp } from '../autoAward.js';
+import { noteBattle, noteTeamLp, noteDowns } from '../autoAward.js';
 
 /** b.pool broadcasts at most this often (ms). */
 const POOL_MIN_GAP_MS = 250;
@@ -567,6 +567,7 @@ export class MatchBoss {
       this._collectSimErrors(f, res);
       f.live = false;
       noteChatKills(this, f, res);
+      noteDowns(this, res); // (GitHub #125) Low Efficiency
       for (const pid of f.players) {
         const pp = res.perPlayer && res.perPlayer[pid];
         const ps = this.players.get(pid);
