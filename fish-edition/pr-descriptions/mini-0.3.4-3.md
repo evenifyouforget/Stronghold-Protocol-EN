@@ -6,7 +6,7 @@ The second mini release on 0.3.3, released as **0.3.4-3**. It brings:
 - clearer player texts from the blind-read retro;
 - Yuri's changes of 2026-11-13 to 11-15.
 
-Base: `main`. Branch `mini/0.3.3-2` (working name; the real version is `0.3.4-3`). It is squash-merged, and the squash commit's message is this description's changelog, so the changes stay readable in `main`'s history.
+Base: `main`. Branch `release/0.3.4-3`: `mini/0.3.3-2` plus a merge of `main` (the urgent #177 went to `main` directly, `mini/*` is protected so it can't be updated, and the repo only squash-merges, so this branch carries the merge instead; it replaces #188 and #190, which have the same content). It is squash-merged, and the squash commit's message is this description's changelog, so the changes stay readable in `main`'s history.
 
 ## Changelog
 
@@ -31,7 +31,7 @@ Base: `main`. Branch `mini/0.3.3-2` (working name; the real version is `0.3.4-3`
 - Siege's Mod Z no longer wastes DP at the 99 cap: her player's DP cap is 999 while she is on the field (#184, issue #176).
 
 ### Sync and tools
-- The release is named **0.3.4-3**: the version fields, the changelog heading and the folded changelog fragments (#190). Numbered updates (`x.y.z-N`) are now releases for the version test, the in-game release notes and the packager.
+- The release is named **0.3.4-3**: the version fields, the changelog heading and the folded changelog fragments (#191). Numbered updates (`x.y.z-N`) are now releases for the version test, the in-game release notes and the packager.
 - Yuri's English translation, 2026-11-13 to 11-15 (#166).
 - `tools/bench-share.mjs --rules` shares SPA-CC grinder sets as compute jobs (#171).
 
