@@ -10,6 +10,8 @@ import { pieceDir, parseDir, mergeTile } from '../board.js';
 import { MAX_OFFER_SLOTS } from './common.js';
 import { onMerge } from '../botEmotes.js';
 import { noteGained } from '../autoAward.js';
+import { pieceBonds } from '../bondsMeta.js';
+import { modZOf } from '../../../shared/modZ.js';
 
 export class PlayerAcquire {
   /** Normal copies of a base chess currently owned (board/hand/temp). */
@@ -55,6 +57,7 @@ export class PlayerAcquire {
       if (!owned) return null;
     } else {
       this.stow(piece, { allowTemp: true, toTemp });
+      if (rec.isGolden) this.grantModZBonds(piece); // (Fish Edition) Mod Z Kal'tsit Esperanta: an elite obtained directly
     }
     this.recompute();
     // [ASSUMED] Custom gain fires for the acquired copy, not the elite produced by a merge.
@@ -110,6 +113,7 @@ export class PlayerAcquire {
     const toTile = (t) => { elite.dir = parseDir(t.dir) || 'RIGHT'; this.board.set(t.key, elite); return 'board'; };
     const tile = mergeTile(deployed, (r, c) => this._legal(elite, r, c));
     const where = tile ? toTile(tile) : this.stow(elite, { allowTemp: true });
+    this.grantModZBonds(elite); // (Fish Edition) Mod Z Kal'tsit Esperanta: the elite a merge made
     for (const it of items) this.stow(it, { allowTemp: true });
     // the returned equipment follows the auto-merge rule like any other gain ("已拥有2件同一初始装备时…自动合并")
     this.checkItemMerges();
@@ -127,6 +131,28 @@ export class PlayerAcquire {
     return elite;
   }
 
+  /**
+   * (Fish Edition) Mod Z Kal'tsit Esperanta: an elite whose active module grants alliances (shared/modZ.js `grants`) gains, now, that
+   * many alliances she is not yet in: each time the active alliance with the most Stacks (ties: the alliance list's order), then the
+   * next. The list is read once, from the current state; it is kept on the piece (`grantedBonds`, read by pieceBonds), so it is gone
+   * when she is sold, and a piece obtained again draws a new list. Called when an elite is obtained, merged or promoted.
+   */
+  grantModZBonds(piece) {
+    const rec = piece && piece.kind === 'chess' ? this.gd.chess(piece.id) : null;
+    const z = rec && rec.module && rec.module.active ? modZOf(rec.module.id) : null;
+    if (!z || !(z.grants > 0)) return;
+    piece.grantedBonds = [];
+    this.recompute();
+    const has = new Set(pieceBonds(this.gd, piece, this.m?.rules));
+    const order = new Map(this.gd.bondIds.map((id, i) => [id, i]));
+    const pick = Object.entries(this.bonds || {})
+      .filter(([id, b]) => b && b.active && !has.has(id) && !this.gd.modeInactiveBonds?.has(id))
+      .sort((a, b) => (b[1].layers || 0) - (a[1].layers || 0) || (order.get(a[0]) ?? 1e9) - (order.get(b[0]) ?? 1e9))
+      .slice(0, z.grants).map(([id]) => id);
+    piece.grantedBonds = pick;
+    this.recompute();
+  }
+
   /** Promote a normal chess piece to its elite in place (升华, 博士投影). Takes extra pool copies when available. */
   promote(piece) {
     if (!piece || piece.kind !== 'chess' || this.gd.isGolden(piece.id)) return false;
@@ -136,6 +162,7 @@ export class PlayerAcquire {
     const extra = Math.max(0, this.gd.goldenCopies - (piece.poolCopies || 0));
     piece.poolCopies = (piece.poolCopies || 0) + this.poolOf(base).take(base, extra, { overdraw: true });
     piece.id = goldenId;
+    this.grantModZBonds(piece); // (Fish Edition) Mod Z Kal'tsit Esperanta: promoted
     this.recompute();
     // an elite on the board tops its summon stacks up to the elite's deploy limit, like an elite merged onto a tile
     // (_mergeChess → grantTokensFor): 麦哲伦 / 令 3 → 4, 望 6 → 7 with their modules (0.2.0 review round 17)

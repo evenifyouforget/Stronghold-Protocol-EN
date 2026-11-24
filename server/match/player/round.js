@@ -170,6 +170,7 @@ export class PlayerRound {
     for (const { r, c, piece } of boardOrder(this.board)) {
       if (piece.kind === 'chess') {
         const u = { uid: piece.uid, kind: 'chess', chessId: piece.id, row: r, col: c, dir: pieceDir(piece), items: (piece.items || []).map((i) => i.id) };
+        if (Array.isArray(piece.grantedBonds) && piece.grantedBonds.length) u.grantedBonds = piece.grantedBonds.slice(); // Mod Z Kal'tsit Esperanta
         const progress = equippedItemProgress(this, piece);
         if (progress) u.itemProgress = progress;
         const pick = this.diyPickOf(piece.id);

@@ -132,6 +132,22 @@ const INSTALL = {
     }, { owner: u });
   },
 
+  // Kal'tsit Esperanta: Physical and Arts damage taken ×0.5 (a plain multiplier with every other damage-taken effect: she has no
+  // other damage reduction, Fish 2026-11-24); at the battle's start she and every operator of her player that shares at least one
+  // alliance with her (the alliances she was granted count; 协防干员 is no alliance) gain 10 SP. The granted alliances come from the
+  // match (grantedBonds, unitBonds).
+  uniequip_fishz_kalts2(battle, u) {
+    liveBuff(battle, u, `${KEY}:kalts2`, () => true, () => ({ physTakenMul: 0.5, artsTakenMul: 0.5 }));
+    battle.on('battleStart', () => {
+      const mine = new Set(unitBonds(u).filter((b) => b !== 'emptyShip'));
+      for (const a of battle.units) {
+        if (a.kind !== 'op' || a.side !== 'ally' || a.ownerId !== u.ownerId || !a.skill || a.skill.noSkill) continue;
+        if (a !== u && !unitBonds(a).some((b) => mine.has(b))) continue;
+        a.skill.gainSp(10, 'init');
+      }
+    }, { owner: u });
+  },
+
   // enemies she damages are marked; at the end of a skill, 17 SP per marked enemy that fell during it
   uniequip_fishz_poca(battle, u) {
     const marked = new WeakSet();
