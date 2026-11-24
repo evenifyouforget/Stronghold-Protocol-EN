@@ -1,0 +1,1 @@
+- "Auto-award free Risk tags" now also covers Objective: Low Efficiency: it is awarded when no Operator ever left the field in a match (no knock-out, retreat or raid). Only in rooms without bots or autoplay (#195, issue #125).
