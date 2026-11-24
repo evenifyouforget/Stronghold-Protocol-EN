@@ -34,7 +34,7 @@ export const MODZ = Object.freeze([
   // 协防干员 (emptyShip) stays beside the granted alliances; `grants`: how many more alliances an obtained / promoted elite gains
   // (the highest-stacked active ones she is not in: PlayerState.grantModZBonds); the DR and the starting SP are the sim's.
   { charId: 'char_1052_kalts2', code: 'kalts2', kind: 'Z', type: 'WAT-Z', attr: {}, bonds: ['visiShip'], keepAssist: true, grants: 3, anyForm: true,
-    name: N_('凯尔希·思衡托的Z型调整'), desc: N_('获得【远见】盟约身份，并保留协防干员盟约身份；受到的物理与法术伤害降低50%；每当她成为精锐干员（获得、合成，或由普通干员晋升）时，获得你场上已生效（加成已开启）、她尚未加入、层数最多的3个盟约身份（层数从高到低）；每场战斗开始时，她自己和你场上所有与她至少共享一个盟约的干员，技力+10') },
+    name: N_('凯尔希·思衡托的Z型调整'), desc: N_('获得【远见】盟约身份，并保留协防干员盟约身份；受到的物理与法术伤害降低50%；每当她成为精锐干员（直接获得精锐、三合一合成，或由普通干员晋升）时，永久加入你场上已生效（加成已开启）、她尚未加入、层数最多的至多3个盟约（层数从高到低），直到她被出售；每场战斗开始时，她自己和你场上所有与她至少共享一个盟约的干员，技力+10') },
   { charId: 'char_197_poca', code: 'poca', kind: 'Z', type: 'SIE-Z', attr: { atk: 700 }, bonds: ['preciShip'],
     name: N_('早露的Z型调整'), desc: N_('获得【精准】盟约身份；标记受到自身伤害的敌人；技能结束时，技能期间每有1名被标记的敌人倒下，回复17点技力') },
   { charId: 'char_416_zumama', code: 'zumama', kind: 'Z', type: 'HES-Z', attr: { atk: 150, def: 150 }, layerAllow: { own: 60 }, bonds: ['steadShip'],
