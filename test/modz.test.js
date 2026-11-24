@@ -9,6 +9,7 @@ import { unitForm } from '../shared/standIn.js';
 import { getDefaultSource } from '../server/sim/simdata.js';
 import { RULES, isRuleValue, normalizeRules, ruleSet } from '../shared/rules.js';
 import { makeBattle, enemyRec, chessRec } from './helpers/battleHarness.js';
+import { unitBonds } from '../server/sim/content/support/index.js';
 
 const ds = getDefaultSource();
 const backups = ds.rawBackups();
@@ -36,7 +37,7 @@ test('withModZ appends to the elite forms only (forms with modules); the players
     assert.ok(hasModZ(m.charId), `${m.charId}: the "Mod Z available" tag`);
     for (const form of Object.values(backups.units[m.charId].forms)) {
       const out = withModZ(m.charId, form);
-      if (!form.modules?.length) { assert.equal(out, form); continue; }
+      if (!form.modules?.length && !m.anyForm) { assert.equal(out, form); continue; }   // anyForm: Kal'tsit Esperanta has no official module
       assert.ok(out.modules.some((x) => x.uniEquipId === m.id && x.fishModZ === m.kind));
       assert.ok(!(form.modules ?? []).some((x) => x.fishModZ), 'the data form is untouched');
     }
@@ -526,5 +527,26 @@ test('Typhon W (v2): the first 30 fallen enemies come back once on their own rou
   assert.equal(e.lpr, 0);
   assert.equal(e.bounty ?? null, null, 'no bounty');
   assert.equal(b.enemies.filter((x) => x.fishRevived && x.defId !== 'enemy_weak').length, 0, 'the same kind of enemy');
+  noErrors(b);
+});
+
+test('Kal\'tsit Esperanta Z in battle: damage taken x0.5 (Physical and Arts), the granted alliances count, +10 starting SP for her and her alliance-mates', () => {
+  const K = 'uniequip_fishz_kalts2';
+  assert.ok(MODZ_INSTALLED.includes(K));
+  const kal = { ...op('char_1052_kalts2', K, 2, 9, 4), grantedBonds: ['kjeragShip'] };
+  const kjerag = { chessId: 'chess_char_3_14_a', row: 9, col: 5, dir: 'RIGHT' };   // a Kjerag operator
+  const other = { chessId: 'chess_char_3_08_a', row: 9, col: 6, dir: 'RIGHT' };    // shares no alliance with her
+  const { h, b, rec, ops } = rig([kal, kjerag, other]);
+  h.run(1);
+  const [k, kj, ot] = ops;
+  assert.ok(unitBonds(k).includes('visiShip') && unitBonds(k).includes('kjeragShip'), `her alliances ${unitBonds(k)}`);
+  assert.ok(unitBonds(kj).includes('kjeragShip') && !unitBonds(ot).includes('kjeragShip'), 'the Kjerag operator shares one, the other does not');
+  assert.equal(k.s.physTakenMul, 0.5);
+  assert.equal(k.s.artsTakenMul, 0.5);
+  assert.equal(kj.s.physTakenMul, 1, 'only she takes less');
+  const init = (u) => rec.sp.filter((x) => x.unit === u && x.reason === 'init' && x.amount === 10).length;
+  assert.equal(init(k), 1, 'she starts with +10 SP');
+  assert.equal(init(kj), 1, 'so does the operator sharing Kjerag with her');
+  assert.equal(init(ot), 0, 'and an operator sharing nothing does not');
   noErrors(b);
 });
