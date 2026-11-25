@@ -182,6 +182,7 @@ node scripts/maintenance.mjs --status            # 正在进行的对局、房�
 node scripts/maintenance.mjs --in 15             # 所有玩家屏幕顶部出现倒计时「服务器将在 14:59 后维护」
 node scripts/maintenance.mjs --at 21:30          # 或者指定时刻（本机时间；已过则为明天）
 node scripts/maintenance.mjs --close             # 从现在起不能开始新的模拟，正在进行的对局照常打完（--open 撤销）
+# 已关闭期间：在选择界面（确认信息、选策略、机变、休整期）连续120秒没有任何操作的玩家会被移出本局；所有玩家都连续150秒没有操作的对局会被直接结束（lobby 选项 afkKickMs / afkEndMs，0 为关闭；GitHub #193）
 node scripts/maintenance.mjs --stop-when-idle    # 没有进行中的对局时自动停止服务器，只生效一次（--keep-running 撤销）
 node scripts/maintenance.mjs --back-in 20        # 告诉玩家的预计停机时间（或 --back-at 21:45）
 node scripts/maintenance.mjs --message "更新 0.2.3"   # 在玩家的提示条里加一行文字（--message "" 删除）

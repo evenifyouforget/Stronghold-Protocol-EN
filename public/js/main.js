@@ -296,6 +296,8 @@ const CLOSE_REASON = {
   ended: N_('模拟已结束'), expired: N_('同盟已过期'), shutdown: N_('服务器维护中，同盟已关闭'),
   // a spectator left behind by a 搜寻队友 merge (no spectator seat free in the target room)
   merged: N_('同盟已与其他同盟合并，观战席已满'),
+  // the server is closing for maintenance and nobody acted on a choice screen for a while (Lobby.sweepAfk)
+  afk: N_('服务器即将维护，你长时间没有操作，已离开本局'),
   // (fork) a 搜寻队友 match on another server: room.move follows (public/js/regions.js)
   moved: N_('已找到队友，正在连接…'), // en: "Teammates found. Connecting…"
   // (fork) a matchmade room of another version: this page could not load its data in time (server/lobby.js waitContent)
