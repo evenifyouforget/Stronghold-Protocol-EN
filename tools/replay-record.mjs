@@ -220,6 +220,9 @@ export function replayRecord(rec, { until = Infinity, bot = null, botNative = fa
       // issue: replay-record --bot handover plays weaker than a native bot).
       if (botNative) { ps.isBot = true; ps.connected = true; m.kickBot(ps); } else { m.setAutoplay(ps, true); }
     }
+    // server/aiTakeover.js recomputes this on every isBot flip (transferAiSeat); do the same here instead of
+    // leaving the construction-time value (every replay seat starts isBot: false, so it's stale either way).
+    if (botNative) m.loneHuman = m.order.filter((p) => !p.isBot && !p.left).length === 1;
     readyBefore = -1; // the bot readies its seats itself
     checking = false;
     drive(() => summary != null);
