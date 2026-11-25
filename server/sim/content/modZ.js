@@ -16,7 +16,7 @@ import { gainLayers, unitBonds, bondActive as bondOn } from './support/index.js'
 
 const KEY = 'fishModZ';
 /** Viviana V: the share (per cent) of the player's boss-pool damage Glimmering Touch adds: the base and one more per combo. */
-export const VVANA_V = { base: 10, mly: 20, nearl: 60, deg: 40 };
+export const VVANA_V = { base: 10, mly: 20, nearl: 60, deg: 40, delay: 25, lock: 0.7 };
 const isBursting = (e) => e.buffs.some((b) => typeof b.key === 'string' && b.key.endsWith('Burst'));
 /** ATK above base, as a fraction (0.25 = +25 %). */
 const atkGain = (u) => (u.base.atk > 0 ? Math.max(0, u.s.atk / u.base.atk - 1) : 0);
@@ -509,7 +509,7 @@ const INSTALL = {
   },
 
   // Viviana V (Kazimierz endgame): no Alliance of her own. Glimmering Touch (cooldown 50 s, ready at once): an enemy in the range
-  // of any of her player's [Kazimierz] operators (leaders first) is marked; 25 s later its tile explodes (5x5 diamond), 1500 % ATK
+  // of any of her player's [Kazimierz] operators (leaders first) is marked; 25 s later its tile explodes (5x5 diamond; the aim follows the enemy to its new tile until the last 0.7 s, VVANA_V.lock, and re-picks if it dies), 1500 % ATK
   // Physical plus VVANA_V percent of the damage her player's units dealt to the boss pool meanwhile (the player's own `bossDamage`
   // counter, the explosion's own damage excluded because the baseline is read when it is queued: nothing outside a boss round).
   // Combos need that operator on the field this battle (alive or fallen), Viviana too; they last the whole battle:
@@ -568,8 +568,8 @@ const INSTALL = {
     battle.on('tick', syncCombos, { owner: u });
     battle.on('battleStart', syncCombos, { owner: u });
     let readyAt = 0;
-    battle.on('tick', () => {
-      if (!up(u) || battle.time < readyAt) return;
+    // the enemy in the range of any of her player's Kazimierz operators with the highest gaugeMax
+    const findTarget = () => {
       let pick = null;
       for (const op of mine()) {
         if (!op.alive || !op.deployed || !memberOf(battle, op, 'kazimierzShip')) continue;
@@ -578,15 +578,36 @@ const INSTALL = {
           pick = e;
         }
       }
+      return pick;
+    };
+    const diamondAt = (tx, ty) => {
+      const t = [];
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) t.push([ty + dr, tx + dc]);
+      return t;
+    };
+    // the aim: follows its target (or, when that dies, the best enemy in range) until the last VVANA_V.lock seconds, then stays put
+    let aim = null;
+    const telegraph = () => battle.fx('telegraph', { x: aim.tx, y: aim.ty, r: 2.5, dur: Math.max(0.4, aim.at - battle.time), tiles: diamondAt(aim.tx, aim.ty), id: u.id, skill: 'fishVvanaV', key: `fishVvanaV:${u.id}` });
+    battle.on('tick', () => {
+      if (aim) {
+        if (battle.time >= aim.at - VVANA_V.lock) return;
+        if (!aim.target?.alive) aim.target = findTarget() || aim.target;
+        const t = aim.target;
+        if (!t?.alive) return;
+        const tx = Math.round(t.x), ty = Math.round(t.y);
+        if (tx !== aim.tx || ty !== aim.ty) { aim.tx = tx; aim.ty = ty; telegraph(); }
+        return;
+      }
+      if (!up(u) || battle.time < readyAt) return;
+      const pick = findTarget();
       if (!pick) return;
       readyAt = battle.time + 50;
-      const tx = Math.round(pick.x), ty = Math.round(pick.y);
-      const diamond = [];
-      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) diamond.push([ty + dr, tx + dc]);
-      battle.fx('telegraph', { x: tx, y: ty, r: 2.5, dur: 25, tiles: diamond, id: u.id, skill: 'fishVvanaV' });
+      aim = { target: pick, tx: Math.round(pick.x), ty: Math.round(pick.y), at: battle.time + VVANA_V.delay };
+      telegraph();
       const pp = battle._pp(u.ownerId);
       const base = pp ? pp.bossDamage : 0;
-      battle.after(25, () => {
+      battle.after(VVANA_V.delay, () => {
+        const { tx, ty } = aim; aim = null;
         const share = (VVANA_V.base + (has.mly ? VVANA_V.mly : 0) + (has.nearl ? VVANA_V.nearl : 0) + (has.deg ? VVANA_V.deg : 0)) / 100;
         const recorded = pp ? Math.max(0, pp.bossDamage - base) * share : 0;
         battle.fx('aoe', { x: tx, y: ty, radius: 2, id: u.id, skill: 'fishVvanaV' });

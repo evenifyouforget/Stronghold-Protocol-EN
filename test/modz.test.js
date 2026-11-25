@@ -680,3 +680,21 @@ test('Viviana V in battle: the combos, Glimmering Touch (1500 % ATK + the record
   assert.equal(boom[0].type, 'phys');
   noErrors(b);
 });
+
+test('Viviana V: Glimmering Touch\'s aim follows its target to its new tile (one telegraph key) and locks for the last 0.7 s', () => {
+  const V = 'uniequip_fishv_vvana';
+  const units = [op('char_4098_vvana', V, 1, 9, 4), { chessId: 'chess_char_5_19_b', row: 9, col: 5, dir: 'RIGHT' }];
+  const { h, b, ops: [v] } = rig(units, [{ key: 'enemy_tank', time: 0, count: 1 }], 70);
+  const log = [];
+  const fx = b.fx.bind(b);
+  b.fx = (kind, o) => { if (o?.skill === 'fishVvanaV') log.push({ kind, t: b.time, x: o.x, y: o.y, key: o.key }); return fx(kind, o); };
+  h.run(45);
+  const tel = log.filter((l) => l.kind === 'telegraph'), aoe = log.find((l) => l.kind === 'aoe');
+  assert.ok(tel.length > 1, `the aim moved with the walker (${tel.length} telegraphs)`);
+  assert.ok(tel.every((l) => l.key === tel[0].key && l.key === `fishVvanaV:${v.id}`), 'one key, so the client replaces the tiles');
+  assert.ok(tel.slice(1).every((l, i) => l.x !== tel[i].x || l.y !== tel[i].y), 'a telegraph only when the tile changed');
+  const last = tel[tel.length - 1];
+  assert.ok(last.t <= aoe.t - 0.7 + 1e-6, `the last re-snap (${last.t}) is before the lock (${aoe.t - 0.7})`);
+  assert.deepEqual([aoe.x, aoe.y], [last.x, last.y], 'it explodes where the aim was locked');
+  noErrors(b);
+});
