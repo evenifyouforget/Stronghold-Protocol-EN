@@ -472,6 +472,63 @@ const INSTALL = {
     }, { owner: u });
   },
 
+  // Viviana W: [Durable] + [Agile]; her damage type is Physical; every other [Kazimierz] Operator on the field has as much +ASPD as
+  // she has (all of it: Agile, the S2 steal, items; the copy is not read back); her attacks add 10 % ATK Corrosion; each Corrosion
+  // burst on an enemy takes another 150 DEF for good (no limit) and gives it a stack of Illuminated (10 at most: DEF -5 %,
+  // Physical damage taken +5 % each, for good) [DRAFT: the stacks come only while she is on the field, what is on the enemy stays;
+  // the percentage DEF applies after the flat loss, as Meteor's does (units.js: (base + flat) x (1 + pct))]
+  uniequip_fishw_vvana(battle, u) {
+    if (u.profile) u.profile.dmgType = 'phys';
+    const COPY = `${KEY}:vvanaCopy`, given = new Map();
+    battle.on('tick', () => {
+      const want = up(u) ? Math.max(0, Math.round(u.s.aspd - (u.base.aspd ?? 100))) : 0;
+      for (const a of battle.units) {
+        if (a.kind !== 'op' || a === u || a.ownerId !== u.ownerId) continue;
+        const v = want > 0 && a.alive && a.deployed && memberOf(battle, a, 'kazimierzShip') ? want : 0;
+        if ((given.get(a) ?? 0) === v) continue;
+        given.set(a, v);
+        if (v > 0) battle.addBuff(a, { key: COPY, mods: { aspd: v }, tags: ['module'] });
+        else if (a.findBuff(COPY)) battle.removeBuff(a, COPY);
+      }
+    }, { owner: u });
+    battle.on('hit', (c) => {
+      if (c.source !== u || c.target?.side !== 'enemy' || !c.target.alive || !isMainHit(c.dmg) || c.dmg.tags?.includes('fishVvanaW')) return;
+      battle.dealElementDamage({ source: u, target: c.target, element: 'erosion', amount: u.s.atk * 0.1, tags: ['module', 'fishVvanaW'] });
+    }, { owner: u });
+    const bursts = new WeakMap();
+    battle.on('elementBurst', (c) => {
+      const e = c.target;
+      if (c.element !== 'erosion' || !e || e.side !== 'enemy' || !e.alive || !up(u)) return;
+      const n = (bursts.get(e) ?? 0) + 1;
+      bursts.set(e, n);
+      const k = Math.min(10, n);
+      battle.addBuff(e, { key: `${KEY}:vvanaW`, mods: { defFlat: -150 * n, defPct: -0.05 * k, physTakenMul: powi(1.05, k) }, tags: ['module'] });
+    }, { owner: u });
+  },
+
+  // Rosa W: [Aid] + [Marvel] (and she keeps Assist Operator). Takes Off: while her skill is active, +2 attack targets, ASPD -30,
+  // ATK scale x2, her hits inflict Bind for 5 s and she shoots enemies without Bind first (targeting.js `fishUnboundFirst`);
+  // an enemy that dies in her range gives +5 stacks to her active Alliances, 10 times per battle [DRAFT: the stacks are not
+  // tied to the skill; +5 and not +2 as asked by Fish 2026-11-25: 50 a battle = Siege W's 50 a round]
+  uniequip_fishw_poca(battle, u) {
+    liveBuff(battle, u, `${KEY}:pocaW`, () => skillBusy(u), () => ({ maxTargets: 2, aspd: -30, atkScaleMul: 2 }));
+    u.fishUnboundFirst = () => skillBusy(u);
+    battle.on('hit', (c) => {
+      if (c.source !== u || c.target?.side !== 'enemy' || !c.target.alive || !isMainHit(c.dmg) || !skillBusy(u)) return;
+      battle.applyStatus(c.target, 'bind', { duration: 5, source: u });
+    }, { owner: u });
+    // "in her range" is the engine's own test (an enemy's body covers tiles, so its centre rounded to a tile is not it): the enemies
+    // in range at the last tick, checked when one dies
+    let kills = 0, inRange = new Set();
+    battle.on('tick', () => { inRange = up(u) ? new Set(battle.enemiesInKeys(u.rangeKeys, u, { canHitFly: true })) : new Set(); }, { owner: u });
+    battle.on('death', (c) => {
+      const e = c.unit;
+      if (!e || e.side !== 'enemy' || kills >= 10 || !up(u) || !inRange.has(e)) return;
+      kills++;
+      stackOwn(battle, u, 5);
+    }, { owner: u });
+  },
+
   // ATK from buffs ×2 (units.js fishStatPost); SP from anything but natural recovery ×2; every skill +1 charge; each
   // damage dealt adds 5 % ATK Corrosion — on an enemy at 0 DEF, 5 % ATK Burn and 10 % ATK Arts instead [DRAFT: the
   // starting SP isn't "gained" (not doubled); the riders follow HP damage only, not element damage]

@@ -550,3 +550,67 @@ test('Kal\'tsit Esperanta Z in battle: damage taken x0.5 (Physical and Arts), th
   assert.equal(init(ot), 0, 'and an operator sharing nothing does not');
   noErrors(b);
 });
+
+test('Viviana W: Durable + Agile, Physical; Kazimierz allies copy all her +ASPD (not read back); Corrosion on hit; each Corrosion burst: DEF -150 and Illuminated, for good', () => {
+  const { h, b, rec, ops: [u, k] } = rig([op('char_4098_vvana', 'uniequip_fishw_vvana', 1, 9, 4), { ...op('char_4098_vvana', null, 1, 9, 2) }], [{ key: 'enemy_tank', time: 0, count: 1 }]);
+  assert.deepEqual([...modZOf('uniequip_fishw_vvana').bonds], ['steadShip', 'skillfulShip']);
+  const slot6 = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
+  const vb = diyRecord(slot6, { charId: 'char_4098_vvana', skillIndex: 1, uniEquipId: 'uniequip_fishw_vvana' }, { elite: true, data })?.bonds ?? [];
+  for (const id of ['kazimierzShip', 'steadShip', 'skillfulShip']) assert.ok(vb.includes(id), `${id} among her bonds`);
+  assert.equal(u.dmgType, 'phys', 'Physical');
+  assert.equal(k.dmgType, 'arts', 'the other Viviana (no module) is still Arts');
+  b.addBuff(u, { key: 'test:aspd', mods: { aspd: 40 } });
+  h.run(1);
+  assert.equal(u.s.aspd, 140);
+  assert.equal(k.s.aspd, 140, 'the Kazimierz ally copies her +40');
+  assert.ok(!u.findBuff('fishModZ:vvanaCopy'), 'she gets no copy of her own');
+  b.addBuff(u, { key: 'test:aspd', mods: { aspd: 100 } });
+  h.run(1);
+  assert.equal(k.s.aspd, 200, 'it follows her bonus live');
+  h.run(50);   // the walker reaches her at ~25 s
+  assert.ok(rec.element.some((x) => x.source === u && x.element === 'erosion' && x.tags?.includes('fishVvanaW')), 'Corrosion on hit');
+  assert.ok(!rec.element.some((x) => x.source === k && x.tags?.includes('fishVvanaW')), 'only hers');
+  const e = b.aliveEnemies()[0];
+  let w = e.findBuff('fishModZ:vvanaW');
+  assert.ok(w, 'her own Corrosion has burst on it by now');
+  const n0 = -w.mods.defFlat / 150;
+  assert.ok(Number.isInteger(n0) && n0 >= 1, `DEF -150 per burst (${n0} so far)`);
+  assert.ok(Math.abs(w.mods.defPct + 0.05 * Math.min(10, n0)) < 1e-9 && Math.abs(w.mods.physTakenMul - 1.05 ** Math.min(10, n0)) < 1e-9, 'Illuminated: -5 % DEF, +5 % Physical taken per stack');
+  for (let i = 0; i < 12; i++) b.emit('elementBurst', { target: e, element: 'erosion', source: u });
+  w = e.findBuff('fishModZ:vvanaW');
+  assert.equal(w.mods.defFlat, -150 * (n0 + 12), 'DEF: no limit');
+  assert.ok(Math.abs(w.mods.defPct + 0.5) < 1e-9, 'Illuminated stops at 10 stacks: DEF -50 %');
+  assert.ok(Math.abs(w.mods.physTakenMul - 1.05 ** 10) < 1e-9, 'Physical damage taken +5 % per stack');
+  b.emit('elementBurst', { target: e, element: 'burn', source: u });
+  assert.equal(e.findBuff('fishModZ:vvanaW').mods.defFlat, -150 * (n0 + 12), 'only Corrosion bursts count');
+  b.retreat(u, { dying: true });
+  h.run(1);
+  assert.equal(e.findBuff('fishModZ:vvanaW').mods.defFlat, -150 * (n0 + 12), 'kept after she falls');
+  assert.equal(k.s.aspd, 100, 'the copy ends with her');
+  noErrors(b);
+});
+
+test('Rosa W: Aid + Marvel (keeps Assist Operator); in her skill +2 targets, ASPD -30, ATK scale x2, Bind 5 s, unbound first; +5 stacks per kill in range, 10 times per battle', () => {
+  const al = () => ({ count: 3, active: true, tier: 1, layers: 0 });
+  const bonds = { deputShip: al(), miraShip: al(), kjeragShip: al() };
+  const { h, b, rec, ops: [u] } = rig([op('char_197_poca', 'uniequip_fishw_poca', 1, 9, 4)], [{ key: 'enemy_weak', time: 1, count: 80, interval: 0.5 }], 120, { bonds, flags: { layerGainsEnabled: true } });
+  const slot6 = Object.keys(backups.diy.slots).find((id) => backups.diy.slots[id].tier === 6);
+  const rb = diyRecord(slot6, { charId: 'char_197_poca', skillIndex: 1, uniEquipId: 'uniequip_fishw_poca' }, { elite: true, data })?.bonds ?? [];
+  for (const id of ['deputShip', 'miraShip', 'emptyShip']) assert.ok(rb.includes(id), `${id} among her bonds`);
+  assert.equal(u.fishUnboundFirst(), false, 'not in the skill: her usual order');
+  assert.ok(!u.findBuff('fishModZ:pocaW'));
+  h.runUntil(() => u.skill.active && u.skill.isTimed, 100);
+  h.run(0.5);
+  assert.equal(u.fishUnboundFirst(), true, 'in the skill: enemies without Bind first');
+  const w = u.findBuff('fishModZ:pocaW');
+  assert.deepEqual({ ...w.mods }, { maxTargets: 2, aspd: -30, atkScaleMul: 2 });
+  h.run(15);
+  assert.ok(rec.status.some((x) => x.s === 'bind' && x.o?.source === u && x.o.duration === 5), 'Bind for 5 s');
+  h.run(60);
+  const L = b.getPlayer(u.ownerId).bonds;
+  assert.ok(L.deputShip.layers > 0 && L.deputShip.layers % 5 === 0, `Aid ${L.deputShip.layers}`);
+  assert.ok(L.deputShip.layers <= 50 && L.miraShip.layers <= 50, 'at most 10 x 5');
+  assert.equal(L.miraShip.layers, L.deputShip.layers, 'every Alliance she has');
+  assert.equal(L.kjeragShip.layers, 0, 'only her own Alliances');
+  noErrors(b);
+});
