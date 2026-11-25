@@ -316,6 +316,25 @@ they go to the server with the art upload like any other file under `public/asse
 whose file is on disk whether or not the mirror has it. Review the `data/assets.json` diff before committing: a run
 also adds anything else the plan wants but has never been fetched.
 
+### Lobby voice lines of the animated cards (fork)
+
+The room's animated cards speak official home-screen lines (design/client.md §10 "The cards talk"). Which voice sets
+get them is the committed `tools/assets/lobby-voice.json`, never the disk: the base charId of every illustration in the
+`dynillust` group of `data/local-assets.json` and the word key of every illustrated outfit with its own voice set
+(`data/outfits.json voice`), with the word counts of their join lines (`audio.voiceWords`). After the illustrations
+were re-extracted, rewrite it (the EN gamedata's charword_table gives the English word counts):
+
+```sh
+node tools/assets/lobby-voice.mjs [--en <ArknightsGamedata>/en/gamedata/excel/charword_table.json]
+node tools/assets/lobby-voice.mjs --check     # exit 1 when the committed file is stale
+node tools/fetch-assets.mjs --add-only        # downloads the new lines, every dub, and adds them to data/assets.json
+```
+
+The lines come from the same mirror folders as the battle lines (`voice_cn/`, `voice/`, `voice_en/`, `voice_kr/`,
+`voice_custom/`); English gaps are filled by `voice.py` as above. They sit in the voice packs' folders, so the
+preloader's voice pack and the full release zip carry them with the dub (`shared/resources.js packOf`,
+`tools/package.mjs`).
+
 ### Re-extracting scenes after an update
 
 Scene extraction version **4** removes complete, exact redundant renderers (GitHub #684, DESIGN §34.24).
@@ -524,7 +543,15 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
                            // out (an operator with none has no entry), never an empty array. Only these twelve ever play (DESIGN §21.30): the
                            // prep-only slots 干员报到 / 编入队伍 / 任命队长 are left out of the plan by default —
                            // nothing requests them and they cost 360 files (19.3 MB) per run — and `--voice-all` adds
-                           // them (audio.mjs VOICE_PREP_SLOTS) for the complete official set
+                           // them (audio.mjs VOICE_PREP_SLOTS) for the complete official set.
+                           // (fork) The voice sets of tools/assets/lobby-voice.json — the operators and outfits with an
+                           // animated illustration, 58 + 17 — also carry the lobby lines (audio.mjs LOBBY_VOICE_SLOTS):
+                           // talk (交谈, 8), idle (闲置), greeting (问候), squadFirst (任命队长); public/js/ui/lobbyVoice.js
+                           // plays them in the room (design/client.md §10 "The cards talk")
+    voiceWords?: { [charId or word key]: { squadFirst?: number[], place?: number[], greeting?: number[] } },
+                           // (fork) the official text's word count of each join line, in voiceIndex order (English
+                           // text first, else Chinese; Intl.Segmenter): a join line is cut off after 2 of its words
+                           // when the next player's comes in (tools/assets/lobby-voice.mjs)
     voiceJp: { [charId]: { …the slots of `voice` } },
                            // the Japanese dub (0.2.2, the owner's request 「全套的日配语音」): the same slots, lines and file
                            // names as `voice`, under /assets/audio/voice/jp/ (AA2 `voice/`). The client plays it when the
@@ -963,12 +990,25 @@ The 2026-09-27 verification pass also checked:
 Settings ▸ Preload Assets keeps the assets on the player's disk, so nothing downloads mid-match.
 
 - **Manifest** `/data/resource-manifest.json` (server/resources.js): every file under `public/assets` and `public/fonts` up
-  to 24 MiB as `[path, size, sha1-12]`. Built once per process in the background at boot; hashes are cached by
+  to 24 MiB as `[path, size, sha1-12]`, at most 100 000 of them (shared/resources.js `MAX_MANIFEST_FILES`: the client
+  refuses more, the server warns at boot; the list's size and parsing time are in its comment). (fork) The Live2D cards
+  (`assets/local/dynillust/`, 14 524 files, 616 MB on 2026-11-24) are listed too, as the optional pack `live2d`
+  (shared/resources.js `LIVE2D_PACK`, off by default, last in the download order): a player who never ticks it
+  downloads none of them (their files load when a card shows, as before), and the list stays well under the cap
+  (70 608 of 100 000 files). Settings ▸ Preload Assets shows it as a row of its own with the pack's size and, once
+  files are saved while it is unticked, its own remove button, as the Outfits pack does (`preloadPref.live2d`,
+  stored only while ticked, so a player who preloaded before is not asked for more). Cloudflare caches the files like
+  any other `/assets/` file (SERVER-NOTES "Cloudflare settings", the "game assets" Cache Rule, immutable): the
+  preload fetches `?v=<hash>` URLs, the cards `/assets/~<hash>/…` URLs. The preload zip (`npm run package:preload`)
+  holds no Live2D file (it would pass a zip's 65 535 entries and add 616 MB for every importer);
+  `npm run package:preload -- --live2d` writes `…-preload-live2d.zip` with them, and the same Import zip button takes
+  either. Built once per process in the background at boot; hashes are cached by
   size + mtime in `node_modules/.cache/sp-resource-hashes.json` (cold build ~12 s for 820 MB, warm ~1.5 s). Served
   `no-cache` with an ETag, so clients revalidate with a 304.
 - **Packs** (shared/resources.js `packOf`): `visual` (spine, char, local maps, ui, icons, fonts, ≈400 MB) and `audio` (bgm,
   sfx, guide art, ≈87 MB) are always included; voice packs `cn` / `en` / `jp` / `kr` / `native` (19–90 MB each) are a
-  checklist, pre-ticked from the voice language settings (default + per-operator picks) until the player edits it.
+  checklist, pre-ticked from the voice language settings (default + per-operator picks) until the player edits it;
+  `outfits` (docs/OUTFITS.md) and `live2d` (above) are single optional rows, unticked by default.
 - **Download** (public/js/resources/store.js): one Cache Storage cache, keyed by path; each entry carries the hash of
   its bytes in an `X-SP-Resource` header (no shared index, so the page and the worker never overwrite each other). Files are fetched as `<path>?v=<hash>` (audio through `/media/…`), which files.js marks immutable, so
   Cloudflare caches each version and the VPS sends it once per edge. `cache: 'no-store'` avoids a second copy in the HTTP
