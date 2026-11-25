@@ -1,0 +1,1 @@
+- The room's lobby rules button now reads "Edit lobby rules (SPA-CC tags, cheats, Mod Z, and more)" for the host, and until you have opened the dialog once, a shimmer sweeps across it from left to right besides the glow (#139).
