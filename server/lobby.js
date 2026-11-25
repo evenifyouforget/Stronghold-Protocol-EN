@@ -272,6 +272,10 @@ export { CODE_ALPHABET };
 /** Tunables. */
 export const LOBBY_DEFAULTS = Object.freeze({
   lobbyGraceMs: 60_000,   // disconnected humans keep their lobby seat this long
+  // While the server is closed for maintenance (#193): a human silent this long on a choice screen is removed from the
+  // match, and a match whose humans are all silent this long is ended (0 = off)
+  afkKickMs: 120_000,
+  afkEndMs: 150_000,
   maxRooms: 1000,
   maxRoomsPerAddr: 16,    // rooms created from one client network that may exist at once (0 = unlimited)
   maxMatchesPerAddr: 8,   // matches started from one client network that may run at once (0 = unlimited)
@@ -2615,6 +2619,49 @@ export class Lobby {
   // ---------------------------------------------------------------------------------------------------
   // Match wiring
   // ---------------------------------------------------------------------------------------------------
+
+  /**
+   * GitHub #193: while the server is closed for maintenance, matches nobody plays must not hold up the restart. On a choice
+   * screen a human with no game action for `afkKickMs` is removed (as if they left: the match goes on without them, or
+   * ends when they were the last), and a match whose humans have all been silent for `afkEndMs` is ended. The clock of a
+   * screen starts when it comes up (Match.afkReport), so a battle in between gives everyone a fresh start.
+   * @returns {{ kicked: number, ended: number }}
+   */
+  sweepAfk() {
+    const out = { kicked: 0, ended: 0 };
+    if (!this.closedForMaintenance()) return out;
+    const { afkKickMs, afkEndMs } = this.opts;
+    for (const room of [...this.rooms.values()]) {
+      if (!room.match || room.disposed) continue;
+      let rep = null;
+      try { rep = room.match.afkReport?.() ?? null; } catch (e) { this.log.error(`[lobby] ${room.code} match.afkReport threw`, e); }
+      if (!rep || !rep.humans.length) continue;
+      if (afkEndMs > 0 && rep.humans.every((h) => h.idleMs >= afkEndMs)) {
+        this.log.info(`[lobby] ${room.code} ended: every player silent for ${Math.round(afkEndMs / 1000)} s on ${rep.phase} while the server is closing`);
+        this.disposeRoom(room, 'afk');
+        out.ended++;
+        continue;
+      }
+      if (!(afkKickMs > 0)) continue;
+      for (const h of rep.humans) {
+        if (room.disposed) break;
+        if (h.idleMs < afkKickMs) continue;
+        const seat = room.seatOf(h.playerId);
+        if (!seat || seat.left) continue;
+        const gone = this.registry.byId(h.playerId);
+        const wasHere = !!gone && gone.roomCode === room.code;
+        const replay = this.replayFor(room, h.playerId);
+        this.removeMember(room, h.playerId);
+        if (wasHere) {
+          if (gone.connected) sendSession(gone, { t: 'room.closed', reason: 'afk' });
+          else { gone.notice = 'afk'; gone.pendingResult = replay; }
+        }
+        this.log.info(`[lobby] ${room.code} ${seat.name} removed: silent for ${Math.round(h.idleMs / 1000)} s on ${rep.phase} while the server is closing`);
+        out.kicked++;
+      }
+    }
+    return out;
+  }
 
   /** Planned maintenance closed the server to new matches (scripts/maintenance.mjs --close). */
   closedForMaintenance() {
