@@ -15,6 +15,8 @@ import { hypot, powi } from '../detmath.js';
 import { gainLayers, unitBonds, bondActive as bondOn } from './support/index.js';
 
 const KEY = 'fishModZ';
+/** Viviana V: the share (per cent) of the player's boss-pool damage Glimmering Touch adds: the base and one more per combo. */
+export const VVANA_V = { base: 10, mly: 20, nearl: 60, deg: 40 };
 const isBursting = (e) => e.buffs.some((b) => typeof b.key === 'string' && b.key.endsWith('Burst'));
 /** ATK above base, as a fraction (0.25 = +25 %). */
 const atkGain = (u) => (u.base.atk > 0 ? Math.max(0, u.s.atk / u.base.atk - 1) : 0);
@@ -503,6 +505,97 @@ const INSTALL = {
       bursts.set(e, n);
       const k = Math.min(10, n);
       battle.addBuff(e, { key: `${KEY}:vvanaW`, mods: { defFlat: -150 * n, defPct: -0.05 * k, physTakenMul: powi(1.05, k) }, tags: ['module'] });
+    }, { owner: u });
+  },
+
+  // Viviana V (Kazimierz endgame): no Alliance of her own. Glimmering Touch (cooldown 50 s, ready at once): an enemy in the range
+  // of any of her player's [Kazimierz] operators (leaders first) is marked; 25 s later its tile explodes (5x5 diamond), 1500 % ATK
+  // Physical plus VVANA_V percent of the damage her player's units dealt to the boss pool meanwhile (the player's own `bossDamage`
+  // counter, the explosion's own damage excluded because the baseline is read when it is queued: nothing outside a boss round).
+  // Combos need that operator on the field this battle (alive or fallen), Viviana too; they last the whole battle:
+  //   Mlynar: always full Liberator charge; every [Kazimierz] operator +30 ASPD.   Nearl (the Radiant Knight): she and Viviana
+  //   attack what the other's range covers; every [Kazimierz] operator +30 % max HP.   Degenbrecher: Raid redeploys after 1 s
+  //   (all the player's Raid members), he may land on ranged tiles; every [Kazimierz] operator +30 % ATK.
+  // [DRAFT: the explosion still goes off if she falls meanwhile; the recorded share is computed at detonation; the free Nearl, the
+  // Alliances given to the three and the boss-body landing are match-level pieces (PlayerState), not here]
+  uniequip_fishv_vvana(battle, u) {
+    const MLY = 'char_4064_mlynar', NEARL = 'char_1014_nearl2', DEG = 'char_4116_blkkgt';
+    const charOf = (a) => a.def?.charId ?? a.def?.raw?.charId ?? null;
+    const mine = () => battle.units.filter((a) => a.kind === 'op' && a.ownerId === u.ownerId);
+    const has = {};
+    const BUFF = `${KEY}:vvanaV`, given = new Map();
+    const fieldedRaid = battle.fishRaidIdle ??= new Map();
+    let unionKey = '';
+    const syncCombos = () => {
+      const all = mine();
+      has.mly = all.find((a) => charOf(a) === MLY) ?? null;
+      has.nearl = all.find((a) => charOf(a) === NEARL) ?? null;
+      has.deg = all.find((a) => charOf(a) === DEG) ?? null;
+      const mods = {};
+      if (has.mly) mods.aspd = 30;
+      if (has.nearl) mods.hpPct = 0.3;
+      if (has.deg) mods.atkPct = 0.3;
+      const sig = JSON.stringify(mods);
+      for (const a of all) {
+        const want = a.alive && a.deployed && memberOf(battle, a, 'kazimierzShip') && sig !== '{}' ? sig : '';
+        if ((given.get(a) ?? '') === want) continue;
+        given.set(a, want);
+        if (want) battle.addBuff(a, { key: BUFF, mods, tags: ['module'] });
+        else if (a.findBuff(BUFF)) battle.removeBuff(a, BUFF);
+      }
+      // Mlynar: full charge (the trait's ramp), whenever his skill is not running
+      const m = has.mly;
+      if (m && m.alive && m.deployed && !m.skill?.active && m.trait && 'ramp' in m.trait) {
+        const full = m.profile?.rampMax ?? 2;
+        if (m.trait.ramp < full - 1e-9) { m.trait.ramp = full; battle.addBuff(m, { key: 'trait:libratorRamp', mods: { atkPct: full } }); }
+      }
+      // Raid: 1 s of idleness for all the player's Raid members; Degenbrecher may land on ranged tiles
+      if (has.deg) fieldedRaid.set(u.ownerId, 1); else fieldedRaid.delete(u.ownerId);
+      if (has.deg) has.deg.fishRaidRanged = true;
+      // Nearl and Viviana attack what the other's range covers (the union: each gets the other's own range as extra targets)
+      const a = u, b = has.nearl;
+      if (b && a.alive && a.deployed && b.alive && b.deployed) {
+        const own = (x) => x.rangeKeys.filter((k) => !x.fishUnion?.has(k));
+        const ka = own(a), kb = own(b);
+        const key = `${ka.join()}|${kb.join()}`;
+        if (key !== unionKey) {
+          unionKey = key;
+          a.fishUnion = new Set(kb); b.fishUnion = new Set(ka);
+          battle.setExtraRange(a, kb); battle.setExtraRange(b, ka);
+        }
+      } else if (unionKey) { unionKey = ''; for (const x of [a, b]) if (x?.fishUnion) { x.fishUnion = null; battle.setExtraRange(x, null); } }
+    };
+    battle.on('tick', syncCombos, { owner: u });
+    battle.on('battleStart', syncCombos, { owner: u });
+    let readyAt = 0;
+    battle.on('tick', () => {
+      if (!up(u) || battle.time < readyAt) return;
+      let pick = null;
+      for (const op of mine()) {
+        if (!op.alive || !op.deployed || !memberOf(battle, op, 'kazimierzShip')) continue;
+        for (const e of battle.enemiesInKeys(op.rangeKeys, op, { canHitFly: true })) {
+          if (!e.alive || (pick && (pick.gaugeMax >= e.gaugeMax))) continue;
+          pick = e;
+        }
+      }
+      if (!pick) return;
+      readyAt = battle.time + 50;
+      const tx = Math.round(pick.x), ty = Math.round(pick.y);
+      const diamond = [];
+      for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) if (Math.abs(dr) + Math.abs(dc) <= 2) diamond.push([ty + dr, tx + dc]);
+      battle.fx('telegraph', { x: tx, y: ty, r: 2.5, dur: 25, tiles: diamond, id: u.id, skill: 'fishVvanaV' });
+      const pp = battle._pp(u.ownerId);
+      const base = pp ? pp.bossDamage : 0;
+      battle.after(25, () => {
+        const share = (VVANA_V.base + (has.mly ? VVANA_V.mly : 0) + (has.nearl ? VVANA_V.nearl : 0) + (has.deg ? VVANA_V.deg : 0)) / 100;
+        const recorded = pp ? Math.max(0, pp.bossDamage - base) * share : 0;
+        battle.fx('aoe', { x: tx, y: ty, radius: 2, id: u.id, skill: 'fishVvanaV' });
+        for (const e of battle.aliveEnemies()) {
+          if (Math.abs(Math.round(e.x) - tx) + Math.abs(Math.round(e.y) - ty) > 2) continue;
+          battle.dealDamage({ source: u, target: e, amount: u.s.atk * 15 + recorded, type: 'phys',
+            attackType: 'ADDITION', applyWay: 'NONE', calculation: 'precomputed', tags: ['module', 'fishVvanaV'] });
+        }
+      }, { owner: u });
     }, { owner: u });
   },
 

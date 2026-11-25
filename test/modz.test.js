@@ -614,3 +614,69 @@ test('Rosa W: Aid + Marvel (keeps Assist Operator); in her skill +2 targets, ASP
   assert.equal(L.kjeragShip.layers, 0, 'only her own Alliances');
   noErrors(b);
 });
+
+test('Viviana V in a match: promoting her brings Nearl once; Mlynar, Nearl and Degenbrecher get their Alliances, in any order, kept after she is sold but never granted anew', async () => {
+  const { makeMatch } = await import('./match/harness.js');
+  const T6A = 'chess_char_6_diy1_a', V = 'uniequip_fishv_vvana';
+  const seats = [{ seat: 0, playerId: 'p_0', name: 'P0', isBot: false, connected: true, diy: { [T6A]: { charId: 'char_4098_vvana', skillIndex: 1, uniEquipId: V } } }];
+  const h = makeMatch({ mode: 'solo', seats, seed: 21, lobbyRules: { modZ: [V] } }).start();
+  try {
+    h.toPrep(1);
+    const ps = h.ps('p_0');
+    ps.initDiyStock(new Set());
+    const mly1 = ps.acquireChess('chess_char_5_19_a', { source: 'buy' });
+    assert.deepEqual(mly1.grantedBonds ?? [], [], 'nothing before she is owned as an elite');
+    const viv = ps.acquireChess(T6A, { source: 'buy' });
+    assert.ok(viv);
+    const nearls = () => ps.allChess().filter((p) => ps.gd.chess(p.id)?.charId === 'char_1014_nearl2');
+    assert.equal(nearls().length, 0, 'a normal Viviana brings nothing');
+    assert.equal(ps.promote(viv), true);
+    assert.equal(nearls().length, 1, 'promoted: the Radiant Knight arrives (a 1-star copy)');
+    assert.ok(!ps.gd.isGolden(nearls()[0].id));
+    assert.deepEqual(mly1.grantedBonds, ['steadShip'], 'Mlynar owned before her gets Durable');
+    assert.deepEqual(nearls()[0].grantedBonds, ['swiftShip']);
+    assert.ok(pieceBondsOf(ps, mly1).includes('steadShip') && pieceBondsOf(ps, mly1).includes('kazimierzShip'));
+    const deg = ps.acquireChess('chess_char_6_19_a', { source: 'buy' });
+    assert.deepEqual(deg.grantedBonds, ['raidShip'], 'Degenbrecher bought after her gets Raid');
+    ps.recompute();
+    assert.equal(nearls().length, 1, 'Nearl only once');
+    ps.sell(viv.uid);
+    const mly2 = ps.acquireChess('chess_char_5_19_a', { source: 'buy' });
+    ps.recompute();
+    assert.deepEqual(mly2.grantedBonds ?? [], [], 'after she is sold nothing new is granted');
+    assert.deepEqual(mly1.grantedBonds, ['steadShip'], 'what was granted stays');
+    assert.deepEqual(deg.grantedBonds, ['raidShip']);
+  } finally { h.m.dispose(); }
+});
+function pieceBondsOf(ps, piece) { return ps.gd.chess(piece.id).bonds.concat(piece.grantedBonds ?? []); }
+
+test('Viviana V in battle: the combos, Glimmering Touch (1500 % ATK + the recorded share of the boss damage), Nearl/Viviana range union, Raid 1 s', () => {
+  const V = 'uniequip_fishv_vvana';
+  assert.ok(MODZ_INSTALLED.includes(V));
+  const units = [op('char_4098_vvana', V, 1, 9, 4), { chessId: 'chess_char_5_19_b', row: 9, col: 5, dir: 'RIGHT' },
+    { chessId: 'chess_char_6_17_b', row: 9, col: 6, dir: 'RIGHT' }, { chessId: 'chess_char_6_19_b', row: 9, col: 7, dir: 'RIGHT' },
+    { chessId: 'chess_char_5_19_b', row: 10, col: 5, dir: 'RIGHT' }];
+  const { h, b, rec, ops } = rig(units, [{ key: 'enemy_tank', time: 0, count: 1 }], 70);
+  const [v, mly, nearl, deg] = ops;
+  const BUFF = 'fishModZ:vvanaV';
+  h.run(1);
+  assert.ok(v.findBuff(BUFF) && mly.findBuff(BUFF) && nearl.findBuff(BUFF) && deg.findBuff(BUFF), 'every [Kazimierz] Operator has it');
+  assert.equal(mly.findBuff(BUFF).mods.aspd, 30);
+  assert.equal(mly.findBuff(BUFF).mods.hpPct, 0.3);
+  assert.equal(mly.findBuff(BUFF).mods.atkPct, 0.3);
+  assert.equal(b.fishRaidIdle.get(v.ownerId), 1, 'Raid waits 1 s');
+  assert.equal(deg.fishRaidRanged, true);
+  assert.ok(nearl.extraRangeKeys && v.extraRangeKeys, 'Nearl and Viviana have each other\'s range as extra targets');
+  assert.ok(v.extraRangeKeys.some((k) => nearl.rangeKeys.includes(k)));
+  // the recorded share: 10 + 20 + 60 + 40 = 130 % of the boss damage dealt while the explosion is queued
+  const pp = b._pp(v.ownerId);
+  h.run(10);
+  pp.bossDamage += 10000;   // 10,000 of boss damage during the wait
+  const before = rec.damage.length;
+  h.run(40);
+  const boom = rec.damage.slice(before).filter((d) => d.tags && [...d.tags].includes('fishVvanaV'));
+  assert.ok(boom.length > 0, 'the explosion went off');
+  assert.ok(Math.abs(boom[0].amount - (v.s.atk * 15 + 13000)) < 1, `1500 % ATK + 130 % of 10,000: ${boom[0].amount} vs ${v.s.atk * 15 + 13000}`);
+  assert.equal(boom[0].type, 'phys');
+  noErrors(b);
+});

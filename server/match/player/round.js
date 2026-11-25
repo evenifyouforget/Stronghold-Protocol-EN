@@ -110,6 +110,7 @@ export class PlayerRound {
   }
 
   recompute() {
+    this.applyModVBonds(); // (Fish Edition) Mod V Viviana: the Alliances of Mlynar, Nearl and Degenbrecher
     noteHand(this.m, this); // (GitHub #125) a placement or unequip that filled the hand: Junk 1 can't be awarded
     this.deployMap(); // a change of the deploy field (a boss round's prep) marks the legality stale
     if (this._legalityStale) this._evictIllegal();
