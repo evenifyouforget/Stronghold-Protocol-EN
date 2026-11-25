@@ -395,7 +395,7 @@ export function RulesBar({ room, isHost, busy, onSet }) {
   return html`<div class="room-rules">
     <span class="room-bar__label">${t('自定义房间改动')}<${MicroLabel}>CUSTOM<//></span>
     <${Button} variant="secondary" class=${cx('rules-open', !seen && 'is-new')} onClick=${openDialog}
-      title=${!seen ? t('作弊、盟约调整与风险词条：开局前由创建者设置') : undefined}>${isHost ? t('调整房间规则（SPA-CC标签、作弊、Mod Z等）') : t('查看')}<//>
+      title=${!seen ? t('作弊、盟约调整与风险词条：开局前由创建者设置') : undefined}>${isHost ? t('调整房间规则（SPA-CC标签、作弊、Mod Z等）') : t('查看房间规则')}<//>
     <div class="rules-summary">
       ${on.length ? on.map((k) => html`<span key=${k} class=${cx('rules-chip', `rules-chip--${ruleOf(k).category}`)}>${ruleLabel(k, rules)}</span>`)
         : html`<span class="t-dim">${t('原版规则')}</span>`}
