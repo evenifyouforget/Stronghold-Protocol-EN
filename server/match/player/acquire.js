@@ -13,6 +13,10 @@ import { noteGained } from '../autoAward.js';
 import { pieceBonds } from '../bondsMeta.js';
 import { modZOf } from '../../../shared/modZ.js';
 
+/** (Fish Edition) Mod V Viviana: the free Nearl (1-star) and the Alliance each of the three is granted. */
+const MODV_NEARL = 'chess_char_6_17_a';
+const MODV_BONDS = { char_4064_mlynar: 'steadShip', char_1014_nearl2: 'swiftShip', char_4116_blkkgt: 'raidShip' };
+
 export class PlayerAcquire {
   /** Normal copies of a base chess currently owned (board/hand/temp). */
   countCopies(baseId) {
@@ -140,6 +144,12 @@ export class PlayerAcquire {
   grantModZBonds(piece) {
     const rec = piece && piece.kind === 'chess' ? this.gd.chess(piece.id) : null;
     const z = rec && rec.module && rec.module.active ? modZOf(rec.module.id) : null;
+    // (Fish Edition) Mod V Viviana: an elite obtained, merged or promoted with it brings the Radiant Knight Nearl, once a match
+    // (a 1-star copy outside the shared pool); the Alliances for the three come in applyModVBonds
+    if (z && z.kind === 'V' && !this.modVNearl) {
+      this.modVNearl = true;
+      this.acquireChess(MODV_NEARL, { source: 'module', fromPool: false });
+    }
     if (!z || !(z.grants > 0)) return;
     piece.grantedBonds = [];
     this.recompute();
@@ -151,6 +161,22 @@ export class PlayerAcquire {
       .slice(0, z.grants).map(([id]) => id);
     piece.grantedBonds = pick;
     this.recompute();
+  }
+
+  /**
+   * (Fish Edition) Mod V Viviana: while this player owns an elite Viviana with the module (board, hand or bench), each copy of
+   * Mlynar, Nearl the Radiant Knight and Degenbrecher it owns is granted its Alliance (`piece.grantedBonds`, read by pieceBonds):
+   * whoever came first. A granted piece keeps it when she is sold; nothing new is granted after that. Called by recompute.
+   */
+  applyModVBonds() {
+    const chess = this.allChess();
+    if (!chess.some((p) => modZOf(this.gd.chess(p.id)?.module?.active ? this.gd.chess(p.id).module.id : null)?.kind === 'V')) return;
+    for (const p of chess) {
+      const bond = MODV_BONDS[this.gd.chess(p.id)?.charId];
+      if (!bond) continue;
+      if (!Array.isArray(p.grantedBonds)) p.grantedBonds = [];
+      if (!p.grantedBonds.includes(bond)) p.grantedBonds.push(bond);
+    }
   }
 
   /** Promote a normal chess piece to its elite in place (升华, 博士投影). Takes extra pool copies when available. */
