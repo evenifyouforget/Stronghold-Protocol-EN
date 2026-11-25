@@ -758,16 +758,18 @@
 .rules-badge--seeded { border: 1px solid var(--gold-2); color: var(--gold-2); text-transform: none; }
 .rules-open { flex: none; }
 /* GitHub #139: until this browser has opened the rules once, the button glows (ui/lobbyRules.js RULES_SEEN_PREF) */
-.rules-open.is-new { position: relative; overflow: hidden; animation: rules-new-glow 2.4s var(--ease-out) infinite; border-color: var(--mint-500); }
-/* #139: a shimmer also sweeps across it, left to right, until the dialog has been opened once */
-.rules-open.is-new::after { content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-100%);
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .3) 50%, transparent 70%); animation: rules-new-shimmer 2.8s ease-in-out infinite; }
-@keyframes rules-new-shimmer { 0%, 30% { transform: translateX(-100%); } 80%, 100% { transform: translateX(100%); } }
+.rules-open.is-new { animation: rules-new-glow 2.4s var(--ease-out) infinite; border-color: var(--mint-500); }
 @keyframes rules-new-glow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(78, 216, 175, 0); }
   50% { box-shadow: 0 0 .16rem .03rem rgba(78, 216, 175, .65); }
 }
-@media (prefers-reduced-motion: reduce) { .rules-open.is-new::after { animation: none; display: none; } .rules-open.is-new { animation: none; box-shadow: 0 0 .1rem .02rem rgba(78, 216, 175, .65); } }
+@media (prefers-reduced-motion: reduce) { .rules-open.is-new { animation: none; box-shadow: 0 0 .1rem .02rem rgba(78, 216, 175, .65); } }
+/* #139: a shimmer also sweeps across it, left to right, until the dialog has been opened once (none with reduced motion) */
+.rules-open.is-new { position: relative; overflow: hidden; }
+.rules-open.is-new::after { content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .3) 50%, transparent 70%); animation: rules-new-shimmer 2.8s ease-in-out infinite; }
+@keyframes rules-new-shimmer { 0%, 30% { transform: translateX(-100%); } 80%, 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .rules-open.is-new::after { animation: none; display: none; } }
 .room-rules .rules-summary { order: 0; }
 
 .rules-dialog .rules-note { margin: 0 0 .12rem; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
