@@ -554,7 +554,11 @@ export class MatchBoss {
     if (runner.ticks % 30 === 0) this.flush();
   }
 
-  _finalDone(runner, hidden) { this._finishFinal(hidden, (f) => runner.resultOf(f)); }
+  _finalDone(runner, hidden) {
+    // (fork, #192) how long the Final Assault fight ran, in game seconds (the Hidden Core's does not replace it): the result's `bossSeconds`
+    if (!hidden) this.finalAssaultSec = Math.round(runner.time * 10) / 10;
+    this._finishFinal(hidden, (f) => runner.resultOf(f));
+  }
 
   /** Every boss field is over: stats, bounties, then the Hidden Core or RESULT. */
   _finishFinal(hidden, resultOf) {

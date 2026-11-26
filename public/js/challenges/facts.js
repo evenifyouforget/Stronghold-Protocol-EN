@@ -9,6 +9,7 @@
 //   cheats, risk, seeded, tags   from the lobby rules: any cheat rule, the Risk total, a fixed stage / bans, { ccKey: level }
 //   rounds, hiddenCleared        rounds passed, the hidden core cleared
 //   durationMin    match length in minutes (null unknown)
+//   bossSeconds    the Final Assault fight's length in game seconds (null: not recorded / not fought)
 //   nobodyOut      every player was still alive at the end (null unknown)
 //   lpLost, perfectRounds        the player's own counters (null unknown)
 //   stats          { dmgDealt, kills, leaks, gold (funds spent), refreshes, merges, itemsEquipped, bossDamage, activatedLayers }
@@ -52,6 +53,7 @@ export function factsFromClientRecord(rec) {
     ...ruleFacts(rec.rules),
     rounds: Number.isFinite(me.roundsPassed) ? me.roundsPassed : rec.roundsPassed ?? 0,
     hiddenCleared: !!rec.hiddenCleared,
+    bossSeconds: Number.isFinite(rec.bossSeconds) ? rec.bossSeconds : null,
     durationMin: Number.isFinite(rec.durationMs) && rec.durationMs > 0 ? rec.durationMs / 60000 : null,
     nobodyOut: rec.players.every((p) => p.alive !== false),
     lpLost: num(st.lpLost), perfectRounds: num(st.perfectRounds),

@@ -8,7 +8,7 @@
 // `kind`: 'setting' = something the player chooses before the match (difficulty, players, rules), 'performance' = something
 // the match has to produce (stacks, funds, kills). The ratings prior treats them differently (tools/challenge-prior.mjs).
 // `group` + `key`: what may not be combined (conflicts below). `needsPrior: false` = no source for a rating yet, so the
-// generator must not offer it (the boss fight's duration is not recorded; match length is not in the server records).
+// generator must not offer it (the boss fight's duration is recorded since #192 P6 (result.bossSeconds) but there are no matches yet to rate it from; match length is not in the server records).
 
 import { RULES } from '../../../shared/rules.js';
 
@@ -54,7 +54,7 @@ export const CONDITIONS = [
   inst('custom>=1', 'lineup', 'performance', 1, (f) => ge(f.custom, 1), { key: 'lineup:custom' }),
   // no source for a rating yet (needsPrior false): kept so the catalog is the whole list of what is planned
   ...[20, 30, 45, 60].map((n) => inst(`minutes<=${n}`, 'time', 'performance', n, (f) => (f.durationMin == null ? null : f.durationMin <= n), { key: 'minutes', needsPrior: false })),
-  ...[30, 60, 120].map((n) => inst(`bossSeconds<=${n}`, 'time', 'performance', n, () => null, { key: 'bossSeconds', needsPrior: false })),
+  ...[30, 60, 120].map((n) => inst(`bossSeconds<=${n}`, 'time', 'performance', n, (f) => (f.bossSeconds == null ? null : f.bossSeconds <= n), { key: 'bossSeconds', needsPrior: false })),
 ];
 
 export const ALL = [...OUTCOMES, ...CONDITIONS];

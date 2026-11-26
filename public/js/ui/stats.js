@@ -293,6 +293,7 @@ export function normalizeRecord(raw) {
     hiddenBossId: str(r.hiddenBossId),
     seed: num(r.seed),
     durationMs: num(r.durationMs),
+    ...(Number.isFinite(r.bossSeconds) && r.bossSeconds >= 0 && r.bossSeconds <= 36000 ? { bossSeconds: r.bossSeconds } : {}),
     teamLp: num(r.teamLp),
     roomMode: r.roomMode === 'solo' || r.roomMode === 'coop' ? r.roomMode : null,
     selfId: str(r.selfId),
@@ -717,6 +718,7 @@ export function recordToResult(rec) {
     hiddenBossId: r.hiddenBossId,
     seed: r.seed,
     durationMs: r.durationMs,
+    ...(Number.isFinite(r.bossSeconds) ? { bossSeconds: r.bossSeconds } : {}),
     teamLp: r.teamLp,
     players: r.players,
   };

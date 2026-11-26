@@ -22,7 +22,9 @@ test('conditions check the facts, and unknown is not failed', () => {
   assert.equal(BY_ID.get('leaks<=5').test(f), true);
   assert.equal(check([BY_ID.get('win'), BY_ID.get('noLpLost')], facts({ lpLost: null })), null);
   assert.equal(check([BY_ID.get('win'), BY_ID.get('risk>=15')], f), false);
-  assert.equal(BY_ID.get('bossSeconds<=60').test(f), null);
+  assert.equal(BY_ID.get('bossSeconds<=60').test(f), null, 'not recorded: unknown, never failed');
+  assert.equal(BY_ID.get('bossSeconds<=60').test({ ...f, bossSeconds: 45.5 }), true);
+  assert.equal(BY_ID.get('bossSeconds<=30').test({ ...f, bossSeconds: 45.5 }), false);
 });
 
 test('compatibility', () => {

@@ -225,6 +225,8 @@ export function buildResult(m, outcome) {
     hiddenBossId: m.hiddenBossId,
     seed: m.seed,
     durationMs: Math.max(0, m.sched.now() - m.startedAt),
+    // (fork, #192) only when the Final Assault was fought, so every other payload keeps its shape
+    ...(Number.isFinite(m.finalAssaultSec) ? { bossSeconds: m.finalAssaultSec } : {}),
     players: rows,
   };
   // A test match is marked on the settlement the replay stores. The keys are absent otherwise, so a normal
