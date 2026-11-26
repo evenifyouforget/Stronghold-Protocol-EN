@@ -52,3 +52,30 @@ test('reset clears everything and takes a new seed', () => {
   const s = ensure(reset(7), [], prior);
   assert.equal(s.level, 0); assert.equal(s.done.length, 0); assert.notDeepEqual(parts(s), parts(first()));
 });
+
+import { complete } from '../public/js/challenges/state.js';
+import { BY_ID } from '../public/js/challenges/catalog.js';
+
+const stateWith = (cards) => ({ ...defaultState(5), open: cards.map((parts, i) => ({ id: `c${i}`, parts, rating: 1, points: 10 * (i + 1), frozen: i === 1 })) });
+const won = { win: true, difficulty: 4, humans: 1, bots: 0, solo: true, cheats: false, risk: 8, seeded: false, tags: {}, rounds: 15, hiddenCleared: false, durationMin: 40, nobodyOut: true, lpLost: 0, perfectRounds: 5, stats: { kills: 320, gold: 250, leaks: 3 }, layers: { yanShip: 320 }, active: ['yanShip'], golden: 0, custom: 0 };
+
+test('complete: a card whose parts all hold is spent, paid, listed, replaced by an unfrozen card; the others stay as they are', () => {
+  const s = stateWith([['win', 'risk>=6'], ['win', 'risk>=15'], ['win', 'bond:yanShip>=300']]); // 0 and 2 hold; 1 (frozen) does not
+  const r = complete(s, won, [], prior, 1000);
+  assert.deepEqual(r.completed.map((c) => c.index), [0, 2]);
+  assert.equal(r.points, 10 + 30);
+  assert.deepEqual(r.state.open[1], s.open[1], 'the card that did not hold is untouched, its freeze too');
+  for (const i of [0, 2]) { assert.notEqual(r.state.open[i].id, s.open[i].id); assert.equal(r.state.open[i].frozen, false); assert.ok(r.state.open[i].parts.every((id) => BY_ID.has(id))); }
+  assert.deepEqual(r.state.done.map((d) => [d.at, d.pts]), [[1000, 10], [1000, 30]]);
+  assert.equal(new Set(r.state.open.flatMap((c) => c.parts.slice(1).map((id) => BY_ID.get(id).key))).size, r.state.open.flatMap((c) => c.parts.slice(1)).length, 'no key repeated');
+});
+
+test('complete: nothing holds, an unknown part, or switched off = no change; a lost match completes nothing', () => {
+  const s = stateWith([['win', 'risk>=15'], ['win', 'bondsActive>=9'], ['win', 'bond:yanShip>=800']]);
+  assert.equal(complete(s, won, [], prior).state, s);
+  assert.equal(complete(s, { ...won, win: false }, [], prior).completed.length, 0);
+  assert.equal(complete({ ...s, enabled: false }, won, [], prior).state.enabled, false);
+  assert.equal(complete(s, null, [], prior).completed.length, 0);
+  const unknown = complete(stateWith([['win', 'noLpLost'], ['win'], ['win']]), { ...won, lpLost: null }, [], prior);
+  assert.deepEqual(unknown.completed.map((c) => c.index), [1, 2], 'an unknown condition is neither completed nor failed');
+});

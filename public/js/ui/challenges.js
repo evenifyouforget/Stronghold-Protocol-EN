@@ -9,7 +9,10 @@ import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { html, Modal, Button, Icon, confirmDialog } from './components.js';
 import { t } from '../../../shared/i18n.js';
 import { loadChallenges, saveChallenges, localHistory } from '../challenges/persist.js';
-import { ensure, reroll, easier, harder, toggleFreeze, setEnabled, setShowPopup, reset } from '../challenges/state.js';
+import { ensure, reroll, easier, harder, toggleFreeze, setEnabled, setShowPopup, reset, complete } from '../challenges/state.js';
+import { factsFromClientRecord } from '../challenges/facts.js';
+import { setChallengePts } from './stats.js';
+import { toast } from './toasts.js';
 import { describeCard } from '../challenges/texts.js';
 import { ability } from '../challenges/model.js';
 import { useLang } from './lang.js';
@@ -41,6 +44,34 @@ export const challengeActions = {
   popup: (on) => put(setShowPopup(get(), on)),
   reset: () => { history = null; put(reset(((Date.now() / 1000) | 0) || 1)); },
 };
+/**
+ * A match has just been recorded (main.js, right after ui/stats.js recordResult stored it): checks the open cards against it, writes
+ * the points into that record (so the LV recomputed from the records counts them), spends the completed cards and draws their
+ * replacements, and, when the pop-up is on, says what was done. Never throws: a failure here must not touch the result screen.
+ * @param {any} rec the record just stored (ui/stats.js buildRecord shape)
+ */
+export async function completeFor(rec) {
+  try {
+    const s0 = get();
+    if (!s0.enabled || !rec) return null;
+    const facts = factsFromClientRecord(rec);
+    if (!facts) return null;
+    const p = await loadPrior();
+    const hist = freshHistory();
+    const r = complete(get(), facts, hist, p);
+    if (!r.completed.length) return null;
+    setChallengePts(rec.id, r.points);
+    put(r.state);
+    if (get().showPopup) {
+      for (const c of r.completed) toast(t('挑战完成：{text}（+{n}）', { text: describeCard({ parts: c.parts }, undefined).title, n: c.points }), 'success');
+    }
+    return r;
+  } catch (e) {
+    console.warn('[challenges] completion check failed', e);
+    return null;
+  }
+}
+
 export function useChallenges() {
   const [, tick] = useState(0);
   useEffect(() => { const f = () => tick((n) => n + 1); subs.add(f); return () => { subs.delete(f); }; }, []);

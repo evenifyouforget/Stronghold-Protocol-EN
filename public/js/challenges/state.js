@@ -7,7 +7,7 @@
 //   card = { id, parts: [instance id], rating, points, frozen }.   rolls counts the regenerations, so every one draws fresh.
 
 import { generatePanel, SLOTS } from './generate.js';
-import { BY_ID } from './catalog.js';
+import { BY_ID, check } from './catalog.js';
 
 export const STATE_VERSION = 1;
 export const MAX_LEVEL = 6; // Easier / Harder presses either way (beyond it the generator would only repeat the extremes)
@@ -62,3 +62,27 @@ export const setEnabled = (state, enabled) => ({ ...state, enabled: !!enabled })
 export const setShowPopup = (state, showPopup) => ({ ...state, showPopup: !!showPopup });
 /** B12: everything this system stored goes (the seed is new, so the panel is not the same one again). */
 export const reset = (seed) => defaultState(seed);
+
+/**
+ * A finished match against the open cards: every card all of whose parts hold is completed (true, never "unknown"), earns its
+ * points, goes into `done` and is replaced by a new card (an unfrozen one: a completed freeze is spent). The other cards stay as they
+ * are, frozen or not. `history` should already hold this match (the model then sees it). Pure; `facts` is facts.js of the match.
+ * @returns {{ state: any, completed: { index: number, parts: string[], points: number }[], points: number }}
+ */
+export function complete(state, facts, history, prior, now = Date.now()) {
+  if (!state.enabled || !facts) return { state, completed: [], points: 0 };
+  const completed = [];
+  state.open.forEach((c, index) => {
+    if (c && check(c.parts.map((id) => BY_ID.get(id)), facts) === true) completed.push({ index, parts: c.parts, points: c.points });
+  });
+  if (!completed.length) return { state, completed, points: 0 };
+  const points = completed.reduce((n, c) => n + c.points, 0);
+  const gone = new Set(completed.map((c) => c.index));
+  // the cards that stay are held (frozen) for the draw, so only the completed slots get new cards; their own flags come back after
+  const held = state.open.map((c, i) => (c && !gone.has(i) ? { ...c, frozen: true } : null));
+  const rolls = state.rolls + 1;
+  const panel = generatePanel({ prior, history, level: state.level, frozen: held, seed: (state.seed + rolls * 7919) >>> 0 || 1 });
+  const open = panel.cards.map((card, i) => (gone.has(i) ? { id: card.id, parts: card.parts, rating: card.rating, points: card.points, frozen: false } : state.open[i]));
+  const done = [...state.done, ...completed.map((c) => ({ at: now, pts: c.points, parts: c.parts }))].slice(-MAX_DONE);
+  return { state: { ...state, rolls, open, done }, completed, points };
+}
