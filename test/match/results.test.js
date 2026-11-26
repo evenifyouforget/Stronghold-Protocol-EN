@@ -61,6 +61,7 @@ test('m.result rows: lineup, bonds, stats, roundsPassed per player, trophies (co
   assert.equal(rows.p_0.reward, Math.round(20 * 1.7 * 1.25), 'reward = base[rounds] × difficulty × mode');
   assert.equal(r.modeId, 'mode_multi_hard');
   assert.ok(Number.isFinite(r.durationMs));
+  assert.equal('bossSeconds' in r, false, 'no Final Assault fought: the key is absent');
   m.dispose();
 });
 
@@ -72,6 +73,7 @@ test('Final Assault: the result LP are the alive players\' shares of the merged 
   assert.equal(h.m.teamLp, 0);
   assert.equal(end.reason, 'defeat');
   assert.equal(end.teamLp, 0);
+  assert.ok(Number.isFinite(end.bossSeconds) && end.bossSeconds > 0, '#192: the Final Assault fight\'s length (game seconds) is in the result');
   for (const p of end.players) {
     assert.equal(p.alive, true);
     assert.equal(p.roundsPassed, 13);
