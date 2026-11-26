@@ -50,8 +50,8 @@ export function makeAnyCustom(pool, r) {
   if (!rest.length) return null;
   return resolve(anyCustomId([a, b, rest[Math.floor(r() * rest.length)]]));
 }
-/** The points of a challenge (the prior rating, not the personal one: playing badly on purpose cannot raise it). Scale is for P5 to settle. */
-export const pointsOf = (rating) => Math.max(1, Math.round(rating * 5));
+/** The points of a challenge (the prior rating, not the personal one: playing badly on purpose cannot raise it). Scale (Fish, 2026-11-27): 100 to 400, about a won match's worth (100 to 450); steps of 10. */
+export const pointsOf = (rating) => Math.min(400, Math.max(100, Math.round((rating * 130) / 10) * 10));
 const isWinOutcome = (p) => p.id === 'win' || p.id === 'winHidden';
 
 /** One challenge near `target` (±tol), avoiding keys in `taken` (what the other cards hold). */
