@@ -12,7 +12,7 @@
 // The ratings are a PRIOR derived from human matches (tools/challenge-prior.mjs); this model only shifts them by θ. Whether the sum of
 // ratings predicts a conjunction well is checked offline (docs: the calibration report); the novelty weighting is a design choice, not a result.
 
-import { ALL, OUTCOMES, STACK_BONDS } from './catalog.js';
+import { ALL, STACK_BONDS } from './catalog.js';
 import { RULES } from '../../../shared/rules.js';
 
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
