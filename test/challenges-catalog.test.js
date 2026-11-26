@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ALL, BY_ID, compatible, check } from '../public/js/challenges/catalog.js';
+import { ALL, BY_ID, compatible, check, resolve, anyCustomId } from '../public/js/challenges/catalog.js';
 import { factsFromClientRecord } from '../public/js/challenges/facts.js';
 
 const prior = JSON.parse(fs.readFileSync(new URL('../public/js/challenges/prior.json', import.meta.url), 'utf8'));
@@ -42,4 +42,18 @@ test('facts from a client record; a quit record has none', () => {
   const f = factsFromClientRecord(rec);
   assert.equal(f.win, true); assert.equal(f.difficulty, 4); assert.equal(f.solo, true); assert.equal(f.layers.yanShip, 310); assert.equal(f.durationMin, 30); assert.equal(f.golden, 1);
   assert.equal(factsFromClientRecord({ ...rec, end: 'quit' }), null);
+});
+
+import { normalizeRecord } from '../public/js/ui/stats.js';
+
+test('#192 any-custom: the facts hold the custom operators fielded at ANY point (server customSeen) plus the final board', () => {
+  const base = { v: 1, t: 1, id: 'x', end: 'settled', victory: true, selfId: 'p1', roundsPassed: 15, players: [{ playerId: 'p1', victory: true, roundsPassed: 15, stats: {},
+    lineup: [{ id: 'chess_char_5_diy1_a', diy: { charId: 'char_a', skillIndex: 0 } }], customSeen: ['char_4132_ascln', 'char_a', 'bad id'] }] };
+  const rec = normalizeRecord(base);
+  assert.deepEqual(rec.players[0].customSeen, ['char_4132_ascln', 'char_a'], 'only charId-shaped strings are kept');
+  assert.deepEqual(factsFromClientRecord(rec).customIds.sort(), ['char_4132_ascln', 'char_a']);
+  const c = resolve(anyCustomId(['char_4132_ascln', 'char_y', 'char_z']));
+  assert.equal(c.test(factsFromClientRecord(rec)), true, 'Ascalon farmed stacks and left before the boss: it still counts');
+  const old = normalizeRecord({ ...base, players: [{ ...base.players[0], customSeen: undefined, lineup: [] }] });
+  assert.equal(factsFromClientRecord(old).customIds, null, 'no lineup and no customSeen: unknown');
 });

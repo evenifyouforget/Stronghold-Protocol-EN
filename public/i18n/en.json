@@ -3114,5 +3114,5 @@
   "使用自选干员": "Use a Custom Squad Operator",
   "挑战完成 +{n}": "Challenges completed +{n}",
   "挑战完成：{text}（+{n}）": "Challenge complete: {text} (+{n} {n|pt|pts})",
-  "上场其中一名自选干员：{names}": "Field one of these Custom Squad Operators: {names}"
+  "在对局中使用其中一名自选干员：{names}": "Use one of these Custom Squad Operators in the match: {names}"
 }

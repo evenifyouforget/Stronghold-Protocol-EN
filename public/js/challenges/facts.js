@@ -15,7 +15,7 @@
 //   stats          { dmgDealt, kills, leaks, gold (funds spent), refreshes, merges, itemsEquipped, bossDamage, activatedLayers }
 //   band           strategy id
 //   layers         { bondId: layers } at the end (null when the record kept no bonds); active: [bondId]
-//   customIds      charIds of the custom operators on the final board (null unknown)
+//   customIds      charIds of the custom operators fielded at any point of the match (null unknown)
 //   golden, custom elite operators / custom (自选) operators on the final board (null unknown)
 
 import { normalizeRules, ruleLabels } from '../../../shared/rules.js';
@@ -63,6 +63,8 @@ export function factsFromClientRecord(rec) {
     layers, active,
     golden: lineup ? lineup.filter((u) => u.golden).length : null,
     custom: lineup ? lineup.filter((u) => u.diy).length : null,
-    customIds: lineup ? lineup.filter((u) => u.diy?.charId).map((u) => u.diy.charId) : null,
+    // the custom operators fielded at ANY point of the match (Fish, 2026-11-27: Ascalon farms stacks and leaves for the boss): the server's
+    // `customSeen` plus the final board; null when neither is known
+    customIds: lineup || me.customSeen ? [...new Set([...(me.customSeen ?? []), ...(lineup ? lineup.filter((u) => u.diy?.charId).map((u) => u.diy.charId) : [])])] : null,
   };
 }

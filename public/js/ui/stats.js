@@ -154,6 +154,11 @@ const str = (v, max = 64) => (typeof v === 'string' && v.length ? v.slice(0, max
 // selfRowOf then read player 1's row as theirs (wrong win / loss and stats on the stats page)
 const MAX_PLAYERS = LARGE_ROOM_SEATS;
 const MAX_LINEUP = 12;
+/** (fork, #192) the charIds of the custom operators a player fielded in any battle (server result `customSeen`), or null. */
+const customSeenOf = (p) => {
+  const a = (Array.isArray(p.customSeen) ? p.customSeen : []).filter((x) => typeof x === 'string' && /^char_[0-9a-z_]{1,40}$/.test(x)).slice(0, 24);
+  return a.length ? a : null;
+};
 const MAX_ITEMS = 4;
 const MAX_BONDS = 24;
 const MAX_STAT_KEYS = 24;
@@ -255,6 +260,7 @@ function normalizePlayerRow(raw, quit = false) {
     trophies: int(p.trophies, 0),
     reward: int(p.reward, 0),
     lineup,
+    ...(customSeenOf(p) ? { customSeen: customSeenOf(p) } : {}),
     bonds,
     ...(Array.isArray(p.usedBondIds) ? { usedBondIds: usedBondIdsOf(p) } : {}),
     stats: normalizeStatBlock(p.stats),
@@ -445,6 +451,7 @@ export function compactRecord(rec) {
     trophies: self.trophies,
     reward: self.reward,
     ...(usedBondIds.length ? { usedBondIds } : {}),
+    ...(self.customSeen ? { customSeen: self.customSeen } : {}),
     ...(self.creditedKills != null ? { creditedKills: self.creditedKills } : {}),
   }] : [];
   return out;

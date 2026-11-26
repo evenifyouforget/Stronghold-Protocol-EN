@@ -55,7 +55,7 @@ export function describe(id, lang) {
     }
   }
   if (c.key === 'lineup:golden') return t('至少 {n} 名精英干员上场', { n });
-  if (c.key === 'lineup:anyCustom') return t('上场其中一名自选干员：{names}', { names: c.param.map(opName).join(' / ') });
+  if (c.key === 'lineup:anyCustom') return t('在对局中使用其中一名自选干员：{names}', { names: c.param.map(opName).join(' / ') });
   if (c.key === 'lineup:custom') return t('使用自选干员');
   return null;
 }
