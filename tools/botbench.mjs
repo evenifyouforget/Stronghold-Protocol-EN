@@ -18,6 +18,8 @@
 //               profileFromData; the tactics: botTacticsBasic.js, botTacticsLegacy.js)
 //   --layers   include per-bond layer events, their nested sources, spending and prep/settlement snapshots in JSON;
 //              diagnostic only (timings include tracing overhead). No gameplay or RNG changes.
+//   --records D every match is also saved in D as a replayable record, <config>-<seed>.json.gz (the match's own recorder,
+//               server/match/records.js: the same shape a human room leaves; reuse them for analysis and training)
 //   --jobs N    run the matches in N worker threads (outcomes are identical; the timings are then inflated by the
 //               parallel load — measure decision time with --jobs 1)
 //   --rules R   lobby rules for every match, as key=value pairs (shared/rules.js RULES; e.g. ccPatriot=1,ccBoss=2;
@@ -46,7 +48,9 @@ import { parseScenario, applyScenario } from './scenario.mjs';
 import { toolVersion } from './versions/runtime.mjs';
 import { DEFAULT_VERSION } from '../shared/versions.js';
 import { performance } from 'node:perf_hooks';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { installRecorder, finishRecord } from '../server/match/records.js';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { traceLayers } from './ai/layer-trace.mjs';
 import { runMatch, strategyMetrics, aggregateStrategies } from './ai/run-match.mjs';
@@ -98,6 +102,8 @@ const profile = opt.profile ? profileFromData(JSON.parse(readFileSync(String(opt
 if (profile && opt.bot) throw new Error('--bot and --profile: give one');
 const scenarioRaw = opt.scenario ? JSON.parse(readFileSync(String(opt.scenario), 'utf8')) : null;
 const scenario = scenarioRaw ? parseScenario(scenarioRaw) : null;
+const recordsDir = opt.records && opt.records !== true ? String(opt.records) : null;
+if (recordsDir && isMainThread) mkdirSync(recordsDir, { recursive: true });
 const rehearsal = opt.rehearsal != null && opt.rehearsal !== true ? Math.max(0, Math.floor(Number(opt.rehearsal) || 0)) : undefined;
 
 async function runOne(cfg, seed) {
@@ -114,6 +120,7 @@ async function runOne(cfg, seed) {
   });
   // Test-only band forcing overrides the selected picker, preserving real band metadata for custom strategies.
   if (opt.band && cfg.mode === 'solo') m.bot = defineBotStrategy({ id: m.bot.id, base: m.bot, pickBand: () => String(opt.band) });
+  if (recordsDir) installRecorder(m);
   const rec = { config: cfg.name, botStrategy: m.bot.id, seed, stageId: m.stageId, bossId: m.bossId, preps: [], economy: [], picks: [], rounds: [], bounties: [] };
   if (scenario) { parseScenario(scenarioRaw, m.gd); rec.scenario = { id: scenario.id, given: applyScenario(m, scenario) }; }
   if (toolVersion !== DEFAULT_VERSION) rec.version = toolVersion;
@@ -233,6 +240,10 @@ async function runOne(cfg, seed) {
   const alive = m.order.filter((p) => p.alive);
   rec.lpLeft = rec.victory && m.teamLp != null ? m.teamLp : alive.reduce((s, p) => s + Math.max(0, p.lpAtFinal ?? p.lp), 0);
   rec.players = (summary && summary.players ? summary.players : []).map((p) => ({ pid: p.playerId, band: p.bandId, rounds: p.roundsPassed, merges: p.stats.merges, spent: p.stats.gold }));
+  if (recordsDir && summary) {
+    const full = finishRecord(m, summary);
+    if (full) writeFileSync(`${recordsDir}/${rec.botStrategy}-${cfg.name.replace(/[^A-Za-z0-9_.-]/g, "_")}-${seed}.json.gz`, gzipSync(JSON.stringify(full)));
+  }
   m.dispose();
   return rec;
 }
