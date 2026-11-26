@@ -7,6 +7,7 @@
 
 import { OUTCOMES, CONDITIONS, resolve, compatible, META_CUSTOM, anyCustomId } from './catalog.js';
 import { ability, playstyle } from './model.js';
+import { MODZ } from '../../../shared/modZ.js';
 
 export const STEP = 0.5; // logit per Easier / Harder press (Fish, 2026-11-26: halve if automated tests find it too extreme)
 export const HALF_WIDTH = 0.4; // half-width of the target range
@@ -32,14 +33,21 @@ export const ANY_CUSTOM_RATING = 0.8;
 const rateOf = (p, prior) => (p.dynamic ? prior.ratings.anyCustom ?? ANY_CUSTOM_RATING : prior.ratings[p.id] ?? 0);
 export const ratingOf = (parts, prior) => parts.reduce((s, p) => s + rateOf(p, prior), 0);
 
-/** "Field one of A, B, C": two meta operators and one other, from the custom pool of this game version (null without a pool). */
+/**
+ * "Field one of A, B, C", from the custom pool of this game version (null without one). Fish, 2026-11-26: at least one of the three has
+ * a Mod Z / W / V (they are the operators to try in a modded room), and either at least one is a meta operator or a second has a module;
+ * the third is any other operator. The card never needs the module itself: the operator on the board is enough.
+ */
 export function makeAnyCustom(pool, r) {
   const have = new Set(pool ?? []);
-  const meta = META_CUSTOM.filter((x) => have.has(x));
-  const rest = (pool ?? []).filter((x) => !META_CUSTOM.includes(x));
-  if (meta.length < 2 || !rest.length) return null;
-  const a = meta.splice(Math.floor(r() * meta.length), 1)[0];
-  const b = meta.splice(Math.floor(r() * meta.length), 1)[0];
+  const mods = [...new Set(MODZ.map((m) => m.charId))].filter((x) => have.has(x));
+  const meta = META_CUSTOM.filter((x) => have.has(x) && !mods.includes(x));
+  if (!mods.length || !meta.length) return null;
+  const take = (arr) => arr.splice(Math.floor(r() * arr.length), 1)[0];
+  const a = take(mods);
+  const b = r() < 0.75 || !mods.length ? take(meta) : take(mods); // a second module operator also satisfies the rule
+  const rest = (pool ?? []).filter((x) => x !== a && x !== b);
+  if (!rest.length) return null;
   return resolve(anyCustomId([a, b, rest[Math.floor(r() * rest.length)]]));
 }
 /** The points of a challenge (the prior rating, not the personal one: playing badly on purpose cannot raise it). Scale is for P5 to settle. */

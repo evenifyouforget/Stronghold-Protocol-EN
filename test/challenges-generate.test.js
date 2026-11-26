@@ -91,7 +91,8 @@ test('a generated card can be checked against a match', () => {
 import { META_CUSTOM, anyCustomId, resolve } from '../public/js/challenges/catalog.js';
 import { makeAnyCustom, ANY_CUSTOM_RATING } from '../public/js/challenges/generate.js';
 
-const POOL = [...META_CUSTOM, 'char_1_a', 'char_2_b', 'char_3_c', 'char_4_d', 'char_5_e'];
+const MODDED = ['char_2012_typhon', 'char_4098_vvana', 'char_112_siege'];
+const POOL = [...META_CUSTOM, ...MODDED, 'char_1_a', 'char_2_b', 'char_3_c', 'char_4_d', 'char_5_e'];
 
 test('"field one of A, B, C": built from its id, true if one is on the final board, unknown without the board, never failed on a guess', () => {
   const id = anyCustomId(['char_b', 'char_a', 'char_c']);
@@ -105,7 +106,7 @@ test('"field one of A, B, C": built from its id, true if one is on the final boa
   for (const bad of ['anyCustom:', 'anyCustom:char_a', 'anyCustom:b,a', 'anyCustom:char_a;rm,char_b', 'anyCustom:char_b,char_a', 'nonsense']) assert.equal(resolve(bad), null, bad);
 });
 
-test('the generator offers it only with a pool, at most once a panel, with at least two meta operators, rated by the placeholder', () => {
+test('the generator offers it only with a pool, at most once a panel, one with a module and a meta or a second module operator, rated by the placeholder', () => {
   const none = []; let seen = 0;
   for (let seed = 1; seed <= 300; seed++) none.push(...generatePanel({ prior, level: 1, seed }).cards.flatMap((c) => c.parts));
   assert.ok(!none.some((id) => id.startsWith('anyCustom:')), 'no pool, no card');
@@ -117,7 +118,9 @@ test('the generator offers it only with a pool, at most once a panel, with at le
       seen++;
       const ids = id.slice('anyCustom:'.length).split(',');
       assert.equal(ids.length, 3);
-      assert.ok(ids.filter((x) => META_CUSTOM.includes(x)).length >= 2, id);
+      assert.ok(ids.some((x) => MODDED.includes(x)), `${id}: one has a module`);
+      assert.ok(ids.some((x) => META_CUSTOM.includes(x)) || ids.filter((x) => MODDED.includes(x)).length >= 2, `${id}: a meta operator or a second module`);
+      assert.equal(new Set(ids).size, 3);
       const card = p.cards.find((c) => c.parts.includes(id));
       assert.equal(card.parts[0] === 'win' || card.parts[0] === 'winHidden', true, 'only with a win outcome');
       assert.ok(Math.abs(card.rating - ratingOf(card.parts.map((x) => resolve(x)), prior)) < 1e-9, 'the rating counts the placeholder for it');
@@ -125,5 +128,5 @@ test('the generator offers it only with a pool, at most once a panel, with at le
   }
   assert.ok(seen > 10, `offered ${seen} times in 300 panels`);
   assert.deepEqual(generatePanel({ prior: { ...prior, customPool: POOL }, seed: 9 }), generatePanel({ prior: { ...prior, customPool: POOL }, seed: 9 }));
-  assert.equal(makeAnyCustom(['char_1_a'], () => 0.5), null, 'a pool without meta operators');
+  assert.equal(makeAnyCustom(META_CUSTOM, () => 0.5), null, 'a pool without a module operator');
 });
