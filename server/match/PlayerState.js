@@ -187,6 +187,8 @@ export class PlayerState {
     this.diyStock = new DiyStock();
     /** slotted slots without stock: every bond of the operator is switched off this match */
     this.diyBanned = Object.freeze([]);
+    /** (fork, #192) the charIds of the 自选 picks this player took into ANY battle (battleInput): the result's `customSeen`; a pick taken off for the boss still counts */
+    this.diyEver = new Set();
     // A modded room's content list (Match.diyKitted) is what the lobby already accepted. Without it setDiy
     // keeps the vanilla kit list and drops a plugin operator with no error (checkDiyPicks is lenient).
     // Bots never slot 自选; they read the human's composed records once this succeeds (bot.js chessRec).

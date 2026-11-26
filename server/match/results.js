@@ -189,6 +189,8 @@ export function buildResult(m, outcome) {
       lp: Math.max(0, ps.lp),
       bandId: ps.bandId,
       lineup,
+      // (fork, #192) only when a 自选 operator was fielded in some battle, so every other payload keeps its shape
+      ...(ps.diyEver?.size ? { customSeen: [...ps.diyEver].sort() } : {}),
       bonds: bondList(gd, ps.bonds).filter((b) => b.active || b.layers > 0),
       stats: {
         dmgDealt: Math.round(ps.stats.dmgDealt), kills: ps.stats.kills, leaks: ps.stats.leaks, gold: ps.stats.gold,

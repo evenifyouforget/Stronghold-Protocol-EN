@@ -101,7 +101,7 @@ test('"field one of A, B, C": built from its id, true if one is on the final boa
   assert.ok(c && c.dynamic && c.key === 'lineup:anyCustom');
   assert.equal(resolve(id), c, 'cached');
   assert.equal(c.test({ customIds: ['char_x', 'char_b'] }), true);
-  assert.equal(c.test({ customIds: ['char_x'] }), false);
+  assert.equal(c.test({ customIds: ['char_x'] }), null, 'not seen: unknown (the facts may hold only the final board), never failed');
   assert.equal(c.test({ customIds: null }), null);
   for (const bad of ['anyCustom:', 'anyCustom:char_a', 'anyCustom:b,a', 'anyCustom:char_a;rm,char_b', 'anyCustom:char_b,char_a', 'nonsense']) assert.equal(resolve(bad), null, bad);
 });

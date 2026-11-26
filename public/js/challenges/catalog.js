@@ -67,7 +67,7 @@ export const BY_ID = new Map(ALL.map((c) => [c.id, c]));
 export const META_CUSTOM = Object.freeze(['char_1050_chen3', 'char_4182_oblvns', 'char_4231_clemnt', 'char_4247_oxi', 'char_1035_wisdel', 'char_377_gdglow',
   'char_4133_logos', 'char_1042_phatm2', 'char_4202_haruka', 'char_1015_aglna2', 'char_2027_wang', 'char_4132_ascln']);
 const ANY_PREFIX = 'anyCustom:';
-/** The id of the "one of these custom operators is on the board at the end" condition (ids sorted: one id per set). */
+/** The id of the "one of these custom operators was fielded at some point of the match" condition (ids sorted: one id per set). True or unknown, never false: the facts may hold only the final board. */
 export const anyCustomId = (charIds) => ANY_PREFIX + [...charIds].sort().join(',');
 const dynamic = new Map();
 /** An instance by id: the fixed ones of the list, or one "field one of …" condition built from its id (null for anything else). */
@@ -78,7 +78,7 @@ export function resolve(id) {
   const ids = id.slice(ANY_PREFIX.length).split(',').filter((x) => /^char_[0-9a-z_]+$/.test(x));
   const inst = ids.length >= 2 && ids.length <= 4 && anyCustomId(ids) === id
     ? { id, group: 'lineup', key: 'lineup:anyCustom', kind: 'performance', param: ids, needsPrior: false, dynamic: true,
-      test: (f) => (Array.isArray(f.customIds) ? ids.some((x) => f.customIds.includes(x)) : null) }
+      test: (f) => (Array.isArray(f.customIds) && ids.some((x) => f.customIds.includes(x)) ? true : null) }
     : null;
   dynamic.set(id, inst);
   return inst;
