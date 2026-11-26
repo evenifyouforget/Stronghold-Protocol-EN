@@ -3076,7 +3076,7 @@
   "关闭挑战": "Disable challenges",
   "已完成（{n}）": "Completed ({n})",
   "还没有完成过挑战。": "No challenge completed yet.",
-  "挑战只在这台浏览器里生成和判定，不会发送给服务器，也不会过期；带作弊或改动的对局也算数，点数只会计入你的卫戍认证。": "Challenges are made and checked in this browser only. Nothing is sent to the server and nothing expires; matches with cheats or changed room rules count too, and the points only count toward your Stronghold Certification.",
+  "挑战只在这台浏览器里生成和判定，不会发送给服务器，也不会过期；带作弊或改动的对局也算数，点数只会计入你的卫戍认证。一条挑战的所有条件需要在同一局里同时满足；完成后会换成新的挑战。": "Challenges are made and checked in this browser only. Nothing is sent to the server and nothing expires; matches with cheats or changed room rules count too, and the points only count toward your Stronghold Certification. A challenge is done when every line on it holds in the same match; a finished challenge is replaced by a new one.",
   "为了让挑战贴合你的水平，游戏会根据你在这里打完的对局算出一个自动调节用的数值：它只用于生成挑战，不是评级，不用于匹配，也永远不会发送到任何地方。数值越高，挑战越难。": "To fit the challenges to your level, the game works out an auto-tuning number from the matches you finished here. It is used only to make challenges: it is not a rating, it is not used for matchmaking, and it is never sent anywhere. A higher number means harder challenges.",
   "自动调节数值：{theta}（难度步进 {step}）": "Auto-tuning number: {theta} (difficulty step {step})",
   "很难完成": "Very hard to complete",
@@ -3113,6 +3113,6 @@
   "至少 {n} 名精英干员上场": "At least {n} Elite Operators on the field",
   "使用自选干员": "Use a Custom Squad Operator",
   "挑战完成 +{n}": "Challenges completed +{n}",
-  "挑战完成：{text}（+{n}）": "Challenge complete: {text} (+{n})",
+  "挑战完成：{text}（+{n}）": "Challenge complete: {text} (+{n} {n|pt|pts})",
   "上场其中一名自选干员：{names}": "Field one of these Custom Squad Operators: {names}"
 }
