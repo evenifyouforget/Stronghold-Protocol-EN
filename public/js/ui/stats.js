@@ -309,6 +309,8 @@ export function normalizeRecord(raw) {
   if (r.test === true) rec.test = true;
   if (rec.test === true && Number.isInteger(r.testActions) && r.testActions >= 0 && r.testActions <= 1e6) rec.testActions = r.testActions;
   if (r.compact === true) rec.compact = true;
+  // (fork, #192) the 卫戍认证 this match's finished Challenges added (ui/challenges.js completeFor); counted by settle.js levelProgress
+  if (Number.isInteger(r.challengePts) && r.challengePts > 0 && r.challengePts <= 100000) rec.challengePts = r.challengePts;
   // (fork) the alternate result background (m.result.altArt): noted in the record; the re-view (recordToResult)
   // doesn't show it, only the screen right after the match does
   if (r.altArt === true) rec.altArt = true;
@@ -747,6 +749,22 @@ function storeRecord(rec) {
   const { stats: next, added } = appendRecord(stats, rec);
   if (added && !saveStats(next)) console.warn('[stats] localStorage write failed (quota?), record not persisted');
   return added ? rec : null;
+}
+
+/**
+ * (fork, #192) Writes the Challenges points a finished match earned into its stored record, so the LV that is recomputed from the
+ * records counts them. Returns false when the record is not stored (or the envelope is newer than this build).
+ * @param {string} id the record's id @param {number} pts
+ */
+export function setChallengePts(id, pts) {
+  if (!id || !(pts > 0)) return false;
+  const stats = loadStats();
+  if (stats.newer) return false;
+  const i = stats.records.findIndex((r) => r.id === id);
+  if (i < 0) return false;
+  const records = stats.records.slice();
+  records[i] = { ...records[i], challengePts: Math.min(100000, Math.floor(pts)) };
+  return saveStats({ v: STATS_VERSION, records });
 }
 
 /**

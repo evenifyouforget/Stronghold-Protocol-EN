@@ -3111,5 +3111,7 @@
   "不漏过任何敌人": "Let no enemy through",
   "漏过的敌人不超过 {n} 个": "Let at most {n} enemies through",
   "至少 {n} 名精英干员上场": "At least {n} Elite Operators on the field",
-  "使用自选干员": "Use a custom roster operator"
+  "使用自选干员": "Use a custom roster operator",
+  "挑战完成 +{n}": "Challenges completed +{n}",
+  "挑战完成：{text}（+{n}）": "Challenge complete: {text} (+{n})"
 }

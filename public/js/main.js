@@ -78,6 +78,7 @@ import { CoveredVersionVote } from './ui/versionVote.js';
 import { installRehearsal } from './battle/rehearsal.js';
 import { installBotHost } from './battle/botHost.js';
 import { recordResult, installStatsRecorder } from './ui/stats.js';
+import { completeFor } from './ui/challenges.js';
 import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync, installCardSync, installSettingsViews, loadoutStore } from './ui/loadoutSync.js';
 import { installOutfitSync } from './ui/outfits.js';
 import { startBuildGuard } from './ui/buildGuard.js';
@@ -378,7 +379,11 @@ function wireNet() {
     // it arrives after the room is gone, also to a freshly loaded page; only a non-default one is written)
     const s = store.get();
     const version = s.room ? roomVersion(s.room) : matchFrameVersion({ result: res, public: s.match.public });
-    if (s.room?.test !== true && s.match.public?.test !== true) recordResult(res, { myId: s.me.playerId, roomMode: s.room?.mode ?? null, vs: s.room?.content?.vs ?? null, content: s.room?.content ?? null, rules: s.match.public?.rules ?? null, version: isDefaultVersion(version) ? null : version, now: Date.now() });
+    if (s.room?.test !== true && s.match.public?.test !== true) {
+      const rec = recordResult(res, { myId: s.me.playerId, roomMode: s.room?.mode ?? null, vs: s.room?.content?.vs ?? null, content: s.room?.content ?? null, rules: s.match.public?.rules ?? null, version: isDefaultVersion(version) ? null : version, now: Date.now() });
+      // (fork, #192) Challenges: the match just stored is checked against the open cards (ui/challenges.js; local only)
+      if (rec) completeFor(rec);
+    }
   });
   net.on('m.toast', (msg) => {
     const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';
