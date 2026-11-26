@@ -60,6 +60,30 @@ export const CONDITIONS = [
 export const ALL = [...OUTCOMES, ...CONDITIONS];
 export const BY_ID = new Map(ALL.map((c) => [c.id, c]));
 
+/**
+ * The "meta" custom (自选) operators (Fish, 2026-11-26: roughly the ones left unbuffed and the popular picks). A "field one of A, B or C"
+ * card always holds at least one of them, so the condition is easy to meet. Talulah is char_4247_oxi, Tragodia char_1042_phatm2.
+ */
+export const META_CUSTOM = Object.freeze(['char_1050_chen3', 'char_4182_oblvns', 'char_4231_clemnt', 'char_4247_oxi', 'char_1035_wisdel', 'char_377_gdglow',
+  'char_4133_logos', 'char_1042_phatm2', 'char_4202_haruka', 'char_1015_aglna2', 'char_2027_wang', 'char_4132_ascln']);
+const ANY_PREFIX = 'anyCustom:';
+/** The id of the "one of these custom operators is on the board at the end" condition (ids sorted: one id per set). */
+export const anyCustomId = (charIds) => ANY_PREFIX + [...charIds].sort().join(',');
+const dynamic = new Map();
+/** An instance by id: the fixed ones of the list, or one "field one of …" condition built from its id (null for anything else). */
+export function resolve(id) {
+  const c = BY_ID.get(id);
+  if (c || typeof id !== 'string' || !id.startsWith(ANY_PREFIX)) return c ?? null;
+  if (dynamic.has(id)) return dynamic.get(id);
+  const ids = id.slice(ANY_PREFIX.length).split(',').filter((x) => /^char_[0-9a-z_]+$/.test(x));
+  const inst = ids.length >= 2 && ids.length <= 4 && anyCustomId(ids) === id
+    ? { id, group: 'lineup', key: 'lineup:anyCustom', kind: 'performance', param: ids, needsPrior: false, dynamic: true,
+      test: (f) => (Array.isArray(f.customIds) ? ids.some((x) => f.customIds.includes(x)) : null) }
+    : null;
+  dynamic.set(id, inst);
+  return inst;
+}
+
 /** Per-group limits on how many conditions of that group one challenge may hold. */
 const GROUP_MAX = { tag: 2, bond: 2, stat: 2, safety: 2, lineup: 2 };
 

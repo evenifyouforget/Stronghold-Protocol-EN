@@ -7,10 +7,11 @@
 
 import { t, N_ } from '../../../shared/i18n.js';
 import { data } from '../data.js';
-import { BY_ID } from './catalog.js';
+import { resolve } from './catalog.js';
 import { riskText } from '../ui/lobbyRules.js';
 
 const DIFF_NAME = ['', N_('标准模拟'), N_('险境模拟'), N_('绝境模拟'), N_('终极模拟')];
+const opName = (id) => data.get('backups')?.diy?.operators?.[id]?.name || id;
 const bondName = (id) => data.lookup('bonds', id)?.name || id;
 /** A count as a person reads it: 5 000 000 → "5M" / "500万" (the browser's own compact form for the page's language). */
 export function fmtCount(n, lang) {
@@ -19,7 +20,7 @@ export function fmtCount(n, lang) {
 
 /** @param {string} id an instance id of catalog.js */
 export function describe(id, lang) {
-  const c = BY_ID.get(id);
+  const c = resolve(id);
   if (!c) return null;
   const n = c.param;
   const num = fmtCount(n, lang);
@@ -54,6 +55,7 @@ export function describe(id, lang) {
     }
   }
   if (c.key === 'lineup:golden') return t('至少 {n} 名精英干员上场', { n });
+  if (c.key === 'lineup:anyCustom') return t('上场其中一名自选干员：{names}', { names: c.param.map(opName).join(' / ') });
   if (c.key === 'lineup:custom') return t('使用自选干员');
   return null;
 }

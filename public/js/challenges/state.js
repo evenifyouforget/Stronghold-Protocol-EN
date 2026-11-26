@@ -7,7 +7,7 @@
 //   card = { id, parts: [instance id], rating, points, frozen }.   rolls counts the regenerations, so every one draws fresh.
 
 import { generatePanel, SLOTS } from './generate.js';
-import { BY_ID, check } from './catalog.js';
+import { resolve, check } from './catalog.js';
 
 export const STATE_VERSION = 1;
 export const MAX_LEVEL = 6; // Easier / Harder presses either way (beyond it the generator would only repeat the extremes)
@@ -22,7 +22,7 @@ export function defaultState(seed = 1) {
 
 function normalizeCard(c) {
   if (!isObj(c) || !Array.isArray(c.parts) || !c.parts.length || c.parts.length > 8) return null;
-  if (!c.parts.every((id) => typeof id === 'string' && BY_ID.has(id))) return null;
+  if (!c.parts.every((id) => typeof id === 'string' && resolve(id))) return null;
   const rating = Number.isFinite(c.rating) ? c.rating : 0;
   return { id: typeof c.id === 'string' ? c.id.slice(0, 120) : c.parts.join('+'), parts: [...c.parts], rating, points: int(c.points, 1, 1, 10000), frozen: c.frozen === true };
 }
@@ -73,7 +73,7 @@ export function complete(state, facts, history, prior, now = Date.now()) {
   if (!state.enabled || !facts) return { state, completed: [], points: 0 };
   const completed = [];
   state.open.forEach((c, index) => {
-    if (c && check(c.parts.map((id) => BY_ID.get(id)), facts) === true) completed.push({ index, parts: c.parts, points: c.points });
+    if (c && check(c.parts.map((id) => resolve(id)), facts) === true) completed.push({ index, parts: c.parts, points: c.points });
   });
   if (!completed.length) return { state, completed, points: 0 };
   const points = completed.reduce((n, c) => n + c.points, 0);

@@ -16,6 +16,7 @@ import { toast } from './toasts.js';
 import { describeCard } from '../challenges/texts.js';
 import { ability } from '../challenges/model.js';
 import { useLang } from './lang.js';
+import { data, loadData } from '../data.js';
 
 let state = null;
 let prior = null;
@@ -25,6 +26,8 @@ const get = () => (state ??= loadChallenges());
 function put(next) { state = next; saveChallenges(next); subs.forEach((f) => f()); }
 async function loadPrior() {
   if (!prior) { const r = await fetch(new URL('../challenges/prior.json', import.meta.url)); prior = await r.json(); }
+  // the custom operators this game version lets a player pick (backups.diy.ownedPool), for the "field one of …" condition
+  try { await loadData('backups'); prior = { ...prior, customPool: data.get('backups')?.diy?.ownedPool ?? [] }; } catch { /* no pool: no such condition */ }
   return prior;
 }
 /** The local history, read once per opening of the panel (a match played meanwhile is read the next time it opens). */

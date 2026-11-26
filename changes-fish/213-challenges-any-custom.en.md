@@ -1,0 +1,1 @@
+- Challenges: a new condition, "field one of these custom operators". Any one of three custom operators on your final board is enough, and at least two of the three are common strong picks, so it stays easy to meet (#192, #213).

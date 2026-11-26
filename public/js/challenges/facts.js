@@ -15,6 +15,7 @@
 //   stats          { dmgDealt, kills, leaks, gold (funds spent), refreshes, merges, itemsEquipped, bossDamage, activatedLayers }
 //   band           strategy id
 //   layers         { bondId: layers } at the end (null when the record kept no bonds); active: [bondId]
+//   customIds      charIds of the custom operators on the final board (null unknown)
 //   golden, custom elite operators / custom (自选) operators on the final board (null unknown)
 
 import { normalizeRules, ruleLabels } from '../../../shared/rules.js';
@@ -62,5 +63,6 @@ export function factsFromClientRecord(rec) {
     layers, active,
     golden: lineup ? lineup.filter((u) => u.golden).length : null,
     custom: lineup ? lineup.filter((u) => u.diy).length : null,
+    customIds: lineup ? lineup.filter((u) => u.diy?.charId).map((u) => u.diy.charId) : null,
   };
 }
