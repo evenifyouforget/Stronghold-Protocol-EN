@@ -197,6 +197,8 @@ export function buildResult(m, outcome) {
         refreshes: ps.stats.refreshes, merges: ps.stats.merges, itemsEquipped: ps.stats.itemsEquipped,
         bossDamage: Math.round(ps.stats.bossDamage), activatedLayers: ps.activatedLayers(), lpLost: ps.stats.lpLost,
         perfectRounds: ps.stats.perfectRounds,
+        // rlbot #197 I2: per-operator Final Assault / Hidden Core damage, only when a boss round was fought
+        ...(ps.stats.faUnitStats.length ? { faUnitStats: ps.stats.faUnitStats } : {}),
       },
       title: m.test === true || Number.isInteger(ps.aiTakeoverRound) ? null : titles.get(ps.playerId) ?? null,
       trophies: m.test === true || Number.isInteger(ps.aiTakeoverRound) ? 0 : trophiesFor(gd, roundsPassed, cleared && hiddenCleared),
