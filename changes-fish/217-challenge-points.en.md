@@ -1,0 +1,1 @@
+- A challenge now pays 100 to 400 points (about a won match's worth), up from about 5 to 15 (#192, #217).

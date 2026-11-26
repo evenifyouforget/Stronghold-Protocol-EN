@@ -1,0 +1,1 @@
+- The AI profiles window has a new "Risk-tag win rate" line: the average Ultimate win rate of each AI with fixed combinations of Risk tags, and how many combinations it is measured on. A profile not measured yet says so (#124, #216).

@@ -3114,5 +3114,9 @@
   "使用自选干员": "Use a Custom Squad Operator",
   "挑战完成 +{n}": "Challenges completed +{n}",
   "挑战完成：{text}（+{n}）": "Challenge complete: {text} (+{n} {n|pt|pts})",
-  "在对局中使用其中一名自选干员：{names}": "Use one of these Custom Squad Operators in the match: {names}"
+  "在对局中使用其中一名自选干员：{names}": "Use one of these Custom Squad Operators in the match: {names}",
+  "固定风险标签组合（单人与 4 人组队各 8 组）下终极难度的胜率，对已测的组数取平均；越高越好": "Fixed combinations of Risk tags (8 for solo and 8 for a team of 4): the win rate on Ultimate, averaged over the combinations measured; higher is better",
+  "风险标签胜率：平均 {rate}%（已测 {sets} / {of} 组风险标签组合）": "Risk-tag win rate: {rate}% on average ({sets} of {of} Risk-tag combinations measured)",
+  "风险标签胜率：尚未测量": "Risk-tag win rate: not measured yet",
+  "风险标签胜率是在固定风险标签组合下的终极难度胜率，越高越好；只有测量组数相同的方案才能直接比较。": "The Risk-tag win rate is the Ultimate win rate with fixed combinations of Risk tags, higher is better; only profiles measured on the same number of combinations can be compared directly."
 }

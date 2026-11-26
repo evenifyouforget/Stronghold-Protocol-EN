@@ -25,7 +25,7 @@ test('every card lands near its target, uses known parts, one outcome, no repeat
       const parts = c.parts.map((id) => BY_ID.get(id));
       assert.ok(parts.every(Boolean)); assert.ok(parts.length <= MAX_PARTS);
       assert.equal(parts.filter((x) => x.group === 'outcome').length, 1);
-      assert.ok(c.points >= 1);
+      assert.ok(c.points >= 100 && c.points <= 400 && c.points % 10 === 0, `a challenge pays 100 to 400 in steps of 10, got ${c.points}`);
       assert.ok(Math.abs(ratingOf(parts, prior) - c.rating) < 1e-9);
       if (parts.some((x) => x.kind === 'performance' && x.group !== 'outcome')) assert.ok(['win', 'winHidden'].includes(parts[0].id), 'performance conditions only with a win outcome');
       assert.ok(!outs.has(parts[0].id)); outs.add(parts[0].id);
