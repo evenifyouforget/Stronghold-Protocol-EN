@@ -86,8 +86,12 @@ export function chanceText(theta, rating) {
   const p = 1 / (1 + Math.exp(-(theta - rating)));
   if (p < 0.02) return t('很难完成');
   if (p > 0.9) return t('几乎每局都能完成');
-  return t('约每 {n} 局完成 1 次', { n: Math.max(1, Math.round(1 / p)) });
+  const n = Math.round(1 / p);
+  return n <= 1 ? t('几乎每局都能完成') : t('约每 {n} 局完成 1 次', { n });
 }
+
+/** A completed challenge as one line: the outcome, then every condition it had (a card's conditions are part of what was done). */
+const doneText = (d, lang) => { const c = describeCard({ parts: d.parts }, lang); return [c.title, ...c.lines].join(' · '); };
 
 function Card({ card, index, lang }) {
   const { title, lines } = describeCard(card, lang);
@@ -106,8 +110,8 @@ function Card({ card, index, lang }) {
 function Info({ s, onBack, lang }) {
   const theta = ability(history ?? [], prior ?? { ratings: {} }).theta;
   return html`<div class="chal-info">
-    <p>${t('挑战只在这台浏览器里生成和判定，不会发送给服务器，也不会过期；点数只会计入你的卫戍认证。')}</p>
-    <p>${t('为了让挑战贴合你的水平，游戏会根据你在这里打完的对局算出一个自动调节用的数值：它只用于生成挑战，不是评级，不用于匹配，也永远不会发送到任何地方。')}</p>
+    <p>${t('挑战只在这台浏览器里生成和判定，不会发送给服务器，也不会过期；带作弊或改动的对局也算数，点数只会计入你的卫戍认证。')}</p>
+    <p>${t('为了让挑战贴合你的水平，游戏会根据你在这里打完的对局算出一个自动调节用的数值：它只用于生成挑战，不是评级，不用于匹配，也永远不会发送到任何地方。数值越高，挑战越难。')}</p>
     <p class="chal-info__level">${t('自动调节数值：{theta}（难度步进 {step}）', { theta: theta.toFixed(1), step: s.level > 0 ? `+${s.level}` : String(s.level) })}</p>
     <ul class="chal-info__odds">${s.open.filter(Boolean).map((c, i) => html`<li key=${i}><span class="num">${i + 1}</span> ${describeCard(c, lang).title}: ${chanceText(theta, c.rating)}</li>`)}</ul>
     <${Button} variant="ghost" size="sm" onClick=${onBack}>${t('返回')}<//>
@@ -125,7 +129,7 @@ export function ChallengesModal({ open, onClose }) {
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('挑战')} micro="CHALLENGES" width="9rem">
     <div class="chal" data-testid="challenges">
       ${info ? html`<${Info} s=${s} lang=${lang} onBack=${() => setInfo(false)} />` : list ? html`<div class="chal-done">
-          ${s.done.length ? html`<ul>${[...s.done].reverse().map((d, i) => html`<li key=${i}><span class="num">${new Date(d.at).toLocaleDateString()}</span> ${describeCard({ parts: d.parts }, lang).title} <b class="num">+${d.pts}</b></li>`)}</ul>`
+          ${s.done.length ? html`<ul>${[...s.done].reverse().map((d, i) => html`<li key=${i}><span class="num">${new Date(d.at).toLocaleDateString()}</span> ${doneText(d, lang)} <b class="num">+${d.pts}</b></li>`)}</ul>`
             : html`<p>${t('还没有完成过挑战。')}</p>`}
           <${Button} variant="ghost" size="sm" onClick=${() => setList(false)}>${t('返回')}<//>
         </div>` : html`
