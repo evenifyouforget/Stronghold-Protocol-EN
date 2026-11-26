@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { generatePanel, rng, STEP, SLOTS, HALF_WIDTH, ratingOf, MAX_PARTS } from '../public/js/challenges/generate.js';
+import { generatePanel, STEP, SLOTS, HALF_WIDTH, ratingOf, MAX_PARTS } from '../public/js/challenges/generate.js';
 import { ability, playstyle } from '../public/js/challenges/model.js';
-import { BY_ID, check, STACK_BONDS } from '../public/js/challenges/catalog.js';
+import { BY_ID, check } from '../public/js/challenges/catalog.js';
 
 const prior = JSON.parse(fs.readFileSync(new URL('../public/js/challenges/prior.json', import.meta.url), 'utf8'));
 const match = (o = {}) => ({ win: true, difficulty: 4, humans: 1, bots: 0, solo: true, cheats: false, risk: 6, seeded: false, tags: {}, rounds: 15, hiddenCleared: false, durationMin: 40, nobodyOut: true, lpLost: 0, perfectRounds: 5, stats: { kills: 320, gold: 250, leaks: 3, dmgDealt: 5e7, refreshes: 80, merges: 20, itemsEquipped: 40, bossDamage: 3e7, activatedLayers: 2000 }, layers: { yanShip: 320 }, active: ['yanShip'], golden: 0, custom: 0, ...o });

@@ -43,6 +43,7 @@ import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
 import { detectFeatures, isIOS } from './device.js';
 import { LangToggle, machineTranslationNote } from './lang.js';
+import { ChallengeSettings } from './challenges.js';
 import { PreloadRow } from './preload.js';
 import { t, tc, tParts, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
@@ -657,6 +658,7 @@ export function SettingsModal({ open, onClose }) {
       <${HotkeySection} keys=${s.keys} touchUi=${touchUi} />
       <${CosmeticSection} />
       <${PublicNameSection} />
+      <${ChallengeSettings} Toggle=${Toggle} />
       <${UiPluginSection} />
       <${StorageSection} />
       <${DiagSection} />

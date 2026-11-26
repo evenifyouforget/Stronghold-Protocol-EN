@@ -77,6 +77,7 @@ import { RoomBrowser, askRoomPassword, PrivacyFields, StrategySwitch } from '../
 import { ROOM_PASSWORD_RE } from '../../../shared/largeRoom.js';
 import { RegionPing } from '../ui/regionPicker.js';
 import { contentSet, retryContentSet } from '../content.js';
+import { ChallengesPlate } from '../ui/challenges.js';
 import { DEFAULT_VERSION, lobbyVersion, offeredDifficulties, fallbackDifficulty, seasonOf, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
@@ -994,6 +995,7 @@ export function LobbyScreen() {
         <${SweepPlate} onClick=${() => setSweep({ restore: null })} />
         <${LoadoutButton} from="lobby" size="lg" class="hub-plate hub-plate--loadout lobby-loadout" label=${t('干员调配')} />
         <${AchievementPlate} onOpen=${() => setAchOpen(true)} />
+        <${ChallengesPlate} />
       </aside>
       <section class=${`hub-entries${queue.queued ? ' is-queued' : ''}`} aria-label=${t('模拟方式')}>
         ${queue.queued ? html`<div class="create-box hub-queue"><${QueuePanel} busy=${busy} online=${online} run=${run} /></div>`

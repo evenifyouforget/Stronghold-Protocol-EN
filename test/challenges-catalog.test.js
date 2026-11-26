@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ALL, BY_ID, OUTCOMES, CONDITIONS, compatible, check } from '../public/js/challenges/catalog.js';
+import { ALL, BY_ID, compatible, check } from '../public/js/challenges/catalog.js';
 import { factsFromClientRecord } from '../public/js/challenges/facts.js';
 
 const prior = JSON.parse(fs.readFileSync(new URL('../public/js/challenges/prior.json', import.meta.url), 'utf8'));
