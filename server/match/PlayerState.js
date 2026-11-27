@@ -243,6 +243,10 @@ export class PlayerState {
     this.stats = {
       dmgDealt: 0, kills: 0, leaks: 0, gold: 0, refreshes: 0, merges: 0, itemMerges: 0, itemsEquipped: 0,
       bossDamage: 0, lpLost: 0, buys: 0, sells: 0, perfectRounds: 0, fundsGained: 0, healing: 0,
+      /** rlbot #197 I2: per-operator damage in a Final Assault / Hidden Core round (bossRounds.js _finishFinal),
+       * one entry per boss round reached: { round, hidden, units: fields.js unitStats shape }. [] on a game
+       * that never reached a boss round. */
+      faUnitStats: [],
     };
     this.eliminatedRound = null;
     this.creditedKills = 0;

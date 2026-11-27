@@ -584,6 +584,9 @@ export class MatchBoss {
           ps.creditedKills += creditedKillsOf(pp);
           ps.dirty(); // m.private.stats
           this._charDamageTickers(ps, pp);
+          // rlbot #197 I2: per-operator FA/Hidden Core damage (fields.js unitStats; skip a synthetic field's empty one). Without `name`:
+          // a DIY operator's name is the player's own text, and records are anonymous (defId names the operator)
+          if (Array.isArray(pp.unitStats) && pp.unitStats.length) ps.stats.faUnitStats.push({ round: this.round, hidden, units: pp.unitStats.map(({ name, ...u }) => u) });
         }
         if (pp && ps) {
           // the own battle counts as perfect when the team won, the result is a real one (not the stand-in of a field that
