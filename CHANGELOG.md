@@ -1,3 +1,10 @@
+## 0.3.4-4 — 2026-11-28
+
+### Fish Edition
+
+本服务器自己的改动，编号是 [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN) 的 PR。
+
+
 ## 0.3.4-3 — 2026-11-24
 
 ### Fish Edition

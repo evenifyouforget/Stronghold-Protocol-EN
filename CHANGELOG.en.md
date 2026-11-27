@@ -2,6 +2,13 @@
 
 > English translation of [CHANGELOG.md](CHANGELOG.md). The Chinese original is the authoritative version.
 
+## 0.3.4-4 — 2026-11-28
+
+### Fish Edition
+
+This server's own changes. Their numbers are the pull requests of [Fish Edition](https://github.com/evenifyouforget/Stronghold-Protocol-EN).
+
+
 ## 0.3.4-3 — 2026-11-24
 
 ### Fish Edition
