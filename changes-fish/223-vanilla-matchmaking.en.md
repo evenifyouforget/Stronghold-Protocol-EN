@@ -1,1 +1,0 @@
-- Matchmaking is the original game unless a player allows mods. Find teammates asks whether the lobby is vanilla only (rules cleared and locked) or modded (rules stay editable, and only players who allow mods meet it); the home screen has a *Preference: Vanilla only / Allow mods* button; Grand Alliances open private, and making one public asks the same question (#222, #223).
