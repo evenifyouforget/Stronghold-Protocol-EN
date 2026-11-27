@@ -3118,5 +3118,17 @@
   "固定风险标签组合（单人与 4 人组队各 8 组）下终极难度的胜率，对已测的组数取平均；越高越好": "Fixed combinations of Risk tags (8 for solo and 8 for a team of 4): the win rate on Ultimate, averaged over the combinations measured; higher is better",
   "风险标签胜率：平均 {rate}%（已测 {sets} / {of} 组风险标签组合）": "Risk-tag win rate: {rate}% on average ({sets} of {of} Risk-tag combinations measured)",
   "风险标签胜率：尚未测量": "Risk-tag win rate: not measured yet",
-  "风险标签胜率是在固定风险标签组合下的终极难度胜率，越高越好；只有测量组数相同的方案才能直接比较。": "The Risk-tag win rate is the Ultimate win rate with fixed combinations of Risk tags, higher is better; only profiles measured on the same number of combinations can be compared directly."
+  "风险标签胜率是在固定风险标签组合下的终极难度胜率，越高越好；只有测量组数相同的方案才能直接比较。": "The Risk-tag win rate is the Ultimate win rate with fixed combinations of Risk tags, higher is better; only profiles measured on the same number of combinations can be compared directly.",
+  "开放给陌生人": "Open to strangers",
+  "改动房间只会匹配到允许改动的博士。": "A modded lobby only meets Doctors who allow mods.",
+  "仅限原版（之后无法再修改）": "This will be vanilla only (prevents further edits)",
+  "标记为改动房间（允许修改房间规则）": "Mark this lobby as modded (allows editing lobby rules)",
+  "仅限原版会清除当前已选的房间规则；改动房间会保留它们。": "Vanilla only clears the lobby rules you have chosen; a modded lobby keeps them.",
+  "偏好：仅限原版": "Preference: Vanilla only",
+  "偏好：允许改动": "Preference: Allow mods",
+  "允许改动：也会加入标记为改动的房间，房主之后可能修改房间规则。": "Allow mods: you may also join lobbies marked as modded, and the host may change the lobby rules later.",
+  "仅限原版：匹配时只会加入原版房间。": "Vanilla only: matchmaking only puts you in vanilla lobbies.",
+  "改动房间": "Modded",
+  "这是原版房间：房间规则已清除并锁定": "This is a vanilla lobby: the lobby rules are cleared and locked",
+  "有其他博士入座后无法撤销；在房间只剩你一人时停止搜寻即可解除。": "This cannot be undone once another Doctor is seated; stopping the search while you are alone in the lobby lifts it."
 }
