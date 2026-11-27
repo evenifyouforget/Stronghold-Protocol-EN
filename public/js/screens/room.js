@@ -74,6 +74,8 @@ import { PluginTag, VersionTag, isModdedRoom } from '../ui/pluginTag.js';
 import { VersionVote, versionVoteOf } from '../ui/versionVote.js';
 import { VersionPicker } from '../ui/versionPicker.js';
 import { StrategySwitch, OneForAllTag } from '../ui/largeRooms.js';
+import { OpenKindDialog } from '../ui/modsPref.js';
+import { rulesInForce } from '../../../shared/rules.js';
 import { DEFAULT_VERSION, lobbyVersion, needsContent, offeredDifficulties, roomVersion, serverDefaultVersion, soloTimedOf, soloTimeMsgid, versionLabel } from '../versions.js';
 import { hasScriptConsent, rememberScriptConsent, pageVersion } from '../content.js';
 import { net } from '../net.js';
@@ -534,14 +536,16 @@ function RoomAccess({ room, isHost, busy, onLock }) {
   }
   const clean = (v) => v.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
   // private again: the server brings back the room's last password (room.setLock { on: true } without one)
-  const pick = (priv) => { if (busy || priv === on) return; onLock?.(priv); };
+  // public asks vanilla or modded first (server/lobby.js Room.searchKind); the button glows while the room is still private
+  const [ask, setAsk] = useState(false);
+  const pick = (priv) => { if (busy || priv === on) return; if (priv) onLock?.(true); else setAsk(true); };
   // 4 letters that differ: saved; anything else: the room's own back in the field
   const commit = () => {
     if (ROOM_PASSWORD_RE.test(pw) && pw !== room.password) onLock?.(true, pw);
     else setPw(room.password || '');
   };
   const btn = (priv, icon, label, id) => html`<button type="button" role="radio" aria-checked=${on === priv ? 'true' : 'false'} data-testid=${id}
-      class=${`rs-access__opt${on === priv ? ' is-on' : ''}`} disabled=${!!busy} onClick=${() => pick(priv)}><${Icon} name=${icon} />${label}</button>`;
+      class=${`rs-access__opt${on === priv ? ' is-on' : ''}${!priv && on && !busy ? ' is-nudge' : ''}`} disabled=${!!busy} onClick=${() => pick(priv)}><${Icon} name=${icon} />${label}</button>`;
   // (fork) Public: rerolls stay off for this room from then on (server/lobby.js rerollLock; user, 2026-11-13)
   const opt = (priv, icon, label, id) => (priv ? btn(priv, icon, label, id)
     : html`<${Tooltip} text=${t('房间公开或搜寻队友后，不能再重刷本局。' /* en: "Once a room is public or uses Find Teammates, it has no stage setup reroll." */)}>${btn(priv, icon, label, id)}<//>`);
@@ -550,6 +554,8 @@ function RoomAccess({ room, isHost, busy, onLock }) {
     <div class="rs-access__seg" role="radiogroup" aria-label=${t('房间权限')}>
       ${opt(false, 'users', t('公开'), 'room-public')}${opt(true, 'lock', t('私密'), 'room-private')}
     </div>
+    <${OpenKindDialog} open=${ask} hasRules=${rulesInForce(room.rules).length > 0} onClose=${() => setAsk(false)}
+      onPick=${(kind) => { setAsk(false); onLock?.(false, undefined, kind); }} />
     ${on ? html`<label class=${`rs-access__pw${short ? ' is-short' : ''}`} title=${t('修改密码')}>
       <span class="rs-access__pwk">${t('密码')}</span>
       <input class="num" data-testid="room-password" value=${pw} maxLength=${4} autoComplete="off" spellCheck=${false} aria-label=${t('修改密码')}
@@ -799,7 +805,7 @@ export function RoomScreen() {
   const setAiLast = (on) => run('ailast', () => net.request('room.setAiPicksLast', { on }));
   const setRules = (partial) => run('rules', () => net.request('room.setRules', { rules: partial }));
   // (fork) a large room (shared/largeRoom.js): the list switch, sitting elsewhere, the host's seat swap (two taps)
-  const setLock = (on, password) => run('lock', () => net.request('room.setLock', on && password ? { on, password } : { on }));
+  const setLock = (on, password, kind) => run('lock', () => net.request('room.setLock', { on, ...(on && password ? { password } : {}), ...(!on && kind ? { kind } : {}) }));
   // (fork) One for All (ui/largeRooms.js StrategySwitch): the host's strategy mode; nobody is un-readied, a search restarts
   const setOneForAll = (on) => run('ofa', () => net.request('room.setOneForAll', { on }));
   const [swapFrom, setSwapFrom] = useState(null);

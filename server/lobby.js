@@ -533,6 +533,13 @@ export class Room {
     /** @type {number | null} */
     this.searchSince = null;
     /**
+     * (fork) What the room promised strangers when it opened to them (search, or a Grand Alliance made public): 'vanilla' =
+     * the original game, the lobby rules are cleared and locked (see vanillaLocked); 'modded' = the host may still change
+     * the rules, and only players who allow mods meet it. null until then. Part of the matchmaking pool (poolKey).
+     * @type {'vanilla' | 'modded' | null}
+     */
+    this.searchKind = null;
+    /**
      * (fork) the room was open to strangers before a match: it searched (搜寻队友), the solo queue formed or filled it, or
      * it was a public Grand Alliance. Its matches have no setup reroll (Lobby.rerollLock; user, 2026-11-13). Never cleared.
      */
@@ -560,6 +567,17 @@ export class Room {
 
   /** Does the room play a content set with gameplay plugins (its own cs; header "Gameplay plugins")? */
   get modded() { return !!this.content && this.content.vanilla === false; }
+
+  /**
+   * (fork) A vanilla room's rules cannot change while strangers may be in it: it searches, it is a public Grand Alliance,
+   * or another human is seated (a stranger matched in stays after the match). Alone and not searching, the host may edit again.
+   * Pure: nothing is stored, so a stopped search, a maintenance stop or a match end cannot reopen the room.
+   */
+  get vanillaLocked() {
+    if (this.searchKind !== 'vanilla') return false;
+    if (this.searching || (this.large && !this.locked)) return true;
+    return this.seats.filter((s) => s && !s.isBot && !s.left).length > 1 || this.seats.some((s) => s && s.matched);
+  }
 
   /**
    * Must every member's page load and check the room's content before ready / start (header "Gameplay plugins",
@@ -647,6 +665,8 @@ export class Room {
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(this.needsContent ? { content: /** @type {any} */ (s).content || 'loading' } : {}), ...(s.matched ? { matched: true } : {}) })),
       searching: this.searching,
       searchSince: this.searchSince,
+      ...(this.searchKind ? { searchKind: this.searchKind } : {}),
+      ...(this.vanillaLocked ? { vanillaLock: true } : {}),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
       // another official version than 第二期下半, and its open vote (header "Official versions"): omitted otherwise, so a
       // default room's room.state stays identical
@@ -1264,9 +1284,10 @@ export class Lobby {
     const room = new Room(code, mode, difficulty, this.now(), version);
     room.test = test === true;
     if (large) { room.capacity = LARGE_ROOM_SEATS; room.seats = new Array(LARGE_ROOM_SEATS).fill(null); }
-    if (large && password != null) { room.locked = true; room.password = password.toUpperCase(); }
+    // (fork) a Grand Alliance opens private: a password (the host's, else 4 random letters) until the host makes it public
+    // (setLock on false, with the choice vanilla / modded); the browser lists it, locked
+    if (large) { room.locked = true; room.password = password != null ? password.toUpperCase() : randomPassword(); }
     if (large && oneForAll === true) room.oneForAll = true;
-    if (large && !room.locked) room.wentPublic = true;   // (fork) a public Grand Alliance (Lobby.rerollLock)
     // 「不限时」 only on a solo room of a version whose solo is timed (header). Anywhere else the key is ignored, so a
     // stray true cannot change a default or co-op create.
     if (mode === 'solo' && soloUnlimited === true && this.versionSoloTimed(version)) room.soloUnlimited = true;
@@ -1454,8 +1475,10 @@ export class Lobby {
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
     const next = normalizeRules(rules, room.rules);
-    // searching for teammates plays the original game (shared/rules.js): stop the search before setting a rule
-    if (room.searching && anyRule(next)) return fail(ERR.CUSTOM_RULES);
+    // a vanilla room (it searches, is a public Grand Alliance, or has a stranger seated) plays the original game
+    // (shared/rules.js); a room that searches as 'modded' may still change its rules
+    if (room.vanillaLocked) return fail(ERR.CUSTOM_RULES, 'a vanilla room cannot change its rules');
+    if (room.searching && room.searchKind !== 'modded' && anyRule(next)) return fail(ERR.CUSTOM_RULES);
     this.dropReplay(room, session.playerId);
     if (Object.keys(next).some((k) => !sameRuleValue(next[k], room.rules[k]))) {
       room.rules = next;
@@ -1504,6 +1527,8 @@ export class Lobby {
     const r = this.resolveContent(room, ids, settings);
     if ('error' in r) return r;
     let content = r.content;
+    // (fork) a vanilla room (Room.vanillaLocked) takes no gameplay plugins either
+    if (content?.vanilla === false && room.vanillaLocked) return fail(ERR.PLUGIN_BLOCKED, 'a vanilla room cannot take gameplay plugins');
     const before = room.content;
     const sameSet = (before?.vs ?? null) === (content?.vs ?? null) && (before?.cs ?? null) === (content?.cs ?? null);
     const marks = (c) => JSON.stringify((c?.plugins || []).map((p) => [p.id, !!p.auto, p.settings || null]));
@@ -2056,13 +2081,16 @@ export class Lobby {
    * without one (`{ on: true }`) brings it back; a room that never had one gets 4 random letters. A private room still
    * shows in the room browser, marked; joining or watching it needs the password, its members are not asked again.
    */
-  setLock(session, { on, password }) {
+  setLock(session, { on, password, kind }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (!room.large) return fail(ERR.BAD_TARGET, 'only Grand Alliance rooms lock');
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (on && password != null && !(typeof password === 'string' && ROOM_PASSWORD_RE.test(password))) return fail(ERR.BAD_MSG, 'a password of 4 letters');
     if (on) room.password = password != null ? password.toUpperCase() : room.password || randomPassword();
+    // (fork) public (on false) opens the room to strangers: it says what for (vanilla by default; Room.searchKind)
+    if (!on && room.locked) this.openToStrangers(room, kind === 'modded' ? 'modded' : 'vanilla');
+    // private again: a vanilla room stays locked while another human is seated (Room.vanillaLocked)
     room.locked = on;
     if (!on) room.wentPublic = true;   // (fork) a public Grand Alliance (Lobby.rerollLock)
     this.broadcastState(room);
@@ -2117,7 +2145,7 @@ export class Lobby {
       const host = room.seatOf(room.hostId);
       const squads = [0, 1].map((sq) => room.seats.slice(sq * SQUAD_SEATS, (sq + 1) * SQUAD_SEATS).filter(Boolean).length);
       out.push({ code: room.code, host: host ? host.name : '', seats, capacity: room.capacity, difficulty: room.difficulty, squads,
-        ...(room.locked ? { locked: true } : {}), ...(room.oneForAll ? { oneForAll: true } : {}), at: room.createdAt });
+        ...(room.locked ? { locked: true } : {}), ...(room.oneForAll ? { oneForAll: true } : {}), ...(room.searchKind === 'modded' ? { modded: true } : {}), at: room.createdAt });
     }
     out.sort((x, y) => x.at - y.at);
     return out.slice(0, 50);
@@ -3085,7 +3113,7 @@ export class Lobby {
   // 搜寻队友 (server/matchmaker.js plans, these carry it out)
   // ---------------------------------------------------------------------------------------------------
 
-  search(session, { on }) {
+  search(session, { on, kind }) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
@@ -3102,18 +3130,32 @@ export class Lobby {
     // (fork) a test room is joined by its code only too (strangers would skip its testAck)
     if (room.test) return fail(ERR.BAD_TARGET, 'test rooms are joined by room code only');
     if (room.searching) return OK;
-    // strangers join a search: it plays the original game (Custom Lobby Modifications are for friends' rooms)
-    if (anyRule(room.rules)) return fail(ERR.CUSTOM_RULES);
     // (fork) a room of any official version searches among rooms of its version (server/matchmaker.js poolKey); a Grand
     // Alliance (shared/largeRoom.js), locked or not, among Grand Alliances and opted-in queued Doctors
     if (roomSize(room) >= roomCap(room)) return fail(ERR.ROOM_FULL);
     if (!groupReady(room)) return fail(ERR.NOT_READY);
+    // (fork) what the search promises strangers: the original game (the default, also for a client that sends no kind: the
+    // lobby rules are cleared and locked) or 'modded' (the rules stay editable; only players who allow mods meet it)
+    this.openToStrangers(room, kind === 'modded' ? 'modded' : 'vanilla');
     room.searching = true;
     room.searchSince = this.now();
     room.wentPublic = true;   // (fork) Find teammates: strangers may sit down (Lobby.rerollLock)
     this.log.info(`[lobby] ${room.code} searching (${roomSize(room)}/${roomCap(room)}, ${room.difficulty}${room.version !== DEFAULT_VERSION ? `, ${room.version}` : ''})`);
     this.broadcastState(room);
     return OK;
+  }
+
+  /**
+   * (fork) A room opens to strangers (a search, a Grand Alliance made public) as 'vanilla' or 'modded' (Room.searchKind). Vanilla
+   * clears the lobby rules; Room.vanillaLocked then keeps them off. Nobody is un-readied: an empty rule set is what the
+   * others readied for, and the room.state they get says so.
+   */
+  openToStrangers(room, kind) {
+    if (kind === 'vanilla' && anyRule(room.rules)) {
+      room.rules = normalizeRules(null);
+      for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+    }
+    room.searchKind = kind;
   }
 
   /**
@@ -3235,7 +3277,8 @@ export class Lobby {
     const rooms = [];
     for (const r of this.rooms.values()) {
       // (fork) a One for All room matches on its own server only [ASSUMED: the digest and the arbiter carry no mode]
-      if (!isMatchable(r) || r.test || r.oneForAll || !this.matchAllowed(r)) continue;
+      // (fork) nor does a room that searches as 'modded': other servers only ever see vanilla rooms
+      if (!isMatchable(r) || r.test || r.oneForAll || r.searchKind === 'modded' || !this.matchAllowed(r)) continue;
       const humans = r.seats.filter((s) => s && !s.left && !s.isBot).length;
       rooms.push({ code: r.code, humans, bots: roomSize(r) - humans, difficulty: r.difficulty, wait: now - (r.searchSince ?? now),
         ...(r.version !== DEFAULT_VERSION ? { version: r.version } : {}), ...(r.large ? { cap: r.capacity, squads: squadCounts(r) } : {}) });
@@ -3496,7 +3539,7 @@ export class Lobby {
    * also be seated in a Grand Alliance (only while the server has them and 第二期下半 is queued for: they play it alone).
    * `oneForAll` (with `large` only): may also be seated in a One for All Grand Alliance (off by default).
    */
-  queueJoin(session, { difficulty, versions: asked, large, oneForAll }) {
+  queueJoin(session, { difficulty, versions: asked, large, oneForAll, mods }) {
     const cur = this.roomOf(session);
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');
     if (this.closedForMaintenance()) return fail(ERR.MAINTENANCE);
@@ -3510,12 +3553,13 @@ export class Lobby {
     for (const v of versions) { const d = this.fallbackDifficulty(v, 'coop', difficulty); if (d !== difficulty) at[v] = d; }
     const opts = { versions, at: Object.keys(at).length ? at : null, large: large === true && this.largeRooms === true && versions.includes(DEFAULT_VERSION) };
     opts.oneForAll = opts.large && oneForAll === true;
+    opts.mods = mods === true;   // (fork) allows rooms that search as 'modded'; left out: the original game only
     if (cur) this.removeMember(cur, session.playerId);
     const e = this.soloQueue.get(session.playerId);
     // a second click keeps the wait; another difficulty starts over; other versions or opt-in keep the wait
     if (!e || e.difficulty !== difficulty) this.soloQueue.add(session.playerId, difficulty, this.now(), opts);
     else {
-      e.versions = opts.versions; e.large = opts.large; e.oneForAll = opts.oneForAll;
+      e.versions = opts.versions; e.large = opts.large; e.oneForAll = opts.oneForAll; e.mods = opts.mods;
       if (opts.at) e.at = { ...opts.at }; else delete e.at;
     }
     this.sendQueue(session);
@@ -3590,6 +3634,7 @@ export class Lobby {
   /** Seat queued sessions in `room`'s free seats, ready, and take them out of the queue. Sends nothing. */
   seatSolos(room, sessions) {
     if (sessions.length) room.wentPublic = true;   // (fork) the solo queue seats strangers (Lobby.rerollLock)
+    if (sessions.length && !room.searchKind) room.searchKind = 'vanilla';   // a room the queue forms plays the original game
     // (fork) new humans take seats: the version vote is void, as on a join (header "Official versions")
     if (sessions.length && room.versionVote) this.voidVersionVote(room, 'members');
     for (const s of sessions) {

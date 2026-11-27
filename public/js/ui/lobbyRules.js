@@ -361,7 +361,7 @@ export function restoreAction(room, isHost, remembered, seen = restoredRooms) {
   if (seen.has(room.code)) return { apply: null, save: true };
   seen.add(room.code);
   const want = rulesToRestore(remembered);
-  const plain = !room.match && !room.searching && rulesInForce({ ...DEFAULT_RULES, ...(room.rules || {}) }).length === 0;
+  const plain = !room.match && !room.searching && !room.vanillaLock && rulesInForce({ ...DEFAULT_RULES, ...(room.rules || {}) }).length === 0;
   return { apply: plain && Object.keys(want).length ? want : null, save: !(plain && Object.keys(want).length) };
 }
 
@@ -385,11 +385,11 @@ export function RulesBar({ room, isHost, busy, onSet }) {
   useEffect(() => {
     const { apply, save } = restoreAction(room, isHost, rememberedRules());
     if (apply) { onSet(apply); return; }
-    if (save && isHost && !room.searching) {
+    if (save && isHost && !room.searching && !room.vanillaLock) {
       const now = normalizeRules(rules);
       if (!sameRules(now, rememberedRules())) savePref(RULES_PREF, now);
     }
-  }, [room.code, isHost, JSON.stringify(room.rules || null), !!room.searching]);
+  }, [room.code, isHost, JSON.stringify(room.rules || null), !!room.searching, !!room.vanillaLock]);
   const on = rulesInForce(rules);
   const badges = ruleBadges(rules);
   return html`<div class="room-rules">
@@ -403,7 +403,7 @@ export function RulesBar({ room, isHost, busy, onSet }) {
       ${badges.seeded ? html`<span class="rules-badge rules-badge--seeded">${badges.seeded}</span>` : null}
       ${badges.risk > 0 ? html`<span class="rules-badge rules-badge--risk num">+${badges.risk}</span>` : null}
     </div>
-    <${RulesDialog} open=${open} onClose=${() => setOpen(false)} room=${room} rules=${rules} editable=${isHost && !busy} onSet=${onSet} />
+    <${RulesDialog} open=${open} onClose=${() => setOpen(false)} room=${room} rules=${rules} editable=${isHost && !busy && !room.vanillaLock} onSet=${onSet} />
   </div>`;
 }
 
@@ -632,7 +632,7 @@ export function RulesDialog({ open, onClose, room, rules, editable, onSet }) {
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('自定义房间改动')} micro="CUSTOM" width="13rem" class="rules-dialog"
     actions=${html`${editable && rulesInForce(rules).length ? html`<${Button} variant="ghost" class="rules-clear" onClick=${() => onSet(CLEARED_RULES)}>${t('全部清除')}<//>` : null}<${Button} variant="secondary" onClick=${onClose}>${t('关闭')}<//>`}>
     ${editable ? html`<p class="rules-note">${t('新建同盟时会自动沿用你上次的设置')}</p>` : null}
-    ${room.searching ? html`<p class="rules-note">${t('搜寻队友时使用原版规则')}</p>` : null}
+    ${room.vanillaLock ? html`<p class="rules-note">${t('这是原版房间：房间规则已清除并锁定')}</p>` : null}
     ${editable ? null : html`<p class="rules-note">${t('由创建者设置')}</p>`}
     <${Tabs} class="rules-tabs" size="sm" value=${tab} onChange=${setTab} items=${RULE_TABS.map((tb) => ({ id: tb.id, label: tabLabel[tb.id], badge: badge(tb) }))} />
     ${tab === 'cheat' ? html`<${Section} title=${t('作弊')} note=${t('结算画面将显示「{mark}」', { mark: 'WITH CHEATS' })}>

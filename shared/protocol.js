@@ -21,6 +21,8 @@ const isStr = (v, max = 64) => typeof v === 'string' && v.length <= max;
 /** (fork) the longest chat frame text accepted at all (UTF-16 units): a real line is at most 300 code points, 600 units */
 const CHAT_FRAME_MAX = 600;
 const isBool = (v) => typeof v === 'boolean';
+// (fork) what a room searching for strangers promises them: the original game only, or lobby rules may change (server/lobby.js searchKind)
+const isSearchKind = (v) => v === 'vanilla' || v === 'modded';
 const isId = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64 && /^[A-Za-z0-9_\-.:]+$/.test(v);
 const isUid = (v) => isInt(v, 1, 2 ** 31);
 const isNum = (v, lo = -Infinity, hi = Infinity) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
@@ -589,7 +591,7 @@ export const C2S = {
   // or unlock it (the host)
   'room.moveSeat': { $optional: ['seat', 'squad'], seat: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1), squad: (v) => v === 0 || v === 1 },
   'room.swapSeats': { a: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1), b: (v) => isInt(v, 0, LARGE_ROOM_SEATS - 1) },
-  'room.setLock': { on: isBool, password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), $optional: ['password'] },
+  'room.setLock': { on: isBool, password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), kind: isSearchKind, $optional: ['password', 'kind'] },
   // (fork) the Grand Alliance strategy mode「Free pick | One for All」(host, before the match, large rooms only; un-readies
   // nobody, a searching room restarts its search): room.state.oneForAll
   'room.setOneForAll': { on: isBool },
@@ -631,11 +633,11 @@ export const C2S = {
   'room.spectate': { $optional: ['testAck', 'password'], testAck: (v) => v === true, password: (v) => typeof v === 'string' && ROOM_PASSWORD_RE.test(v), code: (v) => isStr(v, ROOM_CODE_LEN + 2) && /^[A-Za-z0-9]+$/.test(v) },
   'room.removeSpectator': { playerId: isId },
   // 搜寻队友 (DESIGN §90): the host of a co-op room turns the search on or off
-  'room.search': { on: isBool },
+  'room.search': { on: isBool, kind: isSearchKind, $optional: ['kind'] },
   // 单人匹配 (DESIGN §90): queue from the lobby without a room; queue.ai once queue.state's aiAt has passed
   // (fork) versions: the official versions to be matched for (left out: 第二期下半); large: may also sit in a Grand Alliance;
   // oneForAll: with large, may also sit in a One for All Grand Alliance (ignored without large)
-  'queue.join': { difficulty: (v) => DIFFICULTIES.includes(v), versions: (v) => isList(v, 8, isVersionId) && v.length > 0, large: isBool, oneForAll: isBool, $optional: ['versions', 'large', 'oneForAll'] },
+  'queue.join': { difficulty: (v) => DIFFICULTIES.includes(v), versions: (v) => isList(v, 8, isVersionId) && v.length > 0, large: isBool, oneForAll: isBool, mods: isBool, $optional: ['versions', 'large', 'oneForAll', 'mods'] },
   'queue.leave': {},
   'queue.ai': { lang: (v) => isStr(v, 16), $optional: ['lang'] },
   // the room's plugins (DESIGN §32, P1a; host, before the match — like a difficulty change it un-readies the others):
